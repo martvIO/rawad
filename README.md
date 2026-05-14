@@ -1,5 +1,5 @@
 # دعوة (Dawa)
-
+fuck you
 A wedding-invitation distribution app — marketing landing page, a role-based portal
 (groom / driver / admin), and a public guest-confirmation form. State is persisted in the
 browser's `localStorage`; the live map uses Leaflet (loaded from CDN) and address lookup uses
