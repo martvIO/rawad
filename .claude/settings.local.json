@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell($bytes = [System.IO.File]::ReadAllBytes\\(\"App \\(1\\).jsx\"\\); \"First 3 bytes: $\\($bytes[0]\\) $\\($bytes[1]\\) $\\($bytes[2]\\)\"; $content = [System.IO.File]::ReadAllText\\(\"App \\(1\\).jsx\"\\); \"Total chars: $\\($content.Length\\)\"; \"Line 9 sample: \" + \\($content -split \"`n\"\\)[8].Substring\\(0,40\\))",
+      "PowerShell(Get-ChildItem src -Recurse -File | Sort-Object FullName | ForEach-Object { $_.FullName.Replace\\(\\(Get-Location\\).Path + '\\\\', ''\\) + \"  \\(\" + \\(Get-Content $_.FullName\\).Count + \" lines\\)\" })",
+      "PowerShell(npm install 2>&1)",
+      "Bash(npm install *)",
+      "Bash(npm run *)"
+    ]
+  }
+}

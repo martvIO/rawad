@@ -1,0 +1,144 @@
+// Groom → Dashboard: stats, distribution progress, live map, recent deliveries.
+import { LiveMap } from "../../../components/LiveMap.jsx";
+import { usePortal } from "../../../context/PortalContext.jsx";
+
+export function GroomDashboard() {
+  const {
+    t, lang, stats, myGuests, setTab, setViewingPhoto,
+    groomGeoPermission, groomGeoError, requestGroomLocation,
+    groomCoords, groomMapMarkers, driversSharingWithMe,
+  } = usePortal();
+  return (
+          <div style={{ animation: "fadeUp .3s ease" }}>
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 21, fontWeight: 900, color: "#f5e6b8", marginBottom: 4 }}>{t("dash_welcome")}</div>
+              <div style={{ fontSize: 13, color: "#7a6a4a" }}>{t("dash_subtitle")}</div>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 12, marginBottom: 20 }}>
+              {[
+                { label:t("stat_total"),     val:stats.total,     color:"#f5e6b8", icon:"📋" },
+                { label:t("stat_delivered"), val:stats.delivered, color:"#4cc97a", icon:"✓" },
+                { label:t("stat_enroute"),   val:stats.enroute,   color:"#4b9fd4", icon:"🚗" },
+                { label:t("stat_pending"),   val:stats.pending,   color:"#c9a84c", icon:"⌛" },
+              ].map(s => (
+                <div key={s.label} className="card" style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <div style={{ fontSize: 26 }}>{s.icon}</div>
+                  <div>
+                    <div style={{ fontSize: 26, fontWeight: 900, color: s.color }}>{s.val.toLocaleString("en")}</div>
+                    <div style={{ fontSize: 11, color: "#7a6a4a" }}>{s.label}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="gold-card" style={{ marginBottom: 20 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
+                <span style={{ fontSize: 14, color: "#a09070", fontWeight: 700 }}>{t("progress_label")}</span>
+                <span style={{ fontSize: 20, fontWeight: 900, color: "#c9a84c" }}>{stats.pct}%</span>
+              </div>
+              <div style={{ height: 10, background: "rgba(255,255,255,.06)", borderRadius: 5, overflow: "hidden" }}>
+                <div style={{
+                  height: "100%", width: `${stats.pct}%`,
+                  background: "linear-gradient(90deg,#c9a84c,#f0c84c)",
+                  borderRadius: 5, transition: "width .6s ease",
+                }}/>
+              </div>
+            </div>
+
+            {/* ── Live map on the dashboard: groom's own location + every driver sharing ── */}
+            <div style={{ marginBottom: 22 }}>
+              <div style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                marginBottom: 10, gap: 8, flexWrap: "wrap",
+              }}>
+                <div style={{ fontSize: 12, color: "#7a6a4a", fontWeight: 700 }}>
+                  {t("map_legend")}
+                  {driversSharingWithMe.length > 0 && (
+                    <span style={{ color: "#4cc97a", marginInlineStart: 8 }}>
+                      · {driversSharingWithMe.length.toLocaleString("en")} {t("map_drivers_count")}
+                    </span>
+                  )}
+                </div>
+                <button onClick={() => setTab("live")} style={{
+                  background: "rgba(201,168,76,.12)", border: "1px solid rgba(201,168,76,.3)",
+                  color: "#c9a84c", padding: "5px 12px", borderRadius: 8,
+                  fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
+                }}>{lang === "he" ? "מסך מלא ←" : "تكبير ←"}</button>
+              </div>
+
+              {/* Permission prompt for the groom if they haven't allowed location yet */}
+              {groomGeoPermission !== "granted" && (
+                <div style={{
+                  padding: "12px 14px", borderRadius: 12, marginBottom: 10,
+                  background: groomGeoPermission === "denied" ? "rgba(212,122,75,.08)" : "rgba(75,159,212,.06)",
+                  border: `1px solid ${groomGeoPermission === "denied" ? "rgba(212,122,75,.28)" : "rgba(75,159,212,.22)"}`,
+                  display: "flex", flexDirection: "column", gap: 8,
+                }}>
+                  {groomGeoPermission === "denied" && groomGeoError && (
+                    <div style={{ fontSize: 12, color: "#d47a4b", lineHeight: 1.6 }}>⚠ {groomGeoError}</div>
+                  )}
+                  <button onClick={requestGroomLocation} style={{
+                    padding: "10px 0", borderRadius: 10, cursor: "pointer",
+                    background: "linear-gradient(135deg,#c9a84c,#f0c84c)",
+                    color: "#000", border: "none", fontWeight: 900,
+                    fontSize: 13, fontFamily: "inherit",
+                  }}>
+                    {groomGeoPermission === "denied"
+                      ? `${t("geo_retry")} — ${t("geo_grant_btn_groom")}`
+                      : t("geo_grant_btn_groom")}
+                  </button>
+                </div>
+              )}
+
+              {/* The actual map. Shown whether or not anyone is sharing — when nobody's
+                  sharing the groom still sees themselves on a map. */}
+              <div style={{
+                borderRadius: 14, overflow: "hidden",
+                border: "1px solid rgba(201,168,76,.18)",
+              }}>
+                {(groomCoords || driversSharingWithMe.length > 0) ? (
+                  <LiveMap markers={groomMapMarkers} t={t} lang={lang} height={360}/>
+                ) : (
+                  <div style={{
+                    height: 220, display: "flex", alignItems: "center", justifyContent: "center",
+                    background: "rgba(255,255,255,.02)", color: "#7a6a4a",
+                    fontSize: 13, textAlign: "center", padding: 24,
+                  }}>
+                    {t("map_no_location_yet")}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div style={{ fontSize: 13, color: "#7a6a4a", fontWeight: 700, marginBottom: 12 }}>{t("last_deliveries")}</div>
+            {myGuests.filter(g => g.status === "delivered").map(g => {
+              const isImg = typeof g.proofImg === "string" && g.proofImg.startsWith("data:image");
+              return (
+                <div key={g.id} className="card" style={{ marginBottom: 10, display: "flex", gap: 12, alignItems: "center" }}>
+                  <div
+                    onClick={() => isImg && setViewingPhoto(g.proofImg)}
+                    style={{
+                      width: 48, height: 48, borderRadius: 10, flexShrink: 0, overflow: "hidden",
+                      background: "rgba(255,255,255,.04)",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      cursor: isImg ? "zoom-in" : "default",
+                    }}>
+                    {isImg
+                      ? <img src={g.proofImg} alt="proof" style={{ width: "100%", height: "100%", objectFit: "cover" }}/>
+                      : <span style={{ fontSize: 24 }}>{g.proofImg || "📸"}</span>}
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 800, color: "#f5e6b8", fontSize: 14 }}>{g.name}</div>
+                    {g.area && <div style={{ fontSize: 12, color: "#7a6a4a" }}>{g.area}</div>}
+                  </div>
+                  <div style={{ textAlign: "left" }}>
+                    <div style={{ color: "#4cc97a", fontSize: 12, fontWeight: 700 }}>{t("arrived")}</div>
+                    <div style={{ color: "#5a5040", fontSize: 11 }}>{g.deliveredAt}</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+  );
+}
