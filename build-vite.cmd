@@ -1,1 +1,1 @@
-@node "%~dp0node_modules\vite\bin\vite.js" build
+@node "%~dp0scripts\build-vite.cjs"

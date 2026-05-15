@@ -11,7 +11,10 @@
       "Bash(node scripts/build-functions.cjs)",
       "Bash(node_modules/.bin/tsc --version)",
       "Bash(cmd /c build-functions.cmd)",
-      "Bash(npm --version)"
+      "Bash(npm --version)",
+      "Bash(node scripts/build-vite.cjs)",
+      "Bash(cmd /c build-vite.cmd)",
+      "Bash(echo \"exit code: $?\")"
     ]
   }
 }
