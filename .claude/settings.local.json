@@ -5,7 +5,11 @@
       "PowerShell(Get-ChildItem src -Recurse -File | Sort-Object FullName | ForEach-Object { $_.FullName.Replace\\(\\(Get-Location\\).Path + '\\\\', ''\\) + \"  \\(\" + \\(Get-Content $_.FullName\\).Count + \" lines\\)\" })",
       "PowerShell(npm install 2>&1)",
       "Bash(npm install *)",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Bash(npm test *)",
+      "Bash(node scripts/build-functions.js)",
+      "Bash(node scripts/build-functions.cjs)",
+      "Bash(node_modules/.bin/tsc --version)"
     ]
   }
 }

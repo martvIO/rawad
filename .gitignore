@@ -2,3 +2,22 @@ node_modules
 dist
 *.local
 .DS_Store
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Firebase
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+database-debug.log
+functions/lib/
+functions/node_modules/
+
+# Service account keys — must never be committed
+*-adminsdk-*.json
+*-service-account*.json
+serviceAccountKey.json

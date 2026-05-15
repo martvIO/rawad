@@ -1,6 +1,8 @@
 // Login screen — shown until the user authenticates.
+import { useState } from "react";
 import { BrandLogo } from "../../components/BrandLogo.jsx";
 import { LangSwitcher } from "../../components/LangSwitcher.jsx";
+import { PasswordResetFlow } from "../../components/PasswordResetFlow.jsx";
 import { usePortal } from "../../context/PortalContext.jsx";
 
 export function LoginScreen() {
@@ -9,6 +11,7 @@ export function LoginScreen() {
     loginUser, setLoginUser, loginPass, setLoginPass,
     loginError, setLoginError, handleLogin,
   } = usePortal();
+  const [showReset, setShowReset] = useState(false);
   return (
     <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
       <div style={{ width: "100%", maxWidth: 400, animation: "fadeUp .4s ease" }}>
@@ -39,6 +42,13 @@ export function LoginScreen() {
           <button className="gold-btn" style={{ width: "100%" }} onClick={handleLogin}>
             {t("login_submit")}
           </button>
+          <button onClick={() => setShowReset(true)} style={{
+            marginTop: 12, width: "100%", background: "none", border: "none",
+            color: "#c9a84c", fontSize: 12, fontWeight: 700, cursor: "pointer",
+            fontFamily: "inherit", padding: "4px 0",
+          }}>
+            {lang === "he" ? "שכחתי סיסמה — איפוס באמצעות SMS" : "نسيت كلمة المرور — استعادة عبر SMS"}
+          </button>
           <div style={{ marginTop: 18, padding: "12px 14px", borderRadius: 10,
             background: "rgba(255,255,255,.03)", border: "1px solid rgba(255,255,255,.06)",
             textAlign: "center", color: "#7a6a4a", fontSize: 12, lineHeight: 1.9 }}>
@@ -46,6 +56,7 @@ export function LoginScreen() {
           </div>
         </div>
       </div>
+      {showReset && <PasswordResetFlow lang={lang} onClose={() => setShowReset(false)} />}
     </div>
   );
 }

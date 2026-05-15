@@ -1,114 +1,259 @@
-// Central portal state — every piece of state and every handler that the
-// portal's role views (login / admin / driver / groom) share. Lifted out of
-// the old monolithic GroomPortal component so each view can read exactly
-// what it needs via usePortal(). Live-location concerns live in useGeolocation.
-import { useState, useMemo, useEffect, useRef } from "react";
+// Central portal state — every piece of state and every handler the portal's
+// role views (login / admin / driver / groom) share. The data layer is now
+// Firebase; local state is reserved for transient UI (form inputs, modals,
+// tab selection). The shape of the returned object matches the original
+// localStorage-backed version so the role-view slices can stay untouched.
+import { useEffect, useMemo, useRef, useState } from "react";
 import { load, save, removeKey } from "../utils/storage.js";
 import { toIntlPhone, validatePhone } from "../utils/phone.js";
 import { validateName } from "../utils/validation.js";
-import { SAMPLE_GUESTS } from "../data/sampleGuests.js";
+
+import { subscribeAuth, signIn, signOutNow } from "../services/auth.js";
+import {
+  subscribeAllGuests, subscribeGuestsForGroom,
+  addGuest as addGuestSrv, updateGuest as updateGuestSrv, removeGuest as removeGuestSrv,
+} from "../services/guests.js";
+import {
+  subscribeUsers,
+  createPortalUser, deletePortalUser,
+} from "../services/users.js";
+import { subscribeConfirmations } from "../services/confirmations.js";
+import { subscribeSettings, saveSettings } from "../services/adminSettings.js";
+import {
+  uploadProofBlob, dataUrlToBlob, proofDownloadUrl,
+} from "../services/proofs.js";
+import { assignDriverToGroom } from "../services/assignments.js";
 import { useGeolocation } from "./useGeolocation.js";
 
 export function usePortalState({ onBack, t, lang, setLang }) {
-  // ── Session persistence ──
-  const [authed, setAuthed]     = useState(() => load("dawa_session_authed", false));
-  const [userType, setUserType] = useState(() => load("dawa_session_type", null));
-  const [currentUsername, setCurrentUsername] = useState(() => load("dawa_session_user", null));
-  const [driverServingGroom, setDriverServingGroom] = useState(() => load("dawa_driver_serving_groom", null));
+  // ── Auth (driven by Firebase Auth state) ────────────────────────────────────
+  const [authUser, setAuthUser] = useState(null);
+  const [authReady, setAuthReady] = useState(false);
+  useEffect(() => {
+    return subscribeAuth((u) => { setAuthUser(u); setAuthReady(true); });
+  }, []);
 
-  const [loginUser, setLoginUser] = useState("");
-  const [loginPass, setLoginPass] = useState("");
+  const authed = !!authUser;
+  const userType = authUser?.role ?? null;
+  const currentUsername = authUser?.username ?? null;
+  const currentUid = authUser?.uid ?? null;
+  const isAdmin = authUser?.claims?.admin === true || userType === "admin";
+
+  // ── Login form (transient) ──────────────────────────────────────────────────
+  const [loginUser, setLoginUser]   = useState("");
+  const [loginPass, setLoginPass]   = useState("");
   const [loginError, setLoginError] = useState("");
-  const [guests, setGuests] = useState(() => load("dawa_guests", SAMPLE_GUESTS));
-  const [tab, setTab] = useState(() => load("dawa_session_tab", "dashboard"));
-  const [toast, setToast] = useState(null);
 
-  // Logout confirmation
+  // ── Toast ───────────────────────────────────────────────────────────────────
+  const [toast, setToast] = useState(null);
+  const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(null), 3200); };
+
+  // ── UI-only persistence ─────────────────────────────────────────────────────
+  const [tab, setTab] = useState(() => load("dawa_session_tab", "dashboard"));
+  useEffect(() => { save("dawa_session_tab", tab); }, [tab]);
+
+  // Logout confirmation modal
   const [logoutAsking, setLogoutAsking] = useState(false);
 
-  // Driver: pick-groom screen state
+  // ── Driver: active groom they're delivering for ─────────────────────────────
+  // Persisted as { uid, username } because the username isn't world-readable.
+  const [driverServingGroom, setDriverServingGroomState] = useState(
+    () => load("dawa_driver_serving_groom", null),
+  );
+  useEffect(() => { save("dawa_driver_serving_groom", driverServingGroom); }, [driverServingGroom]);
+  const driverServingGroomUid      = driverServingGroom?.uid      ?? null;
+  const driverServingGroomUsername = driverServingGroom?.username ?? null;
+
+  // Driver: pick-groom input
   const [driverGroomInput, setDriverGroomInput] = useState("");
   const [driverGroomError, setDriverGroomError] = useState("");
 
-  // Shared-cities feature
-  const [sharedStep, setSharedStep]               = useState("pickGrooms"); // "pickGrooms" | "pickCity" | "viewRoute"
+  // ── Shared-cities feature (UI only) ─────────────────────────────────────────
+  const [sharedStep, setSharedStep] = useState("pickGrooms");
   const [sharedSelectedGrooms, setSharedSelectedGrooms] = useState([]);
-  const [sharedSelectedCity, setSharedSelectedCity]     = useState(null);
+  const [sharedSelectedCity, setSharedSelectedCity] = useState(null);
 
-  // ── ADMIN: WhatsApp invitation system ──
-  const [adminTab, setAdminTab] = useState("users"); // users | send | confirmations | settings
+  // ── Admin (UI only + subscriptions) ─────────────────────────────────────────
+  const [adminTab, setAdminTab] = useState("users");
   const [adminSelectedGroom, setAdminSelectedGroom] = useState(null);
-  const [adminMessageBody, setAdminMessageBody] = useState(
-    () => load("dawa_admin_msg",
-      "شركة دعوة ترحب بكم 🌸\nنحن شركة دعوة — متخصصون في توصيل مكاتيب الأعراس بطريقة احترافية وراقية.\n\nيُرجى تأكيد بياناتكم من خلال الرابط أدناه ليتمكن المرسل من إيصال المكتوب إليكم:")
-  );
-  const [adminFormLink, setAdminFormLink] = useState(() => load("dawa_admin_link", ""));
-  const [confirmations, setConfirmations] = useState(() => load("dawa_confirmations", []));
+
+  // Admin settings (RTDB-backed, subscribed)
+  const [adminMessageBody, setAdminMessageBodyState] = useState("");
+  const [adminFormLink,    setAdminFormLinkState]    = useState("");
+  useEffect(() => {
+    if (!authed) return;
+    return subscribeSettings((s) => {
+      setAdminMessageBodyState(s.messageBody ?? "");
+      setAdminFormLinkState   (s.formLink    ?? "");
+    });
+  }, [authed]);
+  const setAdminMessageBody = (v) => {
+    setAdminMessageBodyState(v);
+    saveSettings({ messageBody: v }).catch((e) => showToast(e?.message || ""));
+  };
+  const setAdminFormLink = (v) => {
+    setAdminFormLinkState(v);
+    saveSettings({ formLink: v }).catch((e) => showToast(e?.message || ""));
+  };
+
+  // Confirmations (admin-only subscription)
+  const [confirmations, setConfirmations] = useState([]);
+  useEffect(() => {
+    if (!isAdmin) { setConfirmations([]); return; }
+    return subscribeConfirmations(setConfirmations);
+  }, [isAdmin]);
   const [editingConf, setEditingConf] = useState(null);
 
-  // Admin: managed users (persisted)
-  const [users, setUsers] = useState(() => load("dawa_users", [
-    { id: 1, role: "groom",  username: "groom",  password: "1234" },
-    { id: 2, role: "driver", username: "driver", password: "1234" },
-  ]));
-  const [newUserRole, setNewUserRole] = useState("groom");
-  const [newUserName, setNewUserName] = useState("");
-  const [newUserPass, setNewUserPass] = useState("");
+  // Users (admin sees full /users; drivers see their assigned groom as a synthetic single entry)
+  const [adminUsers, setAdminUsers] = useState([]);
+  useEffect(() => {
+    if (!isAdmin) { setAdminUsers([]); return; }
+    return subscribeUsers(setAdminUsers);
+  }, [isAdmin]);
+  const users = useMemo(() => {
+    if (isAdmin) return adminUsers;
+    if (userType === "driver" && driverServingGroom) {
+      return [{
+        uid: driverServingGroom.uid,
+        id:  driverServingGroom.uid,
+        username: driverServingGroom.username,
+        role: "groom",
+      }];
+    }
+    return [];
+  }, [isAdmin, adminUsers, userType, driverServingGroom]);
 
-  // Groom: add-guest form state
-  const [gName, setGName]   = useState("");
+  // Admin user-creation form
+  const [newUserRole,  setNewUserRole]  = useState("groom");
+  const [newUserName,  setNewUserName]  = useState("");
+  const [newUserPass,  setNewUserPass]  = useState("");
+  const [newUserPhone, setNewUserPhone] = useState("");
+
+  // ── Guests subscription ─────────────────────────────────────────────────────
+  const [guests, setGuests] = useState([]);
+  useEffect(() => {
+    if (!authed) { setGuests([]); return; }
+    if (isAdmin)                                 return subscribeAllGuests(setGuests);
+    if (userType === "driver" && driverServingGroomUid)
+      return subscribeGuestsForGroom(driverServingGroomUid, setGuests);
+    if (userType === "groom"  && currentUid)
+      return subscribeGuestsForGroom(currentUid, setGuests);
+    setGuests([]);
+  }, [authed, isAdmin, userType, currentUid, driverServingGroomUid]);
+
+  // Active groom context: groom uses their own uid; driver uses the assigned one.
+  const activeGroomUid      = userType === "groom"  ? currentUid
+                            : userType === "driver" ? driverServingGroomUid
+                            : null;
+  const activeGroomUsername = userType === "groom"  ? currentUsername
+                            : userType === "driver" ? driverServingGroomUsername
+                            : null;
+
+  // For non-admin sessions the subscription already filtered to one groom, so
+  // myGuests === guests; for admin it's the whole flattened list.
+  const myGuests = guests;
+
+  // ── Groom: add/edit guest form (transient) ──────────────────────────────────
+  const [gName, setGName] = useState("");
   const [gPhone, setGPhone] = useState("");
-  const [gArea, setGArea]   = useState("");
-  const [gType, setGType]   = useState("premium");
+  const [gArea, setGArea] = useState("");
+  const [gType, setGType] = useState("premium");
 
-  // Groom: edit-guest modal state
   const [editingGuest, setEditingGuest] = useState(null);
-  const [eName, setEName]   = useState("");
+  const [eName, setEName] = useState("");
   const [ePhone, setEPhone] = useState("");
-  const [eArea, setEArea]   = useState("");
-  const [eType, setEType]   = useState("premium");
+  const [eArea, setEArea] = useState("");
+  const [eType, setEType] = useState("premium");
 
-  // Groom: swipe-to-delete reveal state (guest id whose remove action is shown)
   const [revealedId, setRevealedId] = useState(null);
   const swipeStartRef = useRef({ id: null, x: 0 });
 
-  // Distributor: delivery form state
-  const [activeId, setActiveId]   = useState(null);
+  // ── Delivery form (transient) ───────────────────────────────────────────────
+  const [activeId, setActiveId] = useState(null);
   const [photoTaken, setPhotoTaken] = useState(false);
   const [deliveryNote, setDeliveryNote] = useState("");
-
-  // Photo viewer (groom clicks proof image)
-  const [viewingPhoto, setViewingPhoto] = useState(null);
-  // Captured photo (data-URL) before delivery confirm
   const [photoData, setPhotoData] = useState(null);
 
-  // ── Persist on change ──
-  useEffect(() => { save("dawa_guests", guests); }, [guests]);
-  useEffect(() => { save("dawa_users",  users);  }, [users]);
-  // Session
-  useEffect(() => { save("dawa_session_authed", authed); }, [authed]);
-  useEffect(() => { save("dawa_session_type",   userType); }, [userType]);
-  useEffect(() => { save("dawa_session_user",   currentUsername); }, [currentUsername]);
-  useEffect(() => { save("dawa_session_tab",    tab); }, [tab]);
-  useEffect(() => { save("dawa_driver_serving_groom", driverServingGroom); }, [driverServingGroom]);
-  // Admin
-  useEffect(() => { save("dawa_admin_msg",  adminMessageBody); }, [adminMessageBody]);
-  useEffect(() => { save("dawa_admin_link", adminFormLink);    }, [adminFormLink]);
-  useEffect(() => { save("dawa_confirmations", confirmations); }, [confirmations]);
+  // Photo viewer modal
+  const [viewingPhoto, setViewingPhoto] = useState(null);
 
-  // Toast helper — defined early so useGeolocation (called below) can use it.
-  const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(null), 3200); };
+  // ── Live location ───────────────────────────────────────────────────────────
+  const geo = useGeolocation({
+    userType, currentUid, currentUsername,
+    activeGroomUid,
+    users,
+    t, showToast,
+  });
 
-  // ── Live-location feature (driver broadcast + groom map) ──
-  const geo = useGeolocation({ userType, currentUsername, t, showToast });
+  // ── Derived ─────────────────────────────────────────────────────────────────
+  const stats = useMemo(() => {
+    const total     = myGuests.length;
+    const delivered = myGuests.filter(g => g.status === "delivered").length;
+    const enroute   = myGuests.filter(g => g.status === "enroute").length;
+    const pending   = myGuests.filter(g => g.status === "pending").length;
+    return { total, delivered, enroute, pending, pct: total ? Math.round(delivered/total*100) : 0 };
+  }, [myGuests]);
 
-  // ── WhatsApp helpers ──
-  // Build wa.me URL for a guest (phone + admin's customised message + form link)
+  // ── Handlers: auth ──────────────────────────────────────────────────────────
+  const handleLogin = async () => {
+    const u = loginUser.trim();
+    const p = loginPass;
+    if (!u || !p) { setLoginError(t("login_error")); return; }
+    try {
+      await signIn(u, p);
+      setLoginError("");
+      // setTab is run after auth subscription resolves (effect below).
+    } catch {
+      setLoginError(t("login_error"));
+    }
+  };
+
+  // When auth state changes from null→user, route to the right starting tab.
+  useEffect(() => {
+    if (!authed) return;
+    if (userType === "admin")  setTab("admin");
+    else if (userType === "driver") setTab("pending");
+    else                            setTab("dashboard");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authed, userType]);
+
+  const doLogout = async () => {
+    setLogoutAsking(false);
+    try { await signOutNow(); } catch {}
+    setLoginUser(""); setLoginPass("");
+    setTab("dashboard");
+    setSharedStep("pickGrooms");
+    setSharedSelectedGrooms([]); setSharedSelectedCity(null);
+    setDriverServingGroomState(null);
+    removeKey("dawa_session_tab");
+    removeKey("dawa_driver_serving_groom");
+  };
+
+  // ── Driver picks a groom (server-side: assignDriverToGroom Function) ────────
+  const submitDriverGroom = async () => {
+    const name = driverGroomInput.trim().toLowerCase();
+    if (!name) { setDriverGroomError(t("driver_pick_groom_invalid")); return; }
+    try {
+      const { groomUid } = await assignDriverToGroom(name);
+      setDriverServingGroomState({ uid: groomUid, username: name });
+      setDriverGroomInput(""); setDriverGroomError("");
+      setTab("pending");
+    } catch {
+      setDriverGroomError(t("driver_pick_groom_invalid"));
+    }
+  };
+  // Compatibility alias so the JSX slice's `driverServingGroom` reads the username.
+  const setDriverServingGroom = (next) => setDriverServingGroomState(
+    next === null ? null
+                  : (typeof next === "string" ? { uid: null, username: next } : next),
+  );
+
+  // ── WhatsApp link helpers ───────────────────────────────────────────────────
   const waLinkFor = (phone) => {
     const intl = toIntlPhone(phone);
     if (!intl) return "";
     const body = (adminMessageBody || "").trim();
-    const link = (adminFormLink || "").trim();
+    const link = (adminFormLink    || "").trim();
     const text = [body, link].filter(Boolean).join("\n\n");
     return `https://wa.me/${intl}?text=${encodeURIComponent(text)}`;
   };
@@ -119,225 +264,67 @@ export function usePortalState({ onBack, t, lang, setLang }) {
   };
   const sendWaToAll = (groomUsername) => {
     if (!adminFormLink.trim()) { showToast(t("admin_form_link")); return; }
-    const groomGuests = guests.filter(g => g.groomUsername === groomUsername);
+    const groomUid = adminUsers.find(u => u.username === groomUsername)?.uid;
+    const groomGuests = guests.filter(g => g.groomUid === groomUid);
     if (groomGuests.length === 0) return;
     showToast(t("admin_bulk_warn"));
-    // Open each in a new tab — browsers may block; user must allow popups
     groomGuests.forEach((g, i) => {
       const url = waLinkFor(g.phone);
       if (url) setTimeout(() => window.open(url, "_blank", "noopener"), i * 300);
     });
   };
 
-  // ── Match a confirmation against the groom's invited guests by phone ──
+  // ── Confirmation matching ───────────────────────────────────────────────────
   const matchedGuestFor = (conf) => {
     const wantedPhone = (conf.submittedPhone || "").replace(/\D/g, "");
     if (!wantedPhone) return null;
-    return guests.find(g => {
-      if (g.groomUsername !== conf.groomUsername) return false;
-      return (g.phone || "").replace(/\D/g, "") === wantedPhone;
-    }) || null;
+    return guests.find(g =>
+      g.groomUid === conf.groomUid &&
+      (g.phone || "").replace(/\D/g, "") === wantedPhone,
+    ) || null;
   };
-  // Decide the color (green/red) for a confirmation card
   const matchColor = (conf) => {
     const guest = matchedGuestFor(conf);
-    if (!guest) return "red"; // unknown — no matching phone
+    if (!guest) return "red";
     const sameName = (guest.name || "").trim().toLowerCase() === (conf.submittedName || "").trim().toLowerCase();
     if (!sameName) return "red";
     const groomCity = (guest.area || "").split(/[-،,]/)[0].trim().toLowerCase();
     const guestCity = (conf.submittedCity || "").trim().toLowerCase();
-    // Green if: groom had no city OR cities match
     if (!groomCity || groomCity === guestCity) return "green";
     return "red";
   };
-
-  // ── Admin: apply confirmation edits to the matched guest record ──
-  const useConfirmationData = (conf) => {
+  // (Function name kept for compatibility with the AdminConfirmationsTab slice.)
+  const useConfirmationData = async (conf) => {
     const guest = matchedGuestFor(conf);
     if (!guest) return;
     const fullAddr = [conf.submittedCity, conf.submittedStreet, conf.submittedHouse].filter(Boolean).join("، ");
-    setGuests(prev => prev.map(g => g.id === guest.id ? {
-      ...g, name: conf.submittedName || g.name, phone: conf.submittedPhone || g.phone,
-      area: fullAddr || g.area,
-    } : g));
-    showToast(t("edit_success"));
+    try {
+      await updateGuestSrv(guest.groomUid, guest.id, {
+        name:  conf.submittedName  || guest.name,
+        phone: conf.submittedPhone || guest.phone,
+        area:  fullAddr || guest.area,
+      });
+      showToast(t("edit_success"));
+    } catch (e) { showToast(e?.message || ""); }
   };
 
-  // ── Active groom username (whose guests we're operating on) ──
-  // For groom: their own username. For driver: the groom they picked. For admin: none.
-  const activeGroomUsername = userType === "groom" ? currentUsername
-                            : userType === "driver" ? driverServingGroom
-                            : null;
-
-  // Filtered guest list for the active session
-  const myGuests = useMemo(() =>
-    activeGroomUsername
-      ? guests.filter(g => g.groomUsername === activeGroomUsername)
-      : guests,
-    [guests, activeGroomUsername]
-  );
-
-  // ── Logout ──
-  const doLogout = () => {
-    setAuthed(false);
-    setUserType(null);
-    setCurrentUsername(null);
-    setDriverServingGroom(null);
-    setLoginUser("");
-    setLoginPass("");
-    setTab("dashboard");
-    setSharedStep("pickGrooms");
-    setSharedSelectedGrooms([]);
-    setSharedSelectedCity(null);
-    setLogoutAsking(false);
-    // Clear session-specific localStorage but keep persistent data (guests, users, live url)
-    removeKey("dawa_session_authed");
-    removeKey("dawa_session_type");
-    removeKey("dawa_session_user");
-    removeKey("dawa_session_tab");
-    removeKey("dawa_driver_serving_groom");
-  };
-
-  const stats = useMemo(() => {
-    const total = myGuests.length;
-    const delivered = myGuests.filter(g => g.status === "delivered").length;
-    const enroute   = myGuests.filter(g => g.status === "enroute").length;
-    const pending   = myGuests.filter(g => g.status === "pending").length;
-    return { total, delivered, enroute, pending, pct: total ? Math.round(delivered/total*100) : 0 };
-  }, [myGuests]);
-
-  const handleLogin = () => {
-    const u = loginUser.trim();
-    const p = loginPass;
-    // Admin (hidden, hardcoded — only the owner knows it)
-    if (u === "admin" && p === "admin2026") {
-      setAuthed(true); setUserType("admin"); setCurrentUsername("admin");
-      setLoginError(""); setTab("admin");
-      return;
-    }
-    // Dynamic users created by admin
-    const found = users.find(usr => usr.username === u && usr.password === p);
-    if (found) {
-      setAuthed(true); setUserType(found.role); setCurrentUsername(found.username);
-      setLoginError("");
-      setTab(found.role === "driver" ? "pending" : "dashboard");
-      // For drivers: ensure they pick a groom (will be shown if driverServingGroom is null)
-    } else {
-      setLoginError(t("login_error"));
-    }
-  };
-
-  // Driver picks the groom they serve
-  const submitDriverGroom = () => {
-    const name = driverGroomInput.trim();
-    if (!name) { setDriverGroomError(t("driver_pick_groom_invalid")); return; }
-    const groomUser = users.find(u => u.role === "groom" && u.username === name);
-    if (!groomUser) { setDriverGroomError(t("driver_pick_groom_invalid")); return; }
-    setDriverServingGroom(name);
-    setDriverGroomInput("");
-    setDriverGroomError("");
-    setTab("pending");
-  };
-
-  const addGuest = () => {
-    if (!gName.trim() || !gPhone.trim()) {
-      showToast(t("add_required_msg"));
-      return;
-    }
-    const nameError = validateName(gName, t);
-    if (nameError) { showToast(nameError); return; }
-    const phoneError = validatePhone(gPhone, t);
-    if (phoneError) { showToast(phoneError); return; }
-    // Duplicate detection: by phone (primary) and by name (secondary) — scoped to current groom
-    const normalizedPhone = gPhone.trim().replace(/\s+/g, "");
-    const normalizedName  = gName.trim().toLowerCase();
-    if (myGuests.some(g =>
-        (g.phone || "").replace(/\s+/g, "") === normalizedPhone ||
-        (g.name  || "").trim().toLowerCase() === normalizedName
-    )) {
-      showToast(t("add_duplicate_msg"));
-      return;
-    }
-    const newGuest = {
-      id: Date.now(),
-      groomUsername: activeGroomUsername,
-      name: gName.trim(),
-      phone: gPhone.trim().replace(/\s+/g, ""),
-      area: gArea.trim(),
-      status: "pending",
-      inviteType: gType,
-    };
-    setGuests(prev => [...prev, newGuest]);
-    setGName(""); setGPhone(""); setGArea(""); setGType("premium");
-    showToast(t("add_success"));
-  };
-
-  const removeGuest = (id) => {
-    setGuests(prev => prev.filter(g => g.id !== id));
-    showToast(t("delete_success"));
-  };
-
-  // Edit guest
-  const startEdit = (g) => {
-    setEditingGuest(g);
-    setEName(g.name); setEPhone(g.phone); setEArea(g.area || ""); setEType(g.inviteType);
-  };
-  const cancelEdit = () => setEditingGuest(null);
-  const saveEdit = () => {
-    if (!eName.trim() || !ePhone.trim()) { showToast(t("add_required_msg")); return; }
-    const nameError = validateName(eName, t);
-    if (nameError) { showToast(nameError); return; }
-    const phoneError = validatePhone(ePhone, t);
-    if (phoneError) { showToast(phoneError); return; }
-    setGuests(prev => prev.map(g => g.id === editingGuest.id ? {
-      ...g, name: eName.trim(), phone: ePhone.trim().replace(/\s+/g, ""), area: eArea.trim(), inviteType: eType,
-    } : g));
-    setEditingGuest(null);
-    showToast(t("edit_success"));
-  };
-
-  // Admin: user management
-  const addUser = () => {
-    if (!newUserName.trim() || !newUserPass.trim()) { showToast(t("admin_required")); return; }
-    if (users.some(u => u.username === newUserName.trim()) || newUserName.trim() === "admin") {
-      showToast(t("admin_taken")); return;
-    }
-    setUsers(prev => [...prev, {
-      id: Date.now(), role: newUserRole,
-      username: newUserName.trim(), password: newUserPass.trim(),
-    }]);
-    setNewUserName(""); setNewUserPass("");
-    showToast(t("admin_added"));
-  };
-  const deleteUser = (id) => {
-    setUsers(prev => prev.filter(u => u.id !== id));
-    showToast(t("admin_deleted"));
-  };
-
-  // ── Per-guest confirmation status (used to colour cards in admin "send" tab) ──
-  // Returns null (no confirmation yet), "matched" (everything lines up), or
-  // an object { status: "mismatch", reasons: [...] } when something disagrees.
   const guestConfirmationStatus = (guest) => {
     if (!guest) return null;
     const guestPhoneDigits = (guest.phone || "").replace(/\D/g, "");
     if (!guestPhoneDigits) return null;
-    // Find a confirmation whose phone matches AND that is for this groom
     const conf = confirmations.find(c =>
-      c.groomUsername === guest.groomUsername &&
-      (c.submittedPhone || "").replace(/\D/g, "") === guestPhoneDigits
+      c.groomUid === guest.groomUid &&
+      (c.submittedPhone || "").replace(/\D/g, "") === guestPhoneDigits,
     );
     if (!conf) return null;
     const reasons = [];
-    // Name validation: at least 2 words; AND case-insensitive match to guest.name
     const submittedName = (conf.submittedName || "").trim();
     const words = submittedName.split(/\s+/).filter(Boolean);
     if (words.length < 2) reasons.push(t("conf_mismatch_invalid_name"));
     else if (submittedName.toLowerCase() !== (guest.name || "").trim().toLowerCase()) {
       reasons.push(t("conf_mismatch_name"));
     }
-    // Phone validation: exactly 10 digits
     if (guestPhoneDigits.length !== 10) reasons.push(t("conf_mismatch_invalid_phone"));
-    // City comparison (only if groom recorded a city)
     const groomCity = (guest.area || "").split(/[-،,]/)[0].trim().toLowerCase();
     const guestCity = (conf.submittedCity || "").trim().toLowerCase();
     if (groomCity && guestCity && groomCity !== guestCity) reasons.push(t("conf_mismatch_city"));
@@ -346,62 +333,200 @@ export function usePortalState({ onBack, t, lang, setLang }) {
       : { status: "mismatch", reasons, conf };
   };
 
-  const markDelivered = (id) => {
-    const time = new Date().toLocaleTimeString("ar", { hour: "2-digit", minute: "2-digit" });
-    setGuests(prev => prev.map(g => g.id === id ? {
-      ...g, status: "delivered",
-      // Store the actual image data URL when a photo was captured, fallback to emoji marker
-      proofImg: photoData || (photoTaken ? "📸" : undefined),
-      deliveredAt: time,
-      deliveredBy: lang === "he" ? "השליח (אתה)" : "المرسل (أنت)",
-      deliveryNote: deliveryNote.trim() || undefined,
-    } : g));
-    setActiveId(null); setPhotoTaken(false); setPhotoData(null); setDeliveryNote("");
-    showToast(t("driver_confirm"));
+  // ── Guest CRUD ──────────────────────────────────────────────────────────────
+  const addGuest = async () => {
+    if (!activeGroomUid) { showToast(t("add_required_msg")); return; }
+    if (!gName.trim() || !gPhone.trim()) { showToast(t("add_required_msg")); return; }
+    const nameError  = validateName(gName, t);  if (nameError)  { showToast(nameError);  return; }
+    const phoneError = validatePhone(gPhone, t); if (phoneError) { showToast(phoneError); return; }
+    const normalizedPhone = gPhone.trim().replace(/\s+/g, "");
+    const normalizedName  = gName.trim().toLowerCase();
+    if (myGuests.some(g =>
+        (g.phone || "").replace(/\s+/g, "") === normalizedPhone ||
+        (g.name  || "").trim().toLowerCase() === normalizedName,
+    )) { showToast(t("add_duplicate_msg")); return; }
+    try {
+      await addGuestSrv(activeGroomUid, {
+        groomUsername: activeGroomUsername,
+        name:  gName.trim(),
+        phone: normalizedPhone,
+        area:  gArea.trim(),
+        status: "pending",
+        inviteType: gType,
+      });
+      setGName(""); setGPhone(""); setGArea(""); setGType("premium");
+      showToast(t("add_success"));
+    } catch (e) { showToast(e?.message || ""); }
   };
 
+  const removeGuest = async (id) => {
+    const guest = myGuests.find(g => g.id === id);
+    if (!guest) return;
+    try { await removeGuestSrv(guest.groomUid, id); showToast(t("delete_success")); }
+    catch (e) { showToast(e?.message || ""); }
+  };
+
+  const startEdit = (g) => {
+    setEditingGuest(g);
+    setEName(g.name); setEPhone(g.phone); setEArea(g.area || ""); setEType(g.inviteType);
+  };
+  const cancelEdit = () => setEditingGuest(null);
+  const saveEdit = async () => {
+    if (!editingGuest) return;
+    if (!eName.trim() || !ePhone.trim()) { showToast(t("add_required_msg")); return; }
+    const nameError  = validateName(eName, t);  if (nameError)  { showToast(nameError);  return; }
+    const phoneError = validatePhone(ePhone, t); if (phoneError) { showToast(phoneError); return; }
+    try {
+      await updateGuestSrv(editingGuest.groomUid, editingGuest.id, {
+        name:  eName.trim(),
+        phone: ePhone.trim().replace(/\s+/g, ""),
+        area:  eArea.trim(),
+        inviteType: eType,
+      });
+      setEditingGuest(null);
+      showToast(t("edit_success"));
+    } catch (e) { showToast(e?.message || ""); }
+  };
+
+  // ── Admin user management ───────────────────────────────────────────────────
+  const addUser = async () => {
+    if (!newUserName.trim() || !newUserPass.trim()) { showToast(t("admin_required")); return; }
+    if (newUserPass.length < 8) { showToast(t("admin_required")); return; }
+    if (!newUserPhone.trim()) { showToast(t("admin_required")); return; }
+    try {
+      await createPortalUser({
+        username:  newUserName.trim().toLowerCase(),
+        password:  newUserPass,
+        phoneE164: newUserPhone.trim(),
+        role:      newUserRole,
+      });
+      setNewUserName(""); setNewUserPass(""); setNewUserPhone("");
+      showToast(t("admin_added"));
+    } catch (e) {
+      showToast(e?.message || t("admin_taken"));
+    }
+  };
+  const deleteUser = async (uid) => {
+    try { await deletePortalUser(uid); showToast(t("admin_deleted")); }
+    catch (e) { showToast(e?.message || ""); }
+  };
+
+  // ── Mark delivered (with optional photo upload) ─────────────────────────────
+  const markDelivered = async (id) => {
+    const guest = myGuests.find(g => g.id === id);
+    if (!guest) return;
+    let proofPhotoPath;
+    try {
+      if (photoData) {
+        const blob = dataUrlToBlob(photoData);
+        proofPhotoPath = await uploadProofBlob(guest.groomUid, id, blob);
+      } else if (photoTaken) {
+        proofPhotoPath = "📸"; // legacy fallback marker
+      }
+      const time = new Date().toLocaleTimeString("ar", { hour: "2-digit", minute: "2-digit" });
+      const patch = {
+        status: "delivered",
+        deliveredAt: time,
+        deliveredBy: lang === "he" ? "השליח (אתה)" : "المرسل (أنت)",
+      };
+      if (proofPhotoPath)        patch.proofPhotoPath = proofPhotoPath;
+      if (deliveryNote.trim())   patch.deliveryNote   = deliveryNote.trim();
+      await updateGuestSrv(guest.groomUid, id, patch);
+      setActiveId(null); setPhotoTaken(false); setPhotoData(null); setDeliveryNote("");
+      showToast(t("driver_confirm"));
+    } catch (e) {
+      showToast(e?.message || "");
+    }
+  };
+
+  // Bridge legacy `guest.proofImg` → resolved storage URL for the proof viewer.
+  // The JSX slices check `g.proofImg` strings; for new records we expose a
+  // matching `proofImg` field populated from `proofPhotoPath`.
+  const [proofUrlCache, setProofUrlCache] = useState({});
+  useEffect(() => {
+    let cancelled = false;
+    const need = guests
+      .filter(g => g.proofPhotoPath && /^proofs\//.test(g.proofPhotoPath))
+      .filter(g => !(g.id in proofUrlCache));
+    if (need.length === 0) return;
+    (async () => {
+      const adds = {};
+      for (const g of need) {
+        try { adds[g.id] = await proofDownloadUrl(g.proofPhotoPath); }
+        catch { adds[g.id] = null; }
+      }
+      if (!cancelled) setProofUrlCache((prev) => ({ ...prev, ...adds }));
+    })();
+    return () => { cancelled = true; };
+  }, [guests, proofUrlCache]);
+
+  const decoratedGuests = useMemo(
+    () => guests.map((g) => {
+      if (g.proofPhotoPath && /^proofs\//.test(g.proofPhotoPath)) {
+        const url = proofUrlCache[g.id];
+        return { ...g, proofImg: url || g.proofPhotoPath };
+      }
+      if (g.proofPhotoPath && !g.proofImg) return { ...g, proofImg: g.proofPhotoPath };
+      return g;
+    }),
+    [guests, proofUrlCache],
+  );
+
   return {
-    // passthrough props
+    // passthrough
     onBack, t, lang, setLang,
-    // session / auth
-    authed, userType, currentUsername,
-    driverServingGroom, setDriverServingGroom,
-    loginUser, setLoginUser, loginPass, setLoginPass, loginError, setLoginError,
+
+    // auth + session
+    authed, authReady, userType, currentUsername,
+    driverServingGroom: driverServingGroomUsername,
+    setDriverServingGroom,
+    loginUser, setLoginUser, loginPass, setLoginPass,
+    loginError, setLoginError,
     handleLogin, doLogout,
     logoutAsking, setLogoutAsking,
     driverGroomInput, setDriverGroomInput,
     driverGroomError, setDriverGroomError, submitDriverGroom,
+
     // navigation
     tab, setTab,
+
     // toast
     toast, showToast,
+
     // guests
-    guests, myGuests, activeGroomUsername, stats,
+    guests: decoratedGuests, myGuests: decoratedGuests, activeGroomUsername, stats,
     addGuest, removeGuest,
     gName, setGName, gPhone, setGPhone, gArea, setGArea, gType, setGType,
     editingGuest, startEdit, cancelEdit, saveEdit,
     eName, setEName, ePhone, setEPhone, eArea, setEArea, eType, setEType,
     revealedId, setRevealedId, swipeStartRef,
+
     // delivery
     activeId, setActiveId, photoTaken, setPhotoTaken,
     deliveryNote, setDeliveryNote, photoData, setPhotoData,
     markDelivered,
+
     // photo viewer
     viewingPhoto, setViewingPhoto,
-    // users (admin)
+
+    // users (admin) / synthetic single-entry list for drivers
     users, addUser, deleteUser,
-    newUserRole, setNewUserRole, newUserName, setNewUserName, newUserPass, setNewUserPass,
-    // admin messaging + confirmations
+    newUserRole, setNewUserRole, newUserName, setNewUserName,
+    newUserPass, setNewUserPass, newUserPhone, setNewUserPhone,
+
+    // admin
     adminTab, setAdminTab, adminSelectedGroom, setAdminSelectedGroom,
     adminMessageBody, setAdminMessageBody, adminFormLink, setAdminFormLink,
     confirmations, editingConf, setEditingConf,
     sendWaToOne, sendWaToAll,
     matchedGuestFor, matchColor, useConfirmationData, guestConfirmationStatus,
+
     // shared-cities
     sharedStep, setSharedStep,
     sharedSelectedGrooms, setSharedSelectedGrooms,
     sharedSelectedCity, setSharedSelectedCity,
-    // live location (spread from useGeolocation)
+
+    // geolocation
     ...geo,
   };
 }

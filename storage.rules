@@ -1,0 +1,29 @@
+rules_version = '2';
+
+// Proof photos for delivered invitations.
+//   path: /proofs/{groomUid}/{guestId}/{filename}.jpg
+//
+// Writes are only accepted from the driver currently assigned to that groom
+// (verified via the driver's custom claim `assignedGrooms` map, which is set
+// when a driver picks a groom via the assignDriverToGroom callable function).
+// Reads are allowed for the owning groom and for admins.
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    match /proofs/{groomUid}/{guestId}/{file} {
+      allow read: if request.auth != null
+                  && ( request.auth.uid == groomUid
+                       || request.auth.token.admin == true );
+
+      allow write: if request.auth != null
+                   && request.resource.size < 6 * 1024 * 1024            // 6 MB cap
+                   && request.resource.contentType.matches('image/.*')
+                   && request.auth.token.assignedGrooms[groomUid] == true;
+    }
+
+    // Default deny for everything else.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

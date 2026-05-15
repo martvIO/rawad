@@ -7,7 +7,8 @@ export function GroomProofs() {
           <div style={{ animation: "fadeUp .3s ease" }}>
             <div style={{ marginBottom: 14, fontSize: 15, fontWeight: 800, color: "#f5e6b8" }}>{t("proofs_title")}</div>
             {myGuests.filter(g => g.proofImg).map(g => {
-              const isImageData = typeof g.proofImg === "string" && g.proofImg.startsWith("data:image");
+              const isImageData = typeof g.proofImg === "string"
+                && (g.proofImg.startsWith("data:image") || /^https?:\/\//.test(g.proofImg));
               return (
                 <div key={g.id} className="card" style={{ marginBottom: 12 }}>
                   <div style={{ display: "flex", gap: 12, alignItems: "center" }}>

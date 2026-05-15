@@ -1,40 +1,61 @@
-// Live-location feature: the driver broadcasts their GPS fix; grooms watch
-// the drivers sharing with them on a map. State is mirrored through
-// localStorage ("dawa_live_locations") so it works across browser tabs.
+// Live-location feature backed by Firebase RTDB (sharded by groom uid).
+//
+//   • Driver: holds a watchPosition open and, while broadcasting, writes the
+//     latest fix into /liveLocationsByGroom/{groomUid}/{driverUid} for every
+//     groom they've selected. Stopping clears those nodes.
+//
+//   • Groom: subscribes to /liveLocationsByGroom/{theirUid} so the rules
+//     enforce that they only see drivers who chose to share with them.
+//
+// The previous in-browser localStorage poll loop and its stale-closure
+// `driversSharingWithMe` bug (consumers were reading `d.driver` etc. on raw
+// Object.entries() pairs) are gone — we map the snapshot into proper
+// `{ driver, lat, lng, accuracy, time }` objects here.
 import { useState, useEffect, useRef, useMemo } from "react";
-import { load, save } from "../utils/storage.js";
+import {
+  publishMyFix, clearMyLocation, subscribeDriversForGroom,
+} from "../services/liveLocations.js";
 
-export function useGeolocation({ userType, currentUsername, t, showToast }) {
-  // Distributor → Groom: live location share (per-driver, with explicit shareWith list).
-  // Shape: { [driverUsername]: { lat, lng, accuracy, timeISO, shareWith: [groomUsername...] } }
-  const [liveLocations, setLiveLocations] = useState(() => load("dawa_live_locations", {}));
-  const [liveShareWith, setLiveShareWith] = useState([]);
+const STALE_MS = 30 * 1000; // drivers older than 30s are treated as offline
 
-  // Driver: am I broadcasting? Did I get GPS permission? What's my latest fix?
+export function useGeolocation({
+  userType,
+  currentUid,
+  currentUsername,
+  activeGroomUid,
+  users,          // already scoped to the grooms the driver may share with
+  t, showToast,
+}) {
+  // Translate `liveShareWith` (usernames the JSX slice writes) → groomUids
+  // (what the RTDB shards are keyed by).
+  const usernamesToUids = (list) =>
+    (list || [])
+      .map((u) => (users || []).find((x) => x.username === u)?.uid || u)
+      .filter(Boolean);
+  // ── Local-only state ──────────────────────────────────────────────────────
+  const [liveShareWith, setLiveShareWith] = useState([]); // groomUids selected by the driver
+
   const [driverIsSharing,     setDriverIsSharing]     = useState(false);
-  const [driverGeoPermission, setDriverGeoPermission] = useState("unknown"); // unknown | granted | denied
+  const [driverGeoPermission, setDriverGeoPermission] = useState("unknown");
   const [driverGeoError,      setDriverGeoError]      = useState(null);
-  const [driverCoords,        setDriverCoords]        = useState(null); // {lat, lng, accuracy}
+  const [driverCoords,        setDriverCoords]        = useState(null);
   const driverWatchIdRef  = useRef(null);
   const driverCoordsRef   = useRef(null);
 
-  // Groom: do I want to see myself on the map? GPS permission?
   const [groomGeoPermission, setGroomGeoPermission] = useState("unknown");
   const [groomGeoError,      setGroomGeoError]      = useState(null);
   const [groomCoords,        setGroomCoords]        = useState(null);
   const groomWatchIdRef = useRef(null);
 
-  // Ticking state — bumps every second so live-map markers re-render and the
-  // staleness filter re-evaluates even when liveLocations itself hasn't changed.
+  // Ticker bumps once per second so the stale-filter re-evaluates even when
+  // no new snapshot has arrived.
   const [nowTick, setNowTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setNowTick((n) => n + 1), 1000);
+    return () => clearInterval(id);
+  }, []);
 
-  // Persist driver fixes so grooms (in other tabs) can read them.
-  useEffect(() => { save("dawa_live_locations", liveLocations); }, [liveLocations]);
-
-  // ── Driver: ask the browser for GPS permission, then start watchPosition ──
-  // Permission is auto-prompted by the browser on the first call; we keep a
-  // watchPosition open for the lifetime of the broadcast for smooth updates,
-  // and ALSO push the latest fix to localStorage every 1s for grooms to read.
+  // ── Driver: GPS watchPosition lifecycle ───────────────────────────────────
   const startDriverWatch = () => {
     setDriverGeoError(null);
     if (!("geolocation" in navigator)) {
@@ -42,7 +63,6 @@ export function useGeolocation({ userType, currentUsername, t, showToast }) {
       setDriverGeoPermission("denied");
       return;
     }
-    // Stop any previous watch first (defensive)
     if (driverWatchIdRef.current != null) {
       navigator.geolocation.clearWatch(driverWatchIdRef.current);
       driverWatchIdRef.current = null;
@@ -60,7 +80,7 @@ export function useGeolocation({ userType, currentUsername, t, showToast }) {
         setDriverCoords(fix);
       },
       (err) => {
-        setDriverGeoPermission(err.code === 1 ? "denied" : "denied");
+        setDriverGeoPermission("denied");
         setDriverGeoError(err.code === 1 ? t("geo_denied") : (err.message || t("geo_denied")));
         if (driverWatchIdRef.current != null) {
           navigator.geolocation.clearWatch(driverWatchIdRef.current);
@@ -68,20 +88,18 @@ export function useGeolocation({ userType, currentUsername, t, showToast }) {
         }
         setDriverIsSharing(false);
       },
-      { enableHighAccuracy: true, maximumAge: 1000, timeout: 12000 }
+      { enableHighAccuracy: true, maximumAge: 1000, timeout: 12000 },
     );
   };
 
-  // Start broadcasting (driver pressed "Start sharing")
   const saveLiveLocation = () => {
     if (liveShareWith.length === 0) { showToast(t("geo_pick_grooms_first")); return; }
-    if (!currentUsername) return;
+    if (!currentUid) return;
     setDriverIsSharing(true);
     startDriverWatch();
   };
 
-  // Stop broadcasting (driver pressed "Stop sharing")
-  const stopLiveLocation = () => {
+  const stopLiveLocation = async () => {
     if (driverWatchIdRef.current != null) {
       navigator.geolocation.clearWatch(driverWatchIdRef.current);
       driverWatchIdRef.current = null;
@@ -89,46 +107,31 @@ export function useGeolocation({ userType, currentUsername, t, showToast }) {
     setDriverIsSharing(false);
     setDriverCoords(null);
     driverCoordsRef.current = null;
-    if (currentUsername) {
-      setLiveLocations(prev => {
-        const next = { ...prev };
-        delete next[currentUsername];
-        return next;
-      });
-    }
+    try { await clearMyLocation(currentUid, usernamesToUids(liveShareWith)); } catch {}
     setLiveShareWith([]);
     showToast(t("share_stopped"));
   };
 
-  // While the driver is sharing, push their latest fix to localStorage every 1s
-  // so all grooms watching see fresh data. Uses a ref to avoid restarting the
-  // interval on every coord change.
+  // While broadcasting, push the latest fix to RTDB every second.
   useEffect(() => {
-    if (userType !== "driver" || !driverIsSharing || !currentUsername) return;
+    if (userType !== "driver" || !driverIsSharing || !currentUid) return;
     const tick = () => {
       const fix = driverCoordsRef.current;
       if (!fix) return;
-      setLiveLocations(prev => ({
-        ...prev,
-        [currentUsername]: {
-          lat: fix.lat, lng: fix.lng, accuracy: fix.accuracy,
-          timeISO: new Date().toISOString(),
-          shareWith: [...liveShareWith],
-        },
-      }));
+      publishMyFix(currentUid, currentUsername, fix, usernamesToUids(liveShareWith)).catch(() => {});
     };
-    tick(); // push immediately so grooms see something the first second
+    tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
-  }, [userType, driverIsSharing, currentUsername, liveShareWith]);
+  }, [userType, driverIsSharing, currentUid, liveShareWith]);
 
-  // Cleanup any open watch when the portal unmounts
+  // Clean up any open watch when the portal unmounts.
   useEffect(() => () => {
     if (driverWatchIdRef.current != null) navigator.geolocation.clearWatch(driverWatchIdRef.current);
     if (groomWatchIdRef.current  != null) navigator.geolocation.clearWatch(groomWatchIdRef.current);
   }, []);
 
-  // ── Groom: ask the browser for GPS permission, then start watchPosition ──
+  // ── Groom: GPS watchPosition (their own marker on the map) ────────────────
   const requestGroomLocation = () => {
     setGroomGeoError(null);
     if (!("geolocation" in navigator)) {
@@ -158,54 +161,45 @@ export function useGeolocation({ userType, currentUsername, t, showToast }) {
           groomWatchIdRef.current = null;
         }
       },
-      { enableHighAccuracy: true, maximumAge: 1000, timeout: 12000 }
+      { enableHighAccuracy: true, maximumAge: 1000, timeout: 12000 },
     );
   };
 
-  // Every second: bump a tick + re-read liveLocations from localStorage so the
-  // groom sees driver positions update in near-real-time even across tabs.
-  // We compare via a ref so the comparator sees the freshest state, not a stale closure.
-  const liveLocationsRef = useRef(liveLocations);
-  useEffect(() => { liveLocationsRef.current = liveLocations; }, [liveLocations]);
+  // ── Groom: subscribe to the drivers currently sharing with them ───────────
+  const [driversSnapshot, setDriversSnapshot] = useState({}); // { [driverUid]: { lat, lng, accuracy, timeISO } }
   useEffect(() => {
-    if (userType !== "groom") return;
-    const id = setInterval(() => {
-      setNowTick(n => n + 1);
-      try {
-        const raw = localStorage.getItem("dawa_live_locations");
-        if (!raw) return;
-        const fresh = JSON.parse(raw) || {};
-        const cur = liveLocationsRef.current || {};
-        let changed = false;
-        const keys = new Set([...Object.keys(fresh), ...Object.keys(cur)]);
-        for (const k of keys) {
-          if ((fresh[k]?.timeISO) !== (cur[k]?.timeISO)) { changed = true; break; }
-        }
-        if (changed) setLiveLocations(fresh);
-      } catch {}
-    }, 1000);
-    return () => clearInterval(id);
-  }, [userType]);
+    if (userType !== "groom" || !activeGroomUid) { setDriversSnapshot({}); return; }
+    return subscribeDriversForGroom(activeGroomUid, setDriversSnapshot);
+  }, [userType, activeGroomUid]);
 
-  // Convenience accessors
-  const myLiveLocation = currentUsername ? liveLocations[currentUsername] : null;
+  // Match the original consumer shape: array of objects with .driver, .lat,
+  // .lng, .accuracy, .time. (Fixes the latent bug from the localStorage era.)
   const driversSharingWithMe = useMemo(() => {
-    if (userType !== "groom" || !currentUsername) return [];
-    // A driver is considered "live" only if their last fix is within 30 seconds.
-    // Beyond that we treat them as disconnected so their pin doesn't ghost on the map.
-    const STALE_MS = 30 * 1000;
+    if (userType !== "groom") return [];
     const now = Date.now();
-    return Object.entries(liveLocations)
-      .filter(([_, info]) => {
-        if (!Array.isArray(info?.shareWith)) return false;
-        if (!info.shareWith.includes(currentUsername)) return false;
-        if (typeof info.lat !== "number" || typeof info.lng !== "number") return false;
-        const ts = info.timeISO ? Date.parse(info.timeISO) : 0;
-        return ts && (now - ts) <= STALE_MS;
-      })
-  }, [liveLocations, currentUsername, userType, nowTick]);
+    const out = [];
+    for (const [driverUid, info] of Object.entries(driversSnapshot || {})) {
+      if (!info || typeof info.lat !== "number" || typeof info.lng !== "number") continue;
+      const ts = info.timeISO ? Date.parse(info.timeISO) : 0;
+      if (!ts || (now - ts) > STALE_MS) continue;
+      // Resolve a friendly display name: prefer the name the driver embedded
+      // in their fix; then any /users profile we can see; finally the uid.
+      const profile = (users || []).find(u => u.uid === driverUid);
+      out.push({
+        driver: info.driverDisplayName || profile?.username || driverUid,
+        uid: driverUid,
+        lat: info.lat,
+        lng: info.lng,
+        accuracy: info.accuracy,
+        time: new Date(ts),
+      });
+    }
+    return out;
+  }, [userType, driversSnapshot, users, nowTick]);
 
-  // Build the marker set for the LiveMap (groom's own + every driver sharing with them)
+  const myLiveLocation = driverCoords; // alias kept for any legacy reference
+
+  // ── Marker set for the LiveMap component ──────────────────────────────────
   const groomMapMarkers = useMemo(() => {
     const out = [];
     if (groomCoords) {
@@ -218,7 +212,7 @@ export function useGeolocation({ userType, currentUsername, t, showToast }) {
     }
     for (const d of driversSharingWithMe) {
       out.push({
-        key: `drv_${d.driver}`,
+        key: `drv_${d.uid}`,
         lat: d.lat, lng: d.lng,
         kind: "driver",
         label: `${t("map_driver")} · ${d.driver}`,
@@ -228,7 +222,6 @@ export function useGeolocation({ userType, currentUsername, t, showToast }) {
   }, [groomCoords, driversSharingWithMe, t]);
 
   return {
-    liveLocations, setLiveLocations,
     liveShareWith, setLiveShareWith,
     driverIsSharing, driverGeoPermission, driverGeoError, driverCoords,
     groomGeoPermission, groomGeoError, groomCoords,

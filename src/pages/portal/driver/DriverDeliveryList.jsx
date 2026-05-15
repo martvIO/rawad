@@ -90,7 +90,9 @@ export function DriverDeliveryList() {
                     <div style={{ fontSize: 11, color: "#7a6a4a", marginBottom: 8, lineHeight: 1.7 }}>
                       {t("share_active_with")}{" "}
                       <span style={{ color: "#c9a84c", fontWeight: 700, direction: "ltr" }}>
-                        {(myStoredLoc?.shareWith || liveShareWith).join(", ")}
+                        {liveShareWith
+                          .map(uid => groomUsers.find(u => (u.uid || u.id) === uid)?.username || uid)
+                          .join(", ")}
                       </span>
                     </div>
 
@@ -152,9 +154,10 @@ export function DriverDeliveryList() {
                     ) : (
                       <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
                         {groomUsers.map(u => {
-                          const isSel = liveShareWith.includes(u.username);
+                          const uid = u.uid || u.id;
+                          const isSel = liveShareWith.includes(uid);
                           return (
-                            <button key={u.id} onClick={() => toggleGroom(u.username)} style={{
+                            <button key={uid} onClick={() => toggleGroom(uid)} style={{
                               padding: "6px 12px", borderRadius: 20, cursor: "pointer",
                               background: isSel ? "rgba(201,168,76,.2)" : "rgba(255,255,255,.04)",
                               border: `1.5px solid ${isSel ? "#c9a84c" : "rgba(255,255,255,.1)"}`,

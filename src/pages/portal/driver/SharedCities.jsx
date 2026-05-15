@@ -12,12 +12,14 @@ export function SharedCities() {
   // City extractor, bound to the current language (used by the slice below).
   const extractCity = (area) => extractCityRaw(area, lang);
           const groomUsers = users.filter(u => u.role === "groom");
-          const toggleGroom = (uname) => setSharedSelectedGrooms(prev =>
-            prev.includes(uname) ? prev.filter(x => x !== uname) : [...prev, uname]
+          // We toggle by uid (not username) so the pool filter and security
+          // rules line up with the database's groomUid-keyed model.
+          const toggleGroom = (uid) => setSharedSelectedGrooms(prev =>
+            prev.includes(uid) ? prev.filter(x => x !== uid) : [...prev, uid]
           );
           // Aggregate pending guests from selected grooms
           const pool = guests.filter(g =>
-            g.status !== "delivered" && sharedSelectedGrooms.includes(g.groomUsername)
+            g.status !== "delivered" && sharedSelectedGrooms.includes(g.groomUid)
           );
           // Cities → list of guests
           const cityMap = new Map();
@@ -29,7 +31,7 @@ export function SharedCities() {
           const sharedCities = [];
           for (const [c, list] of cityMap.entries()) {
             // Only include city if it has guests from 2+ grooms (truly shared) OR if 1 groom but user wants it
-            const groomsInCity = new Set(list.map(g => g.groomUsername));
+            const groomsInCity = new Set(list.map(g => g.groomUid));
             sharedCities.push({ city: c, list, groomCount: groomsInCity.size });
           }
           // Prioritize truly-shared cities (2+ grooms) first
@@ -59,9 +61,10 @@ export function SharedCities() {
                     <>
                       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))", gap: 10, marginBottom: 18 }}>
                         {groomUsers.map(u => {
-                          const isSel = sharedSelectedGrooms.includes(u.username);
+                          const uid = u.uid || u.id;
+                          const isSel = sharedSelectedGrooms.includes(uid);
                           return (
-                            <button key={u.id} onClick={() => toggleGroom(u.username)} style={{
+                            <button key={uid} onClick={() => toggleGroom(uid)} style={{
                               padding: "12px 10px", borderRadius: 12, cursor: "pointer",
                               background: isSel ? "rgba(201,168,76,.18)" : "rgba(255,255,255,.03)",
                               border: `1.5px solid ${isSel ? "#c9a84c" : "rgba(255,255,255,.08)"}`,
@@ -136,7 +139,7 @@ export function SharedCities() {
                 // Get pending guests in the selected city across selected grooms, ordered
                 const cityGuests = guests
                   .filter(g => g.status !== "delivered"
-                    && sharedSelectedGrooms.includes(g.groomUsername)
+                    && sharedSelectedGrooms.includes(g.groomUid)
                     && extractCity(g.area) === sharedSelectedCity)
                   .sort((a, b) => (a.area || "").localeCompare(b.area || ""));
                 return (

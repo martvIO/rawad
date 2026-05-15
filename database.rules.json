@@ -1,0 +1,117 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+
+    "users": {
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || auth.token.admin === true)",
+        ".write": "auth.token.admin === true",
+        ".validate": "newData.hasChildren(['username','role','phoneE164','createdAt'])",
+        "username":    {
+          ".read": "auth != null && root.child('driverAssignments').child(auth.uid).child($uid).val() === true",
+          ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 60 && newData.val().matches(/^[a-zA-Z0-9_.-]+$/)"
+        },
+        "role":        {
+          ".read": "auth != null && root.child('driverAssignments').child(auth.uid).child($uid).val() === true",
+          ".validate": "newData.val() === 'groom' || newData.val() === 'driver' || newData.val() === 'admin'"
+        },
+        "phoneE164":   { ".validate": "newData.isString() && newData.val().matches(/^\\+[1-9][0-9]{6,14}$/)" },
+        "displayName": { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 120)" },
+        "createdAt":   { ".validate": "newData.isNumber()" },
+        "createdBy":   { ".validate": "!newData.exists() || newData.isString()" },
+        "$other":      { ".validate": false }
+      }
+    },
+
+    "usernameIndex": {
+      ".read": "auth != null",
+      "$username": {
+        ".write": "auth.token.admin === true",
+        ".validate": "newData.isString() && root.child('users').child(newData.val()).exists()"
+      }
+    },
+
+    "phoneIndex": {
+      ".read": false,
+      "$phone": {
+        ".write": "auth.token.admin === true",
+        ".validate": "newData.isString() && root.child('users').child(newData.val()).exists()"
+      }
+    },
+
+    "guestsByGroom": {
+      ".read": "auth != null && auth.token.admin === true",
+      "$groomUid": {
+        ".read":  "auth != null && ($groomUid === auth.uid || root.child('driverAssignments').child(auth.uid).child($groomUid).val() === true)",
+        ".indexOn": ["status", "inviteType"],
+        "$guestId": {
+          ".write": "auth != null && (auth.token.admin === true || $groomUid === auth.uid || (data.exists() && root.child('driverAssignments').child(auth.uid).child($groomUid).val() === true))",
+          ".validate": "newData.hasChildren(['name','phone','status','inviteType'])",
+          "groomUsername":  { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 60)" },
+          "name":           { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 120" },
+          "phone":          { ".validate": "newData.isString() && newData.val().length <= 30" },
+          "area":           { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 240)" },
+          "status":         { ".validate": "newData.val() === 'pending' || newData.val() === 'enroute' || newData.val() === 'delivered'" },
+          "inviteType":     { ".validate": "newData.val() === 'premium' || newData.val() === 'vip'" },
+          "proofPhotoPath": { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 240)" },
+          "deliveredAt":    { ".validate": "!newData.exists() || newData.isString()" },
+          "deliveredBy":    { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 120)" },
+          "deliveryNote":   { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 240)" },
+          "createdAt":      { ".validate": "!newData.exists() || newData.isNumber()" },
+          "$other":         { ".validate": false }
+        }
+      }
+    },
+
+    "liveLocationsByGroom": {
+      "$groomUid": {
+        ".read": "auth != null && (auth.token.admin === true || $groomUid === auth.uid)",
+        "$driverUid": {
+          ".write": "auth != null && $driverUid === auth.uid",
+          ".validate": "newData.hasChildren(['lat','lng','timeISO'])",
+          "lat":      { ".validate": "newData.isNumber() && newData.val() >= -90  && newData.val() <= 90" },
+          "lng":      { ".validate": "newData.isNumber() && newData.val() >= -180 && newData.val() <= 180" },
+          "accuracy": { ".validate": "!newData.exists() || (newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000)" },
+          "timeISO":            { ".validate": "newData.isString() && newData.val().length <= 40" },
+          "driverDisplayName": { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 120)" },
+          "$other":            { ".validate": false }
+        }
+      }
+    },
+
+    "confirmations": {
+      ".read": "auth != null && auth.token.admin === true",
+      ".write": false,
+      ".indexOn": ["groomUid", "confirmedAt"],
+      "$confId": {
+        ".validate": "newData.hasChildren(['groomUid','submittedName','submittedPhone','confirmedAt'])"
+      }
+    },
+
+    "adminSettings": {
+      ".read":  "auth != null",
+      ".write": "auth != null && auth.token.admin === true",
+      "messageBody": { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 4000)" },
+      "formLink":    { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 1000 && newData.val().matches(/^https:\\/\\//))" },
+      "$other":      { ".validate": false }
+    },
+
+    "driverAssignments": {
+      "$driverUid": {
+        ".read":  "auth != null && (auth.token.admin === true || $driverUid === auth.uid)",
+        ".write": false,
+        "$groomUid": { ".validate": "newData.val() === true" }
+      }
+    },
+
+    "audit": {
+      ".read":  "auth != null && auth.token.admin === true",
+      ".write": false,
+      ".indexOn": ["timestamp", "uid", "action"],
+      "$eventId": {
+        ".validate": "newData.hasChildren(['uid','action','timestamp'])"
+      }
+    }
+  }
+}

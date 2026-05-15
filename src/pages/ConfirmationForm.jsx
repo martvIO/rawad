@@ -1,10 +1,11 @@
 // Public guest confirmation form, opened via ?form=<groomUsername>.
-// Submissions are appended to the shared dawa_confirmations store.
+// Submission goes through the `submitConfirmation` Cloud Function, which
+// validates the input, enforces Firebase App Check, and rate-limits per IP.
 import { useState } from "react";
 import { BrandLogo } from "../components/BrandLogo.jsx";
 import { LangSwitcher } from "../components/LangSwitcher.jsx";
 import { CityField } from "../components/CityField.jsx";
-import { load, save } from "../utils/storage.js";
+import { submitConfirmation } from "../services/confirmations.js";
 
 export function ConfirmationForm({ groomUsername, t, lang, setLang }) {
   const [name, setName]     = useState("");
@@ -14,27 +15,30 @@ export function ConfirmationForm({ groomUsername, t, lang, setLang }) {
   const [house, setHouse]   = useState("");
   const [done, setDone]     = useState(false);
   const [error, setError]   = useState("");
+  const [busy, setBusy]     = useState(false);
 
-  const submit = () => {
+  const submit = async () => {
     if (!name.trim() || !phone.trim() || !city.trim()) {
       setError(t("conf_form_invalid"));
       return;
     }
     setError("");
-    // Append this submission to the shared confirmations store.
-    const existing = load("dawa_confirmations", []);
-    const entry = {
-      id: Date.now(),
-      groomUsername: groomUsername || "",
-      submittedName:   name.trim(),
-      submittedPhone:  phone.trim().replace(/\s+/g, ""),
-      submittedCity:   city.trim(),
-      submittedStreet: street.trim(),
-      submittedHouse:  house.trim(),
-      confirmedAt:     new Date().toISOString(),
-    };
-    save("dawa_confirmations", [...existing, entry]);
-    setDone(true);
+    setBusy(true);
+    try {
+      await submitConfirmation({
+        groomUsername:   (groomUsername || "").toLowerCase(),
+        submittedName:   name.trim(),
+        submittedPhone:  phone.trim().replace(/\s+/g, ""),
+        submittedCity:   city.trim(),
+        submittedStreet: street.trim(),
+        submittedHouse:  house.trim(),
+      });
+      setDone(true);
+    } catch (err) {
+      setError(err?.message || t("conf_form_invalid"));
+    } finally {
+      setBusy(false);
+    }
   };
 
   if (done) {
@@ -105,7 +109,7 @@ export function ConfirmationForm({ groomUsername, t, lang, setLang }) {
           )}
 
           <button className="gold-btn" style={{ width: "100%" }} onClick={submit}
-                  disabled={!name.trim() || !phone.trim() || !city.trim()}>
+                  disabled={busy || !name.trim() || !phone.trim() || !city.trim()}>
             {t("conf_form_submit")}
           </button>
         </div>
