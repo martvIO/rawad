@@ -11,11 +11,12 @@
       "codebase": "default",
       "runtime": "nodejs20",
       "predeploy": [
-        "node scripts/build-functions.cjs"
+        "build-functions.cmd"
       ]
     }
   ],
   "hosting": {
+    "predeploy": ["build-vite.cmd"],
     "public": "dist",
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
     "rewrites": [
