@@ -4,12 +4,28 @@ import { HttpsError, CallableRequest } from "firebase-functions/v2/https";
 const USERNAME_RE = /^[a-zA-Z0-9_.-]{2,60}$/;
 const E164_RE     = /^\+[1-9][0-9]{6,14}$/;
 
+// Custom claims this app stamps on every signed-in user. The base
+// DecodedIdToken from firebase-admin exposes everything as `[key: string]: any`
+// (custom claims aren't declared), so without this typed view a typo like
+// `token.rolez` would compile silently. Keep in lock-step with the claim
+// shape written by users.ts/createPortalUser, updateUser.ts, setAdminClaim,
+// and migrateClaims.js.
+export interface DawaClaims {
+  role?: "admin" | "driver" | "groom";
+  username?: string;
+  assignedGrooms?: Record<string, true>;
+}
+
+export function getClaims(req: CallableRequest): DawaClaims {
+  return (req.auth?.token ?? {}) as DawaClaims;
+}
+
 // Authoritative server-side role check. Every admin-only callable must call
 // this first; the client-side RoleGuard is convenience-only and is not the
 // authoritative gate. Reads auth.token.role (the canonical claim post-migration).
 export function assertAdmin(req: CallableRequest): string {
   if (!req.auth) throw new HttpsError("unauthenticated", "Sign in required.");
-  if (req.auth.token.role !== "admin") {
+  if (getClaims(req).role !== "admin") {
     throw new HttpsError("permission-denied", "Admins only.");
   }
   return req.auth.uid;
