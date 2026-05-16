@@ -85,7 +85,17 @@
       ".write": false,
       ".indexOn": ["groomUid", "confirmedAt"],
       "$confId": {
-        ".validate": "newData.hasChildren(['groomUid','submittedName','submittedPhone','confirmedAt'])"
+        ".write": "auth != null && auth.token.admin === true && data.exists()",
+        ".validate": "newData.hasChildren(['groomUid','submittedName','submittedPhone','confirmedAt'])",
+        "groomUid":        { ".validate": "newData.isString() && newData.val().length <= 64" },
+        "groomUsername":   { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 60)" },
+        "submittedName":   { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 120" },
+        "submittedPhone":  { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 30" },
+        "submittedCity":   { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 80)" },
+        "submittedStreet": { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 120)" },
+        "submittedHouse":  { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 20)" },
+        "confirmedAt":     { ".validate": "newData.isNumber()" },
+        "$other":          { ".validate": false }
       }
     },
 

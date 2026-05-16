@@ -1,0 +1,35 @@
+# Netlify build configuration for the public guest confirmation form.
+# The build pipeline produces a static Vite bundle that calls the deployed
+# Firebase Cloud Function `submitConfirmation` (not the local emulator).
+#
+# Required Netlify dashboard env vars (set in Site Settings → Build & Deploy →
+# Environment) — these override the values in .env.production:
+#   VITE_FIREBASE_API_KEY
+#   VITE_FIREBASE_AUTH_DOMAIN
+#   VITE_FIREBASE_DATABASE_URL
+#   VITE_FIREBASE_PROJECT_ID
+#   VITE_FIREBASE_STORAGE_BUCKET
+#   VITE_FIREBASE_MESSAGING_SENDER_ID
+#   VITE_FIREBASE_APP_ID
+#   VITE_RECAPTCHA_ENTERPRISE_SITE_KEY
+#
+# Also: add the Netlify deploy domain (e.g. <site>.netlify.app and any custom
+# domain) to Firebase Console → App Check → reCAPTCHA Enterprise → Allowed
+# domains, OR App Check tokens will be rejected and submitConfirmation will
+# return PERMISSION_DENIED.
+
+[build]
+  command  = "npm run build"
+  publish  = "dist"
+
+[build.environment]
+  # Force production Firebase regardless of any .env present in the repo.
+  VITE_USE_EMULATORS = "0"
+  NODE_VERSION       = "20"
+
+# SPA fallback — every unknown path returns index.html so the React router
+# (?form=GROOM_USERNAME query) can render the confirmation form.
+[[redirects]]
+  from   = "/*"
+  to     = "/index.html"
+  status = 200

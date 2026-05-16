@@ -17,7 +17,8 @@ import {
   subscribeUsers,
   createPortalUser, deletePortalUser,
 } from "../services/users.js";
-import { subscribeConfirmations } from "../services/confirmations.js";
+import { subscribeConfirmations, updateConfirmation as updateConfirmationSrv } from "../services/confirmations.js";
+import { classifyAll, normalizePhoneForMatching } from "../utils/matchUtils.js";
 import { subscribeSettings, saveSettings } from "../services/adminSettings.js";
 import {
   uploadProofBlob, dataUrlToBlob, proofDownloadUrl,
@@ -275,24 +276,34 @@ export function usePortalState({ onBack, t, lang, setLang }) {
   };
 
   // ── Confirmation matching ───────────────────────────────────────────────────
-  const matchedGuestFor = (conf) => {
-    const wantedPhone = (conf.submittedPhone || "").replace(/\D/g, "");
-    if (!wantedPhone) return null;
-    return guests.find(g =>
-      g.groomUid === conf.groomUid &&
-      (g.phone || "").replace(/\D/g, "") === wantedPhone,
-    ) || null;
-  };
-  const matchColor = (conf) => {
-    const guest = matchedGuestFor(conf);
-    if (!guest) return "red";
-    const sameName = (guest.name || "").trim().toLowerCase() === (conf.submittedName || "").trim().toLowerCase();
-    if (!sameName) return "red";
-    const groomCity = (guest.area || "").split(/[-،,]/)[0].trim().toLowerCase();
-    const guestCity = (conf.submittedCity || "").trim().toLowerCase();
-    if (!groomCity || groomCity === guestCity) return "green";
-    return "red";
-  };
+  // Phone is the primary key. Names/addresses use fuzzy similarity tolerant
+  // of spelling variants, Arabic/Hebrew/English transliteration, and word
+  // reordering (see src/utils/matchUtils.js for details).
+  const classificationMap = useMemo(
+    () => classifyAll(confirmations, guests),
+    [confirmations, guests],
+  );
+
+  const matchedGuestFor = (conf) =>
+    classificationMap.get(conf?.id)?.guest ?? null;
+
+  // matchColor returns "green" | "red" | "unknown" (note: was previously
+  // "red" for unknowns; UI now branches on three states for the Unknown section).
+  const matchColor = (conf) =>
+    classificationMap.get(conf?.id)?.status ?? "unknown";
+
+  // Translate machine reason codes into the existing i18n strings so
+  // AdminConfirmationsTab can display them as badges.
+  const reasonsLabel = (codes) => (codes || []).map((c) => {
+    if (c === "name_differs")    return t("conf_mismatch_name");
+    if (c === "address_differs") return t("conf_mismatch_city");
+    return c;
+  });
+
+  const confirmationReasons = (conf) =>
+    reasonsLabel(classificationMap.get(conf?.id)?.reasons);
+
+  // Sync the confirmation's submitted data back into the matched guest record.
   // (Function name kept for compatibility with the AdminConfirmationsTab slice.)
   const useConfirmationData = async (conf) => {
     const guest = matchedGuestFor(conf);
@@ -308,29 +319,54 @@ export function usePortalState({ onBack, t, lang, setLang }) {
     } catch (e) { showToast(e?.message || ""); }
   };
 
+  // Admin edits a confirmation record. Updates both /confirmations/{id}
+  // and the matched guest's record (if any) so the two stay in sync.
+  // After save, re-classification runs automatically because confirmations
+  // and guests both re-subscribe and the memo above re-computes.
+  const saveConfirmationEdit = async (confId, patch) => {
+    const conf = confirmations.find(c => c.id === confId);
+    if (!conf) return;
+    const cleanPatch = {
+      submittedName:  (patch.submittedName  ?? conf.submittedName  ?? "").trim(),
+      submittedPhone: (patch.submittedPhone ?? conf.submittedPhone ?? "").trim(),
+      submittedCity:  (patch.submittedCity  ?? conf.submittedCity  ?? "").trim(),
+    };
+    try {
+      await updateConfirmationSrv(confId, cleanPatch);
+      // Propagate to the guest record matched by the *new* phone, if any.
+      const newPhoneDigits = normalizePhoneForMatching(cleanPatch.submittedPhone);
+      const guestMatch = newPhoneDigits
+        ? guests.find(g =>
+            g.groomUid === conf.groomUid &&
+            normalizePhoneForMatching(g.phone) === newPhoneDigits,
+          )
+        : null;
+      if (guestMatch) {
+        await updateGuestSrv(guestMatch.groomUid, guestMatch.id, {
+          name:  cleanPatch.submittedName  || guestMatch.name,
+          phone: cleanPatch.submittedPhone || guestMatch.phone,
+          area:  cleanPatch.submittedCity  || guestMatch.area || "",
+        });
+      }
+      setEditingConf(null);
+      showToast(t("edit_success"));
+    } catch (e) { showToast(e?.message || ""); }
+  };
+
+  // Status badge for a guest based on whether a confirmation arrived. Used
+  // by the Send tab (per-guest "Matched"/"Mismatch" chip).
   const guestConfirmationStatus = (guest) => {
     if (!guest) return null;
-    const guestPhoneDigits = (guest.phone || "").replace(/\D/g, "");
-    if (!guestPhoneDigits) return null;
+    const guestPhone = normalizePhoneForMatching(guest.phone);
+    if (!guestPhone) return null;
     const conf = confirmations.find(c =>
       c.groomUid === guest.groomUid &&
-      (c.submittedPhone || "").replace(/\D/g, "") === guestPhoneDigits,
+      normalizePhoneForMatching(c.submittedPhone) === guestPhone,
     );
     if (!conf) return null;
-    const reasons = [];
-    const submittedName = (conf.submittedName || "").trim();
-    const words = submittedName.split(/\s+/).filter(Boolean);
-    if (words.length < 2) reasons.push(t("conf_mismatch_invalid_name"));
-    else if (submittedName.toLowerCase() !== (guest.name || "").trim().toLowerCase()) {
-      reasons.push(t("conf_mismatch_name"));
-    }
-    if (guestPhoneDigits.length !== 10) reasons.push(t("conf_mismatch_invalid_phone"));
-    const groomCity = (guest.area || "").split(/[-،,]/)[0].trim().toLowerCase();
-    const guestCity = (conf.submittedCity || "").trim().toLowerCase();
-    if (groomCity && guestCity && groomCity !== guestCity) reasons.push(t("conf_mismatch_city"));
-    return reasons.length === 0
-      ? { status: "matched", conf }
-      : { status: "mismatch", reasons, conf };
+    const cls = classificationMap.get(conf.id);
+    if (!cls || cls.status === "green") return { status: "matched", conf };
+    return { status: "mismatch", reasons: reasonsLabel(cls.reasons), conf };
   };
 
   // ── Guest CRUD ──────────────────────────────────────────────────────────────
@@ -520,6 +556,7 @@ export function usePortalState({ onBack, t, lang, setLang }) {
     confirmations, editingConf, setEditingConf,
     sendWaToOne, sendWaToAll,
     matchedGuestFor, matchColor, useConfirmationData, guestConfirmationStatus,
+    confirmationReasons, saveConfirmationEdit,
 
     // shared-cities
     sharedStep, setSharedStep,

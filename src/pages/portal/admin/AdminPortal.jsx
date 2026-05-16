@@ -3,6 +3,7 @@
 import { LangSwitcher } from "../../../components/LangSwitcher.jsx";
 import { LogoutConfirm } from "../../../components/LogoutConfirm.jsx";
 import { Toast } from "../../../components/Toast.jsx";
+import { EditConfirmationModal } from "../../../components/EditConfirmationModal.jsx";
 import { usePortal } from "../../../context/PortalContext.jsx";
 import { AdminUsersTab } from "./AdminUsersTab.jsx";
 import { AdminSendTab } from "./AdminSendTab.jsx";
@@ -71,6 +72,8 @@ export function AdminPortal() {
         {adminTab === "settings" && <AdminSettingsTab />}
         {adminTab === "confirmations" && <AdminConfirmationsTab />}
       </div>
+
+      <EditConfirmationModal />
     </div>
   );
 }
