@@ -1,7 +1,8 @@
-// Edit-guest modal — overlays every groom view. Renders nothing when no guest is being edited.
+﻿// Edit-guest modal — overlays every groom view. Renders nothing when no guest is being edited.
 import { AddressInput } from "./AddressInput.jsx";
 import { PhoneInput } from "./PhoneInput.jsx";
 import { usePortal } from "../context/PortalContext.jsx";
+import { C } from "../styles/theme.js";
 
 export function EditGuestModal() {
   const {
@@ -21,26 +22,26 @@ export function EditGuestModal() {
             borderRadius: 18, padding: 24, animation: "slideUp .3s ease",
           }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
-              <div style={{ color: "#c9a84c", fontWeight: 900, fontSize: 18, fontFamily: "'Amiri',serif" }}>
+              <div style={{ color: C.gold, fontWeight: 900, fontSize: 18, fontFamily: "'Amiri',serif" }}>
                 {t("edit_title")}
               </div>
               <button onClick={cancelEdit} style={{
-                background: "none", border: "none", color: "#7a6a4a", fontSize: 22,
+                background: "none", border: "none", color: C.dim, fontSize: 22,
                 cursor: "pointer", padding: 0, lineHeight: 1,
               }}>×</button>
             </div>
 
-            <div style={{ marginBottom: 6, fontSize: 12, color: "#a09070" }}>{t("field_name")}</div>
+            <div style={{ marginBottom: 6, fontSize: 12, color: C.goldDim }}>{t("field_name")}</div>
             <input className="input-field" type="text" placeholder={t("example_name")}
                    value={eName} onChange={e => setEName(e.target.value)}
                    style={{ marginBottom: 12 }}/>
 
-            <div style={{ marginBottom: 6, fontSize: 12, color: "#a09070" }}>{t("field_phone")}</div>
+            <div style={{ marginBottom: 6, fontSize: 12, color: C.goldDim }}>{t("field_phone")}</div>
             <div style={{ marginBottom: 12 }}>
               <PhoneInput value={ePhone} onChange={setEPhone} t={t} lang={lang} />
             </div>
 
-            <div style={{ marginBottom: 6, fontSize: 12, color: "#a09070" }}>
+            <div style={{ marginBottom: 6, fontSize: 12, color: C.goldDim }}>
               {t("field_address")} <span style={{ color: "#5a5040", fontWeight: 400 }}>{t("field_address_optional")}</span>
             </div>
             <div style={{ marginBottom: 12 }}>
@@ -48,17 +49,17 @@ export function EditGuestModal() {
                             placeholder={t("example_address")} lang={lang} t={t}/>
             </div>
 
-            <div style={{ marginBottom: 6, fontSize: 12, color: "#a09070" }}>{t("field_invite_type")}</div>
+            <div style={{ marginBottom: 6, fontSize: 12, color: C.goldDim }}>{t("field_invite_type")}</div>
             <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
               {[
-                { val: "premium", lbl: t("type_premium"), color: "#c9a84c" },
+                { val: "premium", lbl: t("type_premium"), color: C.gold },
                 { val: "vip",     lbl: t("type_vip"),     color: "#c084fc" },
               ].map(opt => (
                 <button key={opt.val} onClick={() => setEType(opt.val)} style={{
                   flex: 1, padding: "10px 0", borderRadius: 10, cursor: "pointer",
                   background: eType===opt.val ? `${opt.color}22` : "rgba(255,255,255,.04)",
                   border: `1.5px solid ${eType===opt.val ? opt.color : "rgba(255,255,255,.08)"}`,
-                  color: eType===opt.val ? opt.color : "#7a6a4a",
+                  color: eType===opt.val ? opt.color : C.dim,
                   fontWeight: 800, fontSize: 13, fontFamily: "inherit",
                 }}>{opt.lbl}</button>
               ))}

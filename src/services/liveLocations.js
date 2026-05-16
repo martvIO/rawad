@@ -7,6 +7,7 @@
 // with each tick.
 import { ref, set, remove, onValue, update } from "firebase/database";
 import { db } from "../firebase.js";
+import { logErr } from "../utils/logger.js";
 
 // Publish the current driver's GPS fix into one shard per groom they chose.
 // `shareWith` is an array of groomUids. `driverDisplayName` is optional and
@@ -42,7 +43,9 @@ export async function clearMyLocation(driverUid, formerShareWith) {
 // of { [driverUid]: { lat, lng, accuracy, timeISO } }.
 export function subscribeDriversForGroom(groomUid, cb) {
   if (!groomUid) { cb({}); return () => {}; }
-  return onValue(ref(db, `liveLocationsByGroom/${groomUid}`), (snap) => {
-    cb(snap.val() ?? {});
-  });
+  return onValue(
+    ref(db, `liveLocationsByGroom/${groomUid}`),
+    (snap) => { cb(snap.val() ?? {}); },
+    (err) => { logErr("subscribeDriversForGroom", err); cb({}); },
+  );
 }

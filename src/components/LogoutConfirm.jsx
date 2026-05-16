@@ -1,3 +1,4 @@
+﻿import { C } from "../styles/theme.js";
 // Confirmation modal shown before logging the user out.
 
 export function LogoutConfirm({ t, onConfirm, onCancel }) {
@@ -13,7 +14,7 @@ export function LogoutConfirm({ t, onConfirm, onCancel }) {
         borderRadius: 18, padding: 28, animation: "slideUp .3s ease", textAlign: "center",
       }}>
         <div style={{ fontSize: 48, marginBottom: 12 }}>👋</div>
-        <div style={{ color: "#d47a4b", fontWeight: 900, fontSize: 18, marginBottom: 10 }}>
+        <div style={{ color: C.red, fontWeight: 900, fontSize: 18, marginBottom: 10 }}>
           {t("logout_confirm_title")}
         </div>
         <div style={{ color: "rgba(245,230,184,.8)", fontSize: 14, lineHeight: 1.8, marginBottom: 22 }}>

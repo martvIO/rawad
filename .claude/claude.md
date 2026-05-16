@@ -107,7 +107,7 @@ functions/src/
   updateUser.ts        ← NEW: updatePortalUser (admin patches user details)
   adminSetPassword.ts  ← NEW: admin resets another user's password
   assignments.ts       — assignDriverToGroom
-  confirmations.ts     — submitConfirmation (public HTTPS, App Check, rate limit)
+  confirmations.ts     — submitConfirmation (public HTTPS, rate limit only)
   resetPassword.ts     — phone-OTP verified password reset
   audit.ts             — writeAudit helper (internal)
   rateLimit.ts         — in-memory per-key rate limiter
@@ -129,8 +129,7 @@ netlify.toml           ← NEW: Netlify build config (VITE_USE_EMULATORS=0, SPA 
 - **No hardcoded admin** — first admin created via `functions/scripts/seedAdmin.js`.
 - **Default-deny RTDB** — every node requires explicit `.read`/`.write`; all `.validate` schema checks.
 - **Default-deny Storage** — proof photos require `assignedGrooms[groomUid] === true` in custom claim.
-- **App Check** — reCAPTCHA Enterprise; skipped on `localhost` (to avoid 24h throttle); enforced on production domains.
-- **Rate limiting** — `submitConfirmation`: 5/hr per IP; `createPortalUser`/`deletePortalUser`/`updatePortalUser`/`adminSetPassword`: 30/hr per admin.
+- **Rate limiting** — `submitConfirmation`: 5/hr per IP (sole abuse gate on the public endpoint); `createPortalUser`/`deletePortalUser`/`updatePortalUser`/`adminSetPassword`: 30/hr per admin.
 - **Audit log** — admin mutations written to `/audit/{eventId}` by Functions.
 - **CSP headers** — full allowlist in `firebase.json`.
 - **HSTS** — `max-age=63072000; includeSubDomains; preload`.
@@ -194,7 +193,6 @@ Cloud Functions backing it:
 | TypeScript `moduleResolution=node10` | Updated to `module: Node16` + `moduleResolution: node16` |
 | VS Code stale TS errors | Root `tsconfig.json` + `.vscode/settings.json` |
 | CSP blocks localhost in production | `.env.production` with `VITE_USE_EMULATORS=0` |
-| App Check 403 on localhost | `isLocalhost` guard in `firebase.js` skips `initializeAppCheck` |
 | `PASSWORD_LOGIN_DISABLED` error | Enable Email/Password in Firebase Console → Authentication → Sign-in method |
 
 ---
@@ -206,7 +204,7 @@ Cloud Functions backing it:
 - **Cloud Functions TypeScript build** succeeds (`cd functions && npm run build`).
 - **`firebase deploy`** runs both predeploy hooks without error.
 - **Admin account seeded** (UID `9gnlTRbtB0T7VW1ISdYqsIsbtq13`, username `admin`).
-- **Production Firebase** reachable from `localhost` (App Check skipped on localhost to avoid throttle).
+- **Production Firebase** reachable from `localhost` (no App Check — removed project-wide).
 - **Confirmation matching** — fuzzy phone/name/address with GREEN/RED/Unknown sections + admin edit.
 - **Admin User Manager** — full CRUD: create/edit/delete all account types.
 - **RoleGuard** — wraps every role portal in Portal.jsx.
@@ -216,18 +214,15 @@ Cloud Functions backing it:
 
 ## Immediate Next Steps
 
-1. **Implement URL routing** — install `react-router-dom`, replace tab state with URL routes (see `plans/routing-plan.md` for full plan).
-2. **Deploy new Cloud Functions** — `firebase deploy --only functions` to push `updatePortalUser` and `adminSetPassword`.
-3. **Deploy updated RTDB rules** — `firebase deploy --only database` for the new `/confirmations/$confId` admin-write rule.
-4. **Add Netlify domain to App Check** — Firebase Console → App Check → reCAPTCHA Enterprise → Allowed domains → add Netlify deploy URL.
-5. **Change admin password** — default is `StrongPass123`.
-6. **Role matrix smoke test** on live URL.
+1. **Deploy Cloud Functions** — `firebase deploy --only functions` to push the `submitConfirmation` enforceAppCheck:false flip.
+2. **Deploy hosting** — `firebase deploy --only hosting` so the updated CSP (reCAPTCHA Enterprise allowlist dropped, google.com kept for Phone Auth) ships.
+3. **Change admin password** — default is `StrongPass123`.
+4. **Role matrix smoke test** on live URL.
 
 ---
 
 ## Known Remaining Items
 
 - The `dawa-aa793-firebase-adminsdk-fbsvc-e42554a05c.json` key file is in project root (excluded from Git). Store it securely and delete the local copy.
-- Vite bundle is ~775 KB (minified) — consider code-splitting when routing is added (route-based lazy loading becomes easy with react-router).
-- `adminTab` state and `tab` state in `usePortalState.js` will be removed when routing is implemented.
-- The existing `AdminUsersTab.jsx` is superseded by `AdminUserManager.jsx` and can be deleted.
+- Vite bundle is ~775 KB (minified) — consider code-splitting (route-based lazy loading via react-router) if it grows further.
+- `re.js` at project root is a Google Cloud reCAPTCHA Enterprise sample that's not imported anywhere — can be deleted.

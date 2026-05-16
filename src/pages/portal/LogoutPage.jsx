@@ -1,8 +1,9 @@
-// Logout confirmation page at /portal/logout. Full-screen "Are you sure?"
+﻿// Logout confirmation page at /portal/logout. Full-screen "Are you sure?"
 // using the same copy as the in-portal modal. Cancel navigates back; confirm
 // runs doLogout() (which calls Firebase signOut) and returns the user to /.
 import { useNavigate } from "react-router-dom";
 import { usePortal } from "../../context/PortalContext.jsx";
+import { C } from "../../styles/theme.js";
 
 export function LogoutPage() {
   const navigate = useNavigate();
@@ -17,7 +18,7 @@ export function LogoutPage() {
   return (
     <div style={{
       minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center",
-      padding: 24, background: "#07070a",
+      padding: 24, background: C.bg,
     }}>
       <div style={{
         maxWidth: 420, width: "100%",
@@ -26,7 +27,7 @@ export function LogoutPage() {
         animation: "fadeUp .3s ease",
       }}>
         <div style={{ fontSize: 56, marginBottom: 14 }}>👋</div>
-        <div style={{ color: "#d47a4b", fontWeight: 900, fontSize: 20, marginBottom: 12 }}>
+        <div style={{ color: C.red, fontWeight: 900, fontSize: 20, marginBottom: 12 }}>
           {t("logout_confirm_title")}
         </div>
         <div style={{ color: "rgba(245,230,184,.8)", fontSize: 14, lineHeight: 1.8, marginBottom: 26 }}>

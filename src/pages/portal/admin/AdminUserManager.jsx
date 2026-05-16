@@ -1,4 +1,4 @@
-// Admin → User Manager page (replaces AdminUsersTab). Full CRUD over every
+﻿// Admin → User Manager page (replaces AdminUsersTab). Full CRUD over every
 // account type. Wrapped in a RoleGuard so that even if the parent tab
 // switching mis-fires, a non-admin can never render this view.
 //
@@ -11,11 +11,12 @@ import { RoleGuard } from "../../../components/RoleGuard.jsx";
 import { PasswordRules } from "../../../components/PasswordRules.jsx";
 import { PhoneInput } from "../../../components/PhoneInput.jsx";
 import { isStrongPassword } from "../../../utils/password.js";
+import { C } from "../../../styles/theme.js";
 
 const ROLE_STYLE = {
-  admin:  { bg: "rgba(212,80,58,.15)",  fg: "#d47a4b", icon: "🔒" },
-  driver: { bg: "rgba(75,159,212,.15)", fg: "#4b9fd4", icon: "🚗" },
-  groom:  { bg: "rgba(201,168,76,.15)", fg: "#c9a84c", icon: "♥" },
+  admin:  { bg: "rgba(212,80,58,.15)",  fg: C.red, icon: "🔒" },
+  driver: { bg: "rgba(75,159,212,.15)", fg: C.blue, icon: "🚗" },
+  groom:  { bg: "rgba(201,168,76,.15)", fg: C.gold, icon: "♥" },
 };
 
 function UserManagerInner() {
@@ -34,20 +35,20 @@ function UserManagerInner() {
 
   return (
     <>
-      <div style={{ fontSize: 21, fontWeight: 900, color: "#f5e6b8", marginBottom: 4 }}>
+      <div style={{ fontSize: 21, fontWeight: 900, color: C.goldLight, marginBottom: 4 }}>
         {t("admin_user_manager_title")}
       </div>
-      <div style={{ fontSize: 13, color: "#7a6a4a", marginBottom: 20 }}>
+      <div style={{ fontSize: 13, color: C.dim, marginBottom: 20 }}>
         {t("admin_user_manager_subtitle")}
       </div>
 
       {/* ── Create form ────────────────────────────────────────────────── */}
       <div className="gold-card" style={{ marginBottom: 22 }}>
-        <div style={{ fontSize: 14, fontWeight: 800, color: "#c9a84c", marginBottom: 14 }}>
+        <div style={{ fontSize: 14, fontWeight: 800, color: C.gold, marginBottom: 14 }}>
           {t("admin_add_user")}
         </div>
 
-        <div style={{ marginBottom: 6, fontSize: 12, color: "#a09070" }}>{t("admin_role")}</div>
+        <div style={{ marginBottom: 6, fontSize: 12, color: C.goldDim }}>{t("admin_role")}</div>
         <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
           {[
             { val: "groom",  lbl: t("admin_role_groom") },
@@ -61,25 +62,25 @@ function UserManagerInner() {
                 flex: 1, padding: "10px 0", borderRadius: 10, cursor: "pointer",
                 background: active ? `${s.fg}22` : "rgba(255,255,255,.04)",
                 border: `1.5px solid ${active ? s.fg : "rgba(255,255,255,.08)"}`,
-                color: active ? s.fg : "#7a6a4a",
+                color: active ? s.fg : C.dim,
                 fontWeight: 800, fontSize: 13, fontFamily: "inherit",
               }}>{s.icon} {opt.lbl}</button>
             );
           })}
         </div>
 
-        <div style={{ marginBottom: 6, fontSize: 12, color: "#a09070" }}>{t("login_user")}</div>
+        <div style={{ marginBottom: 6, fontSize: 12, color: C.goldDim }}>{t("login_user")}</div>
         <input className="input-field" type="text" placeholder={t("login_user")}
                value={newUserName} onChange={e => setNewUserName(e.target.value)}
                style={{ marginBottom: 12, direction: "ltr", textAlign: "right" }}/>
 
-        <div style={{ marginBottom: 6, fontSize: 12, color: "#a09070" }}>{t("login_pass")}</div>
+        <div style={{ marginBottom: 6, fontSize: 12, color: C.goldDim }}>{t("login_pass")}</div>
         <input className="input-field" type="password" placeholder="••••••••"
                value={newUserPass} onChange={e => setNewUserPass(e.target.value)}
                style={{ marginBottom: 10, direction: "ltr", textAlign: "right" }}/>
         <PasswordRules password={newUserPass} t={t} />
 
-        <div style={{ marginBottom: 6, fontSize: 12, color: "#a09070" }}>{t("phone_field_label")}</div>
+        <div style={{ marginBottom: 6, fontSize: 12, color: C.goldDim }}>{t("phone_field_label")}</div>
         <div style={{ marginBottom: 16 }}>
           <PhoneInput value={newUserPhone} onChange={setNewUserPhone} t={t} lang={lang} />
         </div>
@@ -102,19 +103,19 @@ function UserManagerInner() {
             flex: "1 1 80px", padding: "8px 0", borderRadius: 10, cursor: "pointer",
             background: filter === opt.val ? "rgba(201,168,76,.18)" : "rgba(255,255,255,.04)",
             border: `1px solid ${filter === opt.val ? "rgba(201,168,76,.4)" : "rgba(255,255,255,.08)"}`,
-            color: filter === opt.val ? "#c9a84c" : "#7a6a4a",
+            color: filter === opt.val ? C.gold : C.dim,
             fontSize: 11, fontWeight: 800, fontFamily: "inherit",
           }}>{opt.lbl}</button>
         ))}
       </div>
 
-      <div style={{ fontSize: 13, color: "#7a6a4a", fontWeight: 700, marginBottom: 10 }}>
+      <div style={{ fontSize: 13, color: C.dim, fontWeight: 700, marginBottom: 10 }}>
         {t("admin_existing")} ({filtered.length.toLocaleString("en")})
       </div>
 
       {/* ── User list ─────────────────────────────────────────────────── */}
       {filtered.length === 0 ? (
-        <div className="card" style={{ textAlign: "center", padding: 32, color: "#7a6a4a" }}>
+        <div className="card" style={{ textAlign: "center", padding: 32, color: C.dim }}>
           {t("admin_no_users")}
         </div>
       ) : (
@@ -134,15 +135,15 @@ function UserManagerInner() {
               }}>{s.icon}</div>
 
               <div style={{ flex: "1 1 200px", minWidth: 0 }}>
-                <div style={{ fontWeight: 800, color: "#f5e6b8", fontSize: 14, direction: "ltr", textAlign: "right" }}>
+                <div style={{ fontWeight: 800, color: C.goldLight, fontSize: 14, direction: "ltr", textAlign: "right" }}>
                   {u.username}
                 </div>
                 {u.displayName && (
-                  <div style={{ fontSize: 11, color: "#a09070", marginTop: 2 }}>
+                  <div style={{ fontSize: 11, color: C.goldDim, marginTop: 2 }}>
                     {u.displayName}
                   </div>
                 )}
-                <div style={{ fontSize: 11, color: "#7a6a4a", marginTop: 2 }}>
+                <div style={{ fontSize: 11, color: C.dim, marginTop: 2 }}>
                   <span style={{ color: s.fg }}>
                     {u.role === "admin"  ? t("admin_role_admin")
                      : u.role === "driver" ? t("admin_role_driver")
@@ -155,7 +156,7 @@ function UserManagerInner() {
               <div style={{ display: "flex", gap: 6 }}>
                 <button onClick={() => startEditUser(u)} style={{
                   background: "rgba(201,168,76,.10)", border: "1px solid rgba(201,168,76,.30)",
-                  color: "#c9a84c", padding: "6px 12px", borderRadius: 8,
+                  color: C.gold, padding: "6px 12px", borderRadius: 8,
                   fontWeight: 700, fontSize: 12, cursor: "pointer", fontFamily: "inherit",
                 }}>✎ {t("admin_edit")}</button>
 
@@ -166,19 +167,19 @@ function UserManagerInner() {
                       setConfirmingDelete(null);
                     }} style={{
                       background: "rgba(212,80,58,.2)", border: "1px solid rgba(212,80,58,.5)",
-                      color: "#d47a4b", padding: "6px 12px", borderRadius: 8,
+                      color: C.red, padding: "6px 12px", borderRadius: 8,
                       fontWeight: 800, fontSize: 12, cursor: "pointer", fontFamily: "inherit",
                     }}>✓ {t("admin_delete_confirm")}</button>
                     <button onClick={() => setConfirmingDelete(null)} style={{
                       background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.08)",
-                      color: "#7a6a4a", padding: "6px 10px", borderRadius: 8,
+                      color: C.dim, padding: "6px 10px", borderRadius: 8,
                       fontWeight: 700, fontSize: 12, cursor: "pointer", fontFamily: "inherit",
                     }}>×</button>
                   </>
                 ) : (
                   <button onClick={() => setConfirmingDelete(u.uid || u.id)} style={{
                     background: "rgba(212,122,75,.12)", border: "1px solid rgba(212,122,75,.3)",
-                    color: "#d47a4b", padding: "6px 12px", borderRadius: 8,
+                    color: C.red, padding: "6px 12px", borderRadius: 8,
                     fontWeight: 700, fontSize: 12, cursor: "pointer", fontFamily: "inherit",
                   }}>{t("admin_delete")}</button>
                 )}

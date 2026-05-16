@@ -1,7 +1,8 @@
-// Groom → Guests: the guest list, split into with/without address, swipe-to-delete.
+﻿// Groom → Guests: the guest list, split into with/without address, swipe-to-delete.
 import { useNavigate } from "react-router-dom";
 import { STATUS } from "../../../data/status.js";
 import { usePortal } from "../../../context/PortalContext.jsx";
+import { C } from "../../../styles/theme.js";
 
 export function GroomGuests() {
   const navigate = useNavigate();
@@ -12,7 +13,7 @@ export function GroomGuests() {
   return (
           <div style={{ animation: "fadeUp .3s ease" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-              <div style={{ fontSize: 15, fontWeight: 800, color: "#f5e6b8" }}>
+              <div style={{ fontSize: 15, fontWeight: 800, color: C.goldLight }}>
                 {t("guests_count")} ({myGuests.length.toLocaleString("en")})
               </div>
               <button className="gold-btn" style={{ padding: "8px 16px", fontSize: 12 }} onClick={() => navigate("/portal/groom/add")}>
@@ -20,7 +21,7 @@ export function GroomGuests() {
               </button>
             </div>
             {myGuests.length === 0 && (
-              <div className="card" style={{ textAlign: "center", padding: 32, color: "#7a6a4a" }}>
+              <div className="card" style={{ textAlign: "center", padding: 32, color: C.dim }}>
                 {t("guests_empty")}
               </div>
             )}
@@ -79,22 +80,22 @@ export function GroomGuests() {
                     >
                       <div style={{ fontSize: 20 }}>{st.icon}</div>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontWeight: 800, color: "#f5e6b8", fontSize: 14, marginBottom: 2 }}>{g.name}</div>
+                        <div style={{ fontWeight: 800, color: C.goldLight, fontSize: 14, marginBottom: 2 }}>{g.name}</div>
                         <div style={{ fontSize: 11, color: "#5a5040", direction: "ltr", textAlign: "right" }}>{g.phone}</div>
-                        {g.area && <div style={{ fontSize: 12, color: "#7a6a4a" }}>📍 {g.area}</div>}
+                        {g.area && <div style={{ fontSize: 12, color: C.dim }}>📍 {g.area}</div>}
                       </div>
                       <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
                         <span className="status-badge" style={{ background: st.bg, color: st.color }}>{t("stat_" + g.status)}</span>
                         <span style={{
                           fontSize: 10, padding: "2px 8px", borderRadius: 20, fontWeight: 700,
                           background: g.inviteType==="vip" ? "rgba(155,75,212,.15)" : "rgba(201,168,76,.12)",
-                          color: g.inviteType==="vip" ? "#c084fc" : "#c9a84c",
+                          color: g.inviteType==="vip" ? "#c084fc" : C.gold,
                         }}>{g.inviteType==="vip" ? t("type_vip") : t("type_premium")}</span>
                         {canDelete && (
                           <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                             <button onClick={() => startEdit(g)}
                                     style={{ background: "rgba(201,168,76,.12)", border: "1px solid rgba(201,168,76,.3)",
-                                             color: "#c9a84c", fontSize: 11, fontWeight: 700,
+                                             color: C.gold, fontSize: 11, fontWeight: 700,
                                              cursor: "pointer", padding: "3px 8px", borderRadius: 8, fontFamily: "inherit" }}>
                               {t("guests_edit")}
                             </button>
@@ -103,7 +104,7 @@ export function GroomGuests() {
                                     style={{
                                       background: isRevealed ? "rgba(212,80,58,.25)" : "rgba(212,80,58,.08)",
                                       border: "1px solid rgba(212,80,58,.4)",
-                                      color: "#d47a4b", fontSize: 13, fontWeight: 900,
+                                      color: C.red, fontSize: 13, fontWeight: 900,
                                       cursor: "pointer", padding: "3px 9px",
                                       borderRadius: 8, fontFamily: "inherit",
                                       transition: "all .2s",
@@ -133,8 +134,8 @@ export function GroomGuests() {
                 <>
                   {withoutAddr.length > 0 && (
                     <>
-                      {sectionHeader(t("guests_without_address"), withoutAddr.length, "#d47a4b", "rgba(212,122,75,.06)")}
-                      <div style={{ fontSize: 11, color: "#7a6a4a", marginBottom: 10, lineHeight: 1.7, padding: "0 6px" }}>
+                      {sectionHeader(t("guests_without_address"), withoutAddr.length, C.red, "rgba(212,122,75,.06)")}
+                      <div style={{ fontSize: 11, color: C.dim, marginBottom: 10, lineHeight: 1.7, padding: "0 6px" }}>
                         {t("guests_without_hint")}
                       </div>
                       {withoutAddr.map(renderCard)}

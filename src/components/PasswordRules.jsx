@@ -1,7 +1,8 @@
-// Visual checklist of password rules. Pass the current password value and
+﻿// Visual checklist of password rules. Pass the current password value and
 // the translator (`t`); each rule lights up green when it passes, dim when
 // it doesn't. The component is content-only — callers control the wrapping.
 import { evaluatePassword } from "../utils/password.js";
+import { C } from "../styles/theme.js";
 
 export function PasswordRules({ password, t, compact = false }) {
   const results = evaluatePassword(password);
@@ -15,7 +16,7 @@ export function PasswordRules({ password, t, compact = false }) {
       border: "1px solid rgba(201,168,76,.18)",
     }}>
       <div style={{
-        fontSize: 11, color: "#a09070", fontWeight: 700,
+        fontSize: 11, color: C.goldDim, fontWeight: 700,
         marginBottom: 8, letterSpacing: .5,
       }}>
         {t("pwd_rules_title")}
@@ -25,7 +26,7 @@ export function PasswordRules({ password, t, compact = false }) {
           <li key={id} style={{
             display: "flex", alignItems: "center", gap: 8,
             fontSize: 12, lineHeight: 1.5,
-            color: passed ? "#4cc97a" : "#7a6a4a",
+            color: passed ? "#4cc97a" : C.dim,
             transition: "color .25s ease",
           }}>
             <span aria-hidden style={{

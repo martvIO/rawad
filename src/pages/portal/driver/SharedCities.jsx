@@ -1,7 +1,8 @@
-// Driver → Shared-cities tab: distribute for several grooms in one city in a single round.
+﻿// Driver → Shared-cities tab: distribute for several grooms in one city in a single round.
 import { telLink } from "../../../utils/phone.js";
 import { wazeLink, extractCity as extractCityRaw } from "../../../utils/geo.js";
 import { usePortal } from "../../../context/PortalContext.jsx";
+import { C } from "../../../styles/theme.js";
 
 export function SharedCities() {
   const {
@@ -40,21 +41,21 @@ export function SharedCities() {
           return (
             <div style={{ animation: "fadeUp .3s ease" }}>
               <div style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: 18, fontWeight: 900, color: "#c9a84c", fontFamily: "'Amiri',serif", marginBottom: 4 }}>
+                <div style={{ fontSize: 18, fontWeight: 900, color: C.gold, fontFamily: "'Amiri',serif", marginBottom: 4 }}>
                   🏘 {t("shared_title")}
                 </div>
-                <div style={{ fontSize: 12, color: "#7a6a4a", lineHeight: 1.7 }}>
+                <div style={{ fontSize: 12, color: C.dim, lineHeight: 1.7 }}>
                   {t("shared_subtitle")}
                 </div>
               </div>
 
               {sharedStep === "pickGrooms" && (
                 <>
-                  <div style={{ fontSize: 13, color: "#a09070", fontWeight: 700, marginBottom: 10 }}>
+                  <div style={{ fontSize: 13, color: C.goldDim, fontWeight: 700, marginBottom: 10 }}>
                     {t("shared_pick_grooms_label")}
                   </div>
                   {groomUsers.length === 0 ? (
-                    <div className="card" style={{ textAlign: "center", padding: 32, color: "#7a6a4a" }}>
+                    <div className="card" style={{ textAlign: "center", padding: 32, color: C.dim }}>
                       {t("shared_grooms_empty")}
                     </div>
                   ) : (
@@ -67,8 +68,8 @@ export function SharedCities() {
                             <button key={uid} onClick={() => toggleGroom(uid)} style={{
                               padding: "12px 10px", borderRadius: 12, cursor: "pointer",
                               background: isSel ? "rgba(201,168,76,.18)" : "rgba(255,255,255,.03)",
-                              border: `1.5px solid ${isSel ? "#c9a84c" : "rgba(255,255,255,.08)"}`,
-                              color: isSel ? "#c9a84c" : "#a09070",
+                              border: `1.5px solid ${isSel ? C.gold : "rgba(255,255,255,.08)"}`,
+                              color: isSel ? C.gold : C.goldDim,
                               fontWeight: 800, fontSize: 13, fontFamily: "inherit", textAlign: "center",
                               display: "flex", flexDirection: "column", alignItems: "center", gap: 6,
                               transition: "all .2s",
@@ -99,16 +100,16 @@ export function SharedCities() {
               {sharedStep === "pickCity" && (
                 <>
                   <button onClick={() => setSharedStep("pickGrooms")} style={{
-                    background: "none", border: "none", color: "#c9a84c", cursor: "pointer",
+                    background: "none", border: "none", color: C.gold, cursor: "pointer",
                     fontSize: 12, fontWeight: 700, marginBottom: 14, fontFamily: "inherit",
                   }}>{t("shared_back_to_grooms")}</button>
 
-                  <div style={{ fontSize: 13, color: "#a09070", fontWeight: 700, marginBottom: 12 }}>
+                  <div style={{ fontSize: 13, color: C.goldDim, fontWeight: 700, marginBottom: 12 }}>
                     {t("shared_pick_city")}
                   </div>
 
                   {sharedCities.length === 0 ? (
-                    <div className="card" style={{ textAlign: "center", padding: 32, color: "#7a6a4a" }}>
+                    <div className="card" style={{ textAlign: "center", padding: 32, color: C.dim }}>
                       {t("shared_no_pending")}
                     </div>
                   ) : (
@@ -123,12 +124,12 @@ export function SharedCities() {
                         }}>
                         <span style={{ fontSize: 22 }}>🏘</span>
                         <div style={{ flex: 1 }}>
-                          <div style={{ fontWeight: 800, color: "#f5e6b8", fontSize: 14 }}>{city}</div>
-                          <div style={{ fontSize: 11, color: "#7a6a4a", marginTop: 2 }}>
+                          <div style={{ fontWeight: 800, color: C.goldLight, fontSize: 14 }}>{city}</div>
+                          <div style={{ fontSize: 11, color: C.dim, marginTop: 2 }}>
                             {list.length.toLocaleString("en")} {t("shared_city_count")} · {groomCount.toLocaleString("en")} {groomCount === 1 ? (lang === "he" ? "חתן" : "عريس") : (lang === "he" ? "חתנים" : "عرسان")}
                           </div>
                         </div>
-                        <span style={{ color: "#c9a84c", fontSize: 18 }}>←</span>
+                        <span style={{ color: C.gold, fontSize: 18 }}>←</span>
                       </div>
                     ))
                   )}
@@ -145,14 +146,14 @@ export function SharedCities() {
                 return (
                   <>
                     <button onClick={() => { setSharedStep("pickCity"); setSharedSelectedCity(null); }} style={{
-                      background: "none", border: "none", color: "#c9a84c", cursor: "pointer",
+                      background: "none", border: "none", color: C.gold, cursor: "pointer",
                       fontSize: 12, fontWeight: 700, marginBottom: 14, fontFamily: "inherit",
                     }}>{t("shared_back_to_cities")}</button>
 
                     <div style={{ marginBottom: 14, padding: "10px 14px", borderRadius: 12,
                       background: "rgba(201,168,76,.08)", border: "1px solid rgba(201,168,76,.22)" }}>
-                      <div style={{ fontSize: 12, color: "#7a6a4a" }}>{t("shared_route_in")}</div>
-                      <div style={{ fontSize: 18, fontWeight: 900, color: "#c9a84c", fontFamily: "'Amiri',serif" }}>
+                      <div style={{ fontSize: 12, color: C.dim }}>{t("shared_route_in")}</div>
+                      <div style={{ fontSize: 18, fontWeight: 900, color: C.gold, fontFamily: "'Amiri',serif" }}>
                         🏘 {sharedSelectedCity}
                       </div>
                     </div>
@@ -168,22 +169,22 @@ export function SharedCities() {
                             <div style={{
                               width: 28, height: 28, borderRadius: "50%", flexShrink: 0,
                               background: idx === 0 ? "rgba(75,159,212,.2)" : "rgba(255,255,255,.05)",
-                              color: idx === 0 ? "#4b9fd4" : "#7a6a4a",
+                              color: idx === 0 ? C.blue : C.dim,
                               display: "flex", alignItems: "center", justifyContent: "center",
                               fontWeight: 900, fontSize: 13,
                             }}>{idx + 1}</div>
                             <div>
-                              <div style={{ fontWeight: 800, color: "#f5e6b8", fontSize: 15 }}>{g.name}</div>
-                              <div style={{ fontSize: 10, color: "#c9a84c", marginTop: 3 }}>
+                              <div style={{ fontWeight: 800, color: C.goldLight, fontSize: 15 }}>{g.name}</div>
+                              <div style={{ fontSize: 10, color: C.gold, marginTop: 3 }}>
                                 {t("for_groom")} <span style={{ direction: "ltr" }}>{g.groomUsername}</span>
                               </div>
-                              {g.area && <div style={{ fontSize: 12, color: "#7a6a4a", marginTop: 3 }}>📍 {g.area}</div>}
+                              {g.area && <div style={{ fontSize: 12, color: C.dim, marginTop: 3 }}>📍 {g.area}</div>}
                             </div>
                           </div>
                           {idx === 0 && (
                             <span style={{
                               fontSize: 10, padding: "3px 10px", borderRadius: 20,
-                              background: "rgba(75,159,212,.15)", color: "#4b9fd4", fontWeight: 700,
+                              background: "rgba(75,159,212,.15)", color: C.blue, fontWeight: 700,
                             }}>{t("driver_next")}</span>
                           )}
                         </div>

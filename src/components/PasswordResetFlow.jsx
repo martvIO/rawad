@@ -1,4 +1,4 @@
-// Three-step password reset: phone → SMS code → new password.
+﻿// Three-step password reset: phone → SMS code → new password.
 // Uses Firebase Phone Auth on steps 1–2 and the `resetPassword` Cloud
 // Function on step 3 (server-side verifies that the phone-OTP session
 // matches the target portal user's stored phoneE164).
@@ -8,7 +8,9 @@ import { callResetPassword } from "../services/users.js";
 import { PasswordRules } from "./PasswordRules.jsx";
 import { PhoneInput } from "./PhoneInput.jsx";
 import { isStrongPassword } from "../utils/password.js";
+import { logErr } from "../utils/logger.js";
 import { makeT } from "../i18n/index.js";
+import { C } from "../styles/theme.js";
 
 const STRINGS = {
   ar: {
@@ -76,6 +78,7 @@ export function PasswordResetFlow({ lang, onClose }) {
       confirmationRef.current = await sendPasswordResetCode(phone.trim(), captchaContainerId);
       setStep(2);
     } catch (e) {
+      logErr("sendPasswordResetCode", e);
       setError(e?.message || T("invalid_phone"));
     } finally { setBusy(false); }
   };
@@ -88,6 +91,7 @@ export function PasswordResetFlow({ lang, onClose }) {
       await confirmPasswordResetCode(confirmationRef.current, code.trim());
       setStep(3);
     } catch (e) {
+      logErr("confirmPasswordResetCode", e);
       setError(e?.message || T("invalid_code"));
     } finally { setBusy(false); }
   };
@@ -100,6 +104,7 @@ export function PasswordResetFlow({ lang, onClose }) {
       await callResetPassword(pass);
       setStep(4);
     } catch (e) {
+      logErr("callResetPassword", e);
       setError(e?.message || tGlobal("pwd_weak"));
     } finally { setBusy(false); }
   };
@@ -116,22 +121,22 @@ export function PasswordResetFlow({ lang, onClose }) {
         borderRadius: 18, padding: 28, animation: "slideUp .3s ease",
       }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
-          <div style={{ color: "#c9a84c", fontWeight: 900, fontSize: 18, fontFamily: "'Amiri',serif" }}>
+          <div style={{ color: C.gold, fontWeight: 900, fontSize: 18, fontFamily: "'Amiri',serif" }}>
             {T("title")}
           </div>
           <button onClick={onClose} style={{
-            background: "none", border: "none", color: "#7a6a4a", fontSize: 22,
+            background: "none", border: "none", color: C.dim, fontSize: 22,
             cursor: "pointer", padding: 0, lineHeight: 1,
           }}>×</button>
         </div>
 
         {step === 1 && (
           <>
-            <div style={{ marginBottom: 6, fontSize: 12, color: "#a09070" }}>{T("step1_label")}</div>
+            <div style={{ marginBottom: 6, fontSize: 12, color: C.goldDim }}>{T("step1_label")}</div>
             <div style={{ marginBottom: 12 }}>
               <PhoneInput value={phone} onChange={(v) => { setPhone(v); setError(""); }} t={tGlobal} lang={lang} autoFocus />
             </div>
-            {error && <div style={{ color: "#d47a4b", fontSize: 12, marginBottom: 10 }}>{error}</div>}
+            {error && <div style={{ color: C.red, fontSize: 12, marginBottom: 10 }}>{error}</div>}
             <button className="gold-btn" style={{ width: "100%" }} disabled={busy || !phone} onClick={sendCode}>
               {T("step1_submit")}
             </button>
@@ -140,11 +145,11 @@ export function PasswordResetFlow({ lang, onClose }) {
 
         {step === 2 && (
           <>
-            <div style={{ marginBottom: 6, fontSize: 12, color: "#a09070" }}>{T("step2_label")}</div>
+            <div style={{ marginBottom: 6, fontSize: 12, color: C.goldDim }}>{T("step2_label")}</div>
             <input className="input-field" type="tel" inputMode="numeric" placeholder={T("step2_placeholder")}
                    value={code} onChange={e => { setCode(e.target.value.replace(/[^\d]/g, "")); setError(""); }}
                    style={{ marginBottom: 12, direction: "ltr", textAlign: "right" }}/>
-            {error && <div style={{ color: "#d47a4b", fontSize: 12, marginBottom: 10 }}>{error}</div>}
+            {error && <div style={{ color: C.red, fontSize: 12, marginBottom: 10 }}>{error}</div>}
             <button className="gold-btn" style={{ width: "100%" }} disabled={busy} onClick={verifyCode}>
               {T("step2_submit")}
             </button>
@@ -156,12 +161,12 @@ export function PasswordResetFlow({ lang, onClose }) {
 
         {step === 3 && (
           <>
-            <div style={{ marginBottom: 6, fontSize: 12, color: "#a09070" }}>{T("step3_label")}</div>
+            <div style={{ marginBottom: 6, fontSize: 12, color: C.goldDim }}>{T("step3_label")}</div>
             <input className="input-field" type="password" placeholder={T("step3_placeholder")}
                    value={pass} onChange={e => { setPass(e.target.value); setError(""); }}
                    style={{ marginBottom: 10 }}/>
             <PasswordRules password={pass} t={tGlobal} />
-            {error && <div style={{ color: "#d47a4b", fontSize: 12, marginBottom: 10 }}>{error}</div>}
+            {error && <div style={{ color: C.red, fontSize: 12, marginBottom: 10 }}>{error}</div>}
             <button className="gold-btn" style={{ width: "100%" }}
                     disabled={busy || !isStrongPassword(pass)} onClick={updatePassword}>
               {T("step3_submit")}

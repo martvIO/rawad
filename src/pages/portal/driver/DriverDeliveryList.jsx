@@ -1,8 +1,9 @@
-// Driver → main route: pending guests grouped by city, the delivery form,
+﻿// Driver → main route: pending guests grouped by city, the delivery form,
 // the live-location share panel, and the completed list.
 import { telLink } from "../../../utils/phone.js";
 import { wazeLink, extractCity as extractCityRaw } from "../../../utils/geo.js";
 import { usePortal } from "../../../context/PortalContext.jsx";
+import { C } from "../../../styles/theme.js";
 
 export function DriverDeliveryList() {
   const {
@@ -53,9 +54,9 @@ export function DriverDeliveryList() {
                 borderRadius: 4, transition: "width .6s ease",
               }}/>
             </div>
-            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6, fontSize: 11, color: "#7a6a4a" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6, fontSize: 11, color: C.dim }}>
               <span>{t("driver_remaining")} {pending.length.toLocaleString("en")}</span>
-              <span style={{ color: "#c9a84c", fontWeight: 700 }}>{pct}%</span>
+              <span style={{ color: C.gold, fontWeight: 700 }}>{pct}%</span>
               <span>{t("driver_done")} {done.length.toLocaleString("en")}</span>
             </div>
           </div>
@@ -76,7 +77,7 @@ export function DriverDeliveryList() {
               }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
                   <span style={{ fontSize: 18 }}>📡</span>
-                  <div style={{ fontSize: 13, fontWeight: 800, color: isActive ? "#4cc97a" : "#4b9fd4" }}>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: isActive ? "#4cc97a" : C.blue }}>
                     {t("share_section")}
                   </div>
                 </div>
@@ -87,9 +88,9 @@ export function DriverDeliveryList() {
                     <div style={{ fontSize: 12, color: "#4cc97a", fontWeight: 700, marginBottom: 4 }}>
                       {t("geo_share_active")}
                     </div>
-                    <div style={{ fontSize: 11, color: "#7a6a4a", marginBottom: 8, lineHeight: 1.7 }}>
+                    <div style={{ fontSize: 11, color: C.dim, marginBottom: 8, lineHeight: 1.7 }}>
                       {t("share_active_with")}{" "}
-                      <span style={{ color: "#c9a84c", fontWeight: 700, direction: "ltr" }}>
+                      <span style={{ color: C.gold, fontWeight: 700, direction: "ltr" }}>
                         {liveShareWith
                           .map(uid => groomUsers.find(u => (u.uid || u.id) === uid)?.username || uid)
                           .join(", ")}
@@ -103,10 +104,10 @@ export function DriverDeliveryList() {
                         background: "rgba(76,201,122,.05)", border: "1px solid rgba(76,201,122,.18)",
                         display: "flex", flexDirection: "column", gap: 4,
                       }}>
-                        <div style={{ fontSize: 11, color: "#7a6a4a", direction: "ltr", textAlign: "right" }}>
+                        <div style={{ fontSize: 11, color: C.dim, direction: "ltr", textAlign: "right" }}>
                           📍 {driverCoords.lat.toFixed(5)}, {driverCoords.lng.toFixed(5)}
                         </div>
-                        <div style={{ fontSize: 11, color: "#7a6a4a" }}>
+                        <div style={{ fontSize: 11, color: C.dim }}>
                           {t("geo_accuracy")} ±{driverCoords.accuracy} {t("geo_meters")}
                         </div>
                         <div style={{ fontSize: 10, color: "#4cc97a", fontWeight: 700 }}>
@@ -117,14 +118,14 @@ export function DriverDeliveryList() {
                     <button onClick={stopLiveLocation} style={{
                       width: "100%", padding: "10px 0", borderRadius: 10, cursor: "pointer",
                       background: "rgba(212,122,75,.12)", border: "1px solid rgba(212,122,75,.3)",
-                      color: "#d47a4b", fontSize: 13, fontWeight: 700, fontFamily: "inherit",
+                      color: C.red, fontSize: 13, fontWeight: 700, fontFamily: "inherit",
                     }}>{t("geo_share_stop")}</button>
                   </>
                 ) : (
                   /* ─── NOT BROADCASTING — show permission flow + start button ─── */
                   <>
                     <div style={{
-                      fontSize: 11, color: "#a09070", marginBottom: 12, lineHeight: 1.9,
+                      fontSize: 11, color: C.goldDim, marginBottom: 12, lineHeight: 1.9,
                       padding: "10px 14px", borderRadius: 10,
                       background: "rgba(38,165,228,.06)", border: "1px solid rgba(38,165,228,.22)",
                       whiteSpace: "pre-line",
@@ -137,13 +138,13 @@ export function DriverDeliveryList() {
                       <div style={{
                         padding: "10px 12px", borderRadius: 10, marginBottom: 12,
                         background: "rgba(212,122,75,.08)", border: "1px solid rgba(212,122,75,.3)",
-                        fontSize: 12, color: "#d47a4b", lineHeight: 1.6,
+                        fontSize: 12, color: C.red, lineHeight: 1.6,
                       }}>
                         ⚠ {driverGeoError}
                       </div>
                     )}
 
-                    <div style={{ marginBottom: 6, fontSize: 11, color: "#7a6a4a", fontWeight: 700 }}>
+                    <div style={{ marginBottom: 6, fontSize: 11, color: C.dim, fontWeight: 700 }}>
                       {t("share_pick_grooms")}
                     </div>
                     {groomUsers.length === 0 ? (
@@ -160,8 +161,8 @@ export function DriverDeliveryList() {
                             <button key={uid} onClick={() => toggleGroom(uid)} style={{
                               padding: "6px 12px", borderRadius: 20, cursor: "pointer",
                               background: isSel ? "rgba(201,168,76,.2)" : "rgba(255,255,255,.04)",
-                              border: `1.5px solid ${isSel ? "#c9a84c" : "rgba(255,255,255,.1)"}`,
-                              color: isSel ? "#c9a84c" : "#7a6a4a",
+                              border: `1.5px solid ${isSel ? C.gold : "rgba(255,255,255,.1)"}`,
+                              color: isSel ? C.gold : C.dim,
                               fontSize: 12, fontWeight: 700, fontFamily: "inherit",
                               display: "flex", alignItems: "center", gap: 6,
                             }}>
@@ -201,7 +202,7 @@ export function DriverDeliveryList() {
           {/* Pending — grouped by city */}
           {pending.length > 0 && (
             <>
-              <div style={{ fontSize: 12, color: "#7a6a4a", fontWeight: 700, marginBottom: 12 }}>
+              <div style={{ fontSize: 12, color: C.dim, fontWeight: 700, marginBottom: 12 }}>
                 {t("driver_list_title")}
               </div>
 
@@ -214,10 +215,10 @@ export function DriverDeliveryList() {
                     background: "rgba(201,168,76,.08)", border: "1px solid rgba(201,168,76,.2)",
                   }}>
                     <span style={{ fontSize: 16 }}>🏘</span>
-                    <div style={{ flex: 1, fontWeight: 800, color: "#c9a84c", fontSize: 14 }}>
+                    <div style={{ flex: 1, fontWeight: 800, color: C.gold, fontSize: 14 }}>
                       {group.city}
                     </div>
-                    <span style={{ fontSize: 11, color: "#7a6a4a" }}>
+                    <span style={{ fontSize: 11, color: C.dim }}>
                       {group.list.length.toLocaleString("en")}
                     </span>
                   </div>
@@ -236,19 +237,19 @@ export function DriverDeliveryList() {
                           <div style={{
                             width: 28, height: 28, borderRadius: "50%", flexShrink: 0,
                             background: isNext ? "rgba(75,159,212,.2)" : "rgba(255,255,255,.05)",
-                            color: isNext ? "#4b9fd4" : "#7a6a4a",
+                            color: isNext ? C.blue : C.dim,
                             display: "flex", alignItems: "center", justifyContent: "center",
                             fontWeight: 900, fontSize: 13,
                           }}>{ordinal}</div>
                           <div>
-                            <div style={{ fontWeight: 800, color: "#f5e6b8", fontSize: 15 }}>{g.name}</div>
-                            {g.area && <div style={{ fontSize: 12, color: "#7a6a4a", marginTop: 4 }}>📍 {g.area}</div>}
+                            <div style={{ fontWeight: 800, color: C.goldLight, fontSize: 15 }}>{g.name}</div>
+                            {g.area && <div style={{ fontSize: 12, color: C.dim, marginTop: 4 }}>📍 {g.area}</div>}
                           </div>
                         </div>
                         {isNext && (
                           <span style={{
                             fontSize: 10, padding: "3px 10px", borderRadius: 20,
-                            background: "rgba(75,159,212,.15)", color: "#4b9fd4", fontWeight: 700,
+                            background: "rgba(75,159,212,.15)", color: C.blue, fontWeight: 700,
                           }}>{t("driver_next")}</span>
                         )}
                       </div>
@@ -285,7 +286,7 @@ export function DriverDeliveryList() {
                                 width: "100%", padding: "10px 0", borderRadius: 10, cursor: "pointer",
                                 background: activeId === g.id ? "rgba(201,168,76,.15)" : "rgba(201,168,76,.08)",
                                 border: "1px solid rgba(201,168,76,.35)",
-                                color: "#c9a84c", fontSize: 13, fontWeight: 700, fontFamily: "inherit",
+                                color: C.gold, fontSize: 13, fontWeight: 700, fontFamily: "inherit",
                               }}>
                         {activeId === g.id ? t("driver_cancel") : t("driver_deliver_btn")}
                       </button>
@@ -301,7 +302,7 @@ export function DriverDeliveryList() {
                             {t("driver_complete_form")}
                           </div>
 
-                          <div style={{ marginBottom: 6, fontSize: 12, color: "#7a6a4a" }}>
+                          <div style={{ marginBottom: 6, fontSize: 12, color: C.dim }}>
                             {t("driver_photo_label")} <span style={{ color: "#5a5040", fontWeight: 400 }}>{t("driver_photo_optional")}</span>
                           </div>
                           <label style={{
@@ -339,7 +340,7 @@ export function DriverDeliveryList() {
                             )}
                           </label>
 
-                          <div style={{ marginBottom: 6, fontSize: 12, color: "#7a6a4a" }}>{t("driver_note_label")}</div>
+                          <div style={{ marginBottom: 6, fontSize: 12, color: C.dim }}>{t("driver_note_label")}</div>
                           <input className="input-field" type="text"
                                  placeholder={t("driver_note_placeholder")}
                                  value={deliveryNote} onChange={e => setDeliveryNote(e.target.value)}
@@ -363,7 +364,7 @@ export function DriverDeliveryList() {
           {/* Done list */}
           {done.length > 0 && (
             <>
-              <div style={{ fontSize: 12, color: "#7a6a4a", fontWeight: 700, margin: "20px 0 12px" }}>
+              <div style={{ fontSize: 12, color: C.dim, fontWeight: 700, margin: "20px 0 12px" }}>
                 {t("driver_done_section")} ({done.length.toLocaleString("en")})
               </div>
               {done.map(g => (
@@ -389,7 +390,7 @@ export function DriverDeliveryList() {
             <div style={{ textAlign: "center", padding: "44px 0" }}>
               <div style={{ fontSize: 60, marginBottom: 12 }}>🎉</div>
               <div style={{ fontSize: 18, fontWeight: 900, color: "#4cc97a" }}>{t("driver_all_done_title")}</div>
-              <div style={{ fontSize: 13, color: "#7a6a4a", marginTop: 8 }}>{t("driver_all_done_subtitle")}</div>
+              <div style={{ fontSize: 13, color: C.dim, marginTop: 8 }}>{t("driver_all_done_subtitle")}</div>
             </div>
           )}
     </>

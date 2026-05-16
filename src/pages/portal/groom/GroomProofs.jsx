@@ -1,11 +1,12 @@
-// Groom → Proofs: delivery proof photos for each delivered guest.
+﻿// Groom → Proofs: delivery proof photos for each delivered guest.
 import { usePortal } from "../../../context/PortalContext.jsx";
+import { C } from "../../../styles/theme.js";
 
 export function GroomProofs() {
   const { t, myGuests, setViewingPhoto } = usePortal();
   return (
           <div style={{ animation: "fadeUp .3s ease" }}>
-            <div style={{ marginBottom: 14, fontSize: 15, fontWeight: 800, color: "#f5e6b8" }}>{t("proofs_title")}</div>
+            <div style={{ marginBottom: 14, fontSize: 15, fontWeight: 800, color: C.goldLight }}>{t("proofs_title")}</div>
             {myGuests.filter(g => g.proofImg).map(g => {
               const isImageData = typeof g.proofImg === "string"
                 && (g.proofImg.startsWith("data:image") || /^https?:\/\//.test(g.proofImg));
@@ -39,13 +40,13 @@ export function GroomProofs() {
                       )}
                     </div>
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 800, color: "#f5e6b8", fontSize: 14 }}>{g.name}</div>
-                      {g.area && <div style={{ fontSize: 12, color: "#7a6a4a", marginTop: 3 }}>📍 {g.area}</div>}
+                      <div style={{ fontWeight: 800, color: C.goldLight, fontSize: 14 }}>{g.name}</div>
+                      {g.area && <div style={{ fontSize: 12, color: C.dim, marginTop: 3 }}>📍 {g.area}</div>}
                       <div style={{ fontSize: 11, color: "#5a5040", marginTop: 3 }}>{t("proofs_distributor")} {g.deliveredBy} · {g.deliveredAt}</div>
                       {isImageData && (
                         <button onClick={() => setViewingPhoto(g.proofImg)} style={{
                           marginTop: 6, background: "rgba(201,168,76,.12)",
-                          border: "1px solid rgba(201,168,76,.3)", color: "#c9a84c",
+                          border: "1px solid rgba(201,168,76,.3)", color: C.gold,
                           padding: "4px 10px", borderRadius: 8, fontSize: 11, fontWeight: 700,
                           cursor: "pointer", fontFamily: "inherit",
                         }}>🔍 {t("photo_view")}</button>

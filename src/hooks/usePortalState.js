@@ -9,6 +9,7 @@ import { load, save, removeKey } from "../utils/storage.js";
 import { toIntlPhone, validatePhone } from "../utils/phone.js";
 import { validateName } from "../utils/validation.js";
 import { isStrongPassword } from "../utils/password.js";
+import { logErr } from "../utils/logger.js";
 
 import { subscribeAuth, signIn, signOutNow } from "../services/auth.js";
 import {
@@ -309,7 +310,7 @@ export function usePortalState({ onBack, t, lang, setLang }) {
         area:  fullAddr || guest.area,
       });
       showToast(t("edit_success"));
-    } catch (e) { showToast(e?.message || ""); }
+    } catch (e) { logErr("useConfirmationData", e); showToast(e?.message || ""); }
   };
 
   // Admin edits a confirmation record. Updates both /confirmations/{id}
@@ -343,7 +344,7 @@ export function usePortalState({ onBack, t, lang, setLang }) {
       }
       setEditingConf(null);
       showToast(t("edit_success"));
-    } catch (e) { showToast(e?.message || ""); }
+    } catch (e) { logErr("saveConfirmationEdit", e); showToast(e?.message || ""); }
   };
 
   // Status badge for a guest based on whether a confirmation arrived. Used
@@ -387,14 +388,14 @@ export function usePortalState({ onBack, t, lang, setLang }) {
       });
       setGName(""); setGPhone(""); setGArea(""); setGType("premium");
       showToast(t("add_success"));
-    } catch (e) { showToast(e?.message || ""); }
+    } catch (e) { logErr("addGuest", e); showToast(e?.message || ""); }
   };
 
   const removeGuest = async (id) => {
     const guest = myGuests.find(g => g.id === id);
     if (!guest) return;
     try { await removeGuestSrv(guest.groomUid, id); showToast(t("delete_success")); }
-    catch (e) { showToast(e?.message || ""); }
+    catch (e) { logErr("removeGuest", e); showToast(e?.message || ""); }
   };
 
   const startEdit = (g) => {
@@ -416,7 +417,7 @@ export function usePortalState({ onBack, t, lang, setLang }) {
       });
       setEditingGuest(null);
       showToast(t("edit_success"));
-    } catch (e) { showToast(e?.message || ""); }
+    } catch (e) { logErr("saveGuestEdit", e); showToast(e?.message || ""); }
   };
 
   // ── Admin user management ───────────────────────────────────────────────────
@@ -434,12 +435,13 @@ export function usePortalState({ onBack, t, lang, setLang }) {
       setNewUserName(""); setNewUserPass(""); setNewUserPhone("");
       showToast(t("admin_added"));
     } catch (e) {
+      logErr("addUser", e);
       showToast(e?.message || t("admin_taken"));
     }
   };
   const deleteUser = async (uid) => {
     try { await deletePortalUser(uid); showToast(t("admin_deleted")); }
-    catch (e) { showToast(e?.message || ""); }
+    catch (e) { logErr("deleteUser", e); showToast(e?.message || ""); }
   };
 
   // Admin user-edit lifecycle. Open the modal with a user row, save patches
@@ -466,6 +468,7 @@ export function usePortalState({ onBack, t, lang, setLang }) {
       setEditingUser(null);
       showToast(t("admin_user_edit_saved"));
     } catch (e) {
+      logErr("saveUserEdit", e);
       showToast(e?.message || "");
     }
   };
@@ -494,6 +497,7 @@ export function usePortalState({ onBack, t, lang, setLang }) {
       setActiveId(null); setPhotoTaken(false); setPhotoData(null); setDeliveryNote("");
       showToast(t("driver_confirm"));
     } catch (e) {
+      logErr("markDelivered", e);
       showToast(e?.message || "");
     }
   };

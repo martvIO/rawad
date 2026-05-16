@@ -1,4 +1,4 @@
-// Groom portal shell — sticky header with the five groom tabs, plus the
+﻿// Groom portal shell — sticky header with the five groom tabs, plus the
 // proof-photo viewer and edit-guest modal that overlay every groom tab.
 // Tabs are URL-driven: NavLink updates the path, nested Routes pick the
 // component to render.
@@ -14,6 +14,7 @@ import { GroomGuests } from "./GroomGuests.jsx";
 import { GroomAddGuest } from "./GroomAddGuest.jsx";
 import { GroomProofs } from "./GroomProofs.jsx";
 import { GroomLiveMap } from "./GroomLiveMap.jsx";
+import { C } from "../../../styles/theme.js";
 
 const navClass = ({ isActive }) => `nav-tab${isActive ? " active" : ""}`;
 const navStyle = { fontSize: 12, padding: "6px 10px", textDecoration: "none", display: "inline-block" };
@@ -26,7 +27,7 @@ export function GroomPortalView() {
   } = usePortal();
 
   return (
-    <div style={{ minHeight: "100vh", background: "#07070a" }}>
+    <div style={{ minHeight: "100vh", background: C.bg }}>
       <Toast message={toast} variant="gold" />
 
       <div style={{
@@ -35,8 +36,8 @@ export function GroomPortalView() {
       }}>
         <div style={{ maxWidth: 900, margin: "0 auto", height: 54, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <button onClick={onBack} style={{ background: "none", border: "none", color: "#7a6a4a", cursor: "pointer", fontSize: 16 }}>←</button>
-            <span style={{ fontFamily: "'Amiri',serif", color: "#c9a84c", fontWeight: 900, fontSize: 18 }}>{lang === "he" ? "דעוה" : "دعوة"}</span>
+            <button onClick={onBack} style={{ background: "none", border: "none", color: C.dim, cursor: "pointer", fontSize: 16 }}>←</button>
+            <span style={{ fontFamily: "'Amiri',serif", color: C.gold, fontWeight: 900, fontSize: 18 }}>{lang === "he" ? "דעוה" : "دعوة"}</span>
           </div>
           <div style={{ display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center" }}>
             <NavLink to="/portal/groom/dashboard" className={navClass} style={navStyle}>{t("tab_dashboard")}</NavLink>
@@ -47,7 +48,7 @@ export function GroomPortalView() {
             <LangSwitcher lang={lang} setLang={setLang} />
             <button onClick={() => setLogoutAsking(true)} title={t("logout")} style={{
               background: "rgba(212,80,58,.08)", border: "1px solid rgba(212,80,58,.3)",
-              color: "#d47a4b", padding: "5px 10px", borderRadius: 8,
+              color: C.red, padding: "5px 10px", borderRadius: 8,
               fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", marginInlineStart: 4,
             }}>↩ {t("logout")}</button>
           </div>

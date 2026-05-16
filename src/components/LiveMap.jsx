@@ -1,6 +1,7 @@
-// Leaflet map that renders/syncs multiple markers without re-creating the map.
+﻿// Leaflet map that renders/syncs multiple markers without re-creating the map.
 import { useRef, useEffect } from "react";
 import { useLeaflet } from "../hooks/useLeaflet.js";
+import { C } from "../styles/theme.js";
 
 export function LiveMap({ markers, t, lang, height = 420 }) {
   const leafletReady = useLeaflet();
@@ -15,7 +16,7 @@ export function LiveMap({ markers, t, lang, height = 420 }) {
     if (!L) return null;
     const isYou = kind === "you";
     const bg     = isYou ? "linear-gradient(135deg,#c9a84c,#f0c84c)" : "linear-gradient(135deg,#4b9fd4,#3a7fb0)";
-    const ring   = isYou ? "#c9a84c" : "#4b9fd4";
+    const ring   = isYou ? C.gold : C.blue;
     const icon   = isYou ? "👤" : "🚗";
     const html = `
       <div style="position:relative;width:44px;height:54px;display:flex;flex-direction:column;align-items:center;">
@@ -127,7 +128,7 @@ export function LiveMap({ markers, t, lang, height = 420 }) {
         width: "100%", height,
         display: "flex", alignItems: "center", justifyContent: "center",
         background: "rgba(255,255,255,.03)", border: "1px dashed rgba(201,168,76,.2)",
-        borderRadius: 14, color: "#7a6a4a", fontSize: 13,
+        borderRadius: 14, color: C.dim, fontSize: 13,
       }}>
         {t("map_loading")}
       </div>

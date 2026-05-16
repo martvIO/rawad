@@ -1,6 +1,7 @@
-// Autocomplete input that picks a city from the local CITIES_DB.
+﻿// Autocomplete input that picks a city from the local CITIES_DB.
 import { useState, useMemo } from "react";
 import { CITIES_DB } from "../data/cities.js";
+import { C } from "../styles/theme.js";
 
 export function CityField({ value, onChange, lang, t }) {
   const [open, setOpen] = useState(false);
@@ -37,7 +38,7 @@ export function CityField({ value, onChange, lang, t }) {
                    onClick={() => { onChange(primary); setOpen(false); }}
                    style={{
                      padding: "9px 12px", borderRadius: 8, cursor: "pointer",
-                     fontSize: 13, color: "#f5e6b8", lineHeight: 1.5,
+                     fontSize: 13, color: C.goldLight, lineHeight: 1.5,
                      transition: "background .15s",
                      display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8,
                    }}

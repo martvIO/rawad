@@ -1,6 +1,7 @@
-// Groom → Live: full-size live map of the groom + every driver sharing with them.
+﻿// Groom → Live: full-size live map of the groom + every driver sharing with them.
 import { LiveMap } from "../../../components/LiveMap.jsx";
 import { usePortal } from "../../../context/PortalContext.jsx";
+import { C } from "../../../styles/theme.js";
 
 export function GroomLiveMap() {
   const {
@@ -10,10 +11,10 @@ export function GroomLiveMap() {
   return (
           <div style={{ animation: "fadeUp .3s ease" }}>
             <div style={{ marginBottom: 14 }}>
-              <div style={{ fontSize: 19, fontWeight: 900, color: "#c9a84c", fontFamily: "'Amiri',serif", marginBottom: 4 }}>
+              <div style={{ fontSize: 19, fontWeight: 900, color: C.gold, fontFamily: "'Amiri',serif", marginBottom: 4 }}>
                 {t("live_title")}
               </div>
-              <div style={{ fontSize: 12, color: "#7a6a4a" }}>
+              <div style={{ fontSize: 12, color: C.dim }}>
                 {t("live_subtitle")}
               </div>
             </div>
@@ -27,7 +28,7 @@ export function GroomLiveMap() {
                 display: "flex", flexDirection: "column", gap: 8,
               }}>
                 {groomGeoPermission === "denied" && groomGeoError && (
-                  <div style={{ fontSize: 12, color: "#d47a4b", lineHeight: 1.6 }}>⚠ {groomGeoError}</div>
+                  <div style={{ fontSize: 12, color: C.red, lineHeight: 1.6 }}>⚠ {groomGeoError}</div>
                 )}
                 <button onClick={requestGroomLocation} style={{
                   padding: "12px 0", borderRadius: 10, cursor: "pointer",
@@ -51,7 +52,7 @@ export function GroomLiveMap() {
               }}>
                 <div style={{ fontSize: 12, color: "#4cc97a", fontWeight: 700 }}>
                   🚗 {driversSharingWithMe.length.toLocaleString("en")} {t("map_drivers_count")}{" "}
-                  · <span style={{ direction: "ltr", color: "#c9a84c" }}>
+                  · <span style={{ direction: "ltr", color: C.gold }}>
                     {driversSharingWithMe.map(d => d.driver).join(", ")}
                   </span>
                 </div>
@@ -73,14 +74,14 @@ export function GroomLiveMap() {
                 <div style={{
                   height: 380, display: "flex", flexDirection: "column",
                   alignItems: "center", justifyContent: "center",
-                  background: "rgba(255,255,255,.02)", color: "#7a6a4a",
+                  background: "rgba(255,255,255,.02)", color: C.dim,
                   fontSize: 14, textAlign: "center", padding: 24, gap: 14,
                 }}>
                   <div style={{ fontSize: 48 }}>📡</div>
-                  <div style={{ fontWeight: 800, color: "#c9a84c" }}>
+                  <div style={{ fontWeight: 800, color: C.gold }}>
                     {driversSharingWithMe.length === 0 ? t("no_driver_sharing") : t("map_no_location_yet")}
                   </div>
-                  <div style={{ fontSize: 12, color: "#7a6a4a", maxWidth: 420, lineHeight: 1.8 }}>
+                  <div style={{ fontSize: 12, color: C.dim, maxWidth: 420, lineHeight: 1.8 }}>
                     {t("live_empty_body")}
                   </div>
                 </div>
@@ -101,10 +102,10 @@ export function GroomLiveMap() {
                       fontSize: 18, flexShrink: 0,
                     }}>🚗</div>
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 800, color: "#f5e6b8", fontSize: 13, direction: "ltr", textAlign: "right" }}>
+                      <div style={{ fontWeight: 800, color: C.goldLight, fontSize: 13, direction: "ltr", textAlign: "right" }}>
                         {d.driver}
                       </div>
-                      <div style={{ fontSize: 10, color: "#7a6a4a", direction: "ltr", textAlign: "right" }}>
+                      <div style={{ fontSize: 10, color: C.dim, direction: "ltr", textAlign: "right" }}>
                         {d.lat.toFixed(5)}, {d.lng.toFixed(5)} · ±{d.accuracy || 0}{t("geo_meters")}
                       </div>
                     </div>

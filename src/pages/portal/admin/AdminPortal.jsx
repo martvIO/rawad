@@ -1,4 +1,4 @@
-// Admin portal shell — sticky header, warning banner, sub-tab navigation,
+﻿// Admin portal shell — sticky header, warning banner, sub-tab navigation,
 // and the four admin tabs (users / send / confirmations / settings).
 // Tabs are URL-driven: NavLink updates the path, nested Routes pick the
 // component to render. NavLink's `isActive` callback drives the active
@@ -14,12 +14,13 @@ import { AdminUserManager } from "./AdminUserManager.jsx";
 import { AdminSendTab } from "./AdminSendTab.jsx";
 import { AdminSettingsTab } from "./AdminSettingsTab.jsx";
 import { AdminConfirmationsTab } from "./AdminConfirmationsTab.jsx";
+import { C } from "../../../styles/theme.js";
 
 const tabStyle = ({ isActive }) => ({
   flex: "1 1 140px", padding: "10px 0", borderRadius: 10, cursor: "pointer",
   background: isActive ? "rgba(201,168,76,.18)" : "rgba(255,255,255,.04)",
   border: `1px solid ${isActive ? "rgba(201,168,76,.4)" : "rgba(255,255,255,.08)"}`,
-  color: isActive ? "#c9a84c" : "#7a6a4a",
+  color: isActive ? C.gold : C.dim,
   fontSize: 12, fontWeight: 800, fontFamily: "inherit", transition: "all .2s",
   textAlign: "center", textDecoration: "none", display: "block",
 });
@@ -32,7 +33,7 @@ export function AdminPortal() {
   } = usePortal();
 
   return (
-    <div style={{ minHeight: "100vh", background: "#07070a" }}>
+    <div style={{ minHeight: "100vh", background: C.bg }}>
       <Toast message={toast} variant="gold" />
 
       <div style={{
@@ -41,15 +42,15 @@ export function AdminPortal() {
       }}>
         <div style={{ maxWidth: 720, margin: "0 auto", height: 54, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <button onClick={onBack} style={{ background: "none", border: "none", color: "#7a6a4a", cursor: "pointer", fontSize: 16 }}>←</button>
+            <button onClick={onBack} style={{ background: "none", border: "none", color: C.dim, cursor: "pointer", fontSize: 16 }}>←</button>
             <span style={{ fontSize: 20 }}>🔒</span>
-            <span style={{ fontFamily: "'Amiri',serif", color: "#c9a84c", fontWeight: 900, fontSize: 17 }}>{t("admin_title")}</span>
+            <span style={{ fontFamily: "'Amiri',serif", color: C.gold, fontWeight: 900, fontSize: 17 }}>{t("admin_title")}</span>
           </div>
           <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
             <LangSwitcher lang={lang} setLang={setLang} />
             <button onClick={() => setLogoutAsking(true)} title={t("logout")} style={{
               background: "rgba(212,80,58,.08)", border: "1px solid rgba(212,80,58,.3)",
-              color: "#d47a4b", padding: "5px 10px", borderRadius: 8,
+              color: C.red, padding: "5px 10px", borderRadius: 8,
               fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
             }}>↩ {t("logout")}</button>
           </div>

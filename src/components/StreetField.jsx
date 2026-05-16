@@ -1,6 +1,7 @@
-// Street autocomplete scoped to a city — queries Nominatim + Photon.
+﻿// Street autocomplete scoped to a city — queries Nominatim + Photon.
 import { useState, useMemo, useRef, useEffect } from "react";
 import { CITIES_DB } from "../data/cities.js";
+import { C } from "../styles/theme.js";
 
 export function StreetField({ value, onChange, city, lang, t }) {
   const [open, setOpen] = useState(false);
@@ -117,12 +118,12 @@ export function StreetField({ value, onChange, city, lang, t }) {
           boxShadow: "0 8px 28px rgba(0,0,0,.6)",
         }}>
           {loading && (
-            <div style={{ padding: "10px 12px", fontSize: 12, color: "#7a6a4a", textAlign: "center" }}>
+            <div style={{ padding: "10px 12px", fontSize: 12, color: C.dim, textAlign: "center" }}>
               {t("addr_loading")}
             </div>
           )}
           {!loading && results.length === 0 && (
-            <div style={{ padding: "10px 12px", fontSize: 12, color: "#7a6a4a", textAlign: "center" }}>
+            <div style={{ padding: "10px 12px", fontSize: 12, color: C.dim, textAlign: "center" }}>
               {t("addr_no_matches")}
             </div>
           )}
@@ -131,14 +132,14 @@ export function StreetField({ value, onChange, city, lang, t }) {
                  onClick={() => { onChange(labelFor(r)); setOpen(false); }}
                  style={{
                    padding: "9px 12px", borderRadius: 8, cursor: "pointer",
-                   fontSize: 13, color: "#f5e6b8", lineHeight: 1.5,
+                   fontSize: 13, color: C.goldLight, lineHeight: 1.5,
                    transition: "background .15s",
                  }}
                  onMouseEnter={e => e.currentTarget.style.background = "rgba(201,168,76,.12)"}
                  onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
               <div style={{ fontWeight: 700 }}>🛣 {labelFor(r)}</div>
               {r.type && (
-                <div style={{ fontSize: 10, color: "#7a6a4a", marginTop: 2 }}>
+                <div style={{ fontSize: 10, color: C.dim, marginTop: 2 }}>
                   {r.class === "highway" || /residential|tertiary|primary|secondary/.test(r.type || "")
                     ? (lang === "he" ? "🛣 רחוב" : "🛣 شارع")
                     : `📍 ${r.type}`}

@@ -1,9 +1,10 @@
 // Public guest-confirmation submission. Unauthenticated by design (the guest
 // has no portal account), so abuse protection lives here:
-//   - Firebase App Check (enforced) — only attested clients of THIS app can call.
-//   - Per-IP rate limit.
+//   - Per-IP rate limit (5/hr) — the sole abuse gate.
 //   - Strict schema + length validation.
 //   - Direct client writes to /confirmations are blocked by rules.
+// App Check was removed project-wide; this endpoint stays open and is
+// protected by the rate limit alone.
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { getDatabase } from "firebase-admin/database";
 import { allow }       from "./rateLimit";
@@ -22,7 +23,7 @@ function clampStr(v: unknown, max: number): string {
 }
 
 export const submitConfirmation = onCall(
-  { enforceAppCheck: true },
+  { enforceAppCheck: false },
   async (req) => {
     // Per-IP rate limit: 5 submissions per hour, per IP.
     const ip = (req.rawRequest?.ip ?? "unknown").toString();

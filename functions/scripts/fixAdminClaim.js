@@ -22,15 +22,24 @@ if (!username) {
 }
 
 const databaseURL =
-  process.env.FIREBASE_DATABASE_URL ||
+  process.env.VITE_FIREBASE_DATABASE_URL ||
   "https://dawa-aa793-default-rtdb.firebaseio.com";
 
 const projectId =
   process.env.GCLOUD_PROJECT ||
-  process.env.FIREBASE_PROJECT ||
+  process.env.VITE_FIREBASE_PROJECT_ID ||
   "dawa-aa793";
 
-admin.initializeApp({ databaseURL, projectId });
+const firebaseConfig = {
+  apiKey:            process.env.VITE_FIREBASE_API_KEY,
+  authDomain:        process.env.VITE_FIREBASE_AUTH_DOMAIN,
+  databaseURL:       process.env.VITE_FIREBASE_DATABASE_URL,
+  projectId:         process.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket:     process.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId:             process.env.VITE_FIREBASE_APP_ID,
+};
+admin.initializeApp(firebaseConfig);
 
 const email = `${username.toLowerCase()}@dawa.local`;
 

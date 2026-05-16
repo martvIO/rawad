@@ -1,6 +1,6 @@
-// Public guest confirmation form, opened via /confirm/<groomUsername>.
+﻿// Public guest confirmation form, opened via /confirm/<groomUsername>.
 // Submission goes through the `submitConfirmation` Cloud Function, which
-// validates the input, enforces Firebase App Check, and rate-limits per IP.
+// validates the input and rate-limits per IP.
 import { useState } from "react";
 import { useParams } from "react-router-dom";
 import { BrandLogo } from "../components/BrandLogo.jsx";
@@ -8,6 +8,8 @@ import { LangSwitcher } from "../components/LangSwitcher.jsx";
 import { CityField } from "../components/CityField.jsx";
 import { PhoneInput } from "../components/PhoneInput.jsx";
 import { submitConfirmation } from "../services/confirmations.js";
+import { logErr } from "../utils/logger.js";
+import { C } from "../styles/theme.js";
 
 export function ConfirmationForm({ t, lang, setLang }) {
   const { groomUsername } = useParams();
@@ -38,6 +40,7 @@ export function ConfirmationForm({ t, lang, setLang }) {
       });
       setDone(true);
     } catch (err) {
+      logErr("submitConfirmation", err);
       setError(err?.message || t("conf_form_invalid"));
     } finally {
       setBusy(false);
@@ -71,7 +74,7 @@ export function ConfirmationForm({ t, lang, setLang }) {
           <div style={{ display: "flex", justifyContent: "center", marginBottom: 14 }}>
             <BrandLogo size={68} />
           </div>
-          <h1 style={{ fontFamily: "'Amiri',serif", color: "#c9a84c", fontSize: 26, marginBottom: 10 }}>
+          <h1 style={{ fontFamily: "'Amiri',serif", color: C.gold, fontSize: 26, marginBottom: 10 }}>
             {t("conf_form_welcome_title")}
           </h1>
           <p style={{ color: "rgba(245,230,184,.78)", fontSize: 13, lineHeight: 1.9, maxWidth: 400, margin: "0 auto" }}>
@@ -80,33 +83,33 @@ export function ConfirmationForm({ t, lang, setLang }) {
         </div>
 
         <div className="gold-card">
-          <div style={{ marginBottom: 6, fontSize: 12, color: "#a09070" }}>{t("conf_form_full_name")} *</div>
+          <div style={{ marginBottom: 6, fontSize: 12, color: C.goldDim }}>{t("conf_form_full_name")} *</div>
           <input className="input-field" type="text" placeholder={t("example_name")}
                  value={name} onChange={e => setName(e.target.value)}
                  style={{ marginBottom: 14 }}/>
 
-          <div style={{ marginBottom: 6, fontSize: 12, color: "#a09070" }}>{t("conf_form_phone")} *</div>
+          <div style={{ marginBottom: 6, fontSize: 12, color: C.goldDim }}>{t("conf_form_phone")} *</div>
           <div style={{ marginBottom: 14 }}>
             <PhoneInput value={phone} onChange={setPhone} t={t} lang={lang} />
           </div>
 
-          <div style={{ marginBottom: 6, fontSize: 12, color: "#a09070" }}>{t("conf_form_city")} *</div>
+          <div style={{ marginBottom: 6, fontSize: 12, color: C.goldDim }}>{t("conf_form_city")} *</div>
           <div style={{ marginBottom: 14 }}>
             <CityField value={city} onChange={setCity} lang={lang} t={t}/>
           </div>
 
-          <div style={{ marginBottom: 6, fontSize: 12, color: "#a09070" }}>{t("conf_form_street")}</div>
+          <div style={{ marginBottom: 6, fontSize: 12, color: C.goldDim }}>{t("conf_form_street")}</div>
           <input className="input-field" type="text"
                  value={street} onChange={e => setStreet(e.target.value)}
                  style={{ marginBottom: 14 }}/>
 
-          <div style={{ marginBottom: 6, fontSize: 12, color: "#a09070" }}>{t("conf_form_house_number")}</div>
+          <div style={{ marginBottom: 6, fontSize: 12, color: C.goldDim }}>{t("conf_form_house_number")}</div>
           <input className="input-field" type="text" placeholder="86"
                  value={house} onChange={e => setHouse(e.target.value)}
                  style={{ marginBottom: 14, direction: "ltr", textAlign: "right" }}/>
 
           {error && (
-            <div style={{ color: "#d47a4b", fontSize: 12, marginBottom: 12, textAlign: "center" }}>{error}</div>
+            <div style={{ color: C.red, fontSize: 12, marginBottom: 12, textAlign: "center" }}>{error}</div>
           )}
 
           <button className="gold-btn" style={{ width: "100%" }} onClick={submit}

@@ -1,3 +1,4 @@
+﻿import { C } from "../styles/theme.js";
 // AR / HE language toggle.
 
 export function LangSwitcher({ lang, setLang }) {
@@ -13,7 +14,7 @@ export function LangSwitcher({ lang, setLang }) {
         <button key={code} onClick={() => setLang(code)} style={{
           padding: "5px 12px", fontSize: 12, fontWeight: 800, cursor: "pointer",
           background: lang === code ? "rgba(201,168,76,.18)" : "transparent",
-          color: lang === code ? "#c9a84c" : "#7a6a4a",
+          color: lang === code ? C.gold : C.dim,
           border: "none", fontFamily: "inherit", transition: "all .2s",
         }}>{lbl}</button>
       ))}

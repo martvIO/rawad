@@ -1,7 +1,8 @@
-// Two-field address picker (city then street); emits a combined string.
+﻿// Two-field address picker (city then street); emits a combined string.
 import { useState, useRef, useEffect } from "react";
 import { CityField } from "./CityField.jsx";
 import { StreetField } from "./StreetField.jsx";
+import { C } from "../styles/theme.js";
 
 export function AddressInput({ value, onChange, placeholder, lang, t }) {
   // Parse incoming "value" into city + street ONCE on mount, so editing works
@@ -40,14 +41,14 @@ export function AddressInput({ value, onChange, placeholder, lang, t }) {
 
   return (
     <div>
-      <div style={{ marginBottom: 5, fontSize: 11, color: "#7a6a4a", fontWeight: 700 }}>
+      <div style={{ marginBottom: 5, fontSize: 11, color: C.dim, fontWeight: 700 }}>
         🏘 {t("addr_city_field")}
       </div>
       <div style={{ marginBottom: 12 }}>
         <CityField value={cityVal} onChange={setCityVal} lang={lang} t={t}/>
       </div>
 
-      <div style={{ marginBottom: 5, fontSize: 11, color: "#7a6a4a", fontWeight: 700 }}>
+      <div style={{ marginBottom: 5, fontSize: 11, color: C.dim, fontWeight: 700 }}>
         🛣 {t("addr_street_field")}
       </div>
       {cityVal.trim() ? (

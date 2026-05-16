@@ -1,4 +1,4 @@
-// Admin edit modal for an existing user. Mirrors EditGuestModal's style.
+﻿// Admin edit modal for an existing user. Mirrors EditGuestModal's style.
 // Lets the admin change displayName, phone (E.164), role, username, and
 // optionally set a new password (leave blank to keep current).
 import { useEffect, useState } from "react";
@@ -6,6 +6,7 @@ import { usePortal } from "../context/PortalContext.jsx";
 import { PasswordRules } from "./PasswordRules.jsx";
 import { PhoneInput } from "./PhoneInput.jsx";
 import { isStrongPassword } from "../utils/password.js";
+import { C } from "../styles/theme.js";
 
 export function EditUserModal() {
   const { editingUser, cancelEditUser, saveUserEdit, t, lang } = usePortal();
@@ -51,51 +52,51 @@ export function EditUserModal() {
         borderRadius: 18, padding: 24, animation: "slideUp .3s ease",
       }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
-          <div style={{ color: "#c9a84c", fontWeight: 900, fontSize: 18, fontFamily: "'Amiri',serif" }}>
+          <div style={{ color: C.gold, fontWeight: 900, fontSize: 18, fontFamily: "'Amiri',serif" }}>
             {t("admin_user_edit_title")}
           </div>
           <button onClick={cancelEditUser} style={{
-            background: "none", border: "none", color: "#7a6a4a", fontSize: 22,
+            background: "none", border: "none", color: C.dim, fontSize: 22,
             cursor: "pointer", padding: 0, lineHeight: 1,
           }}>×</button>
         </div>
 
-        <div style={{ marginBottom: 6, fontSize: 12, color: "#a09070" }}>{t("admin_role")}</div>
+        <div style={{ marginBottom: 6, fontSize: 12, color: C.goldDim }}>{t("admin_role")}</div>
         <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
           {[
-            { val: "groom",  lbl: t("admin_role_groom"),  color: "#c9a84c" },
-            { val: "driver", lbl: t("admin_role_driver"), color: "#4b9fd4" },
-            { val: "admin",  lbl: t("admin_role_admin"),  color: "#d47a4b" },
+            { val: "groom",  lbl: t("admin_role_groom"),  color: C.gold },
+            { val: "driver", lbl: t("admin_role_driver"), color: C.blue },
+            { val: "admin",  lbl: t("admin_role_admin"),  color: C.red },
           ].map(opt => (
             <button key={opt.val} onClick={() => setRole(opt.val)} style={{
               flex: 1, padding: "9px 0", borderRadius: 10, cursor: "pointer",
               background: role === opt.val ? `${opt.color}22` : "rgba(255,255,255,.04)",
               border: `1.5px solid ${role === opt.val ? opt.color : "rgba(255,255,255,.08)"}`,
-              color: role === opt.val ? opt.color : "#7a6a4a",
+              color: role === opt.val ? opt.color : C.dim,
               fontWeight: 800, fontSize: 12, fontFamily: "inherit",
             }}>{opt.lbl}</button>
           ))}
         </div>
 
-        <div style={{ marginBottom: 6, fontSize: 12, color: "#a09070" }}>{t("login_user")}</div>
+        <div style={{ marginBottom: 6, fontSize: 12, color: C.goldDim }}>{t("login_user")}</div>
         <input className="input-field" type="text"
                value={username} onChange={e => setUsername(e.target.value)}
                style={{ marginBottom: 4, direction: "ltr", textAlign: "right" }}/>
-        <div style={{ fontSize: 10, color: "#7a6a4a", marginBottom: 12 }}>
+        <div style={{ fontSize: 10, color: C.dim, marginBottom: 12 }}>
           {t("admin_user_edit_username_warn")}
         </div>
 
-        <div style={{ marginBottom: 6, fontSize: 12, color: "#a09070" }}>{t("admin_user_edit_display_name")}</div>
+        <div style={{ marginBottom: 6, fontSize: 12, color: C.goldDim }}>{t("admin_user_edit_display_name")}</div>
         <input className="input-field" type="text"
                value={displayName} onChange={e => setDisplayName(e.target.value)}
                style={{ marginBottom: 12 }}/>
 
-        <div style={{ marginBottom: 6, fontSize: 12, color: "#a09070" }}>{t("phone_field_label")}</div>
+        <div style={{ marginBottom: 6, fontSize: 12, color: C.goldDim }}>{t("phone_field_label")}</div>
         <div style={{ marginBottom: 12 }}>
           <PhoneInput value={phoneE164} onChange={setPhoneE164} t={t} lang={lang} />
         </div>
 
-        <div style={{ marginBottom: 6, fontSize: 12, color: "#a09070" }}>{t("admin_user_edit_new_password")}</div>
+        <div style={{ marginBottom: 6, fontSize: 12, color: C.goldDim }}>{t("admin_user_edit_new_password")}</div>
         <input className="input-field" type="password"
                value={newPassword} onChange={e => setNewPassword(e.target.value)}
                placeholder={t("admin_user_edit_new_password_hint")}
