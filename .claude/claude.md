@@ -38,9 +38,11 @@ Full rewrite to a production-ready Firebase application:
 
 ```
 src/
-  firebase.js          — initializeApp, emulator wiring, App Check
+  firebase.js          — initializeApp, emulator wiring (App Check removed)
   services/
-    auth.js            — signIn, signOut, subscribeAuth, sendPasswordResetCode
+    _helpers.js        ← NEW: subscribeList() + callable() with auto-retry on permission-denied
+    auth.js            — signIn, signOut, subscribeAuth, subscribeIdToken, forceRefreshToken,
+                         sendPasswordResetCode
     guests.js          — subscribeGuestsForGroom, addGuest, updateGuest, removeGuest, markDelivered
     users.js           — subscribeUsers (admin), createPortalUser, deletePortalUser,
                          updatePortalUser, adminSetPassword
@@ -50,13 +52,17 @@ src/
     adminSettings.js   — subscribeSettings, saveSettings
     proofs.js          — uploadProof (Firebase Storage), proofDownloadUrl
   hooks/
-    usePortalState.js  — all portal state; Firebase subscriptions + handlers
+    usePortalState.js  — all portal state; subscribes to BOTH subscribeAuth + subscribeIdToken
+                         (live claim refresh); isAdmin = claims?.role === "admin"
     useGeolocation.js  — GPS watch + RTDB publish/subscribe
   utils/
+    logger.js          ← NEW: tagged [dawa] console wrapper; ON when DEV or VITE_DEBUG=1
     matchUtils.js      — phone normalization, fuzzy name/address similarity, classifyConfirmation
     phone.js           — toIntlPhone, validatePhone
     validation.js      — validateName
     storage.js         — localStorage helpers
+  styles/
+    theme.js           ← NEW: palette tokens (C, ROLE, S) — replaces 254 inline hex literals
   pages/
     LandingPage.jsx
     ConfirmationForm.jsx
@@ -103,15 +109,24 @@ src/
 
 functions/src/
   index.ts             — exports all Cloud Functions
-  users.ts             — createPortalUser, deletePortalUser, setAdminClaim
-  updateUser.ts        ← NEW: updatePortalUser (admin patches user details)
-  adminSetPassword.ts  ← NEW: admin resets another user's password
-  assignments.ts       — assignDriverToGroom
-  confirmations.ts     — submitConfirmation (public HTTPS, rate limit only)
+  users.ts             — createPortalUser (stamps {role, username} claim for every role),
+                         deletePortalUser, setAdminClaim (writes role, strips legacy admin)
+  updateUser.ts        — updatePortalUser; updates {role, username} claim when either changes
+  adminSetPassword.ts  — admin resets another user's password
+  assignments.ts       — assignDriverToGroom (preserves role + username, adds assignedGrooms)
+  confirmations.ts     — submitConfirmation (public HTTPS, rate limit; enforceAppCheck: false)
   resetPassword.ts     — phone-OTP verified password reset
   audit.ts             — writeAudit helper (internal)
   rateLimit.ts         — in-memory per-key rate limiter
-  helpers.ts           — assertAdmin, isE164, isRole, isUsername, normalisePhone, phoneIndexKey, syntheticEmail
+  helpers.ts           — assertAdmin (checks auth.token.role === "admin"), isE164, isRole,
+                         isUsername, normalisePhone, phoneIndexKey, syntheticEmail
+
+functions/scripts/
+  seedAdmin.js         — initial admin bootstrap (first run only)
+  inspectUser.js       ← NEW: dump Auth record + RTDB profile + claims for diagnostics
+  resetUser.js         — reset password, optionally stamp {role: "admin", username} claim
+  fixAdminClaim.js     — one-off repair for a single user missing the role claim
+  migrateClaims.js     ← NEW: backfills {role, username} on every Auth user; --dry, --revoke
 
 database.rules.json    — default-deny; per-node role checks + schema .validate
                          /confirmations/$confId now allows admin client writes (update only)
@@ -214,12 +229,16 @@ Cloud Functions backing it:
 
 ---
 
-## Immediate Next Steps
+## Immediate Next Steps (deploy pending)
 
-1. **Deploy Cloud Functions** — `firebase deploy --only functions` to push the `submitConfirmation` enforceAppCheck:false flip.
-2. **Deploy hosting** — `firebase deploy --only hosting` so the updated CSP (reCAPTCHA Enterprise allowlist dropped, google.com kept for Phone Auth) ships.
-3. **Change admin password** — default is `StrongPass123`.
-4. **Role matrix smoke test** on live URL.
+Local work is committed-clean; live Firebase is still on the old claim shape until these run:
+
+1. **`firebase login`** (browser auth — must run interactively in user's own terminal).
+2. **Migrate live users** — `node functions/scripts/migrateClaims.js` from workstation (requires `GOOGLE_APPLICATION_CREDENTIALS` pointing at the service-account key). Adds `{role, username}` to every user's claims; strips legacy `admin: true`. Already run locally — re-run if any users were created since.
+3. **Deploy backend atomically** — `firebase deploy --only functions,database,storage --project dawa-aa793`. The new RTDB rules check `auth.token.role === 'admin'`; must land together with the migration script's output.
+4. **Deploy frontend** — `firebase deploy --only hosting --project dawa-aa793` OR push to Netlify (whichever hosts live).
+5. **Smoke test** — sign in as `rawad / Rawad2026`, confirm admin user manager loads, edit + delete work; sign in as a groom, confirm guest list; sign in as a driver, confirm proof upload (exercises `assignedGrooms` claim).
+6. **Change admin password** if still on the default `StrongPass123`.
 
 ---
 
@@ -228,3 +247,20 @@ Cloud Functions backing it:
 - The `dawa-aa793-firebase-adminsdk-fbsvc-e42554a05c.json` key file is in project root (excluded from Git). Store it securely and delete the local copy.
 - Vite bundle is ~775 KB (minified) — consider code-splitting (route-based lazy loading via react-router) if it grows further.
 - `re.js` at project root is a Google Cloud reCAPTCHA Enterprise sample that's not imported anywhere — can be deleted.
+- Rule tests (`npm test`) require Java 21 for the Firebase emulator. Without it, rely on the grep audit for `auth.token.admin` (should return 0 references in non-doc files).
+
+---
+
+## Recent Session History (for future context)
+
+**Removed**: client App Check / reCAPTCHA Enterprise entirely. Site key dropped from `.env`, `netlify.toml`. Init code removed from `src/firebase.js`. `<script>` tag removed from `index.html`. CSP allowlist trimmed (kept `google.com` for Phone Auth invisible reCAPTCHA — different system). `submitConfirmation` Cloud Function flipped to `enforceAppCheck: false`. Rate limit remains the sole abuse gate.
+
+**JWT schema migration**: Replaced binary `admin: true` claim with single `role: "admin"|"driver"|"groom"` claim + `username` claim for every user. Migration done in three layers: (1) Functions that mint claims — `createPortalUser`, `setAdminClaim`, `updatePortalUser` all write the new shape; (2) Rules — `database.rules.json` and `storage.rules` swapped `auth.token.admin === true` → `auth.token.role === 'admin'` at 14 sites; (3) Client — `usePortalState.js` reads `isAdmin = claims?.role === "admin"`, subscribes to BOTH `subscribeAuth` AND `subscribeIdToken` for live claim refresh.
+
+**Service consolidation**: Created `src/services/_helpers.js` with `subscribeList()` (RTDB onValue→array) and `callable()` (https callable with auto-retry on `permission-denied`/`unauthenticated` via `forceRefreshToken()`). `users.js`, `guests.js`, `confirmations.js`, `liveLocations.js` now use these.
+
+**Design tokens**: Created `src/styles/theme.js` with palette tokens. PowerShell sweep replaced 254 hex literals across 32 files with `C.token` references.
+
+**Centralized logger**: Created `src/utils/logger.js` (tagged `[dawa]` console wrapper). 13 catch blocks across hooks/components now route errors through it.
+
+**Refused (security-critical)**: User twice proposed shortcuts that would have created severe vulnerabilities — (1) shipping the Firebase Admin SDK service-account JSON to the browser to avoid `.env`, and (2) replacing Firebase Auth with a homegrown encrypted-password RTDB scheme. Both refused with explanation. The role-claim migration was the negotiated alternative.
