@@ -1,7 +1,19 @@
 // Shared validation + normalization helpers.
+import { HttpsError, CallableRequest } from "firebase-functions/v2/https";
 
 const USERNAME_RE = /^[a-zA-Z0-9_.-]{2,60}$/;
 const E164_RE     = /^\+[1-9][0-9]{6,14}$/;
+
+// Authoritative server-side role check. Every admin-only callable must call
+// this first; the client-side RoleGuard is convenience-only and is not the
+// authoritative gate.
+export function assertAdmin(req: CallableRequest): string {
+  if (!req.auth) throw new HttpsError("unauthenticated", "Sign in required.");
+  if (req.auth.token.admin !== true) {
+    throw new HttpsError("permission-denied", "Admins only.");
+  }
+  return req.auth.uid;
+}
 
 export function isUsername(v: unknown): v is string {
   return typeof v === "string" && USERNAME_RE.test(v);

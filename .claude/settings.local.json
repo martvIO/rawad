@@ -21,7 +21,8 @@
       "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\rwadh\\\\OneDrive\\\\Desktop\\\\DAWA\\\\rawad\\\\src\\\\pages\" -Recurse)",
       "Bash*",
       "PowerShell*",
-      "Bash(taskkill //F //IM node.exe)"
+      "Bash(taskkill //F //IM node.exe)",
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\rwadh\\\\OneDrive\\\\Desktop\\\\DAWA\\\\rawad\\\\functions\\\\src\" -Recurse -Filter \"*.ts\" -o Name)"
     ]
   }
 }

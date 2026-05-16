@@ -4,8 +4,9 @@ import { LangSwitcher } from "../../../components/LangSwitcher.jsx";
 import { LogoutConfirm } from "../../../components/LogoutConfirm.jsx";
 import { Toast } from "../../../components/Toast.jsx";
 import { EditConfirmationModal } from "../../../components/EditConfirmationModal.jsx";
+import { EditUserModal } from "../../../components/EditUserModal.jsx";
 import { usePortal } from "../../../context/PortalContext.jsx";
-import { AdminUsersTab } from "./AdminUsersTab.jsx";
+import { AdminUserManager } from "./AdminUserManager.jsx";
 import { AdminSendTab } from "./AdminSendTab.jsx";
 import { AdminSettingsTab } from "./AdminSettingsTab.jsx";
 import { AdminConfirmationsTab } from "./AdminConfirmationsTab.jsx";
@@ -67,13 +68,14 @@ export function AdminPortal() {
           ))}
         </div>
 
-        {adminTab === "users" && <AdminUsersTab />}
+        {adminTab === "users" && <AdminUserManager />}
         {adminTab === "send" && <AdminSendTab />}
         {adminTab === "settings" && <AdminSettingsTab />}
         {adminTab === "confirmations" && <AdminConfirmationsTab />}
       </div>
 
       <EditConfirmationModal />
+      <EditUserModal />
     </div>
   );
 }

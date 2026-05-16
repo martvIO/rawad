@@ -18,6 +18,8 @@ export function subscribeUsers(cb) {
 
 const _createPortalUser = httpsCallable(functions, "createPortalUser");
 const _deletePortalUser = httpsCallable(functions, "deletePortalUser");
+const _updatePortalUser = httpsCallable(functions, "updatePortalUser");
+const _adminSetPassword = httpsCallable(functions, "adminSetPassword");
 const _setAdminClaim    = httpsCallable(functions, "setAdminClaim");
 const _resetPassword    = httpsCallable(functions, "resetPassword");
 
@@ -28,6 +30,19 @@ export async function createPortalUser(input) {
 
 export async function deletePortalUser(uid) {
   const res = await _deletePortalUser({ uid });
+  return res.data;
+}
+
+// Admin-only: patch any combination of username, displayName, phoneE164, role.
+// Cloud Function validates each field and keeps Auth + indices + claims in sync.
+export async function updatePortalUser(input) {
+  const res = await _updatePortalUser(input);
+  return res.data;
+}
+
+// Admin-only: set another user's password (forces re-login on next request).
+export async function adminSetPassword(uid, newPassword) {
+  const res = await _adminSetPassword({ uid, newPassword });
   return res.data;
 }
 

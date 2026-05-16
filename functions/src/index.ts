@@ -6,6 +6,8 @@ import { initializeApp } from "firebase-admin/app";
 initializeApp();
 
 export { createPortalUser, deletePortalUser, setAdminClaim } from "./users";
+export { updatePortalUser }    from "./updateUser";
+export { adminSetPassword }    from "./adminSetPassword";
 export { assignDriverToGroom } from "./assignments";
 export { submitConfirmation }  from "./confirmations";
 export { resetPassword }       from "./resetPassword";

@@ -16,6 +16,8 @@ import {
 import {
   subscribeUsers,
   createPortalUser, deletePortalUser,
+  updatePortalUser as updatePortalUserSrv,
+  adminSetPassword as adminSetPasswordSrv,
 } from "../services/users.js";
 import { subscribeConfirmations, updateConfirmation as updateConfirmationSrv } from "../services/confirmations.js";
 import { classifyAll, normalizePhoneForMatching } from "../utils/matchUtils.js";
@@ -129,6 +131,9 @@ export function usePortalState({ onBack, t, lang, setLang }) {
   const [newUserName,  setNewUserName]  = useState("");
   const [newUserPass,  setNewUserPass]  = useState("");
   const [newUserPhone, setNewUserPhone] = useState("");
+
+  // Admin user-edit modal (full row selected; null = modal closed)
+  const [editingUser, setEditingUser] = useState(null);
 
   // ── Guests subscription ─────────────────────────────────────────────────────
   const [guests, setGuests] = useState([]);
@@ -447,6 +452,34 @@ export function usePortalState({ onBack, t, lang, setLang }) {
     catch (e) { showToast(e?.message || ""); }
   };
 
+  // Admin user-edit lifecycle. Open the modal with a user row, save patches
+  // through updatePortalUser, and (optionally) set a fresh password via
+  // adminSetPassword. The Cloud Functions are authoritative — these client
+  // helpers just choose what to send.
+  const startEditUser = (u) => setEditingUser(u);
+  const cancelEditUser = () => setEditingUser(null);
+  const saveUserEdit = async (uid, patch) => {
+    if (!uid) return;
+    const { username, displayName, phoneE164, role, newPassword } = patch || {};
+    const profilePatch = {};
+    if (typeof username    === "string" && username    !== editingUser?.username)    profilePatch.username    = username;
+    if (typeof displayName === "string" && displayName !== (editingUser?.displayName ?? "")) profilePatch.displayName = displayName;
+    if (typeof phoneE164   === "string" && phoneE164   !== editingUser?.phoneE164)   profilePatch.phoneE164   = phoneE164;
+    if (typeof role        === "string" && role        !== editingUser?.role)        profilePatch.role        = role;
+    try {
+      if (Object.keys(profilePatch).length > 0) {
+        await updatePortalUserSrv({ uid, ...profilePatch });
+      }
+      if (newPassword) {
+        await adminSetPasswordSrv(uid, newPassword);
+      }
+      setEditingUser(null);
+      showToast(t("admin_user_edit_saved"));
+    } catch (e) {
+      showToast(e?.message || "");
+    }
+  };
+
   // ── Mark delivered (with optional photo upload) ─────────────────────────────
   const markDelivered = async (id) => {
     const guest = myGuests.find(g => g.id === id);
@@ -549,6 +582,7 @@ export function usePortalState({ onBack, t, lang, setLang }) {
     users, addUser, deleteUser,
     newUserRole, setNewUserRole, newUserName, setNewUserName,
     newUserPass, setNewUserPass, newUserPhone, setNewUserPhone,
+    editingUser, startEditUser, cancelEditUser, saveUserEdit,
 
     // admin
     adminTab, setAdminTab, adminSelectedGroom, setAdminSelectedGroom,

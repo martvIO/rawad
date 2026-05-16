@@ -41,11 +41,19 @@ export const storage   = getStorage(app);
 // Persist the auth session across page reloads (matches the original UX).
 setPersistence(auth, browserLocalPersistence).catch(() => {});
 
-// App Check — production only. In dev we let the emulator skip attestation.
+// App Check — production-domain only. Skipped in two cases:
+//   1. Emulator mode (dev with VITE_USE_EMULATORS=1).
+//   2. Running on localhost / 127.0.0.1, even against production Firebase.
+//      reCAPTCHA Enterprise rejects unregistered origins with 403, and on
+//      the first failure App Check throttles every Firebase call for 24h
+//      (cached in IndexedDB). Skipping it on localhost avoids that trap.
 const useEmulators =
   env.VITE_USE_EMULATORS === "1" || env.VITE_USE_EMULATORS === "true";
+const isLocalhost =
+  typeof window !== "undefined" &&
+  ["localhost", "127.0.0.1"].includes(window.location.hostname);
 
-if (!useEmulators && env.VITE_RECAPTCHA_ENTERPRISE_SITE_KEY) {
+if (!useEmulators && !isLocalhost && env.VITE_RECAPTCHA_ENTERPRISE_SITE_KEY) {
   // Once enrolled, every RTDB / Storage / Functions call must carry a
   // valid App Check token, blocking traffic from scripts that aren't this app.
   initializeAppCheck(app, {

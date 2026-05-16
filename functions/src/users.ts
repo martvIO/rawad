@@ -1,13 +1,13 @@
 // Admin-only callable functions that manage portal users (grooms / drivers /
 // other admins). The client never creates or deletes users directly — that
 // would bypass our role + claim + index bookkeeping.
-import { HttpsError, onCall, CallableRequest } from "firebase-functions/v2/https";
+import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { getAuth }      from "firebase-admin/auth";
 import { getDatabase }  from "firebase-admin/database";
 import { writeAudit }   from "./audit";
 import { allow }        from "./rateLimit";
 import {
-  isE164, isRole, isUsername,
+  assertAdmin, isE164, isRole, isUsername,
   phoneIndexKey, syntheticEmail,
 } from "./helpers";
 
@@ -17,14 +17,6 @@ interface CreateInput {
   phoneE164: string;
   role: "groom" | "driver" | "admin";
   displayName?: string;
-}
-
-function assertAdmin(req: CallableRequest): string {
-  if (!req.auth) throw new HttpsError("unauthenticated", "Sign in required.");
-  if (req.auth.token.admin !== true) {
-    throw new HttpsError("permission-denied", "Admins only.");
-  }
-  return req.auth.uid;
 }
 
 // ── createPortalUser ──────────────────────────────────────────────────────────
