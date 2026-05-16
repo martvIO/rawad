@@ -44,7 +44,7 @@ export function usePortalState({ onBack, t, lang, setLang }) {
   const userType = authUser?.role ?? null;
   const currentUsername = authUser?.username ?? null;
   const currentUid = authUser?.uid ?? null;
-  const isAdmin = authUser?.claims?.admin === true || userType === "admin";
+  const isAdmin = authUser?.claims?.admin === true;
 
   // ── Login form (transient) ──────────────────────────────────────────────────
   const [loginUser, setLoginUser]   = useState("");
