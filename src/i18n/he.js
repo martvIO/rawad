@@ -104,6 +104,10 @@ export const he = {
   pwd_rule_lowercase: "לפחות אות קטנה אחת (a-z)",
   pwd_rule_number: "לפחות ספרה אחת (0-9)",
   pwd_weak: "הסיסמה חלשה מדי — יש למלא את כל הדרישות שלמעלה",
+  // Phone input
+  phone_country_select: "בחר קידומת מדינה",
+  phone_field_label: "מספר טלפון",
+  phone_hint_il: "הזן את מספר הנייד בלי ה־0 — לדוגמה: 50-123-4567",
   admin_warning: "אתה במצב מנהל — לוח זה גלוי לך בלבד",
   lang_label: "שפה",
   logout: "התנתקות", logout_confirm_title: "התנתקות",

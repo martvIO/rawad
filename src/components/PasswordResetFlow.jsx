@@ -6,6 +6,7 @@ import { useState, useRef, useEffect, useMemo } from "react";
 import { sendPasswordResetCode, confirmPasswordResetCode, signOutNow } from "../services/auth.js";
 import { callResetPassword } from "../services/users.js";
 import { PasswordRules } from "./PasswordRules.jsx";
+import { PhoneInput } from "./PhoneInput.jsx";
 import { isStrongPassword } from "../utils/password.js";
 import { makeT } from "../i18n/index.js";
 
@@ -127,11 +128,11 @@ export function PasswordResetFlow({ lang, onClose }) {
         {step === 1 && (
           <>
             <div style={{ marginBottom: 6, fontSize: 12, color: "#a09070" }}>{T("step1_label")}</div>
-            <input className="input-field" type="tel" placeholder={T("step1_placeholder")}
-                   value={phone} onChange={e => { setPhone(e.target.value); setError(""); }}
-                   style={{ marginBottom: 12, direction: "ltr", textAlign: "right" }}/>
+            <div style={{ marginBottom: 12 }}>
+              <PhoneInput value={phone} onChange={(v) => { setPhone(v); setError(""); }} t={tGlobal} lang={lang} autoFocus />
+            </div>
             {error && <div style={{ color: "#d47a4b", fontSize: 12, marginBottom: 10 }}>{error}</div>}
-            <button className="gold-btn" style={{ width: "100%" }} disabled={busy} onClick={sendCode}>
+            <button className="gold-btn" style={{ width: "100%" }} disabled={busy || !phone} onClick={sendCode}>
               {T("step1_submit")}
             </button>
           </>

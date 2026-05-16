@@ -22,8 +22,10 @@ interface UpdateInput {
   role?: "groom" | "driver" | "admin";
 }
 
+// App Check is OFF — admin-only callable already gated by assertAdmin +
+// rate limit + audit log. See users.ts for the policy rationale.
 export const updatePortalUser = onCall(
-  { enforceAppCheck: true },
+  { enforceAppCheck: false },
   async (req) => {
     const callerUid = assertAdmin(req);
     if (!allow(`updateUser:${callerUid}`, 60, 60 * 60 * 1000)) {

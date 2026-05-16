@@ -11,8 +11,10 @@ import { getDatabase } from "firebase-admin/database";
 import { writeAudit }  from "./audit";
 import { isUsername }  from "./helpers";
 
+// App Check is OFF — driver-only callable already gated by an auth check
+// plus a profile role lookup. See users.ts for the policy rationale.
 export const assignDriverToGroom = onCall(
-  { enforceAppCheck: true },
+  { enforceAppCheck: false },
   async (req) => {
     if (!req.auth) throw new HttpsError("unauthenticated", "Sign in required.");
     const driverUid = req.auth.uid;

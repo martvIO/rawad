@@ -20,8 +20,12 @@ interface CreateInput {
 }
 
 // ── createPortalUser ──────────────────────────────────────────────────────────
+// App Check is OFF for admin callables: they're already gated by the
+// `admin: true` custom claim (assertAdmin) plus per-admin rate limiting
+// and an audit log. App Check stays on the public submitConfirmation
+// endpoint where it's the primary anti-abuse defense.
 export const createPortalUser = onCall(
-  { enforceAppCheck: true },
+  { enforceAppCheck: false },
   async (req) => {
     const callerUid = assertAdmin(req);
     if (!allow(`createUser:${callerUid}`, 30, 60 * 60 * 1000)) {
@@ -86,7 +90,7 @@ export const createPortalUser = onCall(
 
 // ── deletePortalUser ──────────────────────────────────────────────────────────
 export const deletePortalUser = onCall(
-  { enforceAppCheck: true },
+  { enforceAppCheck: false },
   async (req) => {
     const callerUid = assertAdmin(req);
     const uid = req.data?.uid;
@@ -128,7 +132,7 @@ export const deletePortalUser = onCall(
 // Allows an existing admin to promote / demote another user without deleting
 // and re-creating them.
 export const setAdminClaim = onCall(
-  { enforceAppCheck: true },
+  { enforceAppCheck: false },
   async (req) => {
     const callerUid = assertAdmin(req);
     const uid     = req.data?.uid;

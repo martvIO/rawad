@@ -1,5 +1,6 @@
 // Groom → Add: form to add a new guest to the list.
 import { AddressInput } from "../../../components/AddressInput.jsx";
+import { PhoneInput } from "../../../components/PhoneInput.jsx";
 import { usePortal } from "../../../context/PortalContext.jsx";
 
 export function GroomAddGuest() {
@@ -25,11 +26,9 @@ export function GroomAddGuest() {
                      style={{ marginBottom: 14 }}/>
 
               <div style={{ marginBottom: 6, fontSize: 12, color: "#a09070" }}>{t("field_phone")}</div>
-              <input className="input-field" type="tel" inputMode="numeric" maxLength={15}
-                     placeholder={t("example_phone")}
-                     value={gPhone}
-                     onChange={e => setGPhone(e.target.value.replace(/[^\d]/g, ""))}
-                     style={{ marginBottom: 14, direction: "ltr", textAlign: "right" }}/>
+              <div style={{ marginBottom: 14 }}>
+                <PhoneInput value={gPhone} onChange={setGPhone} t={t} lang={lang} />
+              </div>
 
               <div style={{ marginBottom: 6, fontSize: 12, color: "#a09070" }}>
                 {t("field_address")} <span style={{ color: "#5a5040", fontWeight: 400 }}>{t("field_address_optional")}</span>
