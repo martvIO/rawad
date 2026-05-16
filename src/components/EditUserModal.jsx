@@ -4,6 +4,7 @@
 import { useEffect, useState } from "react";
 import { usePortal } from "../context/PortalContext.jsx";
 import { PasswordRules } from "./PasswordRules.jsx";
+import { PhoneInput } from "./PhoneInput.jsx";
 import { isStrongPassword } from "../utils/password.js";
 
 export function EditUserModal() {
@@ -37,10 +38,6 @@ export function EditUserModal() {
       newPassword: newPassword.trim() || null,
     });
   };
-
-  const phoneHint = lang === "he"
-    ? "מספר טלפון (E.164, למשל +972501234567)"
-    : "رقم الهاتف (E.164، مثال +972501234567)";
 
   return (
     <div onClick={cancelEditUser} style={{
@@ -93,11 +90,10 @@ export function EditUserModal() {
                value={displayName} onChange={e => setDisplayName(e.target.value)}
                style={{ marginBottom: 12 }}/>
 
-        <div style={{ marginBottom: 6, fontSize: 12, color: "#a09070" }}>{phoneHint}</div>
-        <input className="input-field" type="tel" inputMode="tel"
-               value={phoneE164} onChange={e => setPhoneE164(e.target.value)}
-               placeholder="+972501234567"
-               style={{ marginBottom: 12, direction: "ltr", textAlign: "right" }}/>
+        <div style={{ marginBottom: 6, fontSize: 12, color: "#a09070" }}>{t("phone_field_label")}</div>
+        <div style={{ marginBottom: 12 }}>
+          <PhoneInput value={phoneE164} onChange={setPhoneE164} t={t} lang={lang} />
+        </div>
 
         <div style={{ marginBottom: 6, fontSize: 12, color: "#a09070" }}>{t("admin_user_edit_new_password")}</div>
         <input className="input-field" type="password"

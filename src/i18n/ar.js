@@ -95,6 +95,10 @@ export const ar = {
   pwd_rule_lowercase: "حرف لاتيني صغير واحد على الأقل (a-z)",
   pwd_rule_number: "رقم واحد على الأقل (0-9)",
   pwd_weak: "كلمة المرور ضعيفة — يرجى استيفاء كل الشروط بالأعلى",
+  // Phone input
+  phone_country_select: "اختر رمز الدولة",
+  phone_field_label: "رقم الهاتف",
+  phone_hint_il: "اكتب رقم الجوال بدون الصفر — مثال: 50-123-4567",
   admin_user_manager_title: "إدارة الحسابات",
   admin_user_manager_subtitle: "إنشاء، تعديل، أو حذف أي نوع من الحسابات",
   admin_user_filter_all: "الكل",

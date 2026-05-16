@@ -6,6 +6,7 @@ import { useParams } from "react-router-dom";
 import { BrandLogo } from "../components/BrandLogo.jsx";
 import { LangSwitcher } from "../components/LangSwitcher.jsx";
 import { CityField } from "../components/CityField.jsx";
+import { PhoneInput } from "../components/PhoneInput.jsx";
 import { submitConfirmation } from "../services/confirmations.js";
 
 export function ConfirmationForm({ t, lang, setLang }) {
@@ -85,11 +86,9 @@ export function ConfirmationForm({ t, lang, setLang }) {
                  style={{ marginBottom: 14 }}/>
 
           <div style={{ marginBottom: 6, fontSize: 12, color: "#a09070" }}>{t("conf_form_phone")} *</div>
-          <input className="input-field" type="tel" inputMode="numeric" maxLength={15}
-                 placeholder={t("example_phone")}
-                 value={phone}
-                 onChange={e => setPhone(e.target.value.replace(/[^\d]/g, ""))}
-                 style={{ marginBottom: 14, direction: "ltr", textAlign: "right" }}/>
+          <div style={{ marginBottom: 14 }}>
+            <PhoneInput value={phone} onChange={setPhone} t={t} lang={lang} />
+          </div>
 
           <div style={{ marginBottom: 6, fontSize: 12, color: "#a09070" }}>{t("conf_form_city")} *</div>
           <div style={{ marginBottom: 14 }}>

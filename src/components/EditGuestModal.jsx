@@ -1,5 +1,6 @@
 // Edit-guest modal — overlays every groom view. Renders nothing when no guest is being edited.
 import { AddressInput } from "./AddressInput.jsx";
+import { PhoneInput } from "./PhoneInput.jsx";
 import { usePortal } from "../context/PortalContext.jsx";
 
 export function EditGuestModal() {
@@ -35,11 +36,9 @@ export function EditGuestModal() {
                    style={{ marginBottom: 12 }}/>
 
             <div style={{ marginBottom: 6, fontSize: 12, color: "#a09070" }}>{t("field_phone")}</div>
-            <input className="input-field" type="tel" inputMode="numeric" maxLength={15}
-                   placeholder={t("example_phone")}
-                   value={ePhone}
-                   onChange={e => setEPhone(e.target.value.replace(/[^\d]/g, ""))}
-                   style={{ marginBottom: 12, direction: "ltr", textAlign: "right" }}/>
+            <div style={{ marginBottom: 12 }}>
+              <PhoneInput value={ePhone} onChange={setEPhone} t={t} lang={lang} />
+            </div>
 
             <div style={{ marginBottom: 6, fontSize: 12, color: "#a09070" }}>
               {t("field_address")} <span style={{ color: "#5a5040", fontWeight: 400 }}>{t("field_address_optional")}</span>

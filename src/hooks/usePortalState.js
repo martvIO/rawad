@@ -370,9 +370,11 @@ export function usePortalState({ onBack, t, lang, setLang }) {
     const phoneError = validatePhone(gPhone, t); if (phoneError) { showToast(phoneError); return; }
     const normalizedPhone = gPhone.trim().replace(/\s+/g, "");
     const normalizedName  = gName.trim().toLowerCase();
+    // Compare on normalised digits so "+972501234567" and "0501234567" are equal.
+    const newPhoneDigits = normalizePhoneForMatching(normalizedPhone);
     if (myGuests.some(g =>
-        (g.phone || "").replace(/\s+/g, "") === normalizedPhone ||
-        (g.name  || "").trim().toLowerCase() === normalizedName,
+        (newPhoneDigits && normalizePhoneForMatching(g.phone) === newPhoneDigits) ||
+        (g.name || "").trim().toLowerCase() === normalizedName,
     )) { showToast(t("add_duplicate_msg")); return; }
     try {
       await addGuestSrv(activeGroomUid, {

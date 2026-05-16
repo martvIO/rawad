@@ -9,6 +9,7 @@ import { useState } from "react";
 import { usePortal } from "../../../context/PortalContext.jsx";
 import { RoleGuard } from "../../../components/RoleGuard.jsx";
 import { PasswordRules } from "../../../components/PasswordRules.jsx";
+import { PhoneInput } from "../../../components/PhoneInput.jsx";
 import { isStrongPassword } from "../../../utils/password.js";
 
 const ROLE_STYLE = {
@@ -30,10 +31,6 @@ function UserManagerInner() {
   const [confirmingDelete, setConfirmingDelete] = useState(null);
 
   const filtered = filter === "all" ? users : users.filter(u => u.role === filter);
-
-  const phoneHint = lang === "he"
-    ? "מספר טלפון (E.164, למשל +972501234567)"
-    : "رقم الهاتف (E.164، مثال +972501234567)";
 
   return (
     <>
@@ -82,10 +79,10 @@ function UserManagerInner() {
                style={{ marginBottom: 10, direction: "ltr", textAlign: "right" }}/>
         <PasswordRules password={newUserPass} t={t} />
 
-        <div style={{ marginBottom: 6, fontSize: 12, color: "#a09070" }}>{phoneHint}</div>
-        <input className="input-field" type="tel" inputMode="tel" placeholder="+972501234567"
-               value={newUserPhone} onChange={e => setNewUserPhone(e.target.value)}
-               style={{ marginBottom: 16, direction: "ltr", textAlign: "right" }}/>
+        <div style={{ marginBottom: 6, fontSize: 12, color: "#a09070" }}>{t("phone_field_label")}</div>
+        <div style={{ marginBottom: 16 }}>
+          <PhoneInput value={newUserPhone} onChange={setNewUserPhone} t={t} lang={lang} />
+        </div>
 
         <button className="gold-btn" style={{ width: "100%" }} onClick={addUser}
                 disabled={!newUserName.trim() || !newUserPhone.trim() || !isStrongPassword(newUserPass)}>

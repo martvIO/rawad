@@ -209,6 +209,73 @@ export const GlobalStyle = () => (
       box-shadow: 0 18px 60px rgba(0,0,0,.5);
     }
 
+    /* ── Phone input (country chip + national number) ─────────────────── */
+    .phone-input-shell {
+      display: flex; align-items: stretch; width: 100%;
+      background: rgba(255,255,255,.04);
+      border: 1px solid rgba(255,255,255,.10);
+      border-radius: 12px; overflow: hidden;
+      transition: border-color .2s, box-shadow .2s, background .2s;
+    }
+    .phone-input-shell:hover:not(.is-disabled) { border-color: rgba(201,168,76,.25); }
+    .phone-input-shell:focus-within {
+      border-color: rgba(201,168,76,.65);
+      box-shadow: 0 0 0 3px rgba(201,168,76,.18);
+      background: rgba(255,255,255,.06);
+    }
+    .phone-input-shell.is-valid { border-color: rgba(76,201,122,.45); }
+    .phone-input-shell.is-valid:focus-within { box-shadow: 0 0 0 3px rgba(76,201,122,.16); }
+    .phone-input-shell.has-error {
+      border-color: rgba(212,122,75,.7);
+      box-shadow: 0 0 0 3px rgba(212,122,75,.15);
+    }
+    .phone-input-shell.is-disabled { opacity: .6; }
+    .phone-input-chip {
+      display: flex; align-items: center; gap: 6px;
+      padding: 0 12px; flex-shrink: 0;
+      background: rgba(255,255,255,.025);
+      border: none; border-inline-end: 1px solid rgba(255,255,255,.08);
+      color: #c9a84c; cursor: pointer; font-family: inherit;
+      font-size: 13px; transition: background .2s, color .2s;
+    }
+    .phone-input-chip:hover:not(:disabled) { background: rgba(201,168,76,.10); color: #f0c84c; }
+    .phone-input-chip:disabled { cursor: not-allowed; }
+    .phone-input-native {
+      flex: 1; min-width: 0;
+      background: transparent; border: none; outline: none;
+      color: #f5e6b8; font-size: 15px; font-weight: 600;
+      padding: 12px 14px; font-family: inherit;
+      direction: ltr; text-align: left;
+      letter-spacing: .5px; font-variant-numeric: tabular-nums;
+    }
+    .phone-input-native::placeholder { color: rgba(245,230,184,.30); font-weight: 400; }
+    .phone-input-status {
+      display: flex; align-items: center; padding: 0 12px;
+      color: #4cc97a; font-size: 16px; font-weight: 900;
+      animation: fadeIn .2s ease;
+    }
+    .phone-input-picker {
+      position: absolute; top: calc(100% + 6px);
+      inset-inline-start: 0; inset-inline-end: 0;
+      z-index: 60;
+      background: #0c0c11; border: 1px solid rgba(201,168,76,.30);
+      border-radius: 12px; padding: 6px;
+      box-shadow: 0 18px 50px rgba(0,0,0,.55);
+      animation: slideDown .18s ease both;
+      max-height: 280px; overflow-y: auto;
+    }
+    .phone-input-picker-row {
+      display: flex; align-items: center; gap: 10px;
+      width: 100%; padding: 10px 12px;
+      background: transparent; border: none; border-radius: 8px;
+      cursor: pointer; font-family: inherit; font-size: 13px; font-weight: 700;
+      color: #a09070; transition: background .15s, color .15s;
+    }
+    .phone-input-picker-row:hover { background: rgba(255,255,255,.04); color: #f5e6b8; }
+    .phone-input-picker-row.active {
+      background: rgba(201,168,76,.12); color: #c9a84c;
+    }
+
     /* ── Inline loading spinner (use beside text in buttons / toasts) ──── */
     .spinner {
       display: inline-block; width: 14px; height: 14px;
