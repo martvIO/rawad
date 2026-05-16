@@ -22,8 +22,12 @@ import { writeAudit }  from "./audit";
 import { allow }       from "./rateLimit";
 import { isStrongPassword, phoneIndexKey } from "./helpers";
 
+// App Check is OFF — the phone-OTP requirement is itself a strong gate
+// (you need to receive an SMS at the phone registered to a portal user),
+// and per-phone rate limiting (5/hr) is enforced below. App Check stays
+// on the public submitConfirmation endpoint where it actually matters.
 export const resetPassword = onCall(
-  { enforceAppCheck: true },
+  { enforceAppCheck: false },
   async (req) => {
     if (!req.auth) throw new HttpsError("unauthenticated", "Phone verification required.");
 
