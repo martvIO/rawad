@@ -67,7 +67,7 @@ async function seed(updates) {
 
 // Convenience wrappers.
 const asAnon   = () => env.unauthenticatedContext().database();
-const asAdmin  = () => env.authenticatedContext(ADMIN, { admin: true }).database();
+const asAdmin  = () => env.authenticatedContext(ADMIN, { role: "admin" }).database();
 const asGroom  = (uid = GROOM)  => env.authenticatedContext(uid).database();
 const asDriver = (uid = DRIVER) => env.authenticatedContext(uid).database();
 
@@ -101,8 +101,8 @@ describe("/users", () => {
   });
   test("clients cannot write to /users (only the admin SDK can)", async () => {
     // Even when authenticated as admin we should be blocked — the rule grants
-    // .write only to auth.token.admin === true. That works for the test SDK
-    // because we pass the admin claim, so we instead test that NON-admin is blocked.
+    // .write only to auth.token.role === 'admin'. That works for the test SDK
+    // because we pass the role claim, so we instead test that NON-admin is blocked.
     await assertFails(set(ref(asGroom(), `users/${GROOM}`), validUser()));
   });
   test("admin can write /users", async () => {

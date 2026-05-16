@@ -41,11 +41,28 @@ const email = `${username.toLowerCase()}@dawa.local`;
   await admin.auth().revokeRefreshTokens(user.uid);
   console.log("✓ Password reset.");
 
-  // 2. (Optional) Stamp admin:true claim and force role=admin in RTDB.
+  // 2. (Optional) Stamp role:"admin" claim and force role=admin in RTDB.
   if (setAdmin) {
     const existing = user.customClaims ?? {};
-    await admin.auth().setCustomUserClaims(user.uid, { ...existing, admin: true });
-    console.log("✓ Custom claim admin:true set.");
+    // Drop legacy admin:true if present; we now use role as the single claim.
+    // eslint-disable-next-line no-unused-vars
+    const { admin: _legacyAdmin, ...rest } = existing;
+    // Best-effort: also stamp username so the claim mirrors what
+    // createPortalUser would have set. Fall back to the part of the email
+    // before "@dawa.local" if the profile is missing.
+    let usernameClaim = rest.username;
+    if (!usernameClaim) {
+      const profileSnap = await admin.database().ref(`users/${user.uid}/username`).get();
+      usernameClaim = profileSnap.exists()
+        ? profileSnap.val()
+        : user.email.replace(/@.*/, "");
+    }
+    await admin.auth().setCustomUserClaims(user.uid, {
+      ...rest,
+      role: "admin",
+      username: usernameClaim,
+    });
+    console.log(`✓ Custom claims set: role="admin", username="${usernameClaim}".`);
     await admin.database().ref(`users/${user.uid}/role`).set("admin");
     console.log("✓ RTDB role=admin ensured.");
   }

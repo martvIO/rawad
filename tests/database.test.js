@@ -86,7 +86,7 @@ const anon   = () => testEnv.unauthenticatedContext().database();
 const groom1 = () => testEnv.authenticatedContext(UID_GROOM1).database();
 const groom2 = () => testEnv.authenticatedContext(UID_GROOM2).database();
 const driver = () => testEnv.authenticatedContext(UID_DRIVER).database();
-const admin  = () => testEnv.authenticatedContext(UID_ADMIN, { admin: true }).database();
+const admin  = () => testEnv.authenticatedContext(UID_ADMIN, { role: "admin" }).database();
 
 /* ─────────────────────────── /users ─────────────────────────── */
 

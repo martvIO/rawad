@@ -3,7 +3,8 @@
 import { ref, onValue } from "firebase/database";
 import { httpsCallable } from "firebase/functions";
 import { db, functions } from "../firebase.js";
-import { logErr } from "../utils/logger.js";
+import { forceRefreshToken } from "./auth.js";
+import { logErr, logWarn } from "../utils/logger.js";
 
 // Subscribe to a list-shaped RTDB path. `mapItem` is optional; by default each
 // child becomes { id: key, ...val }. Errors call `cb([])` so the UI degrades
@@ -25,15 +26,35 @@ export function subscribeList(path, cb, mapItem) {
   );
 }
 
+// Codes that usually mean "your token is stale" — most commonly because a
+// custom claim was granted after the token was minted (e.g. admin promotion).
+const REFRESHABLE_CODES = new Set([
+  "functions/permission-denied",
+  "functions/unauthenticated",
+  "permission-denied",
+  "unauthenticated",
+]);
+
 // Wrap a Cloud Function callable. Returns an async fn that resolves to the
-// unwrapped `.data` payload and logs any failure under a stable tag before
-// re-throwing for the caller's UI to handle.
+// unwrapped `.data` payload. On the first permission-denied / unauthenticated
+// failure we force a token refresh and retry once — handles the case where
+// the user was just promoted while signed in.
 export function callable(name) {
   const fn = httpsCallable(functions, name);
   return async (input) => {
     try {
       return (await fn(input)).data;
     } catch (e) {
+      if (REFRESHABLE_CODES.has(e?.code)) {
+        logWarn(`callable(${name}) ${e.code} — refreshing token and retrying`);
+        try {
+          await forceRefreshToken();
+          return (await fn(input)).data;
+        } catch (e2) {
+          logErr(`callable(${name}) retry`, e2);
+          throw e2;
+        }
+      }
       logErr(`callable(${name})`, e);
       throw e;
     }

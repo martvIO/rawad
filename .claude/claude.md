@@ -127,6 +127,7 @@ netlify.toml           ← NEW: Netlify build config (VITE_USE_EMULATORS=0, SPA 
 
 - **No plaintext passwords** — Firebase Auth owns credentials.
 - **No hardcoded admin** — first admin created via `functions/scripts/seedAdmin.js`.
+- **JWT custom claims** — every user carries `{ role: "admin"|"driver"|"groom", username }` in `auth.token`. Drivers additionally carry `assignedGrooms: { [groomUid]: true }`. The legacy `admin: true` boolean was retired in favour of the single `role` field. RTDB / Storage / Cloud Functions all check `auth.token.role === "admin"`.
 - **Default-deny RTDB** — every node requires explicit `.read`/`.write`; all `.validate` schema checks.
 - **Default-deny Storage** — proof photos require `assignedGrooms[groomUid] === true` in custom claim.
 - **Rate limiting** — `submitConfirmation`: 5/hr per IP (sole abuse gate on the public endpoint); `createPortalUser`/`deletePortalUser`/`updatePortalUser`/`adminSetPassword`: 30/hr per admin.
@@ -135,6 +136,7 @@ netlify.toml           ← NEW: Netlify build config (VITE_USE_EMULATORS=0, SPA 
 - **HSTS** — `max-age=63072000; includeSubDomains; preload`.
 - **assertAdmin** — shared helper in `functions/src/helpers.ts`; every privileged Cloud Function calls it first.
 - **RoleGuard** — client-side component wrapping each role portal; not authoritative but prevents wrong-role UI from rendering.
+- **Live claim refresh** — the client subscribes to `onIdTokenChanged` (via `subscribeIdToken` in `services/auth.js`) so a role change picks up automatically, and `callable()` retries once after `getIdToken(true)` on `permission-denied` to handle just-granted claims.
 
 ---
 
@@ -142,7 +144,7 @@ netlify.toml           ← NEW: Netlify build config (VITE_USE_EMULATORS=0, SPA 
 
 | Layer | Where | Enforced by |
 |---|---|---|
-| Server: RTDB | `database.rules.json` | `auth.token.admin === true`, ownership checks |
+| Server: RTDB | `database.rules.json` | `auth.token.role === 'admin'`, ownership checks |
 | Server: Functions | `functions/src/helpers.ts` → `assertAdmin()` | Throws `permission-denied` before any logic runs |
 | Client: UI | `src/components/RoleGuard.jsx` | Renders `null` for wrong role |
 

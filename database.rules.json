@@ -5,8 +5,8 @@
 
     "users": {
       "$uid": {
-        ".read": "auth != null && (auth.uid === $uid || auth.token.admin === true)",
-        ".write": "auth.token.admin === true",
+        ".read": "auth != null && (auth.uid === $uid || auth.token.role === 'admin')",
+        ".write": "auth.token.role === 'admin'",
         ".validate": "newData.hasChildren(['username','role','phoneE164','createdAt'])",
         "username":    {
           ".read": "auth != null && root.child('driverAssignments').child(auth.uid).child($uid).val() === true",
@@ -27,7 +27,7 @@
     "usernameIndex": {
       ".read": "auth != null",
       "$username": {
-        ".write": "auth.token.admin === true",
+        ".write": "auth.token.role === 'admin'",
         ".validate": "newData.isString() && root.child('users').child(newData.val()).exists()"
       }
     },
@@ -35,18 +35,18 @@
     "phoneIndex": {
       ".read": false,
       "$phone": {
-        ".write": "auth.token.admin === true",
+        ".write": "auth.token.role === 'admin'",
         ".validate": "newData.isString() && root.child('users').child(newData.val()).exists()"
       }
     },
 
     "guestsByGroom": {
-      ".read": "auth != null && auth.token.admin === true",
+      ".read": "auth != null && auth.token.role === 'admin'",
       "$groomUid": {
         ".read":  "auth != null && ($groomUid === auth.uid || root.child('driverAssignments').child(auth.uid).child($groomUid).val() === true)",
         ".indexOn": ["status", "inviteType"],
         "$guestId": {
-          ".write": "auth != null && (auth.token.admin === true || $groomUid === auth.uid || (data.exists() && root.child('driverAssignments').child(auth.uid).child($groomUid).val() === true))",
+          ".write": "auth != null && (auth.token.role === 'admin' || $groomUid === auth.uid || (data.exists() && root.child('driverAssignments').child(auth.uid).child($groomUid).val() === true))",
           ".validate": "newData.hasChildren(['name','phone','status','inviteType'])",
           "groomUsername":  { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 60)" },
           "name":           { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 120" },
@@ -66,7 +66,7 @@
 
     "liveLocationsByGroom": {
       "$groomUid": {
-        ".read": "auth != null && (auth.token.admin === true || $groomUid === auth.uid)",
+        ".read": "auth != null && (auth.token.role === 'admin' || $groomUid === auth.uid)",
         "$driverUid": {
           ".write": "auth != null && $driverUid === auth.uid",
           ".validate": "newData.hasChildren(['lat','lng','timeISO'])",
@@ -81,11 +81,11 @@
     },
 
     "confirmations": {
-      ".read": "auth != null && auth.token.admin === true",
+      ".read": "auth != null && auth.token.role === 'admin'",
       ".write": false,
       ".indexOn": ["groomUid", "confirmedAt"],
       "$confId": {
-        ".write": "auth != null && auth.token.admin === true && data.exists()",
+        ".write": "auth != null && auth.token.role === 'admin' && data.exists()",
         ".validate": "newData.hasChildren(['groomUid','submittedName','submittedPhone','confirmedAt'])",
         "groomUid":        { ".validate": "newData.isString() && newData.val().length <= 64" },
         "groomUsername":   { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 60)" },
@@ -101,7 +101,7 @@
 
     "adminSettings": {
       ".read":  "auth != null",
-      ".write": "auth != null && auth.token.admin === true",
+      ".write": "auth != null && auth.token.role === 'admin'",
       "messageBody": { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 4000)" },
       "formLink":    { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 1000 && newData.val().matches(/^https:\\/\\//))" },
       "$other":      { ".validate": false }
@@ -109,14 +109,14 @@
 
     "driverAssignments": {
       "$driverUid": {
-        ".read":  "auth != null && (auth.token.admin === true || $driverUid === auth.uid)",
+        ".read":  "auth != null && (auth.token.role === 'admin' || $driverUid === auth.uid)",
         ".write": false,
         "$groomUid": { ".validate": "newData.val() === true" }
       }
     },
 
     "audit": {
-      ".read":  "auth != null && auth.token.admin === true",
+      ".read":  "auth != null && auth.token.role === 'admin'",
       ".write": false,
       ".indexOn": ["timestamp", "uid", "action"],
       "$eventId": {

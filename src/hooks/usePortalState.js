@@ -11,7 +11,7 @@ import { validateName } from "../utils/validation.js";
 import { isStrongPassword } from "../utils/password.js";
 import { logErr } from "../utils/logger.js";
 
-import { subscribeAuth, signIn, signOutNow } from "../services/auth.js";
+import { subscribeAuth, subscribeIdToken, signIn, signOutNow } from "../services/auth.js";
 import {
   subscribeAllGuests, subscribeGuestsForGroom,
   addGuest as addGuestSrv, updateGuest as updateGuestSrv, removeGuest as removeGuestSrv,
@@ -35,17 +35,22 @@ export function usePortalState({ onBack, t, lang, setLang }) {
   const navigate = useNavigate();
 
   // ── Auth (driven by Firebase Auth state) ────────────────────────────────────
+  // We subscribe to BOTH auth-state changes (sign-in / sign-out) AND ID-token
+  // refreshes. The token refresh path is what makes a newly-granted role
+  // claim visible to the UI without forcing a sign-out / sign-in.
   const [authUser, setAuthUser] = useState(null);
   const [authReady, setAuthReady] = useState(false);
   useEffect(() => {
-    return subscribeAuth((u) => { setAuthUser(u); setAuthReady(true); });
+    const unsubAuth  = subscribeAuth((u)  => { setAuthUser(u); setAuthReady(true); });
+    const unsubToken = subscribeIdToken((u) => { setAuthUser(u); setAuthReady(true); });
+    return () => { unsubAuth(); unsubToken(); };
   }, []);
 
   const authed = !!authUser;
   const userType = authUser?.role ?? null;
   const currentUsername = authUser?.username ?? null;
   const currentUid = authUser?.uid ?? null;
-  const isAdmin = authUser?.claims?.admin === true;
+  const isAdmin = authUser?.claims?.role === "admin";
 
   // ── Login form (transient) ──────────────────────────────────────────────────
   const [loginUser, setLoginUser]   = useState("");

@@ -109,12 +109,21 @@ export const updatePortalUser = onCall(
       await getAuth().updateUser(uid, authPatch);
     }
 
-    // Custom-claim sync when role flips to or from admin.
-    if (newRole !== null && newRole !== profile.role) {
+    // Custom-claim sync when role and/or username changes. We always carry
+    // `role` and `username` in claims; the rule layer reads them as
+    // auth.token.role / auth.token.username. The legacy `admin: true` field
+    // is stripped so it can't be relied on going forward.
+    if (
+      (newRole     !== null && newRole     !== profile.role) ||
+      (newUsername !== null && newUsername !== profile.username)
+    ) {
       const existing = (await getAuth().getUser(uid)).customClaims ?? {};
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { admin: _legacyAdmin, ...rest } = existing as Record<string, unknown>;
       await getAuth().setCustomUserClaims(uid, {
-        ...existing,
-        admin: newRole === "admin" ? true : undefined,
+        ...rest,
+        role:     newRole     ?? profile.role,
+        username: newUsername ?? profile.username,
       });
     }
 

@@ -64,10 +64,13 @@ export const createPortalUser = onCall(
       disabled: false,
     });
 
-    // Custom claim for admins so security rules can check auth.token.admin === true.
-    if (input.role === "admin") {
-      await getAuth().setCustomUserClaims(userRecord.uid, { admin: true });
-    }
+    // Custom claims: every user gets `role` and `username` so security rules
+    // can branch on auth.token.role === 'admin' (etc.) and audit logs can
+    // identify the actor by username without an extra lookup.
+    await getAuth().setCustomUserClaims(userRecord.uid, {
+      role: input.role,
+      username,
+    });
 
     const profile = {
       username,
@@ -145,8 +148,13 @@ export const setAdminClaim = onCall(
     }
 
     const existing = (await getAuth().getUser(uid)).customClaims ?? {};
-    await getAuth().setCustomUserClaims(uid, { ...existing, admin: isAdmin || undefined });
-    await getDatabase().ref(`users/${uid}/role`).set(isAdmin ? "admin" : "groom");
+    // Drop the legacy `admin: true` field if present; the new shape uses
+    // `role: "admin"|"groom"` as the single source of truth.
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { admin: _legacyAdmin, ...rest } = existing as Record<string, unknown>;
+    const newRole = isAdmin ? "admin" : "groom";
+    await getAuth().setCustomUserClaims(uid, { ...rest, role: newRole });
+    await getDatabase().ref(`users/${uid}/role`).set(newRole);
 
     await writeAudit(callerUid, "setAdminClaim", { uid, isAdmin });
     return { ok: true };

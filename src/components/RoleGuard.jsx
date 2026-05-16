@@ -6,7 +6,7 @@
 // privileged action is also gated by:
 //   - Cloud Function `assertAdmin()` (functions/src/helpers.ts)
 //   - RTDB security rules (database.rules.json)
-//   - Firebase Auth custom claims (auth.token.admin, assignedGrooms)
+//   - Firebase Auth custom claims (auth.token.role, assignedGrooms)
 // Even if a determined client bypasses this guard, the server will reject
 // any action they're not entitled to.
 import { usePortal } from "../context/PortalContext.jsx";

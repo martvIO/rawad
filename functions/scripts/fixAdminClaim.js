@@ -1,6 +1,8 @@
-// One-off repair: stamp admin: true custom claim on a user whose RTDB profile
-// says role="admin" but whose Firebase Auth record has no custom claim.
+// One-off repair: stamp role="admin" custom claim on a user whose RTDB profile
+// says role="admin" but whose Firebase Auth record has no matching claim.
 // This happens when an account is created/migrated outside of createPortalUser.
+//
+// For broader migrations across every user, prefer functions/scripts/migrateClaims.js.
 //
 // Usage (against live Firebase — needs service-account key):
 //   set GOOGLE_APPLICATION_CREDENTIALS=./dawa-aa793-firebase-adminsdk-fbsvc-e42554a05c.json
@@ -55,14 +57,24 @@ const email = `${username.toLowerCase()}@dawa.local`;
   console.log(`Found user: ${userRecord.uid} (${userRecord.email})`);
   console.log("Current claims:", JSON.stringify(userRecord.customClaims ?? {}));
 
-  if (userRecord.customClaims?.admin === true) {
-    console.log("admin: true is already set — nothing to do.");
+  if (userRecord.customClaims?.role === "admin") {
+    console.log('role: "admin" is already set — nothing to do.');
     process.exit(0);
   }
 
   const existing = userRecord.customClaims ?? {};
-  await admin.auth().setCustomUserClaims(userRecord.uid, { ...existing, admin: true });
-  console.log("✓ Set admin: true claim on", userRecord.uid);
+  // Drop legacy admin:true if present.
+  // eslint-disable-next-line no-unused-vars
+  const { admin: _legacyAdmin, ...rest } = existing;
+  const profileSnap = await admin.database().ref(`users/${userRecord.uid}/username`).get();
+  const usernameClaim = rest.username
+    ?? (profileSnap.exists() ? profileSnap.val() : userRecord.email.replace(/@.*/, ""));
+  await admin.auth().setCustomUserClaims(userRecord.uid, {
+    ...rest,
+    role: "admin",
+    username: usernameClaim,
+  });
+  console.log(`✓ Set role="admin", username="${usernameClaim}" on ${userRecord.uid}`);
 
   await admin.database().ref(`users/${userRecord.uid}/role`).set("admin");
   console.log("✓ Set role=admin in RTDB");
