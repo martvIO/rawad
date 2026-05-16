@@ -1,5 +1,7 @@
 // Driver portal shell — gates on picking a groom, then shows the sticky header
-// with the two driver tabs (delivery route / shared cities).
+// with the two driver tabs (delivery route / shared cities). Tabs are
+// URL-driven via NavLink + nested Routes.
+import { NavLink, Routes, Route, Navigate } from "react-router-dom";
 import { LangSwitcher } from "../../../components/LangSwitcher.jsx";
 import { LogoutConfirm } from "../../../components/LogoutConfirm.jsx";
 import { Toast } from "../../../components/Toast.jsx";
@@ -8,11 +10,20 @@ import { DriverPickGroom } from "./DriverPickGroom.jsx";
 import { DriverDeliveryList } from "./DriverDeliveryList.jsx";
 import { SharedCities } from "./SharedCities.jsx";
 
+const tabStyle = ({ isActive }) => ({
+  flex: 1, padding: "8px 0", borderRadius: 10, cursor: "pointer",
+  background: isActive ? "rgba(75,159,212,.18)" : "rgba(255,255,255,.04)",
+  border: `1px solid ${isActive ? "rgba(75,159,212,.4)" : "rgba(255,255,255,.08)"}`,
+  color: isActive ? "#4b9fd4" : "#7a6a4a",
+  fontSize: 12, fontWeight: 800, fontFamily: "inherit", transition: "all .2s",
+  textAlign: "center", textDecoration: "none", display: "block",
+});
+
 export function DriverPortal() {
   const {
     onBack, t, lang, setLang, toast,
     logoutAsking, setLogoutAsking, doLogout,
-    tab, setTab, myGuests,
+    myGuests,
     driverServingGroom, setDriverServingGroom,
   } = usePortal();
 
@@ -50,18 +61,8 @@ export function DriverPortal() {
           </div>
           {/* Driver tabs */}
           <div style={{ display: "flex", gap: 6 }}>
-            {[
-              ["pending", "📋 " + t("driver_subtitle")],
-              ["shared",  "🏘 " + t("tab_shared")],
-            ].map(([id, lbl]) => (
-              <button key={id} onClick={() => setTab(id)} style={{
-                flex: 1, padding: "8px 0", borderRadius: 10, cursor: "pointer",
-                background: tab === id ? "rgba(75,159,212,.18)" : "rgba(255,255,255,.04)",
-                border: `1px solid ${tab === id ? "rgba(75,159,212,.4)" : "rgba(255,255,255,.08)"}`,
-                color: tab === id ? "#4b9fd4" : "#7a6a4a",
-                fontSize: 12, fontWeight: 800, fontFamily: "inherit", transition: "all .2s",
-              }}>{lbl}</button>
-            ))}
+            <NavLink to="/portal/driver/pending" style={tabStyle}>📋 {t("driver_subtitle")}</NavLink>
+            <NavLink to="/portal/driver/shared"  style={tabStyle}>🏘 {t("tab_shared")}</NavLink>
             <button onClick={() => setDriverServingGroom(null)} title={t("driver_pick_groom_change")} style={{
               padding: "8px 12px", borderRadius: 10, cursor: "pointer",
               background: "rgba(201,168,76,.08)", border: "1px solid rgba(201,168,76,.25)",
@@ -77,8 +78,12 @@ export function DriverPortal() {
       {logoutAsking && <LogoutConfirm t={t} onConfirm={doLogout} onCancel={() => setLogoutAsking(false)}/>}
 
       <div style={{ maxWidth: 560, margin: "0 auto", padding: "16px 16px 80px" }}>
-        {(tab === "pending" || tab !== "shared") && <DriverDeliveryList />}
-        {tab === "shared" && <SharedCities />}
+        <Routes>
+          <Route index           element={<Navigate to="pending" replace />} />
+          <Route path="pending"  element={<DriverDeliveryList />} />
+          <Route path="shared"   element={<SharedCities />} />
+          <Route path="*"        element={<Navigate to="pending" replace />} />
+        </Routes>
       </div>
     </div>
   );

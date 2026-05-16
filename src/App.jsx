@@ -1,39 +1,18 @@
-// Root component — detects the ?form= URL parameter, owns language state, and
-// routes between the three top-level views (landing / portal / confirm form).
-// Auto-resumes the portal when Firebase Auth detects an existing session.
+// Root component — owns language state and renders the top-level routes:
+//   /                       → Landing page
+//   /confirm/:groomUsername → Public guest confirmation form
+//   /portal/*               → Authenticated portal (login + role views)
+// A back-compat effect rewrites legacy `?form=GROOM` query strings to the
+// new `/confirm/GROOM` path so old WhatsApp links still work.
 import { useState, useMemo, useEffect } from "react";
-import { onAuthStateChanged } from "firebase/auth";
+import { Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom";
 import { makeT } from "./i18n/index.js";
-import { auth } from "./firebase.js";
 import { GlobalStyle } from "./styles/GlobalStyle.jsx";
 import { LandingPage } from "./pages/LandingPage.jsx";
 import { ConfirmationForm } from "./pages/ConfirmationForm.jsx";
 import { Portal } from "./pages/portal/Portal.jsx";
 
 export default function App() {
-  // Detect URL parameter ?form=GROOM_USERNAME to show the guest confirmation form.
-  const initialFormGroom = useMemo(() => {
-    try {
-      const params = new URLSearchParams(window.location.search);
-      return params.get("form") || "";
-    } catch { return ""; }
-  }, []);
-
-  // view: "confirmForm" | "landing" | "portal".
-  // Default to landing; auto-route to portal once Firebase confirms an active session.
-  const [view, setView] = useState(initialFormGroom ? "confirmForm" : "landing");
-
-  useEffect(() => {
-    if (initialFormGroom) return;
-    // Auto-resume the portal if a session already exists. Don't kick the user
-    // out of the landing page if they explicitly hit "back" later (the back
-    // button calls setView("landing"); we won't re-route while signed in).
-    const unsub = onAuthStateChanged(auth, (u) => {
-      if (u) setView((v) => (v === "landing" ? "portal" : v));
-    });
-    return unsub;
-  }, [initialFormGroom]);
-
   // Language (raw-string localStorage; preserves existing values).
   const [lang, setLang] = useState(() => {
     try { return localStorage.getItem("dawa_lang") || "ar"; }
@@ -42,7 +21,6 @@ export default function App() {
   const t = useMemo(() => makeT(lang), [lang]);
 
   useEffect(() => { try { localStorage.setItem("dawa_lang", lang); } catch {} }, [lang]);
-  useEffect(() => { try { localStorage.setItem("dawa_view", view); } catch {} }, [view]);
 
   // Apply RTL for both AR + HE.
   useEffect(() => {
@@ -50,12 +28,33 @@ export default function App() {
     document.documentElement.lang = lang;
   }, [lang]);
 
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  // Back-compat for the old `?form=GROOM` URLs — silently rewrite to /confirm/GROOM.
+  useEffect(() => {
+    if (location.pathname !== "/") return;
+    try {
+      const params = new URLSearchParams(location.search);
+      const groom = params.get("form");
+      if (groom) navigate(`/confirm/${encodeURIComponent(groom)}`, { replace: true });
+    } catch {}
+  }, [location.pathname, location.search, navigate]);
+
+  // Pass `t`, `lang`, `setLang` to every routed page through render props
+  // so individual pages don't have to import the i18n helper themselves.
+  const langProps = { t, lang, setLang };
+  const onBack = () => navigate("/");
+
   return (
     <>
       <GlobalStyle />
-      {view === "confirmForm" && <ConfirmationForm groomUsername={initialFormGroom} t={t} lang={lang} setLang={setLang}/>}
-      {view === "landing"     && <LandingPage onEnterPortal={() => setView("portal")} t={t} lang={lang} setLang={setLang} />}
-      {view === "portal"      && <Portal       onBack={() => setView("landing")} t={t} lang={lang} setLang={setLang} />}
+      <Routes>
+        <Route path="/" element={<LandingPage onEnterPortal={() => navigate("/portal")} {...langProps} />} />
+        <Route path="/confirm/:groomUsername" element={<ConfirmationForm {...langProps} />} />
+        <Route path="/portal/*" element={<Portal onBack={onBack} {...langProps} />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
     </>
   );
 }

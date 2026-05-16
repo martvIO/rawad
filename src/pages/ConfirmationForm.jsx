@@ -1,13 +1,15 @@
-// Public guest confirmation form, opened via ?form=<groomUsername>.
+// Public guest confirmation form, opened via /confirm/<groomUsername>.
 // Submission goes through the `submitConfirmation` Cloud Function, which
 // validates the input, enforces Firebase App Check, and rate-limits per IP.
 import { useState } from "react";
+import { useParams } from "react-router-dom";
 import { BrandLogo } from "../components/BrandLogo.jsx";
 import { LangSwitcher } from "../components/LangSwitcher.jsx";
 import { CityField } from "../components/CityField.jsx";
 import { submitConfirmation } from "../services/confirmations.js";
 
-export function ConfirmationForm({ groomUsername, t, lang, setLang }) {
+export function ConfirmationForm({ t, lang, setLang }) {
+  const { groomUsername } = useParams();
   const [name, setName]     = useState("");
   const [phone, setPhone]   = useState("");
   const [city, setCity]     = useState("");

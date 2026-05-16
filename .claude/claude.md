@@ -30,6 +30,7 @@ Full rewrite to a production-ready Firebase application:
 | Data layout | Sharded by groomUid (`/guestsByGroom/{uid}`, `/liveLocationsByGroom/{uid}`) | RTDB requires `.read` at the path you subscribe to — flat paths with per-child rules don't work for non-admin listeners |
 | TypeScript (functions) | `module: Node16` + `moduleResolution: node16` | Matches Node 20 runtime; non-deprecated in TS 5.9+ |
 | Tests | Vitest + `@firebase/rules-unit-testing` against the Database emulator | 79 tests, all passing |
+| Routing | react-router-dom (planned, not yet implemented) | Bookmarkable URLs, back button, direct links |
 
 ---
 
@@ -41,29 +42,83 @@ src/
   services/
     auth.js            — signIn, signOut, subscribeAuth, sendPasswordResetCode
     guests.js          — subscribeGuestsForGroom, addGuest, updateGuest, removeGuest, markDelivered
-    users.js           — subscribeUsers (admin), createPortalUser, deletePortalUser
+    users.js           — subscribeUsers (admin), createPortalUser, deletePortalUser,
+                         updatePortalUser, adminSetPassword
     liveLocations.js   — publishMyFix (driver → RTDB), subscribeDriversForGroom (groom listener)
-    confirmations.js   — subscribeConfirmations, submitConfirmation (via Cloud Function)
+    confirmations.js   — subscribeConfirmations, submitConfirmation (via Cloud Function),
+                         updateConfirmation (admin patch)
     adminSettings.js   — subscribeSettings, saveSettings
     proofs.js          — uploadProof (Firebase Storage), proofDownloadUrl
   hooks/
-    usePortalState.js  — all portal state; replaces localStorage reads/writes with Firebase subscriptions
-    useGeolocation.js  — GPS watch + RTDB publish/subscribe; fixed driversSharingWithMe shape bug
-  pages/ …             — LoginScreen, ConfirmationForm, admin/, driver/, groom/ views
+    usePortalState.js  — all portal state; Firebase subscriptions + handlers
+    useGeolocation.js  — GPS watch + RTDB publish/subscribe
+  utils/
+    matchUtils.js      — phone normalization, fuzzy name/address similarity, classifyConfirmation
+    phone.js           — toIntlPhone, validatePhone
+    validation.js      — validateName
+    storage.js         — localStorage helpers
+  pages/
+    LandingPage.jsx
+    ConfirmationForm.jsx
+    portal/
+      Portal.jsx         — auth guard + role routing (RoleGuard)
+      LoginScreen.jsx
+      admin/
+        AdminPortal.jsx
+        AdminUserManager.jsx   ← NEW: full CRUD account management
+        AdminSendTab.jsx
+        AdminConfirmationsTab.jsx
+        AdminSettingsTab.jsx
+      driver/
+        DriverPortal.jsx
+        DriverPickGroom.jsx
+        DriverDeliveryList.jsx
+        SharedCities.jsx
+      groom/
+        GroomPortalView.jsx
+        GroomDashboard.jsx
+        GroomGuests.jsx
+        GroomAddGuest.jsx
+        GroomProofs.jsx
+        GroomLiveMap.jsx
   components/
-    PasswordResetFlow.jsx — 3-step phone OTP modal
+    RoleGuard.jsx            ← NEW: client-side role enforcement
+    EditUserModal.jsx         ← NEW: admin user edit form
+    EditConfirmationModal.jsx ← NEW: admin confirmation edit form
+    EditGuestModal.jsx
+    AddressInput.jsx
+    BrandLogo.jsx
+    CityField.jsx
+    LangSwitcher.jsx
+    LiveMap.jsx
+    LogoutConfirm.jsx
+    PasswordResetFlow.jsx
+    PhotoViewer.jsx
+    Toast.jsx
+  context/
+    PortalContext.jsx
+  i18n/
+    ar.js
+    he.js
 
 functions/src/
-  users.ts             — createPortalUser, deletePortalUser, setAdminClaim (admin-only callables)
-  assignments.ts       — assignDriverToGroom (sets custom claim + RTDB entry)
-  confirmations.ts     — submitConfirmation (public HTTPS, App Check, per-IP rate limit 5/hr)
+  index.ts             — exports all Cloud Functions
+  users.ts             — createPortalUser, deletePortalUser, setAdminClaim
+  updateUser.ts        ← NEW: updatePortalUser (admin patches user details)
+  adminSetPassword.ts  ← NEW: admin resets another user's password
+  assignments.ts       — assignDriverToGroom
+  confirmations.ts     — submitConfirmation (public HTTPS, App Check, rate limit)
   resetPassword.ts     — phone-OTP verified password reset
-  audit.ts             — auditLog helper (internal)
-  rateLimit.ts         — in-memory per-key rate limiter used by confirmations
+  audit.ts             — writeAudit helper (internal)
+  rateLimit.ts         — in-memory per-key rate limiter
+  helpers.ts           — assertAdmin, isE164, isRole, isUsername, normalisePhone, phoneIndexKey, syntheticEmail
 
 database.rules.json    — default-deny; per-node role checks + schema .validate
+                         /confirmations/$confId now allows admin client writes (update only)
 storage.rules          — proof photos gated by assignedGrooms custom claim
 firebase.json          — CSP/HSTS/X-Frame-Options headers; hosting + functions + db + storage config
+netlify.toml           ← NEW: Netlify build config (VITE_USE_EMULATORS=0, SPA fallback)
+.env.production        ← NEW: VITE_USE_EMULATORS=0 for production/Netlify builds
 ```
 
 ---
@@ -71,102 +126,108 @@ firebase.json          — CSP/HSTS/X-Frame-Options headers; hosting + functions
 ## Security Model (summary)
 
 - **No plaintext passwords** — Firebase Auth owns credentials.
-- **No hardcoded admin** — first admin created via `functions/scripts/seedAdmin.js` with service account.
+- **No hardcoded admin** — first admin created via `functions/scripts/seedAdmin.js`.
 - **Default-deny RTDB** — every node requires explicit `.read`/`.write`; all `.validate` schema checks.
 - **Default-deny Storage** — proof photos require `assignedGrooms[groomUid] === true` in custom claim.
-- **App Check** — reCAPTCHA Enterprise; enforced on RTDB, Storage, and all callable Functions.
-- **Rate limiting** — `submitConfirmation`: 5 requests/hr per IP.
-- **Audit log** — admin mutations written to `/audit/{eventId}` by Functions (client write blocked).
-- **CSP headers** — full allowlist in `firebase.json`; blocks inline scripts, framing, unknown origins.
+- **App Check** — reCAPTCHA Enterprise; skipped on `localhost` (to avoid 24h throttle); enforced on production domains.
+- **Rate limiting** — `submitConfirmation`: 5/hr per IP; `createPortalUser`/`deletePortalUser`/`updatePortalUser`/`adminSetPassword`: 30/hr per admin.
+- **Audit log** — admin mutations written to `/audit/{eventId}` by Functions.
+- **CSP headers** — full allowlist in `firebase.json`.
 - **HSTS** — `max-age=63072000; includeSubDomains; preload`.
+- **assertAdmin** — shared helper in `functions/src/helpers.ts`; every privileged Cloud Function calls it first.
+- **RoleGuard** — client-side component wrapping each role portal; not authoritative but prevents wrong-role UI from rendering.
+
+---
+
+## Security Layer — Three Rings
+
+| Layer | Where | Enforced by |
+|---|---|---|
+| Server: RTDB | `database.rules.json` | `auth.token.admin === true`, ownership checks |
+| Server: Functions | `functions/src/helpers.ts` → `assertAdmin()` | Throws `permission-denied` before any logic runs |
+| Client: UI | `src/components/RoleGuard.jsx` | Renders `null` for wrong role |
+
+---
+
+## Confirmation Matching (Guest Form → Admin Panel)
+
+Implemented in `src/utils/matchUtils.js`:
+
+- **Phone normalization** — strips country codes (+972, 972, 00972, +970, etc.) and leading zeros. `+972-50-123-4567` and `0501234567` both map to `501234567` for comparison.
+- **Name similarity** — Dice bigram coefficient + Jaccard word-set (handles Arabic/Hebrew/English transliterations and word reordering). Threshold: 0.55.
+- **Address similarity** — Jaccard word-set on normalized city/area. Threshold: 0.40.
+- **Case A** — phone + name similar + address similar → GREEN
+- **Case B** — phone + name similar + groom has no address → GREEN
+- **Case C** — phone matched but name/address differ → RED with reason badges
+- **Unknown** — phone not in groom's guest list → separate "Unknown Person" section
+
+Admin can edit any confirmation record (opens `EditConfirmationModal`). Save patches `/confirmations/{id}` and propagates to the matched guest record in `/guestsByGroom`.
+
+---
+
+## Account Management (Admin)
+
+`AdminUserManager.jsx` (replaces old `AdminUsersTab`):
+- Create users: all three roles (groom, driver, admin), with username, password, phone, optional display name
+- Filter list by role (All / Admin / Groom / Driver)
+- Edit button → `EditUserModal` — change username, display name, phone, role, optional new password
+- Delete with inline confirmation step
+
+Cloud Functions backing it:
+- `createPortalUser` — creates Auth user + RTDB profile + indices + custom claim
+- `updatePortalUser` (`updateUser.ts`) — patches any combination of username/phone/role/displayName; updates Auth email, RTDB, indices, custom claim atomically
+- `deletePortalUser` — cascade-deletes Auth + RTDB + indices + guest data
+- `adminSetPassword` — sets another user's password + revokes their refresh tokens
+- `setAdminClaim` — promotes/demotes admin↔groom without recreating
 
 ---
 
 ## Windows Build Fixes (all resolved)
 
-| Problem | Root cause | Fix |
-|---|---|---|
-| `firebase.json` predeploy `$RESOURCE_DIR` | Bash variable doesn't expand on Windows | Replaced with `build-functions.cmd` wrapper |
-| `spawn npm … ENOENT` | `cross-spawn` inside firebase-tools treats the entire predeploy string as one executable name (no shell split) | Single-word `.cmd` files in project root; cross-spawn finds them by extension |
-| `npm ERR! Cannot read properties of undefined (reading 'stdin')` | npm 10/11 crashes on `process.stdin` being null in non-TTY contexts | `.npmrc`: `foreground-scripts=true`; build scripts call tsc/vite directly, bypassing npm subprocess |
-| `ERR_REQUIRE_ESM` for vite.js | firebase-tools' pkg-bundled Node (v20) can't `require()` ESM; its node wins PATH race | `scripts/build-vite.cjs` loads vite via `await import(pathToFileURL(...))` — dynamic import works in pkg |
-| `ERR_UNSUPPORTED_DIR_IMPORT` | `import(directoryPath)` not supported for ESM on Windows | Import `vite/dist/node/index.js` directly |
-| TypeScript `moduleResolution=node10` deprecated | `functions/tsconfig.json` used legacy `module: commonjs` + `moduleResolution: node` | Updated to `module: Node16` + `moduleResolution: node16` + `rootDir: src` + `composite: true` |
-| VS Code shows stale TS errors | No root `tsconfig.json`; VS Code used implicit project with defaults | Added root `tsconfig.json` (project reference to `functions/`) + `.vscode/settings.json` pointing at workspace TypeScript |
-| CSP blocks `http://127.0.0.1:9099` in production | `VITE_USE_EMULATORS=1` in `.env` baked into `vite build` | Created `.env.production` with `VITE_USE_EMULATORS=0`; Vite loads it after `.env` for production builds |
-| `seedAdmin.js` — `ENOTFOUND metadata.google.internal` | Admin SDK auto-detects project ID from GCP metadata server (only available inside GCP) | Script now reads `GCLOUD_PROJECT` / parses project ID from database URL; service account key added |
-
----
-
-## Files Added / Changed (non-exhaustive)
-
-```
-.env.production          VITE_USE_EMULATORS=0 (production override)
-.npmrc                   foreground-scripts=true (npm stdin fix)
-.vscode/settings.json    typescript.tsdk → functions/node_modules/typescript/lib
-tsconfig.json            Root solution tsconfig (references ./functions)
-build-functions.cmd      Cross-spawn-safe wrapper → scripts/build-functions.cjs
-build-vite.cmd           Cross-spawn-safe wrapper → scripts/build-vite.cjs
-scripts/build-functions.cjs  Calls tsc directly (no npm, no stdin issue)
-scripts/build-vite.cjs   Calls vite via await import() (ESM-safe from pkg node)
-functions/tsconfig.json  module: Node16, moduleResolution: node16, rootDir: src, composite: true
-functions/scripts/seedAdmin.js  Fixed project-ID detection; uses service account key
-database.rules.json      Full default-deny rules
-storage.rules            Proof photo access rules
-firebase.json            CSP/HSTS headers; predeploy hooks; emulator config
-```
+| Problem | Fix |
+|---|---|
+| `$RESOURCE_DIR` Bash variable | `build-functions.cmd` wrapper |
+| `spawn npm ENOENT` | Single-word `.cmd` files in project root |
+| npm stdin crash | `.npmrc`: `foreground-scripts=true` |
+| `ERR_REQUIRE_ESM` for vite.js | `scripts/build-vite.cjs` with dynamic `await import()` |
+| `ERR_UNSUPPORTED_DIR_IMPORT` | Import `vite/dist/node/index.js` directly |
+| TypeScript `moduleResolution=node10` | Updated to `module: Node16` + `moduleResolution: node16` |
+| VS Code stale TS errors | Root `tsconfig.json` + `.vscode/settings.json` |
+| CSP blocks localhost in production | `.env.production` with `VITE_USE_EMULATORS=0` |
+| App Check 403 on localhost | `isLocalhost` guard in `firebase.js` skips `initializeAppCheck` |
+| `PASSWORD_LOGIN_DISABLED` error | Enable Email/Password in Firebase Console → Authentication → Sign-in method |
 
 ---
 
 ## Current State
 
-- **79/79 database rules tests pass** against the emulator (`npm test`).
+- **79/79 database rules tests pass** (emulator — requires Java 21).
 - **Vite client build** succeeds (`npm run build`).
-- **Cloud Functions TypeScript build** succeeds (`npm run build` in `functions/`).
+- **Cloud Functions TypeScript build** succeeds (`cd functions && npm run build`).
 - **`firebase deploy`** runs both predeploy hooks without error.
-- **Admin account seeded** in production Firebase (UID `9gnlTRbtB0T7VW1ISdYqsIsbtq13`, username `admin`).
-- **CSP violation fixed** — production build no longer points at local emulator.
+- **Admin account seeded** (UID `9gnlTRbtB0T7VW1ISdYqsIsbtq13`, username `admin`).
+- **Production Firebase** reachable from `localhost` (App Check skipped on localhost to avoid throttle).
+- **Confirmation matching** — fuzzy phone/name/address with GREEN/RED/Unknown sections + admin edit.
+- **Admin User Manager** — full CRUD: create/edit/delete all account types.
+- **RoleGuard** — wraps every role portal in Portal.jsx.
+- **URL routing** — planned but NOT YET IMPLEMENTED (see `plans/routing-plan.md`).
 
 ---
 
 ## Immediate Next Steps
 
-1. **Fill in real Firebase config in `.env`**
-   Get values from Firebase console → Project Settings → Your apps → Web app:
-   ```
-   VITE_FIREBASE_API_KEY=
-   VITE_FIREBASE_AUTH_DOMAIN=dawa-aa793.firebaseapp.com
-   VITE_FIREBASE_DATABASE_URL=https://dawa-aa793-default-rtdb.firebaseio.com
-   VITE_FIREBASE_PROJECT_ID=dawa-aa793
-   VITE_FIREBASE_STORAGE_BUCKET=dawa-aa793.firebasestorage.app
-   VITE_FIREBASE_MESSAGING_SENDER_ID=
-   VITE_FIREBASE_APP_ID=
-   VITE_RECAPTCHA_ENTERPRISE_SITE_KEY=6LekWOssAAAAAI3EjkKLqBjmer3BePT5ohOY81lJ
-   VITE_USE_EMULATORS=1
-   ```
-
-2. **Rebuild and redeploy** after filling in the config:
-   ```powershell
-   npm run build
-   firebase deploy
-   ```
-
-3. **Change the admin password** — log in with `admin` / `StrongPass123` and set a strong password immediately.
-
-4. **Role matrix smoke test** on the live URL:
-   - Admin: sees all users, guests, confirmations; can create/delete users.
-   - Groom: sees only own guests; write to another groom's path → permission denied.
-   - Driver: after `assignDriverToGroom`, sees assigned groom's guests; can mark delivered with proof photo.
-   - Public confirmation form (`?form=GROOM_USERNAME`) submits without login.
-
-5. **Live location smoke test** — driver broadcasts GPS; groom sees pin in real time; unrelated groom sees nothing.
-
-6. **(Optional) Enable App Check enforcement** in the Firebase console once the live URL is confirmed working, to block unauthenticated API access.
+1. **Implement URL routing** — install `react-router-dom`, replace tab state with URL routes (see `plans/routing-plan.md` for full plan).
+2. **Deploy new Cloud Functions** — `firebase deploy --only functions` to push `updatePortalUser` and `adminSetPassword`.
+3. **Deploy updated RTDB rules** — `firebase deploy --only database` for the new `/confirmations/$confId` admin-write rule.
+4. **Add Netlify domain to App Check** — Firebase Console → App Check → reCAPTCHA Enterprise → Allowed domains → add Netlify deploy URL.
+5. **Change admin password** — default is `StrongPass123`.
+6. **Role matrix smoke test** on live URL.
 
 ---
 
 ## Known Remaining Items
 
-- The `dawa-aa793-firebase-adminsdk-fbsvc-e42554a05c.json` key file is excluded from Git (`.gitignore` rule `*-adminsdk-*.json`) but sits in the project root. Store it somewhere safe (password manager, secrets vault) and delete the local copy once no longer needed.
-- The reCAPTCHA site key (`6LekWOssAAAAAI3EjkKLqBjmer3BePT5ohOY81lJ`) is in `.env.example` — this is a **public** key (by design for reCAPTCHA Enterprise) so committing it is fine.
-- Vite bundle is 750 KB (minified) — consider code-splitting if load time becomes a concern.
+- The `dawa-aa793-firebase-adminsdk-fbsvc-e42554a05c.json` key file is in project root (excluded from Git). Store it securely and delete the local copy.
+- Vite bundle is ~775 KB (minified) — consider code-splitting when routing is added (route-based lazy loading becomes easy with react-router).
+- `adminTab` state and `tab` state in `usePortalState.js` will be removed when routing is implemented.
+- The existing `AdminUsersTab.jsx` is superseded by `AdminUserManager.jsx` and can be deleted.

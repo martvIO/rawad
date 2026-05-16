@@ -1,5 +1,9 @@
 // Admin portal shell — sticky header, warning banner, sub-tab navigation,
-// and the four admin tabs (users / send / settings / confirmations).
+// and the four admin tabs (users / send / confirmations / settings).
+// Tabs are URL-driven: NavLink updates the path, nested Routes pick the
+// component to render. NavLink's `isActive` callback drives the active
+// styling so we don't need a parallel `adminTab` state variable.
+import { NavLink, Routes, Route, Navigate } from "react-router-dom";
 import { LangSwitcher } from "../../../components/LangSwitcher.jsx";
 import { LogoutConfirm } from "../../../components/LogoutConfirm.jsx";
 import { Toast } from "../../../components/Toast.jsx";
@@ -11,11 +15,20 @@ import { AdminSendTab } from "./AdminSendTab.jsx";
 import { AdminSettingsTab } from "./AdminSettingsTab.jsx";
 import { AdminConfirmationsTab } from "./AdminConfirmationsTab.jsx";
 
+const tabStyle = ({ isActive }) => ({
+  flex: "1 1 140px", padding: "10px 0", borderRadius: 10, cursor: "pointer",
+  background: isActive ? "rgba(201,168,76,.18)" : "rgba(255,255,255,.04)",
+  border: `1px solid ${isActive ? "rgba(201,168,76,.4)" : "rgba(255,255,255,.08)"}`,
+  color: isActive ? "#c9a84c" : "#7a6a4a",
+  fontSize: 12, fontWeight: 800, fontFamily: "inherit", transition: "all .2s",
+  textAlign: "center", textDecoration: "none", display: "block",
+});
+
 export function AdminPortal() {
   const {
     onBack, t, lang, setLang, toast,
     logoutAsking, setLogoutAsking, doLogout,
-    adminTab, setAdminTab, confirmations,
+    confirmations,
   } = usePortal();
 
   return (
@@ -52,26 +65,20 @@ export function AdminPortal() {
 
         {/* Admin sub-tabs */}
         <div style={{ display: "flex", gap: 6, marginBottom: 18, flexWrap: "wrap" }}>
-          {[
-            ["users",         "👥 " + t("admin_tab_users")],
-            ["send",          "📨 " + t("admin_tab_send")],
-            ["confirmations", "✓ " + t("admin_tab_confirmations") + (confirmations.length ? ` (${confirmations.length})` : "")],
-            ["settings",      "⚙ " + t("admin_tab_settings")],
-          ].map(([id, lbl]) => (
-            <button key={id} onClick={() => setAdminTab(id)} style={{
-              flex: "1 1 140px", padding: "10px 0", borderRadius: 10, cursor: "pointer",
-              background: adminTab === id ? "rgba(201,168,76,.18)" : "rgba(255,255,255,.04)",
-              border: `1px solid ${adminTab === id ? "rgba(201,168,76,.4)" : "rgba(255,255,255,.08)"}`,
-              color: adminTab === id ? "#c9a84c" : "#7a6a4a",
-              fontSize: 12, fontWeight: 800, fontFamily: "inherit", transition: "all .2s",
-            }}>{lbl}</button>
-          ))}
+          <NavLink to="/portal/admin/users"         style={tabStyle}>👥 {t("admin_tab_users")}</NavLink>
+          <NavLink to="/portal/admin/send"          style={tabStyle}>📨 {t("admin_tab_send")}</NavLink>
+          <NavLink to="/portal/admin/confirmations" style={tabStyle}>✓ {t("admin_tab_confirmations")}{confirmations.length ? ` (${confirmations.length})` : ""}</NavLink>
+          <NavLink to="/portal/admin/settings"      style={tabStyle}>⚙ {t("admin_tab_settings")}</NavLink>
         </div>
 
-        {adminTab === "users" && <AdminUserManager />}
-        {adminTab === "send" && <AdminSendTab />}
-        {adminTab === "settings" && <AdminSettingsTab />}
-        {adminTab === "confirmations" && <AdminConfirmationsTab />}
+        <Routes>
+          <Route index                  element={<Navigate to="users" replace />} />
+          <Route path="users"           element={<AdminUserManager />} />
+          <Route path="send"            element={<AdminSendTab />} />
+          <Route path="confirmations"   element={<AdminConfirmationsTab />} />
+          <Route path="settings"        element={<AdminSettingsTab />} />
+          <Route path="*"               element={<Navigate to="users" replace />} />
+        </Routes>
       </div>
 
       <EditConfirmationModal />

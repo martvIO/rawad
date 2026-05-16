@@ -1,10 +1,12 @@
 // Groom → Dashboard: stats, distribution progress, live map, recent deliveries.
+import { useNavigate } from "react-router-dom";
 import { LiveMap } from "../../../components/LiveMap.jsx";
 import { usePortal } from "../../../context/PortalContext.jsx";
 
 export function GroomDashboard() {
+  const navigate = useNavigate();
   const {
-    t, lang, stats, myGuests, setTab, setViewingPhoto,
+    t, lang, stats, myGuests, setViewingPhoto,
     groomGeoPermission, groomGeoError, requestGroomLocation,
     groomCoords, groomMapMarkers, driversSharingWithMe,
   } = usePortal();
@@ -60,7 +62,7 @@ export function GroomDashboard() {
                     </span>
                   )}
                 </div>
-                <button onClick={() => setTab("live")} style={{
+                <button onClick={() => navigate("/portal/groom/live")} style={{
                   background: "rgba(201,168,76,.12)", border: "1px solid rgba(201,168,76,.3)",
                   color: "#c9a84c", padding: "5px 12px", borderRadius: 8,
                   fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",

@@ -4,6 +4,7 @@
 // tab selection). The shape of the returned object matches the original
 // localStorage-backed version so the role-view slices can stay untouched.
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { load, save, removeKey } from "../utils/storage.js";
 import { toIntlPhone, validatePhone } from "../utils/phone.js";
 import { validateName } from "../utils/validation.js";
@@ -29,6 +30,8 @@ import { assignDriverToGroom } from "../services/assignments.js";
 import { useGeolocation } from "./useGeolocation.js";
 
 export function usePortalState({ onBack, t, lang, setLang }) {
+  const navigate = useNavigate();
+
   // ── Auth (driven by Firebase Auth state) ────────────────────────────────────
   const [authUser, setAuthUser] = useState(null);
   const [authReady, setAuthReady] = useState(false);
@@ -50,10 +53,6 @@ export function usePortalState({ onBack, t, lang, setLang }) {
   // ── Toast ───────────────────────────────────────────────────────────────────
   const [toast, setToast] = useState(null);
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(null), 3200); };
-
-  // ── UI-only persistence ─────────────────────────────────────────────────────
-  const [tab, setTab] = useState(() => load("dawa_session_tab", "dashboard"));
-  useEffect(() => { save("dawa_session_tab", tab); }, [tab]);
 
   // Logout confirmation modal
   const [logoutAsking, setLogoutAsking] = useState(false);
@@ -77,7 +76,6 @@ export function usePortalState({ onBack, t, lang, setLang }) {
   const [sharedSelectedCity, setSharedSelectedCity] = useState(null);
 
   // ── Admin (UI only + subscriptions) ─────────────────────────────────────────
-  const [adminTab, setAdminTab] = useState("users");
   const [adminSelectedGroom, setAdminSelectedGroom] = useState(null);
 
   // Admin settings (RTDB-backed, subscribed)
@@ -208,30 +206,19 @@ export function usePortalState({ onBack, t, lang, setLang }) {
     try {
       await signIn(u, p);
       setLoginError("");
-      // setTab is run after auth subscription resolves (effect below).
+      // Post-login routing is handled by PortalRouter's role-based redirect.
     } catch {
       setLoginError(t("login_error"));
     }
   };
 
-  // When auth state changes from null→user, route to the right starting tab.
-  useEffect(() => {
-    if (!authed) return;
-    if (userType === "admin")  setTab("admin");
-    else if (userType === "driver") setTab("pending");
-    else                            setTab("dashboard");
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authed, userType]);
-
   const doLogout = async () => {
     setLogoutAsking(false);
     try { await signOutNow(); } catch {}
     setLoginUser(""); setLoginPass("");
-    setTab("dashboard");
     setSharedStep("pickGrooms");
     setSharedSelectedGrooms([]); setSharedSelectedCity(null);
     setDriverServingGroomState(null);
-    removeKey("dawa_session_tab");
     removeKey("dawa_driver_serving_groom");
   };
 
@@ -243,7 +230,7 @@ export function usePortalState({ onBack, t, lang, setLang }) {
       const { groomUid } = await assignDriverToGroom(name);
       setDriverServingGroomState({ uid: groomUid, username: name });
       setDriverGroomInput(""); setDriverGroomError("");
-      setTab("pending");
+      navigate("/portal/driver/pending");
     } catch {
       setDriverGroomError(t("driver_pick_groom_invalid"));
     }
@@ -556,9 +543,6 @@ export function usePortalState({ onBack, t, lang, setLang }) {
     driverGroomInput, setDriverGroomInput,
     driverGroomError, setDriverGroomError, submitDriverGroom,
 
-    // navigation
-    tab, setTab,
-
     // toast
     toast, showToast,
 
@@ -585,7 +569,7 @@ export function usePortalState({ onBack, t, lang, setLang }) {
     editingUser, startEditUser, cancelEditUser, saveUserEdit,
 
     // admin
-    adminTab, setAdminTab, adminSelectedGroom, setAdminSelectedGroom,
+    adminSelectedGroom, setAdminSelectedGroom,
     adminMessageBody, setAdminMessageBody, adminFormLink, setAdminFormLink,
     confirmations, editingConf, setEditingConf,
     sendWaToOne, sendWaToAll,

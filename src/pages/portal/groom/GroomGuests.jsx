@@ -1,10 +1,12 @@
 // Groom → Guests: the guest list, split into with/without address, swipe-to-delete.
+import { useNavigate } from "react-router-dom";
 import { STATUS } from "../../../data/status.js";
 import { usePortal } from "../../../context/PortalContext.jsx";
 
 export function GroomGuests() {
+  const navigate = useNavigate();
   const {
-    t, lang, myGuests, setTab,
+    t, lang, myGuests,
     revealedId, setRevealedId, swipeStartRef, removeGuest, startEdit,
   } = usePortal();
   return (
@@ -13,7 +15,7 @@ export function GroomGuests() {
               <div style={{ fontSize: 15, fontWeight: 800, color: "#f5e6b8" }}>
                 {t("guests_count")} ({myGuests.length.toLocaleString("en")})
               </div>
-              <button className="gold-btn" style={{ padding: "8px 16px", fontSize: 12 }} onClick={() => setTab("add")}>
+              <button className="gold-btn" style={{ padding: "8px 16px", fontSize: 12 }} onClick={() => navigate("/portal/groom/add")}>
                 {t("guests_add_btn")}
               </button>
             </div>

@@ -1,5 +1,8 @@
 // Groom portal shell — sticky header with the five groom tabs, plus the
 // proof-photo viewer and edit-guest modal that overlay every groom tab.
+// Tabs are URL-driven: NavLink updates the path, nested Routes pick the
+// component to render.
+import { NavLink, Routes, Route, Navigate } from "react-router-dom";
 import { LangSwitcher } from "../../../components/LangSwitcher.jsx";
 import { LogoutConfirm } from "../../../components/LogoutConfirm.jsx";
 import { Toast } from "../../../components/Toast.jsx";
@@ -12,9 +15,12 @@ import { GroomAddGuest } from "./GroomAddGuest.jsx";
 import { GroomProofs } from "./GroomProofs.jsx";
 import { GroomLiveMap } from "./GroomLiveMap.jsx";
 
+const navClass = ({ isActive }) => `nav-tab${isActive ? " active" : ""}`;
+const navStyle = { fontSize: 12, padding: "6px 10px", textDecoration: "none", display: "inline-block" };
+
 export function GroomPortalView() {
   const {
-    onBack, t, lang, setLang, tab, setTab,
+    onBack, t, lang, setLang,
     logoutAsking, setLogoutAsking, doLogout,
     toast, viewingPhoto, setViewingPhoto,
   } = usePortal();
@@ -33,16 +39,11 @@ export function GroomPortalView() {
             <span style={{ fontFamily: "'Amiri',serif", color: "#c9a84c", fontWeight: 900, fontSize: 18 }}>{lang === "he" ? "דעוה" : "دعوة"}</span>
           </div>
           <div style={{ display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center" }}>
-            {[
-              ["dashboard", t("tab_dashboard")],
-              ["guests",    t("tab_guests")],
-              ["add",       t("tab_add")],
-              ["proofs",    t("tab_proofs")],
-              ["live",      t("tab_live")],
-            ].map(([id,lbl]) => (
-              <button key={id} className={`nav-tab${tab===id?" active":""}`} onClick={() => setTab(id)}
-                      style={{ fontSize: 12, padding: "6px 10px" }}>{lbl}</button>
-            ))}
+            <NavLink to="/portal/groom/dashboard" className={navClass} style={navStyle}>{t("tab_dashboard")}</NavLink>
+            <NavLink to="/portal/groom/guests"    className={navClass} style={navStyle}>{t("tab_guests")}</NavLink>
+            <NavLink to="/portal/groom/add"       className={navClass} style={navStyle}>{t("tab_add")}</NavLink>
+            <NavLink to="/portal/groom/proofs"    className={navClass} style={navStyle}>{t("tab_proofs")}</NavLink>
+            <NavLink to="/portal/groom/live"      className={navClass} style={navStyle}>{t("tab_live")}</NavLink>
             <LangSwitcher lang={lang} setLang={setLang} />
             <button onClick={() => setLogoutAsking(true)} title={t("logout")} style={{
               background: "rgba(212,80,58,.08)", border: "1px solid rgba(212,80,58,.3)",
@@ -56,11 +57,15 @@ export function GroomPortalView() {
       {logoutAsking && <LogoutConfirm t={t} onConfirm={doLogout} onCancel={() => setLogoutAsking(false)}/>}
 
       <div style={{ maxWidth: 900, margin: "0 auto", padding: "20px 16px 80px" }}>
-        {tab === "dashboard" && <GroomDashboard />}
-        {tab === "guests" && <GroomGuests />}
-        {tab === "add" && <GroomAddGuest />}
-        {tab === "proofs" && <GroomProofs />}
-        {tab === "live" && <GroomLiveMap />}
+        <Routes>
+          <Route index             element={<Navigate to="dashboard" replace />} />
+          <Route path="dashboard"  element={<GroomDashboard />} />
+          <Route path="guests"     element={<GroomGuests />} />
+          <Route path="add"        element={<GroomAddGuest />} />
+          <Route path="proofs"     element={<GroomProofs />} />
+          <Route path="live"       element={<GroomLiveMap />} />
+          <Route path="*"          element={<Navigate to="dashboard" replace />} />
+        </Routes>
       </div>
 
       {/* Overlays — render nothing unless their state is set */}
