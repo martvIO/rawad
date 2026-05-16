@@ -11,6 +11,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { PortalProvider, usePortal } from "../../context/PortalContext.jsx";
 import { RoleGuard } from "../../components/RoleGuard.jsx";
 import { LoginScreen } from "./LoginScreen.jsx";
+import { LogoutPage } from "./LogoutPage.jsx";
 import { AdminPortal } from "./admin/AdminPortal.jsx";
 import { DriverPortal } from "./driver/DriverPortal.jsx";
 import { GroomPortalView } from "./groom/GroomPortalView.jsx";
@@ -31,6 +32,7 @@ function PortalRouter() {
   return (
     <Routes>
       <Route index element={<Navigate to={defaultPath} replace />} />
+      <Route path="logout"   element={<LogoutPage />} />
       <Route path="admin/*"  element={<RoleGuard roles={["admin"]}  fallback={<Navigate to={defaultPath} replace />}><AdminPortal />     </RoleGuard>} />
       <Route path="driver/*" element={<RoleGuard roles={["driver"]} fallback={<Navigate to={defaultPath} replace />}><DriverPortal />    </RoleGuard>} />
       <Route path="groom/*"  element={<RoleGuard roles={["groom"]}  fallback={<Navigate to={defaultPath} replace />}><GroomPortalView /> </RoleGuard>} />

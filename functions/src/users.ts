@@ -7,7 +7,7 @@ import { getDatabase }  from "firebase-admin/database";
 import { writeAudit }   from "./audit";
 import { allow }        from "./rateLimit";
 import {
-  assertAdmin, isE164, isRole, isUsername,
+  assertAdmin, isE164, isRole, isStrongPassword, isUsername,
   phoneIndexKey, syntheticEmail,
 } from "./helpers";
 
@@ -30,8 +30,11 @@ export const createPortalUser = onCall(
 
     const input = req.data as Partial<CreateInput>;
     if (!isUsername(input.username))       throw new HttpsError("invalid-argument", "Invalid username.");
-    if (typeof input.password !== "string" || input.password.length < 8) {
-      throw new HttpsError("invalid-argument", "Password must be at least 8 characters.");
+    if (!isStrongPassword(input.password)) {
+      throw new HttpsError(
+        "invalid-argument",
+        "Password must be at least 8 characters and include uppercase, lowercase, and a number.",
+      );
     }
     if (!isE164(input.phoneE164))          throw new HttpsError("invalid-argument", "Invalid phone (must be E.164).");
     if (!isRole(input.role))               throw new HttpsError("invalid-argument", "Invalid role.");

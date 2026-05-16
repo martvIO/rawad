@@ -2,9 +2,12 @@
 // Uses Firebase Phone Auth on steps 1–2 and the `resetPassword` Cloud
 // Function on step 3 (server-side verifies that the phone-OTP session
 // matches the target portal user's stored phoneE164).
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { sendPasswordResetCode, confirmPasswordResetCode, signOutNow } from "../services/auth.js";
 import { callResetPassword } from "../services/users.js";
+import { PasswordRules } from "./PasswordRules.jsx";
+import { isStrongPassword } from "../utils/password.js";
+import { makeT } from "../i18n/index.js";
 
 const STRINGS = {
   ar: {
@@ -48,6 +51,7 @@ const tr = (lang, key) => (STRINGS[lang] || STRINGS.ar)[key] || STRINGS.ar[key] 
 
 export function PasswordResetFlow({ lang, onClose }) {
   const T = (k) => tr(lang, k);
+  const tGlobal = useMemo(() => makeT(lang), [lang]);
   const [step, setStep]   = useState(1);
   const [phone, setPhone] = useState("");
   const [code, setCode]   = useState("");
@@ -89,13 +93,13 @@ export function PasswordResetFlow({ lang, onClose }) {
 
   const updatePassword = async () => {
     setError("");
-    if (pass.length < 8) { setError(T("invalid_password")); return; }
+    if (!isStrongPassword(pass)) { setError(tGlobal("pwd_weak")); return; }
     setBusy(true);
     try {
       await callResetPassword(pass);
       setStep(4);
     } catch (e) {
-      setError(e?.message || T("invalid_password"));
+      setError(e?.message || tGlobal("pwd_weak"));
     } finally { setBusy(false); }
   };
 
@@ -154,9 +158,11 @@ export function PasswordResetFlow({ lang, onClose }) {
             <div style={{ marginBottom: 6, fontSize: 12, color: "#a09070" }}>{T("step3_label")}</div>
             <input className="input-field" type="password" placeholder={T("step3_placeholder")}
                    value={pass} onChange={e => { setPass(e.target.value); setError(""); }}
-                   style={{ marginBottom: 12 }}/>
+                   style={{ marginBottom: 10 }}/>
+            <PasswordRules password={pass} t={tGlobal} />
             {error && <div style={{ color: "#d47a4b", fontSize: 12, marginBottom: 10 }}>{error}</div>}
-            <button className="gold-btn" style={{ width: "100%" }} disabled={busy} onClick={updatePassword}>
+            <button className="gold-btn" style={{ width: "100%" }}
+                    disabled={busy || !isStrongPassword(pass)} onClick={updatePassword}>
               {T("step3_submit")}
             </button>
           </>

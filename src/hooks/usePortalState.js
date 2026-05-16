@@ -8,6 +8,7 @@ import { useNavigate } from "react-router-dom";
 import { load, save, removeKey } from "../utils/storage.js";
 import { toIntlPhone, validatePhone } from "../utils/phone.js";
 import { validateName } from "../utils/validation.js";
+import { isStrongPassword } from "../utils/password.js";
 
 import { subscribeAuth, signIn, signOutNow } from "../services/auth.js";
 import {
@@ -419,7 +420,7 @@ export function usePortalState({ onBack, t, lang, setLang }) {
   // ── Admin user management ───────────────────────────────────────────────────
   const addUser = async () => {
     if (!newUserName.trim() || !newUserPass.trim()) { showToast(t("admin_required")); return; }
-    if (newUserPass.length < 8) { showToast(t("admin_required")); return; }
+    if (!isStrongPassword(newUserPass)) { showToast(t("pwd_weak")); return; }
     if (!newUserPhone.trim()) { showToast(t("admin_required")); return; }
     try {
       await createPortalUser({

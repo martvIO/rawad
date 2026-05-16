@@ -20,7 +20,7 @@ import { getAuth }     from "firebase-admin/auth";
 import { getDatabase } from "firebase-admin/database";
 import { writeAudit }  from "./audit";
 import { allow }       from "./rateLimit";
-import { phoneIndexKey } from "./helpers";
+import { isStrongPassword, phoneIndexKey } from "./helpers";
 
 export const resetPassword = onCall(
   { enforceAppCheck: true },
@@ -35,8 +35,11 @@ export const resetPassword = onCall(
     }
 
     const newPassword = req.data?.newPassword;
-    if (typeof newPassword !== "string" || newPassword.length < 8) {
-      throw new HttpsError("invalid-argument", "Password must be at least 8 characters.");
+    if (!isStrongPassword(newPassword)) {
+      throw new HttpsError(
+        "invalid-argument",
+        "Password must be at least 8 characters and include uppercase, lowercase, and a number.",
+      );
     }
 
     if (!allow(`reset:${phoneE164}`, 5, 60 * 60 * 1000)) {

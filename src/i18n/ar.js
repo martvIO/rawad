@@ -88,6 +88,13 @@ export const ar = {
   admin_delete_confirm: "تأكيد الحذف", admin_edit: "تعديل",
   admin_no_users: "لا يوجد مستخدمون", admin_added: "✓ تم إنشاء المستخدم", admin_deleted: "تم حذف المستخدم",
   admin_required: "اسم المستخدم وكلمة المرور مطلوبان", admin_taken: "اسم المستخدم محجوز",
+  // Password strength rules (shared with he.js)
+  pwd_rules_title: "متطلبات كلمة المرور",
+  pwd_rule_min_length: "٨ أحرف على الأقل",
+  pwd_rule_uppercase: "حرف لاتيني كبير واحد على الأقل (A-Z)",
+  pwd_rule_lowercase: "حرف لاتيني صغير واحد على الأقل (a-z)",
+  pwd_rule_number: "رقم واحد على الأقل (0-9)",
+  pwd_weak: "كلمة المرور ضعيفة — يرجى استيفاء كل الشروط بالأعلى",
   admin_user_manager_title: "إدارة الحسابات",
   admin_user_manager_subtitle: "إنشاء، تعديل، أو حذف أي نوع من الحسابات",
   admin_user_filter_all: "الكل",

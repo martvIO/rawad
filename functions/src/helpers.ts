@@ -27,6 +27,19 @@ export function isRole(v: unknown): v is "groom" | "driver" | "admin" {
   return v === "groom" || v === "driver" || v === "admin";
 }
 
+// Strong-password policy — must match src/utils/password.js exactly.
+// Keep the two in lock-step when changing the policy: min 8 chars,
+// at least one uppercase, lowercase, and digit.
+export function isStrongPassword(v: unknown): v is string {
+  return (
+    typeof v === "string" &&
+    v.length >= 8 &&
+    /[A-Z]/.test(v) &&
+    /[a-z]/.test(v) &&
+    /[0-9]/.test(v)
+  );
+}
+
 // Normalise a free-form local phone string to E.164, defaulting unknown
 // country prefixes to Israel (+972). Returns null if it can't be normalised.
 export function normalisePhone(raw: string): string | null {

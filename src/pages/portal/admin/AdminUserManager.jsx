@@ -8,6 +8,8 @@
 import { useState } from "react";
 import { usePortal } from "../../../context/PortalContext.jsx";
 import { RoleGuard } from "../../../components/RoleGuard.jsx";
+import { PasswordRules } from "../../../components/PasswordRules.jsx";
+import { isStrongPassword } from "../../../utils/password.js";
 
 const ROLE_STYLE = {
   admin:  { bg: "rgba(212,80,58,.15)",  fg: "#d47a4b", icon: "🔒" },
@@ -77,7 +79,8 @@ function UserManagerInner() {
         <div style={{ marginBottom: 6, fontSize: 12, color: "#a09070" }}>{t("login_pass")}</div>
         <input className="input-field" type="password" placeholder="••••••••"
                value={newUserPass} onChange={e => setNewUserPass(e.target.value)}
-               style={{ marginBottom: 12, direction: "ltr", textAlign: "right" }}/>
+               style={{ marginBottom: 10, direction: "ltr", textAlign: "right" }}/>
+        <PasswordRules password={newUserPass} t={t} />
 
         <div style={{ marginBottom: 6, fontSize: 12, color: "#a09070" }}>{phoneHint}</div>
         <input className="input-field" type="tel" inputMode="tel" placeholder="+972501234567"
@@ -85,7 +88,7 @@ function UserManagerInner() {
                style={{ marginBottom: 16, direction: "ltr", textAlign: "right" }}/>
 
         <button className="gold-btn" style={{ width: "100%" }} onClick={addUser}
-                disabled={!newUserName.trim() || !newUserPass.trim() || !newUserPhone.trim()}>
+                disabled={!newUserName.trim() || !newUserPhone.trim() || !isStrongPassword(newUserPass)}>
           ➕ {t("admin_create")}
         </button>
       </div>

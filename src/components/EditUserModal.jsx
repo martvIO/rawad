@@ -3,6 +3,8 @@
 // optionally set a new password (leave blank to keep current).
 import { useEffect, useState } from "react";
 import { usePortal } from "../context/PortalContext.jsx";
+import { PasswordRules } from "./PasswordRules.jsx";
+import { isStrongPassword } from "../utils/password.js";
 
 export function EditUserModal() {
   const { editingUser, cancelEditUser, saveUserEdit, t, lang } = usePortal();
@@ -101,7 +103,12 @@ export function EditUserModal() {
         <input className="input-field" type="password"
                value={newPassword} onChange={e => setNewPassword(e.target.value)}
                placeholder={t("admin_user_edit_new_password_hint")}
-               style={{ marginBottom: 20, direction: "ltr", textAlign: "right" }}/>
+               style={{ marginBottom: newPassword ? 10 : 20, direction: "ltr", textAlign: "right" }}/>
+        {newPassword.length > 0 && (
+          <div style={{ marginBottom: 16 }}>
+            <PasswordRules password={newPassword} t={t} compact />
+          </div>
+        )}
 
         <div style={{ display: "flex", gap: 10 }}>
           <button className="ghost-btn" style={{ flex: 1 }} onClick={cancelEditUser}>
@@ -109,7 +116,7 @@ export function EditUserModal() {
           </button>
           <button className="gold-btn" style={{ flex: 1 }} onClick={save}
                   disabled={!username.trim() || !phoneE164.trim() ||
-                            (newPassword.length > 0 && newPassword.length < 8)}>
+                            (newPassword.length > 0 && !isStrongPassword(newPassword))}>
             {t("edit_save")}
           </button>
         </div>

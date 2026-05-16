@@ -97,6 +97,13 @@ export const he = {
   admin_user_edit_new_password_hint: "השאר ריק כדי לשמור את הקיימת",
   admin_user_edit_saved: "✓ השינויים נשמרו",
   admin_required: "שם משתמש וסיסמה נדרשים", admin_taken: "שם המשתמש תפוס",
+  // Password strength rules (shared with ar.js)
+  pwd_rules_title: "דרישות סיסמה",
+  pwd_rule_min_length: "לפחות 8 תווים",
+  pwd_rule_uppercase: "לפחות אות גדולה אחת (A-Z)",
+  pwd_rule_lowercase: "לפחות אות קטנה אחת (a-z)",
+  pwd_rule_number: "לפחות ספרה אחת (0-9)",
+  pwd_weak: "הסיסמה חלשה מדי — יש למלא את כל הדרישות שלמעלה",
   admin_warning: "אתה במצב מנהל — לוח זה גלוי לך בלבד",
   lang_label: "שפה",
   logout: "התנתקות", logout_confirm_title: "התנתקות",

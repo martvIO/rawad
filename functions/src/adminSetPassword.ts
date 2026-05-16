@@ -7,7 +7,7 @@ import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { getAuth }    from "firebase-admin/auth";
 import { writeAudit } from "./audit";
 import { allow }      from "./rateLimit";
-import { assertAdmin } from "./helpers";
+import { assertAdmin, isStrongPassword } from "./helpers";
 
 export const adminSetPassword = onCall(
   { enforceAppCheck: true },
@@ -22,8 +22,11 @@ export const adminSetPassword = onCall(
     if (typeof uid !== "string" || uid.length === 0) {
       throw new HttpsError("invalid-argument", "Missing uid.");
     }
-    if (typeof newPassword !== "string" || newPassword.length < 8) {
-      throw new HttpsError("invalid-argument", "Password must be at least 8 characters.");
+    if (!isStrongPassword(newPassword)) {
+      throw new HttpsError(
+        "invalid-argument",
+        "Password must be at least 8 characters and include uppercase, lowercase, and a number.",
+      );
     }
     if (uid === callerUid) {
       throw new HttpsError("failed-precondition", "Use the regular reset flow for your own password.");

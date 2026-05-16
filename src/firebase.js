@@ -43,17 +43,26 @@ setPersistence(auth, browserLocalPersistence).catch(() => {});
 
 // App Check — production-domain only. Skipped in two cases:
 //   1. Emulator mode (dev with VITE_USE_EMULATORS=1).
-//   2. Running on localhost / 127.0.0.1, even against production Firebase.
+//   2. Running on localhost / 127.0.0.1, UNLESS VITE_APP_CHECK_ON_LOCALHOST=1.
 //      reCAPTCHA Enterprise rejects unregistered origins with 403, and on
 //      the first failure App Check throttles every Firebase call for 24h
-//      (cached in IndexedDB). Skipping it on localhost avoids that trap.
+//      (cached in IndexedDB). The default skip on localhost avoids that
+//      trap; opt back in only after `localhost` / `127.0.0.1` are listed in
+//      the reCAPTCHA Enterprise key's allowed domains.
 const useEmulators =
   env.VITE_USE_EMULATORS === "1" || env.VITE_USE_EMULATORS === "true";
 const isLocalhost =
   typeof window !== "undefined" &&
   ["localhost", "127.0.0.1"].includes(window.location.hostname);
+const allowAppCheckOnLocalhost =
+  env.VITE_APP_CHECK_ON_LOCALHOST === "1" ||
+  env.VITE_APP_CHECK_ON_LOCALHOST === "true";
 
-if (!useEmulators && !isLocalhost && env.VITE_RECAPTCHA_ENTERPRISE_SITE_KEY) {
+if (
+  !useEmulators &&
+  env.VITE_RECAPTCHA_ENTERPRISE_SITE_KEY &&
+  (!isLocalhost || allowAppCheckOnLocalhost)
+) {
   // Once enrolled, every RTDB / Storage / Functions call must carry a
   // valid App Check token, blocking traffic from scripts that aren't this app.
   initializeAppCheck(app, {
