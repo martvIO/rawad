@@ -8,6 +8,7 @@ import { Toast } from "../../../components/Toast.jsx";
 import { usePortal } from "../../../context/PortalContext.jsx";
 import { DriverPickGroom } from "./DriverPickGroom.jsx";
 import { DriverDeliveryList } from "./DriverDeliveryList.jsx";
+import { DriverMap } from "./DriverMap.jsx";
 import { SharedCities } from "./SharedCities.jsx";
 import { C } from "../../../styles/theme.js";
 
@@ -63,6 +64,7 @@ export function DriverPortal() {
           {/* Driver tabs */}
           <div style={{ display: "flex", gap: 6 }}>
             <NavLink to="/portal/driver/pending" style={tabStyle}>📋 {t("driver_subtitle")}</NavLink>
+            <NavLink to="/portal/driver/map"     style={tabStyle}>🗺 {t("tab_map")}</NavLink>
             <NavLink to="/portal/driver/shared"  style={tabStyle}>🏘 {t("tab_shared")}</NavLink>
             <button onClick={() => setDriverServingGroom(null)} title={t("driver_pick_groom_change")} style={{
               padding: "8px 12px", borderRadius: 10, cursor: "pointer",
@@ -82,6 +84,7 @@ export function DriverPortal() {
         <Routes>
           <Route index           element={<Navigate to="pending" replace />} />
           <Route path="pending"  element={<DriverDeliveryList />} />
+          <Route path="map"      element={<DriverMap />} />
           <Route path="shared"   element={<SharedCities />} />
           <Route path="*"        element={<Navigate to="pending" replace />} />
         </Routes>

@@ -8,7 +8,9 @@
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { getDatabase } from "firebase-admin/database";
 import { allow }       from "./rateLimit";
-import { isUsername, normalisePhone } from "./helpers";
+import {
+  isUsername, normalisePhone, isFiniteInRange, normalisePhoneForMatching,
+} from "./helpers";
 
 const MAX_LEN = {
   submittedName:   120,
@@ -52,6 +54,14 @@ export const submitConfirmation = onCall(
       throw new HttpsError("invalid-argument", "Invalid phone number.");
     }
 
+    // Optional GPS fields. Both lat AND lng must be valid finite numbers in
+    // range to count; either-or is rejected to avoid half-set coords.
+    const hasCoords = isFiniteInRange(data.lat, -90, 90) && isFiniteInRange(data.lng, -180, 180);
+    const lat = hasCoords ? (data.lat as number) : null;
+    const lng = hasCoords ? (data.lng as number) : null;
+    const locationAccuracy = isFiniteInRange(data.locationAccuracy, 0, 100000)
+      ? (data.locationAccuracy as number) : null;
+
     const db = getDatabase();
     const groomUidSnap = await db.ref(`usernameIndex/${groomUsername}`).get();
     if (!groomUidSnap.exists()) {
@@ -63,12 +73,59 @@ export const submitConfirmation = onCall(
     const groomUid = groomUidSnap.val();
 
     const confRef = db.ref("confirmations").push();
-    await confRef.set({
+    const confRecord: Record<string, unknown> = {
       groomUid,
       groomUsername,   // denormed so the admin tab can show it without a users lookup
       submittedName, submittedPhone, submittedCity, submittedStreet, submittedHouse,
       confirmedAt: Date.now(),
-    });
-    return { ok: true, id: confRef.key };
+    };
+    if (hasCoords) {
+      confRecord.lat = lat;
+      confRecord.lng = lng;
+      confRecord.locationCapturedAt = Date.now();
+      if (locationAccuracy !== null) confRecord.locationAccuracy = locationAccuracy;
+    }
+    await confRef.set(confRecord);
+
+    // Auto-attach: if exactly one guest under this groom matches the submitted
+    // phone (after normalisation) AND has no location yet, copy the coords
+    // onto the guest. This is best-effort — failure here doesn't fail the
+    // overall submission; the admin can still attach manually.
+    let attachedGuestId: string | null = null;
+    if (hasCoords) {
+      try {
+        const target = normalisePhoneForMatching(submittedPhone);
+        if (target) {
+          const guestsSnap = await db.ref(`guestsByGroom/${groomUid}`).get();
+          const matches: string[] = [];
+          guestsSnap.forEach((g) => {
+            const v = g.val() as { phone?: string } | null;
+            if (v && normalisePhoneForMatching(v.phone ?? "") === target) {
+              if (g.key) matches.push(g.key);
+            }
+            return false;
+          });
+          if (matches.length === 1) {
+            const guestId = matches[0];
+            const guestVal = guestsSnap.child(guestId).val() as { lat?: unknown } | null;
+            if (guestVal && typeof guestVal.lat !== "number") {
+              const guestPatch: Record<string, unknown> = {
+                lat, lng,
+                locationSource: "gps",
+                locationUpdatedAt: Date.now(),
+              };
+              if (locationAccuracy !== null) guestPatch.locationAccuracy = locationAccuracy;
+              await db.ref(`guestsByGroom/${groomUid}/${guestId}`).update(guestPatch);
+              await confRef.update({ attachedGuestId: guestId });
+              attachedGuestId = guestId;
+            }
+          }
+        }
+      } catch (e) {
+        console.warn("submitConfirmation: auto-attach failed", e);
+      }
+    }
+
+    return { ok: true, id: confRef.key, attachedGuestId };
   },
 );

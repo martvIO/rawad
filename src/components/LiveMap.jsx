@@ -1,23 +1,71 @@
-﻿// Leaflet map that renders/syncs multiple markers without re-creating the map.
-import { useRef, useEffect } from "react";
+// Leaflet map that renders/syncs multiple markers without re-creating the map.
+//
+// Marker kinds supported: "you" (gold person), "driver" (blue car),
+// "guest_pending" (blue mail), "guest_enroute" (yellow scooter),
+// "guest_delivered" (green tick). Pass `onMarkerClick(key)` to make markers
+// tappable. Pass `showTileSwitcher` to surface a corner control that lets
+// the user toggle between OSM / satellite / light / dark basemaps.
+import { useRef, useEffect, useState } from "react";
 import { useLeaflet } from "../hooks/useLeaflet.js";
 import { C } from "../styles/theme.js";
 
-export function LiveMap({ markers, t, lang, height = 420 }) {
+const TILE_LAYERS = {
+  osm: {
+    url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+    attribution: "© OpenStreetMap", maxZoom: 19, subdomains: "abc",
+  },
+  satellite: {
+    url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    attribution: "© Esri", maxZoom: 19,
+  },
+  light: {
+    url: "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",
+    attribution: "© OpenStreetMap, © CARTO", maxZoom: 19, subdomains: "abcd",
+  },
+  dark: {
+    url: "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png",
+    attribution: "© OpenStreetMap, © CARTO", maxZoom: 19, subdomains: "abcd",
+  },
+};
+
+// One palette entry per marker kind. Keeps the visual contract central so
+// new pages don't drift in colour or iconography.
+const MARKER_KINDS = {
+  you:              { bg: "linear-gradient(135deg,#c9a84c,#f0c84c)", ring: C.gold,    icon: "👤" },
+  driver:           { bg: "linear-gradient(135deg,#4b9fd4,#3a7fb0)", ring: C.blue,    icon: "🚗" },
+  guest_pending:    { bg: "linear-gradient(135deg,#4b9fd4,#3a7fb0)", ring: C.blue,    icon: "📩" },
+  guest_enroute:    { bg: "linear-gradient(135deg,#f0c84c,#c9a84c)", ring: "#f0c84c", icon: "🛵" },
+  guest_delivered:  { bg: "linear-gradient(135deg,#4cc97a,#2da85a)", ring: "#4cc97a", icon: "✓"  },
+};
+
+export function LiveMap({
+  markers, t, lang, height = 420,
+  onMarkerClick,
+  tileLayer = "osm",
+  showTileSwitcher = false,
+}) {
   const leafletReady = useLeaflet();
   const containerRef = useRef(null);
   const mapRef       = useRef(null);
+  const tileRef      = useRef(null);
   const markerObjsRef = useRef(new Map()); // key -> L.marker
   const didFitRef     = useRef(false);
+  const onClickRef    = useRef(onMarkerClick);
+  const [tile, setTile] = useState(tileLayer);
+
+  // Keep the click handler ref current so existing markers fire the latest
+  // closure without needing to rebind on every re-render.
+  useEffect(() => { onClickRef.current = onMarkerClick; }, [onMarkerClick]);
+
+  // External `tileLayer` prop wins on change (e.g. parent persists a choice).
+  useEffect(() => { setTile(tileLayer); }, [tileLayer]);
 
   // Build marker icon HTML for a given kind. Re-used across renders.
   const buildIcon = (kind, label) => {
     const L = window.L;
     if (!L) return null;
-    const isYou = kind === "you";
-    const bg     = isYou ? "linear-gradient(135deg,#c9a84c,#f0c84c)" : "linear-gradient(135deg,#4b9fd4,#3a7fb0)";
-    const ring   = isYou ? C.gold : C.blue;
-    const icon   = isYou ? "👤" : "🚗";
+    const palette = MARKER_KINDS[kind] || MARKER_KINDS.driver;
+    const { bg, ring, icon } = palette;
     const html = `
       <div style="position:relative;width:44px;height:54px;display:flex;flex-direction:column;align-items:center;">
         <div style="
@@ -59,9 +107,11 @@ export function LiveMap({ markers, t, lang, height = 420 }) {
     const map = L.map(containerRef.current, {
       zoomControl: true, attributionControl: true,
     }).setView(start, 13);
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: "© OpenStreetMap",
-      maxZoom: 19,
+    const initial = TILE_LAYERS[tile] || TILE_LAYERS.osm;
+    tileRef.current = L.tileLayer(initial.url, {
+      attribution: initial.attribution,
+      maxZoom: initial.maxZoom,
+      subdomains: initial.subdomains,
     }).addTo(map);
     mapRef.current = map;
     // Invalidate size after mount so Leaflet picks up final container dimensions
@@ -69,10 +119,24 @@ export function LiveMap({ markers, t, lang, height = 420 }) {
     return () => {
       map.remove();
       mapRef.current = null;
+      tileRef.current = null;
       markerObjsRef.current = new Map();
       didFitRef.current = false;
     };
   }, [leafletReady]);
+
+  // Swap tile layer in-place when the user picks a different basemap.
+  useEffect(() => {
+    if (!mapRef.current || !window.L) return;
+    const cfg = TILE_LAYERS[tile] || TILE_LAYERS.osm;
+    if (tileRef.current) {
+      tileRef.current.remove();
+      tileRef.current = null;
+    }
+    tileRef.current = window.L.tileLayer(cfg.url, {
+      attribution: cfg.attribution, maxZoom: cfg.maxZoom, subdomains: cfg.subdomains,
+    }).addTo(mapRef.current);
+  }, [tile, leafletReady]);
 
   // Sync markers: add/update/remove without re-creating the map
   useEffect(() => {
@@ -91,6 +155,10 @@ export function LiveMap({ markers, t, lang, height = 420 }) {
         prev.setIcon(buildIcon(m.kind, m.label));
       } else {
         const marker = L.marker(latlng, { icon: buildIcon(m.kind, m.label) }).addTo(map);
+        marker.on("click", () => {
+          const cb = onClickRef.current;
+          if (typeof cb === "function") cb(m.key);
+        });
         existing.set(m.key, marker);
       }
     }
@@ -134,5 +202,40 @@ export function LiveMap({ markers, t, lang, height = 420 }) {
       </div>
     );
   }
-  return <div ref={containerRef} style={{ width: "100%", height, borderRadius: 14, overflow: "hidden" }}/>;
+  return (
+    <div style={{ position: "relative", width: "100%", height, borderRadius: 14, overflow: "hidden" }}>
+      <div ref={containerRef} style={{ width: "100%", height: "100%" }}/>
+      {showTileSwitcher && <TileSwitcher tile={tile} setTile={setTile} t={t}/>}
+    </div>
+  );
+}
+
+function TileSwitcher({ tile, setTile, t }) {
+  const opts = [
+    { key: "osm",       label: t("map_layer_street")    || "Street" },
+    { key: "satellite", label: t("map_layer_satellite") || "Satellite" },
+    { key: "light",     label: t("map_layer_light")     || "Light" },
+    { key: "dark",      label: t("map_layer_dark")      || "Dark" },
+  ];
+  return (
+    <div style={{
+      position: "absolute", top: 10, right: 10, zIndex: 500,
+      background: "rgba(7,7,10,.86)", border: "1px solid rgba(201,168,76,.3)",
+      borderRadius: 10, padding: 4, display: "flex", gap: 2,
+      boxShadow: "0 4px 14px rgba(0,0,0,.5)",
+    }}>
+      {opts.map(o => {
+        const active = tile === o.key;
+        return (
+          <button key={o.key} onClick={() => setTile(o.key)} style={{
+            padding: "5px 10px", borderRadius: 6, border: "none",
+            background: active ? "rgba(201,168,76,.25)" : "transparent",
+            color: active ? C.gold : C.dim,
+            fontSize: 11, fontWeight: 800, fontFamily: "inherit",
+            cursor: "pointer", transition: "all .15s",
+          }}>{o.label}</button>
+        );
+      })}
+    </div>
+  );
 }

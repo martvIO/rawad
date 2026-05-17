@@ -59,6 +59,11 @@
           "deliveredBy":    { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 120)" },
           "deliveryNote":   { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 240)" },
           "createdAt":      { ".validate": "!newData.exists() || newData.isNumber()" },
+          "lat":              { ".validate": "!newData.exists() || (newData.isNumber() && newData.val() >= -90  && newData.val() <= 90)" },
+          "lng":              { ".validate": "!newData.exists() || (newData.isNumber() && newData.val() >= -180 && newData.val() <= 180)" },
+          "locationAccuracy": { ".validate": "!newData.exists() || (newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000)" },
+          "locationSource":   { ".validate": "!newData.exists() || newData.val() === 'gps' || newData.val() === 'manual'" },
+          "locationUpdatedAt":{ ".validate": "!newData.exists() || newData.isNumber()" },
           "$other":         { ".validate": false }
         }
       }
@@ -94,6 +99,11 @@
         "submittedCity":   { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 80)" },
         "submittedStreet": { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 120)" },
         "submittedHouse":  { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 20)" },
+        "lat":               { ".validate": "!newData.exists() || (newData.isNumber() && newData.val() >= -90  && newData.val() <= 90)" },
+        "lng":               { ".validate": "!newData.exists() || (newData.isNumber() && newData.val() >= -180 && newData.val() <= 180)" },
+        "locationAccuracy":  { ".validate": "!newData.exists() || (newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000)" },
+        "locationCapturedAt":{ ".validate": "!newData.exists() || newData.isNumber()" },
+        "attachedGuestId":   { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 64)" },
         "confirmedAt":     { ".validate": "newData.isNumber()" },
         "$other":          { ".validate": false }
       }

@@ -14,6 +14,7 @@ import { GroomGuests } from "./GroomGuests.jsx";
 import { GroomAddGuest } from "./GroomAddGuest.jsx";
 import { GroomProofs } from "./GroomProofs.jsx";
 import { GroomLiveMap } from "./GroomLiveMap.jsx";
+import { GroomGuestsMap } from "./GroomGuestsMap.jsx";
 import { C } from "../../../styles/theme.js";
 
 const navClass = ({ isActive }) => `nav-tab${isActive ? " active" : ""}`;
@@ -44,6 +45,7 @@ export function GroomPortalView() {
             <NavLink to="/portal/groom/guests"    className={navClass} style={navStyle}>{t("tab_guests")}</NavLink>
             <NavLink to="/portal/groom/add"       className={navClass} style={navStyle}>{t("tab_add")}</NavLink>
             <NavLink to="/portal/groom/proofs"    className={navClass} style={navStyle}>{t("tab_proofs")}</NavLink>
+            <NavLink to="/portal/groom/map"       className={navClass} style={navStyle}>{t("tab_guest_map")}</NavLink>
             <NavLink to="/portal/groom/live"      className={navClass} style={navStyle}>{t("tab_live")}</NavLink>
             <LangSwitcher lang={lang} setLang={setLang} />
             <button onClick={() => setLogoutAsking(true)} title={t("logout")} style={{
@@ -64,6 +66,7 @@ export function GroomPortalView() {
           <Route path="guests"     element={<GroomGuests />} />
           <Route path="add"        element={<GroomAddGuest />} />
           <Route path="proofs"     element={<GroomProofs />} />
+          <Route path="map"        element={<GroomGuestsMap />} />
           <Route path="live"       element={<GroomLiveMap />} />
           <Route path="*"          element={<Navigate to="dashboard" replace />} />
         </Routes>

@@ -9,7 +9,14 @@ export function subscribeConfirmations(cb) {
   return subscribeList("confirmations", cb);
 }
 
+// Payload shape: { groomUsername, submittedName, submittedPhone, submittedCity,
+//                   submittedStreet, submittedHouse, lat?, lng?, locationAccuracy? }
+// Returns: { ok: true, id, attachedGuestId: string|null }
 export const submitConfirmation = callable("submitConfirmation");
+
+// Admin-only: copy a confirmation's stored lat/lng/accuracy onto a specific
+// guest record. Used when auto-attach couldn't decide (no match or multiple).
+export const attachConfirmationLocationToGuest = callable("attachConfirmationLocationToGuest");
 
 // Admin-only: patch fields on an existing confirmation. RTDB rules enforce
 // that only authenticated admins can write here, and only to existing records.

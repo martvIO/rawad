@@ -30,7 +30,11 @@
       "Bash(awk 'NR==4170 {print substr\\($0, 1100, 400\\)}' dist/assets/index-DJKCxQL7.js)",
       "Bash(awk 'NR==4170 {print substr\\($0, 1650, 400\\)}' dist/assets/index-DJKCxQL7.js)",
       "Bash(grep -oE 'function \\(Lb|vb|kc|Vf\\)\\\\\\([^\\)]*\\\\\\)\\\\{[^}]{0,300}' dist/assets/index-DJKCxQL7.js)",
-      "Bash(awk 'NR==2375 {print substr\\($0, 2900, 350\\)}' dist/assets/index-DJKCxQL7.js)"
+      "Bash(awk 'NR==2375 {print substr\\($0, 2900, 350\\)}' dist/assets/index-DJKCxQL7.js)",
+      "Bash(netstat -ano)",
+      "Bash(findstr LISTENING)",
+      "Bash(tasklist *)",
+      "PowerShell($env:GOOGLE_APPLICATION_CREDENTIALS=\"C:\\\\Users\\\\martv\\\\OneDrive\\\\Documents\\\\github\\\\rawad\\\\dawa-aa793-firebase-adminsdk-fbsvc-e42554a05c.json\"; $env:GCLOUD_PROJECT=\"dawa-aa793\"; node \"C:\\\\Users\\\\martv\\\\OneDrive\\\\Documents\\\\github\\\\rawad\\\\functions\\\\scripts\\\\inspectUser.js\" groom)"
     ]
   }
 }

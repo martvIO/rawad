@@ -22,7 +22,11 @@ import {
   updatePortalUser as updatePortalUserSrv,
   adminSetPassword as adminSetPasswordSrv,
 } from "../services/users.js";
-import { subscribeConfirmations, updateConfirmation as updateConfirmationSrv } from "../services/confirmations.js";
+import {
+  subscribeConfirmations,
+  updateConfirmation as updateConfirmationSrv,
+  attachConfirmationLocationToGuest as attachConfLocationSrv,
+} from "../services/confirmations.js";
 import { classifyAll, normalizePhoneForMatching } from "../utils/matchUtils.js";
 import { subscribeSettings, saveSettings } from "../services/adminSettings.js";
 import {
@@ -352,6 +356,16 @@ export function usePortalState({ onBack, t, lang, setLang }) {
     } catch (e) { logErr("saveConfirmationEdit", e); showToast(e?.message || ""); }
   };
 
+  // Admin-only: copy a confirmation's stored coords onto a specific guest.
+  // Surfaced from EditConfirmationModal when auto-attach couldn't resolve.
+  const attachConfirmationToGuest = async (confirmationId, guestId) => {
+    if (!confirmationId || !guestId) return;
+    try {
+      await attachConfLocationSrv({ confirmationId, guestId });
+      showToast(t("admin_conf_attach_success"));
+    } catch (e) { logErr("attachConfirmationToGuest", e); showToast(e?.message || ""); }
+  };
+
   // Status badge for a guest based on whether a confirmation arrived. Used
   // by the Send tab (per-guest "Matched"/"Mismatch" chip).
   const guestConfirmationStatus = (guest) => {
@@ -479,15 +493,18 @@ export function usePortalState({ onBack, t, lang, setLang }) {
   };
 
   // ── Mark delivered (with optional photo upload) ─────────────────────────────
-  const markDelivered = async (id) => {
+  // Pure variant — accepts its inputs explicitly so callers with their own
+  // local UI state (e.g. the map modal) don't have to plumb through the
+  // delivery-form state that DriverDeliveryList owns.
+  const markGuestDelivered = async (id, { photoData: pData, photoTaken: pTaken, deliveryNote: pNote } = {}) => {
     const guest = myGuests.find(g => g.id === id);
-    if (!guest) return;
+    if (!guest) return false;
     let proofPhotoPath;
     try {
-      if (photoData) {
-        const blob = dataUrlToBlob(photoData);
+      if (pData) {
+        const blob = dataUrlToBlob(pData);
         proofPhotoPath = await uploadProofBlob(guest.groomUid, id, blob);
-      } else if (photoTaken) {
+      } else if (pTaken) {
         proofPhotoPath = "📸"; // legacy fallback marker
       }
       const time = new Date().toLocaleTimeString("ar", { hour: "2-digit", minute: "2-digit" });
@@ -496,14 +513,24 @@ export function usePortalState({ onBack, t, lang, setLang }) {
         deliveredAt: time,
         deliveredBy: lang === "he" ? "השליח (אתה)" : "المرسل (أنت)",
       };
-      if (proofPhotoPath)        patch.proofPhotoPath = proofPhotoPath;
-      if (deliveryNote.trim())   patch.deliveryNote   = deliveryNote.trim();
+      if (proofPhotoPath)              patch.proofPhotoPath = proofPhotoPath;
+      if (pNote && pNote.trim())       patch.deliveryNote   = pNote.trim();
       await updateGuestSrv(guest.groomUid, id, patch);
-      setActiveId(null); setPhotoTaken(false); setPhotoData(null); setDeliveryNote("");
       showToast(t("driver_confirm"));
+      return true;
     } catch (e) {
-      logErr("markDelivered", e);
+      logErr("markGuestDelivered", e);
       showToast(e?.message || "");
+      return false;
+    }
+  };
+
+  // List-view wrapper — reads from the global delivery-form state and clears
+  // it on success. Kept for the existing DriverDeliveryList JSX.
+  const markDelivered = async (id) => {
+    const ok = await markGuestDelivered(id, { photoData, photoTaken, deliveryNote });
+    if (ok) {
+      setActiveId(null); setPhotoTaken(false); setPhotoData(null); setDeliveryNote("");
     }
   };
 
@@ -569,7 +596,7 @@ export function usePortalState({ onBack, t, lang, setLang }) {
     // delivery
     activeId, setActiveId, photoTaken, setPhotoTaken,
     deliveryNote, setDeliveryNote, photoData, setPhotoData,
-    markDelivered,
+    markDelivered, markGuestDelivered,
 
     // photo viewer
     viewingPhoto, setViewingPhoto,
@@ -586,7 +613,7 @@ export function usePortalState({ onBack, t, lang, setLang }) {
     confirmations, editingConf, setEditingConf,
     sendWaToOne, sendWaToAll,
     matchedGuestFor, matchColor, useConfirmationData, guestConfirmationStatus,
-    confirmationReasons, saveConfirmationEdit,
+    confirmationReasons, saveConfirmationEdit, attachConfirmationToGuest,
 
     // shared-cities
     sharedStep, setSharedStep,

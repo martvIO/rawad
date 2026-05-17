@@ -61,6 +61,40 @@ export const toEmbedUrl = (url) => {
 // Build a Waze navigation link for a free-text area/address.
 export const wazeLink = (area) => `https://waze.com/ul?q=${encodeURIComponent(area)}&navigate=yes`;
 
+// Coordinate-based deep links for external navigation apps. Used by the
+// guest-map modal (driver / groom) so users can hand off to whichever app
+// they prefer. Each opens in a new tab via window.open(url, "_blank", "noopener").
+export const wazeLinkCoords        = (lat, lng) => `https://waze.com/ul?ll=${lat},${lng}&navigate=yes`;
+export const googleMapsLinkCoords  = (lat, lng) => `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+export const appleMapsLinkCoords   = (lat, lng) => `https://maps.apple.com/?daddr=${lat},${lng}`;
+
+// One-shot GPS fix wrapper around navigator.geolocation.getCurrentPosition.
+// Resolves to { lat, lng, accuracy } or rejects with a localised error message.
+// `t` is optional — when omitted, errors are returned in English.
+export const getCurrentFix = (t) =>
+  new Promise((resolve, reject) => {
+    if (typeof navigator === "undefined" || !("geolocation" in navigator)) {
+      reject(new Error(t ? t("geo_not_supported") : "Geolocation not supported."));
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        resolve({
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          accuracy: Math.round(pos.coords.accuracy || 0),
+        });
+      },
+      (err) => {
+        const msg = err.code === 1
+          ? (t ? t("geo_denied") : "Location permission denied.")
+          : (err.message || (t ? t("geo_denied") : "Location unavailable."));
+        reject(new Error(msg));
+      },
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 12000 },
+    );
+  });
+
 // Extract the city/town from an area string (text before the first "-" or comma).
 // Falls back to a localised "no address" label when the area is empty.
 export const extractCity = (area, lang) => {

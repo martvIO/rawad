@@ -43,6 +43,29 @@ export function isRole(v: unknown): v is "groom" | "driver" | "admin" {
   return v === "groom" || v === "driver" || v === "admin";
 }
 
+// Finite-number guard with optional inclusive bounds. Used by Cloud Functions
+// that accept GPS coordinates from clients and need to reject NaN/Infinity/
+// out-of-range values before persisting.
+export function isFiniteInRange(v: unknown, min: number, max: number): v is number {
+  return typeof v === "number" && Number.isFinite(v) && v >= min && v <= max;
+}
+
+// Phone-normaliser used for matching only: strip non-digits, drop common
+// country prefixes (+972 / +970), and drop a leading 0. The result is a bare
+// local digit sequence suitable for equality comparison across formats.
+// Keep in sync with the client-side normalizePhoneForMatching in matchUtils.js.
+export function normalisePhoneForMatching(raw: string): string {
+  if (typeof raw !== "string") return "";
+  let d = raw.replace(/\D/g, "");
+  if (!d) return "";
+  if (d.startsWith("00972")) d = d.slice(5);
+  else if (d.startsWith("972")) d = d.slice(3);
+  else if (d.startsWith("00970")) d = d.slice(5);
+  else if (d.startsWith("970")) d = d.slice(3);
+  if (d.startsWith("0")) d = d.slice(1);
+  return d;
+}
+
 // Strong-password policy — must match src/utils/password.js exactly.
 // Keep the two in lock-step when changing the policy: min 8 chars,
 // at least one uppercase, lowercase, and digit.
