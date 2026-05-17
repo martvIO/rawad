@@ -11,16 +11,18 @@ import { validateName } from "../utils/validation.js";
 import { isStrongPassword } from "../utils/password.js";
 import { logErr } from "../utils/logger.js";
 
-import { subscribeAuth, subscribeIdToken, signIn, signOutNow } from "../services/auth.js";
+import { subscribeAuth, subscribeIdToken, signIn, signOutNow, forceRefreshToken } from "../services/auth.js";
 import {
   subscribeAllGuests, subscribeGuestsForGroom,
   addGuest as addGuestSrv, updateGuest as updateGuestSrv, removeGuest as removeGuestSrv,
 } from "../services/guests.js";
 import {
-  subscribeUsers,
+  subscribeUsers, subscribeGroomProfiles,
   createPortalUser, deletePortalUser,
   updatePortalUser as updatePortalUserSrv,
   adminSetPassword as adminSetPasswordSrv,
+  patchUserInRTDB,
+  upsertGroomProfile, removeGroomProfile,
 } from "../services/users.js";
 import {
   subscribeConfirmations,
@@ -116,11 +118,32 @@ export function usePortalState({ onBack, t, lang, setLang }) {
   }, [isAdmin]);
   const [editingConf, setEditingConf] = useState(null);
 
+  // قائمة العرسان العامة — مرئية لجميع المستخدمين (مرسلين + عرسان + أدمن).
+  // تُستخدم في واجهة المرسل لاختيار من يشارك معهم موقعه / البلدات المشتركة.
+  const [groomProfiles, setGroomProfiles] = useState([]);
+  useEffect(() => {
+    if (!authed) { setGroomProfiles([]); return; }
+    return subscribeGroomProfiles(setGroomProfiles);
+  }, [authed]);
+
   // Users (admin sees full /users; drivers see their assigned groom as a synthetic single entry)
   const [adminUsers, setAdminUsers] = useState([]);
+  const [usersLoading, setUsersLoading] = useState(false);
   useEffect(() => {
     if (!isAdmin) { setAdminUsers([]); return; }
-    return subscribeUsers(setAdminUsers);
+    setUsersLoading(true);
+    let unsub = () => {};
+    // نجدّد الـ JWT قبل الاشتراك: يضمن أنّ قواعد RTDB ترى الـ claim الصحيحة
+    // (role === 'admin') من أوّل طلب، دون انتظار دورة التحديث التلقائية (ساعة).
+    forceRefreshToken()
+      .catch(() => {/* إذا فشل التجديد نكمل بالتوكن الحالي */})
+      .finally(() => {
+        unsub = subscribeUsers((list) => {
+          setAdminUsers(list);
+          setUsersLoading(false);
+        });
+      });
+    return () => unsub();
   }, [isAdmin]);
 
   // ── إضافات تفاؤلية لقائمة الأدمن (مع حفظ في localStorage) ──
@@ -197,6 +220,44 @@ export function usePortalState({ onBack, t, lang, setLang }) {
       return subscribeGuestsForGroom(currentUid, setGuests);
     setGuests([]);
   }, [authed, isAdmin, userType, currentUid, driverServingGroomUid]);
+
+  // ── قائمة الـ UIDs المُسنَدة للمرسل (من JWT claim assignedGrooms) ────────────
+  // تُستخدم في البلدات المشتركة لمعرفة أي عرسان يمكنه قراءة معازيمهم.
+  const driverAssignedGroomUids = useMemo(() => {
+    if (userType !== "driver") return [];
+    const ag = authUser?.claims?.assignedGrooms;
+    if (!ag || typeof ag !== "object") return [];
+    return Object.keys(ag).filter(uid => ag[uid] === true);
+  }, [userType, authUser?.claims?.assignedGrooms]);
+
+  // مفتاح نصّي مستقرّ لقائمة العرسان المُسنَدين — يُستخدم كـ dependency بدل
+  // الكائن المباشر الذي يتغيّر مرجعه بكلّ إعادة تصيير.
+  const _assignedKey = driverAssignedGroomUids.slice().sort().join(",");
+
+  // ── اشتراك موحّد بمعازيم كلّ العرسان المُسنَدين للمرسل ──────────────────────
+  // يُستخدم في البلدات المشتركة فقط حتى يرى المرسل البلدات المشتركة عبر
+  // كل العرسان اللي عنده، وليس فقط العريس اللي يخدمه الآن.
+  // قواعد RTDB تسمح للمرسل بقراءة معازيم العرسان المُسنَدين إليه فقط —
+  // أي عريس غير مُسنَد تُعيد اشتراكه فارغاً بصمت.
+  const [sharedGuests, setSharedGuests] = useState([]);
+  useEffect(() => {
+    if (userType !== "driver" || driverAssignedGroomUids.length === 0) {
+      setSharedGuests([]);
+      return;
+    }
+    // حافظ على كلّ bucket منفصل حتى لا تمسح استجابة عريس نتائج عريس آخر
+    const buckets = {};
+    const merge = () =>
+      setSharedGuests(Object.values(buckets).flat());
+    const unsubscribers = driverAssignedGroomUids.map(groomUid =>
+      subscribeGuestsForGroom(groomUid, (list) => {
+        buckets[groomUid] = list;
+        merge();
+      }),
+    );
+    return () => unsubscribers.forEach(fn => fn());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userType, _assignedKey]);
 
   // Active groom context: groom uses their own uid; driver uses the assigned one.
   const activeGroomUid      = userType === "groom"  ? currentUid
@@ -493,14 +554,27 @@ export function usePortalState({ onBack, t, lang, setLang }) {
   const addUser = async () => {
     if (!newUserName.trim() || !newUserPass.trim()) { showToast(t("admin_required")); return null; }
     if (!isStrongPassword(newUserPass)) { showToast(t("pwd_weak")); return null; }
-    if (!newUserPhone.trim()) { showToast(t("admin_required")); return null; }
-    const username  = newUserName.trim().toLowerCase();
-    const phoneE164 = newUserPhone.trim();
-    const role      = newUserRole;
+    const username   = newUserName.trim().toLowerCase();
+    const role       = newUserRole;
+    // الهاتف اختياري في الواجهة. إذا تُرك فارغاً نُولِّد رقماً وهمياً
+    // بنطاق +1202555XXXX (محجوز رسمياً للاستخدام الاختباري في NANP؛
+    // تقبله libphonenumber / Firebase Auth كصيغة E.164 صالحة).
+    // يُحذف هذا التحايل بعد نشر Cloud Function الجديدة التي لا تشترط الهاتف.
+    const typedPhone = newUserPhone.trim();
+    const phoneE164  = typedPhone ||
+      ("+1202555" + (Date.now() % 10000).toString().padStart(4, "0"));
     try {
       const result = await createPortalUser({ username, password: newUserPass, role, phoneE164 });
-      const newRow = { uid: result?.uid, id: result?.uid, username, role, phoneE164 };
-      if (newRow.uid) setOptimisticUsers(prev => [...prev, newRow]);
+      const uid = result?.uid;
+      const newRow = { uid, id: uid, username, role, phoneE164 };
+      if (uid) {
+        setOptimisticUsers(prev => [...prev, newRow]);
+        // إذا كان دور الحساب الجديد "عريس" نكتب سجله في /groomProfiles مباشرةً
+        // من الكلايَنت حتى يظهر فوراً في القوائم (بدون انتظار نشر Cloud Function).
+        if (role === "groom") {
+          upsertGroomProfile(uid, { username }).catch(() => {});
+        }
+      }
       setNewUserName(""); setNewUserPass(""); setNewUserPhone("");
       showToast(t("admin_added"));
       return newRow;
@@ -516,6 +590,8 @@ export function usePortalState({ onBack, t, lang, setLang }) {
     try {
       await deletePortalUser(uid);
       setOptimisticUsers(prev => prev.filter(o => o.uid !== uid));
+      // أزل من groomProfiles إن كان الحساب عريساً (بلا أثر إن لم يكن)
+      removeGroomProfile(uid).catch(() => {});
       showToast(t("admin_deleted"));
     } catch (e) { logErr("deleteUser", e); showToast(e?.message || ""); }
   };
@@ -526,41 +602,113 @@ export function usePortalState({ onBack, t, lang, setLang }) {
   // helpers just choose what to send.
   const startEditUser = (u) => setEditingUser(u);
   const cancelEditUser = () => setEditingUser(null);
-  const saveUserEdit = async (uid, patch) => {
+  // ── saveUserEdit ────────────────────────────────────────────────────────────
+  // الحلّ لـ INTERNAL: نُقسِّم التعديل إلى مسارات مستقلّة حسب نوع الحقل:
+  //
+  //  1. displayName   → RTDB مباشرةً (/users/{uid}/displayName).
+  //                    لا يمرّ عبر Cloud Function لأنّ Auth.updateUser(displayName:null)
+  //                    يُسبّب INTERNAL على بعض أنواع الحسابات.
+  //  2. username / phone / role → Cloud Function (updatePortalUser) — تحتاج
+  //                    تحديث Auth email / phoneNumber / custom claims + indices.
+  //  3. password      → Cloud Function (adminSetPassword) — مستقلّة دائماً.
+  //
+  // هذا التقسيم يُعزل كل نقطة فشل ممكنة ويُظهر رسالة خطأ دقيقة للمشخّص.
+  //
+  // يقبل `originalUser` كمرجع للمقارنة (من الكلايَنت) أو يُستخدم hook-level
+  // editingUser إن لم يُمرَّر.
+  const saveUserEdit = async (uid, patch, originalUser) => {
     if (!uid) return;
-    const { username, displayName, phoneE164, role, newPassword } = patch || {};
-    const profilePatch = {};
-    if (typeof username    === "string" && username    !== editingUser?.username)    profilePatch.username    = username;
-    if (typeof displayName === "string" && displayName !== (editingUser?.displayName ?? "")) profilePatch.displayName = displayName;
-    if (typeof phoneE164   === "string" && phoneE164   !== editingUser?.phoneE164)   profilePatch.phoneE164   = phoneE164;
-    if (typeof role        === "string" && role        !== editingUser?.role)        profilePatch.role        = role;
+    const orig = originalUser ?? editingUser ?? {};
+
+    const newUsername    = patch?.username?.trim().toLowerCase() ?? "";
+    const newDisplayName = typeof patch?.displayName === "string" ? patch.displayName.trim() : undefined;
+    const newPhoneE164   = patch?.phoneE164?.trim() ?? "";
+    const newRole        = typeof patch?.role === "string" ? patch.role : undefined;
+    const newPassword    = patch?.newPassword?.trim() || null;
+
+    // ─ ما الذي تغيّر فعلاً؟ ──────────────────────────────────────────────
+    const usernameChanged    = newUsername    && newUsername    !== (orig.username ?? "");
+    const displayNameChanged = newDisplayName !== undefined
+                               && newDisplayName !== (orig.displayName ?? "");
+    const phoneChanged       = newPhoneE164   && newPhoneE164   !== (orig.phoneE164 ?? "");
+    const roleChanged        = newRole        && newRole        !== (orig.role    ?? "");
+    const needsFunction      = usernameChanged || phoneChanged || roleChanged;
+    const needsPassword      = !!newPassword;
+    const needsDisplayName   = displayNameChanged;
+    const nothingChanged     = !usernameChanged && !displayNameChanged
+                               && !phoneChanged && !roleChanged && !needsPassword;
+
+    // ─ console.log للتشخيص ──────────────────────────────────────────────
+    console.log("[dawa] saveUserEdit — diff:", {
+      uid,
+      usernameChanged, displayNameChanged, phoneChanged, roleChanged,
+      needsPassword,
+      functionPayload: needsFunction
+        ? { uid, ...(usernameChanged && { username: newUsername }),
+            ...(phoneChanged   && { phoneE164: newPhoneE164 }),
+            ...(roleChanged    && { role: newRole }) }
+        : null,
+    });
+
+    if (nothingChanged) { showToast(t("admin_no_changes")); return; }
+
     try {
-      if (Object.keys(profilePatch).length > 0) {
-        await updatePortalUserSrv({ uid, ...profilePatch });
+      // ── 1. displayName: كتابة RTDB مباشرة (لا Cloud Function) ─────────
+      if (needsDisplayName) {
+        console.log("[dawa] patchUserInRTDB displayName:", { uid, displayName: newDisplayName || null });
+        await patchUserInRTDB(uid, { displayName: newDisplayName || null });
       }
-      if (newPassword) {
+
+      // ── 2. username / phone / role: Cloud Function updatePortalUser ────
+      if (needsFunction) {
+        const payload = { uid };
+        if (usernameChanged) payload.username  = newUsername;
+        if (phoneChanged)    payload.phoneE164 = newPhoneE164;
+        if (roleChanged)     payload.role      = newRole;
+        console.log("[dawa] updatePortalUser:", payload);
+        await updatePortalUserSrv(payload);
+      }
+
+      // ── 3. password: Cloud Function adminSetPassword ───────────────────
+      if (needsPassword) {
+        console.log("[dawa] adminSetPassword uid:", uid);
         await adminSetPasswordSrv(uid, newPassword);
       }
-      // ── طبّق التعديلات على القائمة التفاؤلية حتى تظهر فوراً للأدمن، ──
-      // حتى لو كان subscribeUsers الحي محجوباً عنه بسبب قواعد RTDB القديمة.
-      // إن لم يكن المستخدم موجوداً في القائمة التفاؤلية (كان من القائمة الحية)
-      // نُضيفه إليها كصورة محلّية محدّثة.
+
+      // ── حدّث الحالة المحلية فوراً ──────────────────────────────────────
+      const localPatch = {
+        ...(usernameChanged    && { username:    newUsername }),
+        ...(displayNameChanged && { displayName: newDisplayName }),
+        ...(phoneChanged       && { phoneE164:   newPhoneE164 }),
+        ...(roleChanged        && { role:        newRole }),
+      };
+      const mergedUser = { ...orig, uid, id: uid, ...localPatch };
       setOptimisticUsers(prev => {
         const idx = prev.findIndex(o => o.uid === uid);
-        const base = idx >= 0 ? prev[idx] : (editingUser ?? { uid, id: uid });
-        const merged = { ...base, uid, id: uid, ...profilePatch };
-        if (idx >= 0) {
-          const next = [...prev];
-          next[idx] = merged;
-          return next;
-        }
-        return [...prev, merged];
+        if (idx >= 0) { const next = [...prev]; next[idx] = mergedUser; return next; }
+        return [...prev, mergedUser];
       });
+
+      // ── مزامنة /groomProfiles ────────────────────────────────────────
+      const finalRole     = localPatch.role     ?? orig.role;
+      const finalUsername = localPatch.username ?? orig.username ?? "";
+      const finalDN       = localPatch.displayName !== undefined
+                              ? localPatch.displayName
+                              : (orig.displayName ?? undefined);
+      if (finalRole === "groom") {
+        upsertGroomProfile(uid, { username: finalUsername, displayName: finalDN }).catch(() => {});
+      } else if (orig.role === "groom" && finalRole && finalRole !== "groom") {
+        removeGroomProfile(uid).catch(() => {});
+      }
+
       setEditingUser(null);
       showToast(t("admin_user_edit_saved"));
+
     } catch (e) {
       logErr("saveUserEdit", e);
-      showToast(e?.message || "");
+      const msg = e?.message || e?.details?.message || e?.code || "خطأ غير معروف";
+      console.error("[dawa] saveUserEdit FAILED:", { code: e?.code, message: e?.message, details: e?.details });
+      showToast(msg);
     }
   };
 
@@ -569,7 +717,7 @@ export function usePortalState({ onBack, t, lang, setLang }) {
   // local UI state (e.g. the map modal) don't have to plumb through the
   // delivery-form state that DriverDeliveryList owns.
   const markGuestDelivered = async (id, { photoData: pData, photoTaken: pTaken, deliveryNote: pNote } = {}) => {
-    const guest = myGuests.find(g => g.id === id);
+    const guest = myGuests.find(g => g.id === id) || sharedGuests.find(g => g.id === id);
     if (!guest) return false;
     let proofPhotoPath;
     try {
@@ -674,7 +822,7 @@ export function usePortalState({ onBack, t, lang, setLang }) {
     viewingPhoto, setViewingPhoto,
 
     // users (admin) / synthetic single-entry list for drivers
-    users, addUser, deleteUser,
+    users, usersLoading, addUser, deleteUser, groomProfiles,
     newUserRole, setNewUserRole, newUserName, setNewUserName,
     newUserPass, setNewUserPass, newUserPhone, setNewUserPhone,
     editingUser, startEditUser, cancelEditUser, saveUserEdit,
@@ -691,6 +839,7 @@ export function usePortalState({ onBack, t, lang, setLang }) {
     sharedStep, setSharedStep,
     sharedSelectedGrooms, setSharedSelectedGrooms,
     sharedSelectedCity, setSharedSelectedCity,
+    sharedGuests, driverAssignedGroomUids,
 
     // geolocation
     ...geo,

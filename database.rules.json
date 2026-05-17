@@ -4,6 +4,8 @@
     ".write": false,
 
     "users": {
+      // مدير يقرأ القائمة كاملة؛ كل مستخدم يقرأ سجله الخاص فقط
+      ".read": "auth != null && auth.token.role === 'admin'",
       "$uid": {
         ".read": "auth != null && (auth.uid === $uid || auth.token.role === 'admin')",
         ".write": "auth.token.role === 'admin'",
@@ -20,6 +22,20 @@
         "displayName": { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 120)" },
         "createdAt":   { ".validate": "newData.isNumber()" },
         "createdBy":   { ".validate": "!newData.exists() || newData.isString()" },
+        "$other":      { ".validate": false }
+      }
+    },
+
+    // قائمة عامة (للقراءة فقط) تحتوي على username + displayName لكل عريس.
+    // تُقرأ من قِبل المرسلين لاختيار من يشاركونه موقعهم أو البلدات المشتركة.
+    // تُكتب من قِبل الأدمن فقط؛ تُحدَّث تلقائياً عند إنشاء/تعديل/حذف عريس.
+    "groomProfiles": {
+      ".read": "auth != null",
+      "$uid": {
+        ".write": "auth != null && auth.token.role === 'admin'",
+        ".validate": "!newData.exists() || newData.hasChildren(['username'])",
+        "username":    { ".validate": "newData.isString() && newData.val().length > 0" },
+        "displayName": { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 120)" },
         "$other":      { ".validate": false }
       }
     },

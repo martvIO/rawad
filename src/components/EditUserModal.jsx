@@ -69,15 +69,22 @@ export function EditUserModal() {
 
     setSaving(true);
     try {
-      // إذا ترك الأدمن خانة الهاتف فارغة لا نُرسل phoneE164 ضمن الـ patch إطلاقاً
-      // (saveUserEdit يتجاهل الحقول غير المُمرَّرة)، فيبقى الرقم الحالي كما هو.
-      const patch = {
-        username:    username.trim().toLowerCase(),
-        displayName: displayName.trim(),
-        role,
-        newPassword: newPassword.trim() || null,
-      };
-      if (phoneE164.trim()) patch.phoneE164 = phoneE164.trim();
+      // بناء الـ patch: نُرسل فقط ما تغيّر فعلاً.
+      // saveUserEdit يُقارن كل حقل بالأصل ولا يُرسل للـ Cloud Function
+      // إلا ما تغيّر فعلاً — displayName عبر RTDB مباشرةً، username/phone/role
+      // عبر updatePortalUser، password عبر adminSetPassword.
+      const patch = {};
+      patch.username = username.trim().toLowerCase();
+      if (displayName.trim() !== (editingUser.displayName || ""))
+        patch.displayName = displayName.trim();
+      if (phoneE164.trim())
+        patch.phoneE164 = phoneE164.trim();
+      if (role !== (editingUser.role || "groom"))
+        patch.role = role;
+      if (newPassword.trim())
+        patch.newPassword = newPassword.trim();
+
+      console.log("[dawa] EditModal patch:", patch);
       await saveUserEdit(editingUser.uid || editingUser.id, patch);
     } finally {
       setSaving(false);
