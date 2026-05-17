@@ -2,6 +2,7 @@
 import { useState, useRef, useEffect } from "react";
 import { CityField } from "./CityField.jsx";
 import { StreetField } from "./StreetField.jsx";
+import { CITIES_DB } from "../data/cities.js";
 import { C } from "../styles/theme.js";
 
 export function AddressInput({ value, onChange, placeholder, lang, t }) {

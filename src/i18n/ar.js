@@ -87,6 +87,7 @@ export const ar = {
   admin_existing: "المستخدمون الحاليون", admin_create: "إنشاء مستخدم", admin_delete: "حذف",
   admin_delete_confirm: "تأكيد الحذف", admin_edit: "تعديل",
   admin_no_users: "لا يوجد مستخدمون", admin_added: "✓ تم إنشاء المستخدم", admin_deleted: "تم حذف المستخدم",
+  admin_no_changes: "لا توجد تغييرات للحفظ", admin_saving: "جاري الحفظ…",
   admin_required: "اسم المستخدم وكلمة المرور مطلوبان", admin_taken: "اسم المستخدم محجوز",
   // Password strength rules (shared with he.js)
   pwd_rules_title: "متطلبات كلمة المرور",
@@ -102,6 +103,10 @@ export const ar = {
   admin_user_manager_title: "إدارة الحسابات",
   admin_user_manager_subtitle: "إنشاء، تعديل، أو حذف أي نوع من الحسابات",
   admin_user_filter_all: "الكل",
+  // ── تبويبات التصفية لقائمة المستخدمين (صيغة الجمع) ──
+  admin_user_filter_grooms:  "العرسان",
+  admin_user_filter_drivers: "المرسلين",
+  admin_user_filter_admins:  "الأدمن",
   admin_user_edit_title: "تعديل حساب المستخدم",
   admin_user_edit_display_name: "الاسم الظاهر",
   admin_user_edit_username_warn: "تغيير اسم المستخدم سيُلزم المستخدم بإعادة تسجيل الدخول",

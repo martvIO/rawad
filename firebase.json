@@ -11,7 +11,7 @@
       "codebase": "default",
       "runtime": "nodejs20",
       "predeploy": [
-        "build-functions.cmd"
+        "node scripts/build-functions.cjs"
       ]
     }
   ],

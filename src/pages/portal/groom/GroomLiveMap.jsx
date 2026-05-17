@@ -30,16 +30,6 @@ export function GroomLiveMap() {
                 {groomGeoPermission === "denied" && groomGeoError && (
                   <div style={{ fontSize: 12, color: C.red, lineHeight: 1.6 }}>⚠ {groomGeoError}</div>
                 )}
-                <button onClick={requestGroomLocation} style={{
-                  padding: "12px 0", borderRadius: 10, cursor: "pointer",
-                  background: "linear-gradient(135deg,#c9a84c,#f0c84c)",
-                  color: "#000", border: "none", fontWeight: 900,
-                  fontSize: 14, fontFamily: "inherit",
-                }}>
-                  {groomGeoPermission === "denied"
-                    ? `${t("geo_retry")} — ${t("geo_grant_btn_groom")}`
-                    : t("geo_grant_btn_groom")}
-                </button>
               </div>
             )}
 

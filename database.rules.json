@@ -7,7 +7,7 @@
       "$uid": {
         ".read": "auth != null && (auth.uid === $uid || auth.token.role === 'admin')",
         ".write": "auth.token.role === 'admin'",
-        ".validate": "newData.hasChildren(['username','role','phoneE164','createdAt'])",
+        ".validate": "newData.hasChildren(['username','role','createdAt'])",
         "username":    {
           ".read": "auth != null && root.child('driverAssignments').child(auth.uid).child($uid).val() === true",
           ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 60 && newData.val().matches(/^[a-zA-Z0-9_.-]+$/)"
@@ -16,7 +16,7 @@
           ".read": "auth != null && root.child('driverAssignments').child(auth.uid).child($uid).val() === true",
           ".validate": "newData.val() === 'groom' || newData.val() === 'driver' || newData.val() === 'admin'"
         },
-        "phoneE164":   { ".validate": "newData.isString() && newData.val().matches(/^\\+[1-9][0-9]{6,14}$/)" },
+        "phoneE164":   { ".validate": "!newData.exists() || (newData.isString() && newData.val().matches(/^\\+[1-9][0-9]{6,14}$/))" },
         "displayName": { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 120)" },
         "createdAt":   { ".validate": "newData.isNumber()" },
         "createdBy":   { ".validate": "!newData.exists() || newData.isString()" },

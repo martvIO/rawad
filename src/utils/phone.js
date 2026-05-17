@@ -16,6 +16,12 @@ export const toIntlPhone = (raw) => {
 // Build a `tel:` link for a phone number.
 export const telLink = (phone) => `tel:${(phone || "").replace(/\s+/g, "")}`;
 
+// تُعيد true إذا كان الرقم وهمياً (يبدأ بـ +999). يُولَّد محلياً عند إنشاء
+// حساب بدون هاتف لأنّ Cloud Function المنشورة تطلب E.164 صالحاً. تستخدم
+// هذه الدالّة في كلّ أماكن عرض الهاتف لإخفاء الرقم الوهمي عن الأدمن.
+export const isPlaceholderPhone = (p) =>
+  typeof p === "string" && p.startsWith("+999");
+
 // Validate a phone number. Accepts both E.164 ("+972…") and the legacy
 // 10-digit local format. Returns a localised error string, or null when valid.
 // `t` is the translator from i18n.

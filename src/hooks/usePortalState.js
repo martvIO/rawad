@@ -122,8 +122,50 @@ export function usePortalState({ onBack, t, lang, setLang }) {
     if (!isAdmin) { setAdminUsers([]); return; }
     return subscribeUsers(setAdminUsers);
   }, [isAdmin]);
+
+  // ── إضافات تفاؤلية لقائمة الأدمن (مع حفظ في localStorage) ──
+  // عند إنشاء/تعديل حساب نُحدّث هذه القائمة فوراً حتى لا ننتظر subscribeUsers
+  // الحي (الذي قد يكون مرفوضاً من قواعد RTDB إذا لم يُنشر التحديث بعد).
+  // نحفظها في localStorage باسم مفتاح خاص بكلّ أدمن (currentUid)، فتنجو
+  // من إعادة تحميل الصفحة. تبقى مقيّدة بالمتصفّح الواحد — الحلّ النهائي
+  // للقائمة الكاملة هو نشر قواعد RTDB الجديدة.
+  const OPTIMISTIC_KEY = (uid) => `dawa.optimisticUsers.${uid}`;
+  const [optimisticUsers, setOptimisticUsersRaw] = useState([]);
+  // مرجع لمعرفة هل حُمّلت قائمة الـ uid الحالي من localStorage بعد، حتى لا
+  // نطمس البيانات المخزّنة بمصفوفة فارغة قبل أن نقرأ من الـ storage.
+  const optimisticLoadedFor = useRef(null);
+  // حمّل القائمة المخزّنة محلياً عندما يُعرف uid الأدمن.
+  useEffect(() => {
+    if (!isAdmin || !currentUid) return;
+    if (optimisticLoadedFor.current === currentUid) return;
+    optimisticLoadedFor.current = currentUid;
+    try {
+      const raw = localStorage.getItem(OPTIMISTIC_KEY(currentUid));
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) setOptimisticUsersRaw(parsed);
+      }
+    } catch (e) { logErr("loadOptimisticUsers", e); }
+  }, [isAdmin, currentUid]);
+  // أيّ تحديث للقائمة يُحفظ مباشرةً في localStorage (إن كان الـ uid معروفاً).
+  const setOptimisticUsers = (updater) => {
+    setOptimisticUsersRaw(prev => {
+      const next = typeof updater === "function" ? updater(prev) : updater;
+      if (isAdmin && currentUid) {
+        try { localStorage.setItem(OPTIMISTIC_KEY(currentUid), JSON.stringify(next)); }
+        catch (e) { logErr("saveOptimisticUsers", e); }
+      }
+      return next;
+    });
+  };
   const users = useMemo(() => {
-    if (isAdmin) return adminUsers;
+    if (isAdmin) {
+      // ندمج القائمة الحية مع الإضافات التفاؤلية ونُزيل المكررات بالـ uid:
+      // إذا ظهر السجل الحقيقي في Firebase نُسقط نسخته التفاؤلية.
+      const liveUids = new Set(adminUsers.map(u => u.uid || u.id));
+      const ghosts   = optimisticUsers.filter(o => !liveUids.has(o.uid));
+      return [...adminUsers, ...ghosts];
+    }
     if (userType === "driver" && driverServingGroom) {
       return [{
         uid: driverServingGroom.uid,
@@ -133,7 +175,7 @@ export function usePortalState({ onBack, t, lang, setLang }) {
       }];
     }
     return [];
-  }, [isAdmin, adminUsers, userType, driverServingGroom]);
+  }, [isAdmin, adminUsers, optimisticUsers, userType, driverServingGroom]);
 
   // Admin user-creation form
   const [newUserRole,  setNewUserRole]  = useState("groom");
@@ -440,27 +482,42 @@ export function usePortalState({ onBack, t, lang, setLang }) {
   };
 
   // ── Admin user management ───────────────────────────────────────────────────
+  // عند نجاح الإنشاء نُضيف الحساب الجديد إلى optimisticUsers فوراً، حتى يظهر
+  // في القائمة قبل أن يلتقطه subscribeUsers الحي. النتيجة المُعادة تُمكّن
+  // الصفحة من القفز للتبويب الموافق للدور.
+  //
+  // ملاحظة: الـ Cloud Function المنشورة حالياً ما زالت تشترط رقم هاتف
+  // E.164 صالحاً (تمرّره إلى Firebase Auth التي تستخدم libphonenumber).
+  // لا يوجد بادئة وهميّة آمنة 100%، فالهاتف مطلوب حتى ينشر الأدمن النسخة
+  // الجديدة من الدالّة.
   const addUser = async () => {
-    if (!newUserName.trim() || !newUserPass.trim()) { showToast(t("admin_required")); return; }
-    if (!isStrongPassword(newUserPass)) { showToast(t("pwd_weak")); return; }
-    if (!newUserPhone.trim()) { showToast(t("admin_required")); return; }
+    if (!newUserName.trim() || !newUserPass.trim()) { showToast(t("admin_required")); return null; }
+    if (!isStrongPassword(newUserPass)) { showToast(t("pwd_weak")); return null; }
+    if (!newUserPhone.trim()) { showToast(t("admin_required")); return null; }
+    const username  = newUserName.trim().toLowerCase();
+    const phoneE164 = newUserPhone.trim();
+    const role      = newUserRole;
     try {
-      await createPortalUser({
-        username:  newUserName.trim().toLowerCase(),
-        password:  newUserPass,
-        phoneE164: newUserPhone.trim(),
-        role:      newUserRole,
-      });
+      const result = await createPortalUser({ username, password: newUserPass, role, phoneE164 });
+      const newRow = { uid: result?.uid, id: result?.uid, username, role, phoneE164 };
+      if (newRow.uid) setOptimisticUsers(prev => [...prev, newRow]);
       setNewUserName(""); setNewUserPass(""); setNewUserPhone("");
       showToast(t("admin_added"));
+      return newRow;
     } catch (e) {
       logErr("addUser", e);
       showToast(e?.message || t("admin_taken"));
+      return null;
     }
   };
+  // عند الحذف نُزيل السجل من القائمة التفاؤلية أيضاً حتى لو لم يكن قد وصل بعد
+  // من Firebase، لئلا يبقى ظاهراً بعد تأكيد الحذف.
   const deleteUser = async (uid) => {
-    try { await deletePortalUser(uid); showToast(t("admin_deleted")); }
-    catch (e) { logErr("deleteUser", e); showToast(e?.message || ""); }
+    try {
+      await deletePortalUser(uid);
+      setOptimisticUsers(prev => prev.filter(o => o.uid !== uid));
+      showToast(t("admin_deleted"));
+    } catch (e) { logErr("deleteUser", e); showToast(e?.message || ""); }
   };
 
   // Admin user-edit lifecycle. Open the modal with a user row, save patches
@@ -484,6 +541,21 @@ export function usePortalState({ onBack, t, lang, setLang }) {
       if (newPassword) {
         await adminSetPasswordSrv(uid, newPassword);
       }
+      // ── طبّق التعديلات على القائمة التفاؤلية حتى تظهر فوراً للأدمن، ──
+      // حتى لو كان subscribeUsers الحي محجوباً عنه بسبب قواعد RTDB القديمة.
+      // إن لم يكن المستخدم موجوداً في القائمة التفاؤلية (كان من القائمة الحية)
+      // نُضيفه إليها كصورة محلّية محدّثة.
+      setOptimisticUsers(prev => {
+        const idx = prev.findIndex(o => o.uid === uid);
+        const base = idx >= 0 ? prev[idx] : (editingUser ?? { uid, id: uid });
+        const merged = { ...base, uid, id: uid, ...profilePatch };
+        if (idx >= 0) {
+          const next = [...prev];
+          next[idx] = merged;
+          return next;
+        }
+        return [...prev, merged];
+      });
       setEditingUser(null);
       showToast(t("admin_user_edit_saved"));
     } catch (e) {

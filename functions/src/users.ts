@@ -14,7 +14,9 @@ import {
 interface CreateInput {
   username: string;
   password: string;
-  phoneE164: string;
+  // Phone is optional for every role. Users without a phone can't do the
+  // SMS-OTP password reset — an admin has to reset for them via adminSetPassword.
+  phoneE164?: string;
   role: "groom" | "driver" | "admin";
   displayName?: string;
 }
@@ -40,29 +42,34 @@ export const createPortalUser = onCall(
         "Password must be at least 8 characters and include uppercase, lowercase, and a number.",
       );
     }
-    if (!isE164(input.phoneE164))          throw new HttpsError("invalid-argument", "Invalid phone (must be E.164).");
     if (!isRole(input.role))               throw new HttpsError("invalid-argument", "Invalid role.");
+    // Phone is optional, but if provided it must be valid E.164.
+    const hasPhone = typeof input.phoneE164 === "string" && input.phoneE164.length > 0;
+    if (hasPhone && !isE164(input.phoneE164)) {
+      throw new HttpsError("invalid-argument", "Invalid phone (must be E.164).");
+    }
 
     const username  = input.username.toLowerCase();
     const email     = syntheticEmail(username);
-    const phoneIdx  = phoneIndexKey(input.phoneE164);
+    const phoneIdx  = hasPhone ? phoneIndexKey(input.phoneE164 as string) : null;
 
     const db = getDatabase();
     // Uniqueness checks (in addition to Firebase Auth's own email + phone uniqueness).
     if ((await db.ref(`usernameIndex/${username}`).get()).exists()) {
       throw new HttpsError("already-exists", "Username is taken.");
     }
-    if ((await db.ref(`phoneIndex/${phoneIdx}`).get()).exists()) {
+    if (phoneIdx && (await db.ref(`phoneIndex/${phoneIdx}`).get()).exists()) {
       throw new HttpsError("already-exists", "Phone is already registered.");
     }
 
-    const userRecord = await getAuth().createUser({
+    const createUserPayload: Record<string, unknown> = {
       email,
       password: input.password,
-      phoneNumber: input.phoneE164,
       displayName: input.displayName?.slice(0, 120),
       disabled: false,
-    });
+    };
+    if (hasPhone) createUserPayload.phoneNumber = input.phoneE164;
+    const userRecord = await getAuth().createUser(createUserPayload as Parameters<ReturnType<typeof getAuth>["createUser"]>[0]);
 
     // Custom claims: every user gets `role` and `username` so security rules
     // can branch on auth.token.role === 'admin' (etc.) and audit logs can
@@ -72,18 +79,18 @@ export const createPortalUser = onCall(
       username,
     });
 
-    const profile = {
+    const profile: Record<string, unknown> = {
       username,
       role: input.role,
-      phoneE164: input.phoneE164,
       displayName: input.displayName ?? null,
       createdAt: Date.now(),
       createdBy: callerUid,
     };
+    if (hasPhone) profile.phoneE164 = input.phoneE164;
     const updates: Record<string, unknown> = {};
     updates[`users/${userRecord.uid}`]      = profile;
     updates[`usernameIndex/${username}`]    = userRecord.uid;
-    updates[`phoneIndex/${phoneIdx}`]       = userRecord.uid;
+    if (phoneIdx) updates[`phoneIndex/${phoneIdx}`] = userRecord.uid;
     await db.ref().update(updates);
 
     await writeAudit(callerUid, "createPortalUser", { uid: userRecord.uid, role: input.role });
@@ -112,15 +119,18 @@ export const deletePortalUser = onCall(
     if (!profileSnap.exists()) {
       throw new HttpsError("not-found", "User not found.");
     }
-    const profile = profileSnap.val() as { username: string; phoneE164: string };
+    const profile = profileSnap.val() as { username: string; phoneE164?: string };
 
     await getAuth().deleteUser(uid).catch(() => { /* may already be gone */ });
 
     const updates: Record<string, null> = {};
-    updates[`users/${uid}`]                                  = null;
-    updates[`usernameIndex/${profile.username}`]             = null;
-    updates[`phoneIndex/${phoneIndexKey(profile.phoneE164)}`] = null;
-    updates[`driverAssignments/${uid}`]                      = null;
+    updates[`users/${uid}`]                          = null;
+    updates[`usernameIndex/${profile.username}`]     = null;
+    // Phone index only exists if the profile actually stored one.
+    if (profile.phoneE164) {
+      updates[`phoneIndex/${phoneIndexKey(profile.phoneE164)}`] = null;
+    }
+    updates[`driverAssignments/${uid}`]              = null;
     // If they were a groom, blow away their entire data subtree.
     updates[`guestsByGroom/${uid}`]                          = null;
     updates[`liveLocationsByGroom/${uid}`]                   = null;

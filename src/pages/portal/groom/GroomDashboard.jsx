@@ -8,7 +8,6 @@ export function GroomDashboard() {
   const navigate = useNavigate();
   const {
     t, lang, stats, myGuests, setViewingPhoto,
-    groomGeoPermission, groomGeoError, requestGroomLocation,
     groomCoords, groomMapMarkers, driversSharingWithMe,
   } = usePortal();
   return (
@@ -69,30 +68,6 @@ export function GroomDashboard() {
                   fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
                 }}>{lang === "he" ? "מסך מלא ←" : "تكبير ←"}</button>
               </div>
-
-              {/* Permission prompt for the groom if they haven't allowed location yet */}
-              {groomGeoPermission !== "granted" && (
-                <div style={{
-                  padding: "12px 14px", borderRadius: 12, marginBottom: 10,
-                  background: groomGeoPermission === "denied" ? "rgba(212,122,75,.08)" : "rgba(75,159,212,.06)",
-                  border: `1px solid ${groomGeoPermission === "denied" ? "rgba(212,122,75,.28)" : "rgba(75,159,212,.22)"}`,
-                  display: "flex", flexDirection: "column", gap: 8,
-                }}>
-                  {groomGeoPermission === "denied" && groomGeoError && (
-                    <div style={{ fontSize: 12, color: C.red, lineHeight: 1.6 }}>⚠ {groomGeoError}</div>
-                  )}
-                  <button onClick={requestGroomLocation} style={{
-                    padding: "10px 0", borderRadius: 10, cursor: "pointer",
-                    background: "linear-gradient(135deg,#c9a84c,#f0c84c)",
-                    color: "#000", border: "none", fontWeight: 900,
-                    fontSize: 13, fontFamily: "inherit",
-                  }}>
-                    {groomGeoPermission === "denied"
-                      ? `${t("geo_retry")} — ${t("geo_grant_btn_groom")}`
-                      : t("geo_grant_btn_groom")}
-                  </button>
-                </div>
-              )}
 
               {/* The actual map. Shown whether or not anyone is sharing — when nobody's
                   sharing the groom still sees themselves on a map. */}
