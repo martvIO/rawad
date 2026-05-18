@@ -1,0 +1,28 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Digital invitation guests — each groom reads/writes only their own guests
+    match /digitalGuests/{groomUid}/guests/{guestId} {
+      allow read, write: if request.auth != null
+        && (request.auth.uid == groomUid || request.auth.token.role == 'admin');
+    }
+
+    // Background media — one document per groom
+    match /digitalMedia/{groomUid} {
+      allow read, write: if request.auth != null
+        && (request.auth.uid == groomUid || request.auth.token.role == 'admin');
+    }
+
+    // Photographer file metadata — subcollection per groom
+    match /photographerFiles/{groomUid}/files/{fileId} {
+      allow read, write: if request.auth != null
+        && (request.auth.uid == groomUid || request.auth.token.role == 'admin');
+    }
+
+    // Default deny — all other paths
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

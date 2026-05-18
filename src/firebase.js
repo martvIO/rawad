@@ -12,6 +12,7 @@ import {
   browserLocalPersistence,
 } from "firebase/auth";
 import { getDatabase, connectDatabaseEmulator } from "firebase/database";
+import { getFirestore, connectFirestoreEmulator } from "firebase/firestore";
 import { getStorage, connectStorageEmulator } from "firebase/storage";
 import { getFunctions, connectFunctionsEmulator } from "firebase/functions";
 
@@ -27,9 +28,10 @@ const firebaseConfig = {
   appId:             env.VITE_FIREBASE_APP_ID,
 };
 
-export const app  = initializeApp(firebaseConfig);
-export const auth = getAuth(app);
-export const db   = getDatabase(app);
+export const app       = initializeApp(firebaseConfig);
+export const auth      = getAuth(app);
+export const db        = getDatabase(app);
+export const firestore = getFirestore(app);
 // Functions deployed in the default region; override here if you change region.
 export const functions = getFunctions(app, "us-central1");
 export const storage   = getStorage(app);
@@ -41,8 +43,9 @@ setPersistence(auth, browserLocalPersistence).catch(() => {});
 const useEmulators =
   env.VITE_USE_EMULATORS === "1" || env.VITE_USE_EMULATORS === "true";
 if (useEmulators) {
-  try { connectAuthEmulator(auth,     "http://127.0.0.1:9099", { disableWarnings: true }); } catch {}
-  try { connectDatabaseEmulator(db,   "127.0.0.1", 9000); } catch {}
-  try { connectStorageEmulator(storage,"127.0.0.1", 9199); } catch {}
+  try { connectAuthEmulator(auth,           "http://127.0.0.1:9099", { disableWarnings: true }); } catch {}
+  try { connectDatabaseEmulator(db,         "127.0.0.1", 9000); } catch {}
+  try { connectFirestoreEmulator(firestore, "127.0.0.1", 8080); } catch {}
+  try { connectStorageEmulator(storage,     "127.0.0.1", 9199); } catch {}
   try { connectFunctionsEmulator(functions, "127.0.0.1", 5001); } catch {}
 }

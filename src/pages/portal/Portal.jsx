@@ -27,7 +27,7 @@ function PortalRouter() {
   const defaultPath =
     userType === "admin"  ? "/portal/admin/users"
   : userType === "driver" ? "/portal/driver/pending"
-  :                        "/portal/groom/dashboard";
+  :                        "/portal/groom";
 
   return (
     <Routes>

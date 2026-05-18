@@ -34,7 +34,9 @@
       "Bash(netstat -ano)",
       "Bash(findstr LISTENING)",
       "Bash(tasklist *)",
-      "PowerShell($env:GOOGLE_APPLICATION_CREDENTIALS=\"C:\\\\Users\\\\martv\\\\OneDrive\\\\Documents\\\\github\\\\rawad\\\\dawa-aa793-firebase-adminsdk-fbsvc-e42554a05c.json\"; $env:GCLOUD_PROJECT=\"dawa-aa793\"; node \"C:\\\\Users\\\\martv\\\\OneDrive\\\\Documents\\\\github\\\\rawad\\\\functions\\\\scripts\\\\inspectUser.js\" groom)"
+      "PowerShell($env:GOOGLE_APPLICATION_CREDENTIALS=\"C:\\\\Users\\\\martv\\\\OneDrive\\\\Documents\\\\github\\\\rawad\\\\dawa-aa793-firebase-adminsdk-fbsvc-e42554a05c.json\"; $env:GCLOUD_PROJECT=\"dawa-aa793\"; node \"C:\\\\Users\\\\martv\\\\OneDrive\\\\Documents\\\\github\\\\rawad\\\\functions\\\\scripts\\\\inspectUser.js\" groom)",
+      "PowerShell($env:GOOGLE_APPLICATION_CREDENTIALS = \"c:\\\\Users\\\\rwadh\\\\OneDrive\\\\Desktop\\\\DAWA\\\\rawad\\\\dawa-aa793-firebase-adminsdk-fbsvc-e42554a05c.json\"; cd \"c:\\\\Users\\\\rwadh\\\\OneDrive\\\\Desktop\\\\DAWA\\\\rawad\"; npx firebase deploy --only database --project dawa-aa793 --non-interactive 2>&1)",
+      "PowerShell($env:GOOGLE_APPLICATION_CREDENTIALS = \"c:\\\\Users\\\\rwadh\\\\OneDrive\\\\Desktop\\\\DAWA\\\\rawad\\\\dawa-aa793-firebase-adminsdk-fbsvc-e42554a05c.json\"; cd \"c:\\\\Users\\\\rwadh\\\\OneDrive\\\\Desktop\\\\DAWA\\\\rawad\"; npx firebase deploy --only hosting --project dawa-aa793 --non-interactive 2>&1 | Select-Object -Last 8)"
     ]
   }
 }

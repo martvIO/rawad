@@ -62,7 +62,7 @@ export function GroomDashboard() {
                     </span>
                   )}
                 </div>
-                <button onClick={() => navigate("/portal/groom/live")} style={{
+                <button onClick={() => navigate("/portal/groom/handwritten/live")} style={{
                   background: "rgba(201,168,76,.12)", border: "1px solid rgba(201,168,76,.3)",
                   color: C.gold, padding: "5px 12px", borderRadius: 8,
                   fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",

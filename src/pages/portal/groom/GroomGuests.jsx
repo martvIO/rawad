@@ -16,7 +16,7 @@ export function GroomGuests() {
               <div style={{ fontSize: 15, fontWeight: 800, color: C.goldLight }}>
                 {t("guests_count")} ({myGuests.length.toLocaleString("en")})
               </div>
-              <button className="gold-btn" style={{ padding: "8px 16px", fontSize: 12 }} onClick={() => navigate("/portal/groom/add")}>
+              <button className="gold-btn" style={{ padding: "8px 16px", fontSize: 12 }} onClick={() => navigate("/portal/groom/handwritten/add")}>
                 {t("guests_add_btn")}
               </button>
             </div>

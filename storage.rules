@@ -21,6 +21,24 @@ service firebase.storage {
                    && request.auth.token.assignedGrooms[groomUid] == true;
     }
 
+    // Background media for the digital invitation (uploaded by the groom).
+    match /digitalMedia/{groomUid}/{file} {
+      allow read: if request.auth != null
+                  && (request.auth.uid == groomUid || request.auth.token.role == 'admin');
+      allow write: if request.auth != null
+                   && (request.auth.uid == groomUid || request.auth.token.role == 'admin')
+                   && request.resource.size < 50 * 1024 * 1024;
+    }
+
+    // Photographer uploads — photos, videos, and files from the wedding shoot.
+    match /photographerFiles/{groomUid}/{file} {
+      allow read: if request.auth != null
+                  && (request.auth.uid == groomUid || request.auth.token.role == 'admin');
+      allow write: if request.auth != null
+                   && (request.auth.uid == groomUid || request.auth.token.role == 'admin')
+                   && request.resource.size < 200 * 1024 * 1024;
+    }
+
     // Default deny for everything else.
     match /{allPaths=**} {
       allow read, write: if false;

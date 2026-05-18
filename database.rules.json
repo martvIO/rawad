@@ -141,6 +141,46 @@
       }
     },
 
+    "digitalGuests": {
+      "$groomUid": {
+        ".read":  "auth != null && ($groomUid === auth.uid || auth.token.role === 'admin')",
+        ".write": "auth != null && ($groomUid === auth.uid || auth.token.role === 'admin')",
+        "$guestId": {
+          ".validate": "!newData.exists() || newData.hasChildren(['name','phone','status'])",
+          "name":      { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 120" },
+          "phone":     { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 20" },
+          "status":    { ".validate": "newData.val() === 'pending' || newData.val() === 'attending' || newData.val() === 'absent'" },
+          "createdAt": { ".validate": "!newData.exists() || newData.isNumber()" }
+        }
+      }
+    },
+
+    "digitalMedia": {
+      "$groomUid": {
+        ".read":  "auth != null && ($groomUid === auth.uid || auth.token.role === 'admin')",
+        ".write": "auth != null && ($groomUid === auth.uid || auth.token.role === 'admin')",
+        "backgroundUrl":  { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 500)" },
+        "backgroundType": { ".validate": "!newData.exists() || newData.val() === 'image' || newData.val() === 'gif' || newData.val() === 'video'" },
+        "storagePath":    { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 500)" },
+        "$other":         { ".validate": false }
+      }
+    },
+
+    "photographerFiles": {
+      "$groomUid": {
+        ".read":  "auth != null && ($groomUid === auth.uid || auth.token.role === 'admin')",
+        ".write": "auth != null && ($groomUid === auth.uid || auth.token.role === 'admin')",
+        "$fileId": {
+          ".validate": "!newData.exists() || newData.hasChildren(['name','url','uploadedAt'])",
+          "name":        { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 240" },
+          "url":         { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 500" },
+          "type":        { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 60)" },
+          "storagePath": { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 500)" },
+          "uploadedAt":  { ".validate": "newData.isNumber()" }
+        }
+      }
+    },
+
     "audit": {
       ".read":  "auth != null && auth.token.role === 'admin'",
       ".write": false,
