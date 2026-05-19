@@ -40,7 +40,7 @@ Full rewrite to a production-ready Firebase application:
 src/
   firebase.js          — initializeApp, emulator wiring (App Check removed)
   services/
-    _helpers.js        ← NEW: subscribeList() + callable() with auto-retry on permission-denied
+    _helpers.js        — subscribeList() + callable() with auto-retry on permission-denied
     auth.js            — signIn, signOut, subscribeAuth, subscribeIdToken, forceRefreshToken,
                          sendPasswordResetCode
     guests.js          — subscribeGuestsForGroom, addGuest, updateGuest, removeGuest, markDelivered
@@ -51,28 +51,34 @@ src/
                          updateConfirmation (admin patch)
     adminSettings.js   — subscribeSettings, saveSettings
     proofs.js          — uploadProof (Firebase Storage), proofDownloadUrl
+    digitalInvitation.js — addDigitalGuest (Firestore), saveDigitalMediaFile,
+                           uploadPhotographerFile (Firebase Storage)
   hooks/
     usePortalState.js  — all portal state; subscribes to BOTH subscribeAuth + subscribeIdToken
                          (live claim refresh); isAdmin = claims?.role === "admin"
     useGeolocation.js  — GPS watch + RTDB publish/subscribe
   utils/
-    logger.js          ← NEW: tagged [dawa] console wrapper; ON when DEV or VITE_DEBUG=1
+    logger.js          — tagged [dawa] console wrapper; ON when DEV or VITE_DEBUG=1
     matchUtils.js      — phone normalization, fuzzy name/address similarity, classifyConfirmation
     phone.js           — toIntlPhone, validatePhone
     validation.js      — validateName
     storage.js         — localStorage helpers
   styles/
-    theme.js           ← NEW: palette tokens (C, ROLE, S) — replaces 254 inline hex literals
+    theme.js           — palette tokens (C, ROLE, S) — replaces 254 inline hex literals
+  data/
+    status.js          — STATUS map (delivery), REPLY_STATUS map (not-sent/pending/confirmed),
+                         replyStateOf(guest) helper
   pages/
     LandingPage.jsx
     ConfirmationForm.jsx
+    InvitePage.jsx     — per-guest invite link handler (/invite/:token)
     portal/
       Portal.jsx         — auth guard + role routing (RoleGuard)
       LoginScreen.jsx
       admin/
         AdminPortal.jsx
-        AdminUserManager.jsx   ← NEW: full CRUD account management
-        AdminSendTab.jsx
+        AdminUserManager.jsx   — full CRUD account management
+        AdminSendTab.jsx       — shows only non-confirmed guests; amber pending pill + tint
         AdminConfirmationsTab.jsx
         AdminSettingsTab.jsx
       driver/
@@ -83,14 +89,19 @@ src/
       groom/
         GroomPortalView.jsx
         GroomDashboard.jsx
-        GroomGuests.jsx
+        GroomGuests.jsx        — shows delivery + reply state pills per guest
         GroomAddGuest.jsx
         GroomProofs.jsx
         GroomLiveMap.jsx
+        digital/
+          DigitalPortal.jsx
+          DigitalDashboard.jsx   — groom uploads digital media; photo upload flow
+          DigitalAddGuest.jsx    — add digital guest (name + phone only)
+          DigitalPhotographer.jsx — photographer uploads files
   components/
-    RoleGuard.jsx            ← NEW: client-side role enforcement
-    EditUserModal.jsx         ← NEW: admin user edit form
-    EditConfirmationModal.jsx ← NEW: admin confirmation edit form
+    RoleGuard.jsx            — client-side role enforcement
+    EditUserModal.jsx         — admin user edit form
+    EditConfirmationModal.jsx — admin confirmation edit form
     EditGuestModal.jsx
     AddressInput.jsx
     BrandLogo.jsx
@@ -104,8 +115,8 @@ src/
   context/
     PortalContext.jsx
   i18n/
-    ar.js
-    he.js
+    ar.js   — reply_notSent, reply_pending, reply_confirmed keys added
+    he.js   — same
 
 functions/src/
   index.ts             — exports all Cloud Functions
@@ -115,6 +126,10 @@ functions/src/
   adminSetPassword.ts  — admin resets another user's password
   assignments.ts       — assignDriverToGroom (preserves role + username, adds assignedGrooms)
   confirmations.ts     — submitConfirmation (public HTTPS, rate limit; enforceAppCheck: false)
+                         phone-match runs even without GPS coords; always sets confirmedAt
+  invite.ts            — createGuestInvite (mints 32-char token, 90-day TTL),
+                         submitGuestInvite (validates token, patches guest with confirmedAt,
+                         writes /confirmations row, marks token usedAt)
   resetPassword.ts     — phone-OTP verified password reset
   audit.ts             — writeAudit helper (internal)
   rateLimit.ts         — in-memory per-key rate limiter
@@ -123,17 +138,23 @@ functions/src/
 
 functions/scripts/
   seedAdmin.js         — initial admin bootstrap (first run only)
-  inspectUser.js       ← NEW: dump Auth record + RTDB profile + claims for diagnostics
+  inspectUser.js       — dump Auth record + RTDB profile + claims for diagnostics
   resetUser.js         — reset password, optionally stamp {role: "admin", username} claim
   fixAdminClaim.js     — one-off repair for a single user missing the role claim
-  migrateClaims.js     ← NEW: backfills {role, username} on every Auth user; --dry, --revoke
+  migrateClaims.js     — backfills {role, username} on every Auth user; --dry, --revoke
+
+scripts/
+  build-functions.cjs  — wipes functions/lib/ + tsconfig.tsbuildinfo before every tsc run
+                         (prevents stale incremental cache causing firebase to prompt deletion)
 
 database.rules.json    — default-deny; per-node role checks + schema .validate
-                         /confirmations/$confId now allows admin client writes (update only)
-storage.rules          — proof photos gated by assignedGrooms custom claim
+                         /confirmations/$confId: admin client writes (update only)
+                         /guestsByGroom/$uid/$guestId/confirmedAt: isNumber validator
+storage.rules          — proof photos gated by assignedGrooms; digitalMedia/photographerFiles rules
 firebase.json          — CSP/HSTS/X-Frame-Options headers; hosting + functions + db + storage config
-netlify.toml           ← NEW: Netlify build config (VITE_USE_EMULATORS=0, SPA fallback)
-.env.production        ← NEW: VITE_USE_EMULATORS=0 for production/Netlify builds
+netlify.toml           — Netlify build config (VITE_USE_EMULATORS=0, SPA fallback)
+.env.production        — VITE_USE_EMULATORS=0 for production/Netlify builds
+firestore.rules        — digitalGuests, digitalMedia, photographerFiles collection rules
 ```
 
 ---
@@ -219,13 +240,16 @@ Cloud Functions backing it:
 - **79/79 database rules tests pass** (emulator — requires Java 21).
 - **Vite client build** succeeds (`npm run build`).
 - **Cloud Functions TypeScript build** succeeds (`cd functions && npm run build`).
-- **`firebase deploy`** runs both predeploy hooks without error.
+- **`firebase deploy`** runs both predeploy hooks without error; `build-functions.cjs` now wipes the tsc cache on every run to prevent stale-export prompts.
 - **Admin account seeded** (UID `9gnlTRbtB0T7VW1ISdYqsIsbtq13`, username `admin`).
 - **Production Firebase** reachable from `localhost` (no App Check — removed project-wide).
 - **Confirmation matching** — fuzzy phone/name/address with GREEN/RED/Unknown sections + admin edit.
 - **Admin User Manager** — full CRUD: create/edit/delete all account types.
 - **RoleGuard** — wraps every role portal in Portal.jsx.
+- **Guest invite lifecycle** — not-sent / pending (amber) / confirmed (green) fully implemented. Confirmed guests disappear from AdminSendTab and appear in AdminConfirmationsTab. Both the per-guest `/invite/:token` flow and the public `/confirm/:groomUsername` form mark `confirmedAt` on the guest record and write a `/confirmations` row.
+- **Digital invitation section** — groom can add digital guests (Firestore), upload media (Storage), photographer can upload files. Storage rules deployed; Firestore rules in place.
 - **URL routing** — planned but NOT YET IMPLEMENTED (see `plans/routing-plan.md`).
+- **KNOWN ISSUE** — `DigitalAddGuest.jsx` form submit hangs (button loads forever, data not saved). Photo upload on DigitalDashboard and DigitalPhotographer stays "uploading..." forever after success. Both need investigation.
 
 ---
 
@@ -264,3 +288,13 @@ Local work is committed-clean; live Firebase is still on the old claim shape unt
 **Centralized logger**: Created `src/utils/logger.js` (tagged `[dawa]` console wrapper). 13 catch blocks across hooks/components now route errors through it.
 
 **Refused (security-critical)**: User twice proposed shortcuts that would have created severe vulnerabilities — (1) shipping the Firebase Admin SDK service-account JSON to the browser to avoid `.env`, and (2) replacing Firebase Auth with a homegrown encrypted-password RTDB scheme. Both refused with explanation. The role-claim migration was the negotiated alternative.
+
+**Guest invite lifecycle** (not-sent → pending → confirmed): Added `confirmedAt` field to guest schema. `submitGuestInvite` (invite.ts) now sets `confirmedAt` on the guest and writes a `/confirmations` row so the guest shows up on AdminConfirmationsTab. `submitConfirmation` (confirmations.ts) now runs the phone-match lookup unconditionally (not just when GPS coords present) and always patches `confirmedAt` on a single-match guest. AdminSendTab filters out confirmed guests and shows an amber pending pill for sent-but-not-confirmed guests. GroomGuests shows the same three-state reply pill. REPLY_STATUS map + replyStateOf() added to `src/data/status.js`. i18n keys `reply_notSent`, `reply_pending`, `reply_confirmed` added to both ar.js and he.js.
+
+**Storage 403 fix**: `storage.rules` had correct rules for `digitalMedia/{groomUid}` and `photographerFiles/{groomUid}` since commit b282aad but were never deployed. User ran `firebase deploy --only storage --project dawa-aa793` manually. Rules now live.
+
+**tsc incremental cache fix**: When `lib/` was deleted but `tsconfig.tsbuildinfo` survived, tsc skipped emit and firebase deploy prompted to delete `createGuestInvite`/`submitGuestInvite`. Fixed by updating `scripts/build-functions.cjs` to wipe both `functions/lib/` and `functions/tsconfig.tsbuildinfo` before every tsc invocation. Predeploy hook always starts from a clean slate.
+
+**Digital invitation feature** (PARTIALLY working): Grooms can add digital guests (Firestore `digitalGuests/{uid}/guests`), upload media files (Storage `digitalMedia/{uid}/`), and photographer can upload files (Storage `photographerFiles/{uid}/`). Storage rules now deployed. KNOWN BUGS: (1) DigitalAddGuest form submission hangs — button spins forever, data not saved to Firestore. (2) Photo upload on DigitalDashboard + DigitalPhotographer shows "uploading..." forever after success. Both are in queue to fix.
+
+**Pending work**: Fix DigitalAddGuest submit hang + reduce form to name+phone only + add `inviteType` field (digital/physical/both, since same phone can get both). Fix photo upload state not clearing on DigitalDashboard and DigitalPhotographer.
