@@ -124,7 +124,7 @@ export const submitGuestInvite = onCall(
       throw new HttpsError("not-found", "Invite link not found.");
     }
     const tk = tokenSnap.val() as {
-      groomUid: string; guestId: string;
+      groomUid: string; groomUsername?: string; guestId: string;
       expiresAt: number; usedAt?: number;
     };
     if (Date.now() > tk.expiresAt) {
@@ -167,22 +167,53 @@ export const submitGuestInvite = onCall(
       throw new HttpsError("not-found", "Guest record missing.");
     }
 
+    const now = Date.now();
     const guestPatch: Record<string, unknown> = {
       name:  submittedName,
       phone: submittedPhone,
       area,
+      confirmedAt: now,
     };
     if (deliveryNote) guestPatch.deliveryNote = deliveryNote;
     if (hasCoords) {
       guestPatch.lat = lat;
       guestPatch.lng = lng;
       guestPatch.locationSource    = locationSource;
-      guestPatch.locationUpdatedAt = Date.now();
+      guestPatch.locationUpdatedAt = now;
       if (locationAccuracy !== null) guestPatch.locationAccuracy = locationAccuracy;
     }
 
     await guestRef.update(guestPatch);
-    await db.ref(`inviteTokens/${token}/usedAt`).set(Date.now());
+
+    // Mirror into /confirmations so the Admin Confirmations tab shows this
+    // reply alongside ones submitted via the public /confirm/{groomUsername}
+    // form. groomUsername is denormalised on the token; fall back to a users
+    // lookup for older tokens that pre-date that field.
+    let groomUsername = (tk.groomUsername ?? "").toString();
+    if (!groomUsername) {
+      const u = await db.ref(`users/${tk.groomUid}/username`).get();
+      groomUsername = (u.val() ?? "").toString();
+    }
+    const confRecord: Record<string, unknown> = {
+      groomUid: tk.groomUid,
+      groomUsername,
+      submittedName,
+      submittedPhone,
+      submittedCity,
+      submittedStreet,
+      submittedHouse,
+      confirmedAt: now,
+      attachedGuestId: tk.guestId,
+    };
+    if (hasCoords) {
+      confRecord.lat = lat;
+      confRecord.lng = lng;
+      confRecord.locationCapturedAt = now;
+      if (locationAccuracy !== null) confRecord.locationAccuracy = locationAccuracy;
+    }
+    await db.ref("confirmations").push(confRecord);
+
+    await db.ref(`inviteTokens/${token}/usedAt`).set(now);
 
     return { ok: true };
   },

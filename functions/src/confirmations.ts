@@ -88,42 +88,43 @@ export const submitConfirmation = onCall(
     await confRef.set(confRecord);
 
     // Auto-attach: if exactly one guest under this groom matches the submitted
-    // phone (after normalisation) AND has no location yet, copy the coords
-    // onto the guest. This is best-effort — failure here doesn't fail the
-    // overall submission; the admin can still attach manually.
+    // phone (after normalisation), mark it confirmed; opportunistically copy
+    // GPS coords too when the submission included them and the guest has none.
+    // Best-effort — failure here doesn't fail the overall submission.
     let attachedGuestId: string | null = null;
-    if (hasCoords) {
-      try {
-        const target = normalisePhoneForMatching(submittedPhone);
-        if (target) {
-          const guestsSnap = await db.ref(`guestsByGroom/${groomUid}`).get();
-          const matches: string[] = [];
-          guestsSnap.forEach((g) => {
-            const v = g.val() as { phone?: string } | null;
-            if (v && normalisePhoneForMatching(v.phone ?? "") === target) {
-              if (g.key) matches.push(g.key);
-            }
-            return false;
-          });
-          if (matches.length === 1) {
-            const guestId = matches[0];
-            const guestVal = guestsSnap.child(guestId).val() as { lat?: unknown } | null;
-            if (guestVal && typeof guestVal.lat !== "number") {
-              const guestPatch: Record<string, unknown> = {
-                lat, lng,
-                locationSource: "gps",
-                locationUpdatedAt: Date.now(),
-              };
-              if (locationAccuracy !== null) guestPatch.locationAccuracy = locationAccuracy;
-              await db.ref(`guestsByGroom/${groomUid}/${guestId}`).update(guestPatch);
-              await confRef.update({ attachedGuestId: guestId });
-              attachedGuestId = guestId;
-            }
+    try {
+      const target = normalisePhoneForMatching(submittedPhone);
+      if (target) {
+        const guestsSnap = await db.ref(`guestsByGroom/${groomUid}`).get();
+        const matches: string[] = [];
+        guestsSnap.forEach((g) => {
+          const v = g.val() as { phone?: string } | null;
+          if (v && normalisePhoneForMatching(v.phone ?? "") === target) {
+            if (g.key) matches.push(g.key);
           }
+          return false;
+        });
+        if (matches.length === 1) {
+          const guestId = matches[0];
+          const guestVal = guestsSnap.child(guestId).val() as { lat?: unknown } | null;
+          const now = Date.now();
+          const guestPatch: Record<string, unknown> = {
+            confirmedAt: now,
+          };
+          if (hasCoords && guestVal && typeof guestVal.lat !== "number") {
+            guestPatch.lat = lat;
+            guestPatch.lng = lng;
+            guestPatch.locationSource    = "gps";
+            guestPatch.locationUpdatedAt = now;
+            if (locationAccuracy !== null) guestPatch.locationAccuracy = locationAccuracy;
+          }
+          await db.ref(`guestsByGroom/${groomUid}/${guestId}`).update(guestPatch);
+          await confRef.update({ attachedGuestId: guestId });
+          attachedGuestId = guestId;
         }
-      } catch (e) {
-        console.warn("submitConfirmation: auto-attach failed", e);
       }
+    } catch (e) {
+      console.warn("submitConfirmation: auto-attach failed", e);
     }
 
     return { ok: true, id: confRef.key, attachedGuestId };

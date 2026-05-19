@@ -302,4 +302,8 @@ export const he = {
   guests_send_invite: "שלח הזמנה",
   guests_invite_sent: "נשלח",
   admin_form_link_auto_hint: "קישור ייחודי נוצר אוטומטית לכל מוזמן בלחיצה על «שלח הזמנה» — אין צורך להזין ידנית.",
+  // Reply lifecycle pills (not sent / pending / confirmed)
+  reply_notSent:   "לא נשלח",
+  reply_pending:   "⌛ ממתין לתשובה",
+  reply_confirmed: "✓ אישר הגעה",
 };

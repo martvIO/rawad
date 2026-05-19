@@ -82,6 +82,7 @@
           "locationUpdatedAt":{ ".validate": "!newData.exists() || newData.isNumber()" },
           "inviteLinkToken":  { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 64)" },
           "inviteLinkSentAt": { ".validate": "!newData.exists() || newData.isNumber()" },
+          "confirmedAt":      { ".validate": "!newData.exists() || newData.isNumber()" },
           "$other":         { ".validate": false }
         }
       }

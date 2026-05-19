@@ -1,6 +1,11 @@
 ﻿// Admin → Send tab: pick a groom and send WhatsApp confirmation invites to their guests.
+// Confirmed guests (those who already replied) are filtered out — they live on
+// the Confirmations tab now. Remaining guests render in two reply states:
+//   not sent  → neutral card, no reply pill
+//   pending   → soft amber card + "⌛ waiting" pill
 import { usePortal } from "../../../context/PortalContext.jsx";
 import { C } from "../../../styles/theme.js";
+import { REPLY_STATUS, replyStateOf } from "../../../data/status.js";
 
 export function AdminSendTab() {
   const {
@@ -23,8 +28,10 @@ export function AdminSendTab() {
     }
   };
             const groomList = users.filter(u => u.role === "groom");
+            // Confirmed guests move to the Confirmations tab; hide them here so
+            // the Send list is a true "outstanding invites" view.
             const selectedGroomGuests = adminSelectedGroom
-              ? guests.filter(g => g.groomUsername === adminSelectedGroom) : [];
+              ? guests.filter(g => g.groomUsername === adminSelectedGroom && !g.confirmedAt) : [];
             const withoutAddr = selectedGroomGuests.filter(g => !g.area || !g.area.trim());
             const withAddr    = selectedGroomGuests.filter(g =>  g.area &&  g.area.trim());
 
@@ -110,13 +117,19 @@ export function AdminSendTab() {
                           const confStatus = guestConfirmationStatus(g);
                           const isMatched   = confStatus?.status === "matched";
                           const isMismatch  = confStatus?.status === "mismatch";
-                          // Soft tints — gentle red for mismatch, soft green for matched,
-                          // neutral when no confirmation yet.
+                          // Reply lifecycle: confirmed guests are already filtered out,
+                          // so we only see notSent or pending here.
+                          const replyState = replyStateOf(g); // "notSent" | "pending"
+                          const isPending  = replyState === "pending";
+                          // Soft tints — mismatch (red) beats matched (green) beats
+                          // pending (amber), and neutral when nothing applies.
                           const cardBg     = isMismatch ? "rgba(212,122,75,.07)"
                                             : isMatched ? "rgba(76,201,122,.05)"
+                                            : isPending ? "rgba(212,161,75,.06)"
                                             : "rgba(255,255,255,.03)";
                           const cardBorder = isMismatch ? "rgba(212,122,75,.4)"
                                             : isMatched ? "rgba(76,201,122,.3)"
+                                            : isPending ? "rgba(212,161,75,.25)"
                                             : "rgba(255,255,255,.07)";
                           return (
                           <div key={g.id} style={{
@@ -142,6 +155,13 @@ export function AdminSendTab() {
                                     fontSize: 10, padding: "2px 8px", borderRadius: 20, fontWeight: 700,
                                     background: "rgba(212,122,75,.18)", color: C.red,
                                   }}>{t("conf_status_mismatch")}</span>
+                                )}
+                                {/* Reply state — pending only (notSent is silent, confirmed never renders here) */}
+                                {isPending && (
+                                  <span style={{
+                                    fontSize: 10, padding: "2px 8px", borderRadius: 20, fontWeight: 700,
+                                    background: REPLY_STATUS.pending.bg, color: REPLY_STATUS.pending.color,
+                                  }}>{t("reply_pending")}</span>
                                 )}
                               </div>
                               <div style={{ fontSize: 11, color: "#5a5040", direction: "ltr", textAlign: "right" }}>{g.phone}</div>

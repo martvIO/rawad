@@ -1,6 +1,6 @@
 ﻿// Groom → Guests: the guest list, split into with/without address, swipe-to-delete.
 import { useNavigate } from "react-router-dom";
-import { STATUS } from "../../../data/status.js";
+import { STATUS, REPLY_STATUS, replyStateOf } from "../../../data/status.js";
 import { usePortal } from "../../../context/PortalContext.jsx";
 import { C } from "../../../styles/theme.js";
 
@@ -38,6 +38,8 @@ export function GroomGuests() {
               // Shared card renderer (DRY — same card used in both sections)
               const renderCard = (g) => {
                 const st = STATUS[g.status];
+                const reply = REPLY_STATUS[replyStateOf(g)]; // notSent | pending | confirmed
+                const replyKey = replyStateOf(g);
                 const isRevealed = revealedId === g.id;
                 const canDelete = g.status === "pending";
                 return (
@@ -87,6 +89,13 @@ export function GroomGuests() {
                       </div>
                       <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
                         <span className="status-badge" style={{ background: st.bg, color: st.color }}>{t("stat_" + g.status)}</span>
+                        {/* Reply lifecycle — silent when the invite hasn't been sent yet */}
+                        {replyKey !== "notSent" && (
+                          <span style={{
+                            fontSize: 10, padding: "2px 8px", borderRadius: 20, fontWeight: 700,
+                            background: reply.bg, color: reply.color,
+                          }}>{t("reply_" + replyKey)}</span>
+                        )}
                         <span style={{
                           fontSize: 10, padding: "2px 8px", borderRadius: 20, fontWeight: 700,
                           background: g.inviteType==="vip" ? "rgba(155,75,212,.15)" : "rgba(201,168,76,.12)",

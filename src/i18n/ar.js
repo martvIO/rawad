@@ -312,4 +312,8 @@ export const ar = {
   guests_send_invite: "إرسال دعوة",
   guests_invite_sent: "أُرسلت",
   admin_form_link_auto_hint: "يتم إنشاء رابط فريد لكل مدعو تلقائياً عند الضغط على «إرسال دعوة» — لا حاجة لإدخاله يدوياً.",
+  // Reply lifecycle pills (not sent / pending / confirmed)
+  reply_notSent:   "لم تُرسل",
+  reply_pending:   "⌛ بانتظار الرد",
+  reply_confirmed: "✓ أكّد الحضور",
 };
