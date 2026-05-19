@@ -36,8 +36,8 @@ export function AdminDesignRequests() {
     done:     requests.filter(r => r.status === "approved"),
   }), [requests]);
 
-  const handleStart = async (reqId) => {
-    try { await startDesigning(reqId); }
+  const handleStart = async (req) => {
+    try { await startDesigning(req.groomUid, req.id); }
     catch (err) { logErr("startDesigning", err); showToast(err?.message || "خطأ"); }
   };
 
@@ -46,7 +46,7 @@ export function AdminDesignRequests() {
     setUploading(req.id);
     try {
       const newMockup = await uploadMockup(req.groomUid, req.id, file);
-      await commitMockup(req.id, req.mockups, newMockup);
+      await commitMockup(req.groomUid, req.id, req.mockups, newMockup);
       showToast(tt(lang, "✓ تم رفع التصميم", "✓ העיצוב הועלה"));
     } catch (err) {
       logErr("uploadMockup", err);

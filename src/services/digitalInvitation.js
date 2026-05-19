@@ -8,10 +8,11 @@
 //   Firestore SDK has a separate, more reliable auth layer: addDoc/setDoc/updateDoc
 //   all wait for confirmed server writes and throw real errors on rejection.
 //
-// Firestore collections:
-//   digitalGuests/{groomUid}/guests/{guestId}    — guest documents
-//   digitalMedia/{groomUid}                      — single media document per groom
-//   photographerFiles/{groomUid}/files/{fileId}  — photographer upload documents
+// Firestore layout — all digital invitation data nested under one path per groom:
+//   digitalInvitations/{groomUid}                              — background media (doc)
+//   digitalInvitations/{groomUid}/guests/{guestId}             — RSVP list
+//   digitalInvitations/{groomUid}/photographerFiles/{fileId}   — photographer uploads
+//   digitalInvitations/{groomUid}/designRequests/{reqId}       — design workflow (see designRequests.js)
 
 import {
   collection, doc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, query, orderBy,
@@ -27,9 +28,9 @@ export const createDigitalGuestInvite = callable("createDigitalGuestInvite");
 export const submitDigitalGuestInvite = callable("submitDigitalGuestInvite");
 
 // ── Collection / document references ─────────────────────────────────────────
-const guestsCol = (uid) => collection(firestore, `digitalGuests/${uid}/guests`);
-const mediaDoc  = (uid) => doc(firestore, "digitalMedia", uid);
-const filesCol  = (uid) => collection(firestore, `photographerFiles/${uid}/files`);
+const guestsCol = (uid) => collection(firestore, "digitalInvitations", uid, "guests");
+const mediaDoc  = (uid) => doc(firestore, "digitalInvitations", uid);
+const filesCol  = (uid) => collection(firestore, "digitalInvitations", uid, "photographerFiles");
 
 function resolveUid(groomUid) {
   const uid = groomUid || auth.currentUser?.uid;

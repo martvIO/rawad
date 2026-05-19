@@ -50,7 +50,7 @@ export const createDigitalGuestInvite = onCall(
     }
 
     const fs = getFirestore();
-    const guestRef = fs.doc(`digitalGuests/${groomUid}/guests/${guestId}`);
+    const guestRef = fs.doc(`digitalInvitations/${groomUid}/guests/${guestId}`);
     const guestSnap = await guestRef.get();
     if (!guestSnap.exists) {
       throw new HttpsError("not-found", "Guest not found.");
@@ -131,7 +131,7 @@ export const submitDigitalGuestInvite = onCall(
     }
 
     const fs = getFirestore();
-    const guestRef = fs.doc(`digitalGuests/${tk.groomUid}/guests/${tk.guestId}`);
+    const guestRef = fs.doc(`digitalInvitations/${tk.groomUid}/guests/${tk.guestId}`);
     const guestSnap = await guestRef.get();
     if (!guestSnap.exists) {
       throw new HttpsError("not-found", "Guest record missing.");

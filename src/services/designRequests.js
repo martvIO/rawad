@@ -7,17 +7,23 @@
 //   [groom]   revision_requested → groom asked for changes
 //   [groom]   approved           → groom approved the design (terminal)
 //
-// Layout (flat collection):
-//   designRequests/{reqId}
+// Firestore layout — subcollection under each groom's digital invitation doc:
+//   digitalInvitations/{groomUid}/designRequests/{reqId}
 //     groomUid, groomUsername, status, templateData, mockups[],
 //     revisionNotes, createdAt, updatedAt, approvedAt
 import {
-  collection, doc, addDoc, updateDoc, onSnapshot, query, where, orderBy,
+  collection, collectionGroup, doc, addDoc, updateDoc, onSnapshot, query, orderBy,
 } from "firebase/firestore";
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 import { firestore, storage, auth } from "../firebase.js";
 
-const designCol = () => collection(firestore, "designRequests");
+// Subcollection path for a specific groom.
+const designCol = (groomUid) =>
+  collection(firestore, "digitalInvitations", groomUid, "designRequests");
+
+// Document ref helper.
+const designDoc = (groomUid, reqId) =>
+  doc(firestore, "digitalInvitations", groomUid, "designRequests", reqId);
 
 function uid(groomUid) {
   const u = groomUid || auth.currentUser?.uid;
@@ -27,11 +33,7 @@ function uid(groomUid) {
 
 // Groom view — only this groom's requests, newest first.
 export function subscribeDesignRequests(groomUid, cb) {
-  const q = query(
-    designCol(),
-    where("groomUid", "==", groomUid),
-    orderBy("createdAt", "desc"),
-  );
+  const q = query(designCol(groomUid), orderBy("createdAt", "desc"));
   return onSnapshot(
     q,
     (snap) => cb(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
@@ -39,9 +41,11 @@ export function subscribeDesignRequests(groomUid, cb) {
   );
 }
 
-// Admin view — all requests across all grooms.
+// Admin view — every design request across all grooms via collectionGroup.
+// Each doc still carries `groomUid` as a denormalised field so admin UI doesn't
+// need to walk the path to identify which groom owns the request.
 export function subscribeAllDesignRequests(cb) {
-  const q = query(designCol(), orderBy("createdAt", "desc"));
+  const q = query(collectionGroup(firestore, "designRequests"), orderBy("createdAt", "desc"));
   return onSnapshot(
     q,
     (snap) => cb(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
@@ -54,8 +58,8 @@ export function subscribeAllDesignRequests(cb) {
 export async function submitDesignTemplate(groomUid, groomUsername, templateData) {
   const u   = uid(groomUid);
   const now = Date.now();
-  const ref = await addDoc(designCol(), {
-    groomUid: u,
+  const ref = await addDoc(designCol(u), {
+    groomUid: u,                  // denormalised — admin reads it from collectionGroup
     groomUsername: groomUsername || "",
     status: "submitted",
     templateData: templateData || {},
@@ -69,14 +73,15 @@ export async function submitDesignTemplate(groomUid, groomUsername, templateData
 }
 
 // Admin — mark "designing" once they pick up the request.
-export async function startDesigning(reqId) {
-  await updateDoc(doc(designCol(), reqId), {
+export async function startDesigning(groomUid, reqId) {
+  await updateDoc(designDoc(groomUid, reqId), {
     status: "designing",
     updatedAt: Date.now(),
   });
 }
 
-// Admin — upload a mockup image. Appends to mockups[] and moves status to "review".
+// Admin — upload a mockup image to Storage. Returns the mockup metadata; the
+// caller commits it to the Firestore doc via commitMockup.
 export async function uploadMockup(groomUid, reqId, file) {
   const u        = uid(groomUid);
   const safeName = file.name.replace(/[^\w.\-]/g, "_");
@@ -84,15 +89,12 @@ export async function uploadMockup(groomUid, reqId, file) {
   const sr       = storageRef(storage, path);
   await uploadBytes(sr, file, { contentType: file.type || "application/octet-stream" });
   const url = await getDownloadURL(sr);
-
-  // We re-fetch the current document via the snapshot callback in the caller,
-  // so the consumer is responsible for passing the existing mockups array.
   return { url, storagePath: path, uploadedAt: Date.now(), name: file.name };
 }
 
 // Admin — commit a freshly-uploaded mockup to the request.
-export async function commitMockup(reqId, existingMockups, newMockup) {
-  await updateDoc(doc(designCol(), reqId), {
+export async function commitMockup(groomUid, reqId, existingMockups, newMockup) {
+  await updateDoc(designDoc(groomUid, reqId), {
     mockups: [...(existingMockups || []), newMockup],
     status: "review",
     revisionNotes: null,
@@ -101,9 +103,9 @@ export async function commitMockup(reqId, existingMockups, newMockup) {
 }
 
 // Groom — approve the design.
-export async function approveDesign(reqId) {
+export async function approveDesign(groomUid, reqId) {
   const now = Date.now();
-  await updateDoc(doc(designCol(), reqId), {
+  await updateDoc(designDoc(groomUid, reqId), {
     status: "approved",
     approvedAt: now,
     updatedAt: now,
@@ -111,8 +113,8 @@ export async function approveDesign(reqId) {
 }
 
 // Groom — request a revision with free-text notes.
-export async function requestRevision(reqId, notes) {
-  await updateDoc(doc(designCol(), reqId), {
+export async function requestRevision(groomUid, reqId, notes) {
+  await updateDoc(designDoc(groomUid, reqId), {
     status: "revision_requested",
     revisionNotes: (notes || "").trim() || null,
     updatedAt: Date.now(),
