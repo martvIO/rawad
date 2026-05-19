@@ -20,6 +20,20 @@ service cloud.firestore {
         && (request.auth.uid == groomUid || request.auth.token.role == 'admin');
     }
 
+    // Design requests — groom owns their own; admin sees & writes all
+    match /designRequests/{reqId} {
+      allow read:   if request.auth != null
+                    && (request.auth.uid == resource.data.groomUid
+                        || request.auth.token.role == 'admin');
+      allow create: if request.auth != null
+                    && request.resource.data.groomUid == request.auth.uid;
+      allow update: if request.auth != null
+                    && (request.auth.uid == resource.data.groomUid
+                        || request.auth.token.role == 'admin');
+      allow delete: if request.auth != null
+                    && request.auth.token.role == 'admin';
+    }
+
     // Default deny — all other paths
     match /{document=**} {
       allow read, write: if false;

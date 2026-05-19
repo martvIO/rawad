@@ -11,6 +11,7 @@ import { GlobalStyle } from "./styles/GlobalStyle.jsx";
 import { LandingPage } from "./pages/LandingPage.jsx";
 import { ConfirmationForm } from "./pages/ConfirmationForm.jsx";
 import { InviteForm } from "./pages/InviteForm.jsx";
+import { DigitalInviteForm } from "./pages/DigitalInviteForm.jsx";
 import { Portal } from "./pages/portal/Portal.jsx";
 
 export default function App() {
@@ -53,6 +54,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<LandingPage onEnterPortal={() => navigate("/portal")} {...langProps} />} />
         <Route path="/confirm/:groomUsername" element={<ConfirmationForm {...langProps} />} />
+        <Route path="/invite/digital/:token" element={<DigitalInviteForm {...langProps} />} />
         <Route path="/invite/:token" element={<InviteForm {...langProps} />} />
         <Route path="/portal/*" element={<Portal onBack={onBack} {...langProps} />} />
         <Route path="*" element={<Navigate to="/" replace />} />

@@ -14,6 +14,7 @@ import { AdminUserManager } from "./AdminUserManager.jsx";
 import { AdminSendTab } from "./AdminSendTab.jsx";
 import { AdminSettingsTab } from "./AdminSettingsTab.jsx";
 import { AdminConfirmationsTab } from "./AdminConfirmationsTab.jsx";
+import { AdminDesignRequests } from "./AdminDesignRequests.jsx";
 import { C } from "../../../styles/theme.js";
 
 const tabStyle = ({ isActive }) => ({
@@ -69,6 +70,7 @@ export function AdminPortal() {
           <NavLink to="/portal/admin/users"         style={tabStyle}>👥 {t("admin_tab_users")}</NavLink>
           <NavLink to="/portal/admin/send"          style={tabStyle}>📨 {t("admin_tab_send")}</NavLink>
           <NavLink to="/portal/admin/confirmations" style={tabStyle}>✓ {t("admin_tab_confirmations")}{confirmations.length ? ` (${confirmations.length})` : ""}</NavLink>
+          <NavLink to="/portal/admin/designs"       style={tabStyle}>🎨 {lang === "he" ? "עיצובים" : "التصاميم"}</NavLink>
           <NavLink to="/portal/admin/settings"      style={tabStyle}>⚙ {t("admin_tab_settings")}</NavLink>
         </div>
 
@@ -77,6 +79,7 @@ export function AdminPortal() {
           <Route path="users"           element={<AdminUserManager />} />
           <Route path="send"            element={<AdminSendTab />} />
           <Route path="confirmations"   element={<AdminConfirmationsTab />} />
+          <Route path="designs"         element={<AdminDesignRequests />} />
           <Route path="settings"        element={<AdminSettingsTab />} />
           <Route path="*"               element={<Navigate to="users" replace />} />
         </Routes>

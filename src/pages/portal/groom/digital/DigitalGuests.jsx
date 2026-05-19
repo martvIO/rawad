@@ -5,7 +5,9 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { usePortal } from "../../../../context/PortalContext.jsx";
 import {
   subscribeDigitalGuests, updateDigitalGuest, removeDigitalGuest,
+  createDigitalGuestInvite,
 } from "../../../../services/digitalInvitation.js";
+import { toIntlPhone } from "../../../../utils/phone.js";
 import { logErr } from "../../../../utils/logger.js";
 import { C } from "../../../../styles/theme.js";
 
@@ -17,7 +19,7 @@ const STATUS_CFG = {
 const CYCLE = ["pending", "attending", "absent"];
 
 export function DigitalGuests() {
-  const { lang, currentUid, showToast } = usePortal();
+  const { lang, currentUid, showToast, adminMessageBody } = usePortal();
   const navigate  = useNavigate();
   const location  = useLocation();
   const [guests,     setGuests]     = useState([]);
@@ -88,6 +90,33 @@ export function DigitalGuests() {
     } catch (err) {
       logErr("deleteDigitalGuest", err);
       showToast(err?.message || "خطأ");
+    }
+  };
+
+  // ── Send digital invite via WhatsApp ─────────────────────────────────────────
+  const sendDigitalInvite = async (g) => {
+    const intl = toIntlPhone(g.phone);
+    if (!intl) {
+      showToast(lang === "he" ? "מספר טלפון לא תקין" : "رقم هاتف غير صالح");
+      return;
+    }
+    try {
+      const { token } = await createDigitalGuestInvite({ groomUid: currentUid, guestId: g.id });
+      if (!token) {
+        showToast(lang === "he" ? "שגיאה ביצירת קישור" : "خطأ في إنشاء الرابط");
+        return;
+      }
+      const baseUrl = (import.meta.env.VITE_INVITE_BASE_URL || "").replace(/\/+$/, "")
+                   || window.location.origin;
+      const url  = `${baseUrl}/invite/digital/${token}`;
+      const body = (adminMessageBody || "").trim();
+      const text = [body, url].filter(Boolean).join("\n\n");
+      // Optimistic local update — show "sent" badge immediately
+      setGuests(prev => prev.map(x => x.id === g.id ? { ...x, inviteLinkSentAt: Date.now() } : x));
+      window.open(`https://wa.me/${intl}?text=${encodeURIComponent(text)}`, "_blank", "noopener");
+    } catch (err) {
+      logErr("sendDigitalInvite", err);
+      showToast(err?.message || (lang === "he" ? "שגיאה" : "خطأ"));
     }
   };
 
@@ -218,6 +247,24 @@ export function DigitalGuests() {
                               fontFamily: "inherit",
                             }}>
                       {lang === "he" ? sc.label_he : sc.label_ar}
+                    </button>
+
+                    {/* Send digital invite via WhatsApp */}
+                    <button onClick={() => sendDigitalInvite(g)}
+                            title={g.inviteLinkSentAt
+                              ? (lang === "he" ? "כבר נשלח — לשלוח שוב" : "تم الإرسال — إرسال مجدداً")
+                              : (lang === "he" ? "שלח הזמנה ב-WhatsApp" : "إرسال الدعوة عبر WhatsApp")}
+                            style={{
+                              background: g.inviteLinkSentAt ? "rgba(76,201,122,.12)" : "rgba(37,211,102,.14)",
+                              border: `1px solid ${g.inviteLinkSentAt ? "rgba(76,201,122,.35)" : "rgba(37,211,102,.45)"}`,
+                              color: g.inviteLinkSentAt ? "#4cc97a" : "#25d366",
+                              fontSize: 11, fontWeight: 800, cursor: "pointer",
+                              padding: "3px 8px", borderRadius: 8, fontFamily: "inherit",
+                              whiteSpace: "nowrap",
+                            }}>
+                      {g.inviteLinkSentAt
+                        ? "✓ " + (lang === "he" ? "נשלח" : "تم الإرسال")
+                        : "📲 " + (lang === "he" ? "שלח" : "إرسال")}
                     </button>
 
                     {/* Edit + delete buttons — same style as GroomGuests */}

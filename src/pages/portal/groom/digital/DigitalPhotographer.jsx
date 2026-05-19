@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import { usePortal } from "../../../../context/PortalContext.jsx";
 import {
   subscribePhotographerFiles, uploadPhotographerFile, removePhotographerFile,
+  renamePhotographerFile,
 } from "../../../../services/digitalInvitation.js";
 import { logErr } from "../../../../utils/logger.js";
 import { C } from "../../../../styles/theme.js";
@@ -30,6 +31,8 @@ export function DigitalPhotographer() {
   const [uploading,  setUploading]  = useState(false);
   const [inProgress, setInProgress] = useState([]);
   const [deletingId, setDeletingId] = useState(null);
+  const [editingId,  setEditingId]  = useState(null);
+  const [editName,   setEditName]   = useState("");
   // Local previews: shown immediately while uploading, before RTDB confirms
   const [pendingFiles, setPendingFiles] = useState([]); // [{ id, name, type, url, blobUrl }]
   const inputRef = useRef(null);
@@ -39,7 +42,9 @@ export function DigitalPhotographer() {
     return subscribePhotographerFiles(currentUid, setFiles);
   }, [currentUid]);
 
-  // Clean up blob URLs when real RTDB files arrive
+  // Safety net: clean up any pending blobs whose name now exists in confirmed files
+  // (handles the rare case where a file arrived via subscription without going
+  //  through our handleFiles flow — e.g. another device uploaded simultaneously).
   useEffect(() => {
     if (pendingFiles.length === 0) return;
     const arrivedNames = new Set(files.map(f => f.name));
@@ -47,7 +52,7 @@ export function DigitalPhotographer() {
     if (stillPending.length !== pendingFiles.length) {
       pendingFiles
         .filter(p => arrivedNames.has(p.name))
-        .forEach(p => URL.revokeObjectURL(p.blobUrl));
+        .forEach(p => URL.revokeObjectURL(p.url));
       setPendingFiles(stillPending);
     }
   }, [files]);
@@ -71,6 +76,9 @@ export function DigitalPhotographer() {
     const uid = currentUid || auth.currentUser?.uid;
     if (!uid) {
       showToast(lang === "he" ? "אנא התחבר מחדש" : "يرجى إعادة تسجيل الدخول");
+      // Clean up the previews we just added
+      previews.forEach(p => URL.revokeObjectURL(p.url));
+      setPendingFiles(prev => prev.filter(p => !previews.some(pf => pf.id === p.id)));
       return;
     }
 
@@ -78,20 +86,32 @@ export function DigitalPhotographer() {
     setInProgress(arr.map(f => f.name));
 
     const results = await Promise.allSettled(arr.map(f => uploadPhotographerFile(uid, f)));
-    const failed  = results.filter(r => r.status === "rejected");
+    const failedIdx = results
+      .map((r, i) => r.status === "rejected" ? i : -1)
+      .filter(i => i !== -1);
+    const succeededPreviews = previews.filter((_, i) => !failedIdx.includes(i));
+    const failedPreviews    = previews.filter((_, i) =>  failedIdx.includes(i));
 
-    if (failed.length === 0) {
+    // ── Immediate cleanup of successful uploads — don't wait for onSnapshot ──
+    if (succeededPreviews.length > 0) {
+      succeededPreviews.forEach(p => URL.revokeObjectURL(p.url));
+      const succeededIds = new Set(succeededPreviews.map(p => p.id));
+      setPendingFiles(prev => prev.filter(p => !succeededIds.has(p.id)));
+    }
+
+    if (failedIdx.length === 0) {
       showToast(lang === "he"
         ? `✓ הועלו ${arr.length} קבצים`
         : `✓ تم رفع ${arr.length.toLocaleString("en")} ملف`);
     } else {
-      logErr("uploadPhotographerFiles", failed[0].reason);
+      logErr("uploadPhotographerFiles", results[failedIdx[0]].reason);
       showToast(lang === "he"
-        ? `נכשלה העלאה של ${failed.length} קבצים`
-        : `فشل رفع ${failed.length} ملف`);
+        ? `נכשלה העלאה של ${failedIdx.length} קבצים`
+        : `فشل رفع ${failedIdx.length} ملف`);
       // Clean up blobs for failed files only
-      previews.forEach(p => URL.revokeObjectURL(p.url));
-      setPendingFiles(prev => prev.filter(p => !previews.some(pf => pf.id === p.id)));
+      failedPreviews.forEach(p => URL.revokeObjectURL(p.url));
+      const failedIds = new Set(failedPreviews.map(p => p.id));
+      setPendingFiles(prev => prev.filter(p => !failedIds.has(p.id)));
     }
 
     setUploading(false);
@@ -105,6 +125,29 @@ export function DigitalPhotographer() {
       setDeletingId(null);
     } catch (err) {
       logErr("deletePhotographerFile", err);
+      showToast(err?.message || "خطأ");
+    }
+  };
+
+  const startRename = (f) => {
+    setEditingId(f.id);
+    setEditName(f.name);
+    setDeletingId(null);
+  };
+
+  const saveRename = async () => {
+    const trimmed = editName.trim();
+    if (!trimmed) {
+      showToast(lang === "he" ? "שם לא יכול להיות ריק" : "الاسم لا يمكن أن يكون فارغاً");
+      return;
+    }
+    try {
+      await renamePhotographerFile(currentUid, editingId, trimmed);
+      // Optimistic update — onSnapshot will reconcile
+      setFiles(prev => prev.map(f => f.id === editingId ? { ...f, name: trimmed } : f));
+      setEditingId(null);
+    } catch (err) {
+      logErr("renamePhotographerFile", err);
       showToast(err?.message || "خطأ");
     }
   };
@@ -226,10 +269,26 @@ export function DigitalPhotographer() {
               <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
                 <div style={{ fontSize: 28, flexShrink: 0 }}>{iconFor(f.type)}</div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{
-                    fontWeight: 800, color: C.goldLight, fontSize: 13, marginBottom: 2,
-                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                  }}>{f.name}</div>
+                  {editingId === f.id ? (
+                    <input
+                      type="text"
+                      value={editName}
+                      onChange={e => setEditName(e.target.value)}
+                      onKeyDown={e => { if (e.key === "Enter") saveRename(); if (e.key === "Escape") setEditingId(null); }}
+                      autoFocus
+                      style={{
+                        width: "100%", fontSize: 13, fontWeight: 800,
+                        padding: "4px 8px", borderRadius: 6,
+                        background: "rgba(201,168,76,.08)", border: "1px solid rgba(201,168,76,.4)",
+                        color: C.goldLight, fontFamily: "inherit",
+                      }}
+                    />
+                  ) : (
+                    <div style={{
+                      fontWeight: 800, color: C.goldLight, fontSize: 13, marginBottom: 2,
+                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                    }}>{f.name}</div>
+                  )}
                   <div style={{ fontSize: 10, color: C.dim }}>
                     {isPending
                       ? (lang === "he" ? "⏳ מעלה..." : "⏳ جاري الرفع...")
@@ -238,17 +297,39 @@ export function DigitalPhotographer() {
                 </div>
                 {!isPending && (
                   <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                    <a href={f.url} target="_blank" rel="noreferrer" style={{
-                      padding: "6px 10px", borderRadius: 8,
-                      background: "rgba(75,159,212,.1)", border: "1px solid rgba(75,159,212,.25)",
-                      color: C.blue, fontSize: 12, fontWeight: 700, textDecoration: "none",
-                    }}>⬇</a>
-                    {!isDeleting && (
-                      <button onClick={() => setDeletingId(f.id)} style={{
-                        padding: "6px 10px", borderRadius: 8,
-                        background: "rgba(212,80,58,.08)", border: "1px solid rgba(212,80,58,.25)",
-                        color: C.red, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
-                      }}>🗑</button>
+                    {editingId === f.id ? (
+                      <>
+                        <button onClick={saveRename} style={{
+                          padding: "6px 10px", borderRadius: 8,
+                          background: "rgba(76,201,122,.12)", border: "1px solid rgba(76,201,122,.35)",
+                          color: "#4cc97a", fontSize: 12, fontWeight: 800, cursor: "pointer", fontFamily: "inherit",
+                        }}>💾</button>
+                        <button onClick={() => setEditingId(null)} style={{
+                          padding: "6px 10px", borderRadius: 8,
+                          background: "none", border: "1px solid rgba(255,255,255,.1)",
+                          color: C.dim, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
+                        }}>✕</button>
+                      </>
+                    ) : (
+                      <>
+                        <a href={f.url} target="_blank" rel="noreferrer" style={{
+                          padding: "6px 10px", borderRadius: 8,
+                          background: "rgba(75,159,212,.1)", border: "1px solid rgba(75,159,212,.25)",
+                          color: C.blue, fontSize: 12, fontWeight: 700, textDecoration: "none",
+                        }}>⬇</a>
+                        <button onClick={() => startRename(f)} title={lang === "he" ? "ערוך שם" : "تعديل الاسم"} style={{
+                          padding: "6px 10px", borderRadius: 8,
+                          background: "rgba(201,168,76,.12)", border: "1px solid rgba(201,168,76,.3)",
+                          color: C.gold, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
+                        }}>✎</button>
+                        {!isDeleting && (
+                          <button onClick={() => setDeletingId(f.id)} style={{
+                            padding: "6px 10px", borderRadius: 8,
+                            background: "rgba(212,80,58,.08)", border: "1px solid rgba(212,80,58,.25)",
+                            color: C.red, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
+                          }}>🗑</button>
+                        )}
+                      </>
                     )}
                   </div>
                 )}

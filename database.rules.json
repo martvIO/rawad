@@ -146,6 +146,7 @@
         "guestId":       { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 64" },
         "guestName":     { ".validate": "newData.isString() && newData.val().length <= 120" },
         "guestPhone":    { ".validate": "newData.isString() && newData.val().length <= 30" },
+        "guestType":     { ".validate": "!newData.exists() || newData.val() === 'physical' || newData.val() === 'digital'" },
         "createdAt":     { ".validate": "newData.isNumber()" },
         "expiresAt":     { ".validate": "newData.isNumber()" },
         "usedAt":        { ".validate": "!newData.exists() || newData.isNumber()" },

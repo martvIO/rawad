@@ -18,6 +18,13 @@ import {
 } from "firebase/firestore";
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 import { firestore, storage, auth } from "../firebase.js";
+import { callable } from "./_helpers.js";
+
+// ── Per-guest digital invite tokens (callable Cloud Functions) ────────────────
+// createDigitalGuestInvite — groom/admin → { token, expiresAt }
+// submitDigitalGuestInvite — public  → marks guest status from the invite link
+export const createDigitalGuestInvite = callable("createDigitalGuestInvite");
+export const submitDigitalGuestInvite = callable("submitDigitalGuestInvite");
 
 // ── Collection / document references ─────────────────────────────────────────
 const guestsCol = (uid) => collection(firestore, `digitalGuests/${uid}/guests`);
@@ -117,6 +124,13 @@ export async function uploadPhotographerFile(groomUid, file) {
     storagePath: path, uploadedAt: Date.now(),
   });
   return { url, key: docRef.id };
+}
+
+export async function renamePhotographerFile(groomUid, fileId, newName) {
+  const uid  = resolveUid(groomUid);
+  const name = (newName || "").trim();
+  if (!name) throw new Error("Name cannot be empty");
+  await updateDoc(doc(filesCol(uid), fileId), { name });
 }
 
 export async function removePhotographerFile(groomUid, fileId) {

@@ -8,6 +8,7 @@ import { DigitalDashboard } from "./DigitalDashboard.jsx";
 import { DigitalGuests } from "./DigitalGuests.jsx";
 import { DigitalAddGuest } from "./DigitalAddGuest.jsx";
 import { DigitalPhotographer } from "./DigitalPhotographer.jsx";
+import { DigitalDesignRequest } from "./DigitalDesignRequest.jsx";
 import { C } from "../../../../styles/theme.js";
 
 const navClass = ({ isActive }) => `nav-tab${isActive ? " active" : ""}`;
@@ -60,6 +61,9 @@ export function DigitalPortal() {
             <NavLink to="/portal/groom/digital/photographer" className={navClass} style={navStyle}>
               {lang === "he" ? "📸 צלם" : "📸 المصور"}
             </NavLink>
+            <NavLink to="/portal/groom/digital/design"       className={navClass} style={navStyle}>
+              {lang === "he" ? "🎨 עיצוב" : "🎨 التصميم"}
+            </NavLink>
             <button
               onClick={changeType}
               title={lang === "he" ? "החלף סוג הזמנה" : "تغيير نوع المكتوب"}
@@ -88,6 +92,7 @@ export function DigitalPortal() {
           <Route path="guests"       element={<DigitalGuests />} />
           <Route path="add"          element={<DigitalAddGuest />} />
           <Route path="photographer" element={<DigitalPhotographer />} />
+          <Route path="design"       element={<DigitalDesignRequest />} />
           <Route path="*"            element={<Navigate to="dashboard" replace />} />
         </Routes>
       </div>
