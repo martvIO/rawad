@@ -12,8 +12,11 @@ export const logWarn = (...a) => {
 
 // Use this in every catch block. `tag` is a short label (e.g. "addUser",
 // "callable(createPortalUser)"); `e` is the caught error.
+//
+// Errors ALWAYS print, regardless of the DEV/VITE_DEBUG gate — silencing
+// errors in production defeats the purpose of logging. Verbose info/warn
+// stays gated by ON so we don't spam users' consoles with normal traffic.
 export const logErr = (tag, e) => {
-  if (!ON) return;
   const code = e?.code || e?.name || "";
   const msg  = e?.message || String(e);
   console.error("[dawa]", tag, code, msg, e);

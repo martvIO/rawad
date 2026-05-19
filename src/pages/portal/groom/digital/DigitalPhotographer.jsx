@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import { usePortal } from "../../../../context/PortalContext.jsx";
 import {
   subscribePhotographerFiles, uploadPhotographerFile, removePhotographerFile,
-  renamePhotographerFile,
+  renamePhotographerFile, subscribeDigitalMedia, setPhotographerPublished,
 } from "../../../../services/digitalInvitation.js";
 import { logErr } from "../../../../utils/logger.js";
 import { C } from "../../../../styles/theme.js";
@@ -33,14 +33,34 @@ export function DigitalPhotographer() {
   const [deletingId, setDeletingId] = useState(null);
   const [editingId,  setEditingId]  = useState(null);
   const [editName,   setEditName]   = useState("");
+  const [published,  setPublished]  = useState(false);
+  const [publishBusy, setPublishBusy] = useState(false);
   // Local previews: shown immediately while uploading, before RTDB confirms
   const [pendingFiles, setPendingFiles] = useState([]); // [{ id, name, type, url, blobUrl }]
   const inputRef = useRef(null);
 
   useEffect(() => {
     if (!currentUid) return;
-    return subscribePhotographerFiles(currentUid, setFiles);
+    const onErr = (err) => showToast(`✗ ${err?.code || err?.message || "read failed"}`);
+    const u1 = subscribePhotographerFiles(currentUid, setFiles, onErr);
+    const u2 = subscribeDigitalMedia(currentUid, (d) => setPublished(d?.photographerPublished === true), onErr);
+    return () => { u1(); u2(); };
   }, [currentUid]);
+
+  const togglePublish = async () => {
+    setPublishBusy(true);
+    try {
+      await setPhotographerPublished(currentUid, !published);
+      showToast(!published
+        ? (lang === "he" ? "✓ הצילומים פורסמו" : "✓ تم نشر الصور")
+        : (lang === "he" ? "הצילומים נמחקו מהפרסום" : "تم إلغاء نشر الصور"));
+    } catch (err) {
+      logErr("setPhotographerPublished", err);
+      showToast(err?.message || (lang === "he" ? "שגיאה" : "خطأ"));
+    } finally {
+      setPublishBusy(false);
+    }
+  };
 
   // Safety net: clean up any pending blobs whose name now exists in confirmed files
   // (handles the rare case where a file arrived via subscription without going
@@ -221,6 +241,42 @@ export function DigitalPhotographer() {
           </>
         )}
       </label>
+
+      {/* ── أنشر الصور — toggle (controls is_published flag) ───────────── */}
+      <div style={{
+        display: "flex", gap: 12, alignItems: "center",
+        padding: "12px 14px", borderRadius: 12, marginBottom: 20,
+        background: published ? "rgba(76,201,122,.06)" : "rgba(201,168,76,.06)",
+        border: `1px solid ${published ? "rgba(76,201,122,.3)" : "rgba(201,168,76,.3)"}`,
+      }}>
+        <div style={{ fontSize: 22 }}>{published ? "✓" : "🔒"}</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 13, fontWeight: 800, color: published ? "#4cc97a" : C.gold, marginBottom: 2 }}>
+            {published
+              ? (lang === "he" ? "הצילומים פורסמו" : "الصور منشورة")
+              : (lang === "he" ? "הצילומים לא פורסמו" : "الصور غير منشورة")}
+          </div>
+          <div style={{ fontSize: 10, color: C.dim, lineHeight: 1.6 }}>
+            {published
+              ? (lang === "he" ? "המוזמנים יכולים למצוא את תמונותיהם בעמוד הדיגיטלי" : "يستطيع المعازيم إيجاد صورهم في صفحة الدعوة")
+              : (lang === "he" ? "פרסם כדי לאפשר זיהוי פנים למוזמנים" : "انشر لتمكين التعرف على الوجوه للمعازيم")}
+          </div>
+        </div>
+        <button onClick={togglePublish} disabled={publishBusy} style={{
+          padding: "8px 14px", borderRadius: 10, cursor: publishBusy ? "wait" : "pointer",
+          border: "none", fontWeight: 800, fontSize: 12, fontFamily: "inherit",
+          background: published
+            ? "rgba(212,80,58,.14)"
+            : "linear-gradient(135deg,#4cc97a,#2da85a)",
+          color: published ? C.red : "#fff",
+          whiteSpace: "nowrap",
+        }}>
+          {publishBusy ? "..." :
+            (published
+              ? (lang === "he" ? "ביטול פרסום" : "إلغاء النشر")
+              : (lang === "he" ? "📢 פרסם" : "📢 أنشر الصور"))}
+        </button>
+      </div>
 
       {/* ── File list (RTDB confirmed + local pending) ─────────────────── */}
       <div style={{ fontSize: 13, fontWeight: 800, color: C.goldLight, marginBottom: 12 }}>

@@ -1,9 +1,9 @@
 // Digital invitation — Add guest form.
 // Validation: name must be 2+ words, phone must be exactly 10 digits.
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { usePortal } from "../../../../context/PortalContext.jsx";
-import { addDigitalGuest } from "../../../../services/digitalInvitation.js";
+import { addDigitalGuest, subscribeDigitalMedia } from "../../../../services/digitalInvitation.js";
 import { logErr } from "../../../../utils/logger.js";
 import { C } from "../../../../styles/theme.js";
 
@@ -12,7 +12,15 @@ export function DigitalAddGuest() {
   const navigate = useNavigate();
   const [name,   setName]   = useState("");
   const [phone,  setPhone]  = useState("");
+  const [rank,   setRank]   = useState("");
+  const [ranks,  setRanks]  = useState([]);
   const [saving, setSaving] = useState(false);
+
+  // Load the groom's custom ranks from the parent invitation doc.
+  useEffect(() => {
+    if (!currentUid) return;
+    return subscribeDigitalMedia(currentUid, (d) => setRanks(d?.guestRanks || []));
+  }, [currentUid]);
 
   const nameWords  = name.trim().split(/\s+/).filter(Boolean);
   const phoneDigits = phone.replace(/\D/g, "");
@@ -34,15 +42,20 @@ export function DigitalAddGuest() {
     if (saving) return;
     setSaving(true);
     try {
-      const trimName  = name.trim();
-      const id        = await addDigitalGuest(currentUid, { name: trimName, phone: phoneDigits });
+      const trimName = name.trim();
+      const cleanRank = rank.trim();
+      const id = await addDigitalGuest(currentUid, {
+        name: trimName, phone: phoneDigits, rank: cleanRank,
+      });
       showToast(lang === "he" ? "✓ המוזמן נוסף" : "✓ تم إضافة المدعو");
-      setName(""); setPhone("");
+      setName(""); setPhone(""); setRank("");
       // Pass the new guest via navigation state so the list shows it immediately
       // without waiting for the Firebase subscription to fire.
-      navigate("/portal/groom/digital/guests", {
-        state: { newGuest: { id, name: trimName, phone: phoneDigits, status: "pending", createdAt: Date.now() } },
-      });
+      const optimistic = {
+        id, name: trimName, phone: phoneDigits, status: "pending", createdAt: Date.now(),
+      };
+      if (cleanRank) optimistic.rank = cleanRank;
+      navigate("/portal/groom/digital/guests", { state: { newGuest: optimistic } });
     } catch (err) {
       logErr("addDigitalGuest", err);
       showToast(err?.message || "خطأ");
@@ -97,10 +110,37 @@ export function DigitalAddGuest() {
         )}
         {/* Digit counter */}
         <div style={{
-          fontSize: 10, marginBottom: 20, direction: "ltr", textAlign: "right",
+          fontSize: 10, marginBottom: 16, direction: "ltr", textAlign: "right",
           color: phoneOk ? "#4cc97a" : phoneDigits.length > 0 ? C.dim : "transparent",
         }}>
           {phoneDigits.length} / 10
+        </div>
+
+        {/* Rank dropdown — dynamically loaded from the groom's saved ranks */}
+        <div style={{ marginBottom: 6, fontSize: 12, color: C.goldDim }}>
+          {lang === "he" ? "רמת המוזמן" : "رتبة المدعو"}
+        </div>
+        <select
+          className="input-field"
+          value={rank}
+          onChange={e => setRank(e.target.value)}
+          disabled={ranks.length === 0}
+          style={{ marginBottom: 6, fontFamily: "inherit",
+                   cursor: ranks.length === 0 ? "not-allowed" : "pointer" }}
+        >
+          <option value="">
+            {ranks.length === 0
+              ? (lang === "he" ? "אין רמות — הוסף ברשימה הראשית" : "لا توجد رتب — أضفها في الرئيسية")
+              : (lang === "he" ? "— ללא רמה —" : "— بدون رتبة —")}
+          </option>
+          {ranks.map(r => (
+            <option key={r} value={r}>{r}</option>
+          ))}
+        </select>
+        <div style={{ fontSize: 10, color: C.dim, marginBottom: 20, lineHeight: 1.6 }}>
+          {lang === "he"
+            ? "ניתן לנהל את הרמות בעמוד הראשי"
+            : "يمكن إدارة الرتب في الصفحة الرئيسية"}
         </div>
 
         <button
