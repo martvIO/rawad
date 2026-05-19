@@ -3,7 +3,8 @@ import { useState, useEffect, useRef } from "react";
 import { usePortal } from "../../../../context/PortalContext.jsx";
 import {
   subscribePhotographerFiles, uploadPhotographerFile, removePhotographerFile,
-  renamePhotographerFile,
+  removePhotographerFileByPath, renamePhotographerFile,
+  listPhotographerFilesFromStorage, healPhotographerFiles,
 } from "../../../../services/digitalInvitation.js";
 import { logErr } from "../../../../utils/logger.js";
 import { C } from "../../../../styles/theme.js";
@@ -28,6 +29,9 @@ const fmtDate = (ts, lang) => {
 export function DigitalPhotographer() {
   const { lang, currentUid, showToast } = usePortal();
   const [files,      setFiles]      = useState([]);
+  // Storage-listed files (authoritative for "what exists"). Firestore docs are
+  // an optional metadata layer joined to these via storagePath.
+  const [storageFiles, setStorageFiles] = useState([]);
   const [uploading,  setUploading]  = useState(false);
   const [inProgress, setInProgress] = useState([]);
   const [deletingId, setDeletingId] = useState(null);
@@ -36,11 +40,33 @@ export function DigitalPhotographer() {
   // Local previews: shown immediately while uploading, before RTDB confirms
   const [pendingFiles, setPendingFiles] = useState([]); // [{ id, name, type, url, blobUrl }]
   const inputRef = useRef(null);
+  const healedRef = useRef(false);
 
   useEffect(() => {
     if (!currentUid) return;
     return subscribePhotographerFiles(currentUid, setFiles);
   }, [currentUid]);
+
+  // Storage-first listing — fires once per uid. Ensures the page shows files
+  // even when the Firestore metadata layer is empty or temporarily errored.
+  useEffect(() => {
+    if (!currentUid) return;
+    let cancelled = false;
+    (async () => {
+      const list = await listPhotographerFilesFromStorage(currentUid);
+      if (!cancelled) setStorageFiles(list);
+    })();
+    return () => { cancelled = true; };
+  }, [currentUid]);
+
+  // Auto-heal — once both Firestore and Storage have reported in, create
+  // Firestore docs for any Storage objects that lack metadata. Runs at most
+  // once per session; the next Firestore snapshot picks up the new docs.
+  useEffect(() => {
+    if (!currentUid || healedRef.current || storageFiles.length === 0) return;
+    healedRef.current = true;
+    healPhotographerFiles(currentUid, storageFiles, files).catch(() => {});
+  }, [currentUid, storageFiles, files]);
 
   // Safety net: clean up any pending blobs whose name now exists in confirmed files
   // (handles the rare case where a file arrived via subscription without going
@@ -103,6 +129,8 @@ export function DigitalPhotographer() {
       showToast(lang === "he"
         ? `✓ הועלו ${arr.length} קבצים`
         : `✓ تم رفع ${arr.length.toLocaleString("en")} ملف`);
+      // Refresh Storage-list so successful uploads show even if Firestore is silent
+      listPhotographerFilesFromStorage(currentUid).then(setStorageFiles).catch(() => {});
     } else {
       logErr("uploadPhotographerFiles", results[failedIdx[0]].reason);
       showToast(lang === "he"
@@ -119,9 +147,18 @@ export function DigitalPhotographer() {
     if (inputRef.current) inputRef.current.value = "";
   };
 
-  const confirmDelete = async (id) => {
+  const confirmDelete = async (item) => {
     try {
-      await removePhotographerFile(currentUid, id);
+      // Storage-only orphans use their storagePath as the React key; Firestore
+      // docs have a real id and a separate storagePath field.
+      const isOrphan = !files.some(f => f.id === item.id);
+      if (isOrphan) {
+        await removePhotographerFileByPath(currentUid, item.storagePath || item.id);
+      } else {
+        await removePhotographerFile(currentUid, item.id);
+      }
+      // Refresh Storage list so the deleted entry disappears from the merge
+      setStorageFiles(prev => prev.filter(s => s.storagePath !== (item.storagePath || item.id)));
       setDeletingId(null);
     } catch (err) {
       logErr("deletePhotographerFile", err);
@@ -152,10 +189,20 @@ export function DigitalPhotographer() {
     }
   };
 
-  // Merge: real RTDB files + pending (those not yet in RTDB)
-  const realNames   = new Set(files.map(f => f.name));
+  // Merge: Firestore (with custom names + uploadedAt) ∪ Storage-only (orphans) +
+  // pending uploads. Firestore wins where storagePath matches — preserves user
+  // edits like renames. Storage-only entries surface so files are never hidden.
+  const firestoreByPath = new Map(files.map(f => [f.storagePath, f]).filter(([k]) => k));
+  const merged = [...files];
+  for (const s of storageFiles) {
+    if (!firestoreByPath.has(s.storagePath)) merged.push(s);
+  }
+  // Sort newest first by uploadedAt (Firestore items keep theirs; Storage items
+  // got an inferred timestamp from the filename prefix)
+  merged.sort((a, b) => (b.uploadedAt || 0) - (a.uploadedAt || 0));
+  const realNames   = new Set(merged.map(f => f.name));
   const displayList = [
-    ...files,
+    ...merged,
     ...pendingFiles.filter(p => !realNames.has(p.name)),
   ];
 
@@ -340,7 +387,7 @@ export function DigitalPhotographer() {
                   <span style={{ fontSize: 12, color: C.red, flex: 1 }}>
                     {lang === "he" ? "למחוק?" : "حذف هذا الملف؟"}
                   </span>
-                  <button onClick={() => confirmDelete(f.id)} style={{
+                  <button onClick={() => confirmDelete(f)} style={{
                     padding: "6px 12px", borderRadius: 8, border: "none", cursor: "pointer",
                     background: "rgba(212,80,58,.2)", color: C.red, fontWeight: 700, fontSize: 12, fontFamily: "inherit",
                   }}>{lang === "he" ? "כן, מחק" : "نعم، احذف"}</button>

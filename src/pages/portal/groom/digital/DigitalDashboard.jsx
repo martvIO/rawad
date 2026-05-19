@@ -4,6 +4,7 @@ import { usePortal } from "../../../../context/PortalContext.jsx";
 import {
   subscribeDigitalGuests, subscribeDigitalMedia,
   saveDigitalMediaFile, removeDigitalMedia,
+  getLatestDigitalMediaFromStorage, healDigitalMedia,
 } from "../../../../services/digitalInvitation.js";
 import { logErr } from "../../../../utils/logger.js";
 import { C } from "../../../../styles/theme.js";
@@ -18,7 +19,11 @@ export function DigitalDashboard() {
   const [localPreview,  setLocalPreview]  = useState(null); // { url, type } | null
   // Confirmed remote URL stored directly from upload response (no subscription dependency)
   const [confirmedMedia, setConfirmedMedia] = useState(null); // { url, type } | null
+  // Storage-direct fallback — surfaces a previously-uploaded file even when the
+  // Firestore metadata layer is silent (pre-deploy orphan or transient error).
+  const [storageMedia,   setStorageMedia]   = useState(null); // { url, type, storagePath } | null
   const localBlobRef = useRef(null);
+  const healedRef = useRef(false);
 
   useEffect(() => {
     if (!currentUid) return;
@@ -30,6 +35,26 @@ export function DigitalDashboard() {
     });
     return () => { u1(); u2(); };
   }, [currentUid]);
+
+  // Storage-direct scan — runs once per uid. Reads the latest object in
+  // digitalMedia/{uid}/ and shows it as a fallback when Firestore has nothing.
+  useEffect(() => {
+    if (!currentUid) return;
+    let cancelled = false;
+    (async () => {
+      const s = await getLatestDigitalMediaFromStorage(currentUid);
+      if (!cancelled) setStorageMedia(s);
+    })();
+    return () => { cancelled = true; };
+  }, [currentUid]);
+
+  // Auto-heal — once both layers settle, write a Firestore doc for the latest
+  // Storage object if Firestore is missing it.
+  useEffect(() => {
+    if (!currentUid || healedRef.current || !storageMedia) return;
+    healedRef.current = true;
+    healDigitalMedia(currentUid, storageMedia, media).catch(() => {});
+  }, [currentUid, storageMedia, media]);
 
   const stats = useMemo(() => {
     const total     = guests.length;
@@ -64,6 +89,8 @@ export function DigitalDashboard() {
       setLocalPreview(null);
       URL.revokeObjectURL(blobUrl);
       localBlobRef.current = null;
+      // Refresh Storage-direct fallback so it tracks the new upload
+      getLatestDigitalMediaFromStorage(uid).then(setStorageMedia).catch(() => {});
       showToast(lang === "he" ? "✓ הועלה בהצלחה" : "✓ تم الرفع بنجاح");
     } catch (err) {
       logErr("uploadDigitalMedia", err);
@@ -78,16 +105,18 @@ export function DigitalDashboard() {
   const handleRemove = async () => {
     setLocalPreview(null);
     setConfirmedMedia(null);
+    setStorageMedia(null); // prevent the Storage-direct fallback from resurfacing
     if (localBlobRef.current) { URL.revokeObjectURL(localBlobRef.current); localBlobRef.current = null; }
     try { await removeDigitalMedia(currentUid); setMedia(null); }
     catch (err) { logErr("removeDigitalMedia", err); }
   };
 
-  // Priority: localPreview (blob, during upload) > confirmedMedia (from upload response)
-  //           > media from subscription > nothing
+  // Priority: localPreview (blob during upload) > confirmedMedia (upload response)
+  //           > Firestore subscription > Storage-direct fallback > nothing
   const display = localPreview
     ?? confirmedMedia
-    ?? (media?.backgroundUrl ? { url: media.backgroundUrl, type: media.backgroundType } : null);
+    ?? (media?.backgroundUrl ? { url: media.backgroundUrl, type: media.backgroundType } : null)
+    ?? (storageMedia ? { url: storageMedia.url, type: storageMedia.type } : null);
 
   return (
     <div style={{ animation: "fadeUp .3s ease" }}>
