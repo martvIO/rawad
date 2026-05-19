@@ -12,3 +12,4 @@ export { assignDriverToGroom } from "./assignments";
 export { submitConfirmation }  from "./confirmations";
 export { attachConfirmationLocationToGuest } from "./attachLocation";
 export { resetPassword }       from "./resetPassword";
+export { createGuestInvite, submitGuestInvite } from "./invite";

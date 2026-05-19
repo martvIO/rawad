@@ -80,6 +80,8 @@
           "locationAccuracy": { ".validate": "!newData.exists() || (newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000)" },
           "locationSource":   { ".validate": "!newData.exists() || newData.val() === 'gps' || newData.val() === 'manual'" },
           "locationUpdatedAt":{ ".validate": "!newData.exists() || newData.isNumber()" },
+          "inviteLinkToken":  { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 64)" },
+          "inviteLinkSentAt": { ".validate": "!newData.exists() || newData.isNumber()" },
           "$other":         { ".validate": false }
         }
       }
@@ -131,6 +133,23 @@
       "messageBody": { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 4000)" },
       "formLink":    { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 1000 && newData.val().matches(/^https:\\/\\//))" },
       "$other":      { ".validate": false }
+    },
+
+    "inviteTokens": {
+      "$token": {
+        ".read":  true,
+        ".write": "auth != null && (auth.token.role === 'admin' || (auth.token.role === 'groom' && (!newData.exists() || newData.child('groomUid').val() === auth.uid)))",
+        ".validate": "!newData.exists() || newData.hasChildren(['groomUid','groomUsername','guestId','guestName','guestPhone','createdAt','expiresAt'])",
+        "groomUid":      { ".validate": "newData.isString() && newData.val().length <= 64" },
+        "groomUsername": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 60" },
+        "guestId":       { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 64" },
+        "guestName":     { ".validate": "newData.isString() && newData.val().length <= 120" },
+        "guestPhone":    { ".validate": "newData.isString() && newData.val().length <= 30" },
+        "createdAt":     { ".validate": "newData.isNumber()" },
+        "expiresAt":     { ".validate": "newData.isNumber()" },
+        "usedAt":        { ".validate": "!newData.exists() || newData.isNumber()" },
+        "$other":        { ".validate": false }
+      }
     },
 
     "driverAssignments": {

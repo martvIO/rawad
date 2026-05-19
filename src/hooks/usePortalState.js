@@ -35,6 +35,7 @@ import {
   uploadProofBlob, dataUrlToBlob, proofDownloadUrl,
 } from "../services/proofs.js";
 import { assignDriverToGroom } from "../services/assignments.js";
+import { createGuestInvite } from "../services/invites.js";
 import { useGeolocation } from "./useGeolocation.js";
 
 export function usePortalState({ onBack, t, lang, setLang }) {
@@ -379,6 +380,39 @@ export function usePortalState({ onBack, t, lang, setLang }) {
       const url = waLinkFor(g.phone);
       if (url) setTimeout(() => window.open(url, "_blank", "noopener"), i * 300);
     });
+  };
+
+  // Per-guest invite link. Mints a 90-day token on the server, then opens
+  // WhatsApp with a wa.me URL containing /invite/{token}. The guest's record
+  // is stamped with inviteLinkToken + inviteLinkSentAt so the groom's guest
+  // list can show a "sent" indicator.
+  const sendInviteLink = async (guest) => {
+    if (!guest?.groomUid || !guest?.id) { showToast(t("share_invalid")); return; }
+    const intl = toIntlPhone(guest.phone);
+    if (!intl) { showToast(t("share_invalid")); return; }
+    try {
+      const { token } = await createGuestInvite({
+        groomUid: guest.groomUid,
+        guestId:  guest.id,
+      });
+      if (!token) { showToast(t("share_invalid")); return; }
+      // Always use the public Firebase Hosting origin for the invite URL —
+      // a localhost link inside a WhatsApp message would be useless on the
+      // guest's phone. Falls back to window.origin only in production builds
+      // where VITE_INVITE_BASE_URL was omitted.
+      const baseUrl = (import.meta.env.VITE_INVITE_BASE_URL || "").replace(/\/+$/, "")
+                   || window.location.origin;
+      const url  = `${baseUrl}/invite/${token}`;
+      const body = (adminMessageBody || "").trim();
+      const text = [body, url].filter(Boolean).join("\n\n");
+      window.open(
+        `https://wa.me/${intl}?text=${encodeURIComponent(text)}`,
+        "_blank", "noopener",
+      );
+    } catch (e) {
+      logErr("sendInviteLink", e);
+      showToast(e?.message || t("share_invalid"));
+    }
   };
 
   // ── Confirmation matching ───────────────────────────────────────────────────
@@ -812,6 +846,7 @@ export function usePortalState({ onBack, t, lang, setLang }) {
     editingGuest, startEdit, cancelEdit, saveEdit,
     eName, setEName, ePhone, setEPhone, eArea, setEArea, eType, setEType,
     revealedId, setRevealedId, swipeStartRef,
+    sendInviteLink,
 
     // delivery
     activeId, setActiveId, photoTaken, setPhotoTaken,

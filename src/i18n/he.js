@@ -288,4 +288,18 @@ export const he = {
   admin_conf_attach_pick: "— בחר מוזמן —",
   admin_conf_attach_btn: "📍 צרף את המיקום למוזמן זה",
   admin_conf_attach_success: "✓ המיקום צורף למוזמן",
+  // Per-guest invite link (90-day token, sent via WhatsApp)
+  invite_title: "אישור פרטי הזמנה",
+  invite_expired: "תוקף הקישור פג",
+  invite_invalid: "קישור הזמנה לא תקין",
+  invite_used: "הקישור כבר נוצל",
+  invite_submit: "שלח את פרטי",
+  invite_done_title: "תודה! הפרטים התקבלו",
+  invite_done_body: "הנהג יצור איתך קשר בקרוב כדי למסור את ההזמנה",
+  invite_delivery_note: "הערה לנהג (אופציונלי)",
+  invite_pick_map: "בחר מיקום במפה",
+  invite_map_hint: "לחץ על המפה או גרור את הסיכה לכוונון מדויק",
+  guests_send_invite: "שלח הזמנה",
+  guests_invite_sent: "נשלח",
+  admin_form_link_auto_hint: "קישור ייחודי נוצר אוטומטית לכל מוזמן בלחיצה על «שלח הזמנה» — אין צורך להזין ידנית.",
 };

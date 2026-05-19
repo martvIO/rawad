@@ -5,8 +5,23 @@ import { C } from "../../../styles/theme.js";
 export function AdminSendTab() {
   const {
     users, guests, adminSelectedGroom, setAdminSelectedGroom,
-    adminFormLink, lang, t, sendWaToAll, sendWaToOne, guestConfirmationStatus,
+    t, sendInviteLink, guestConfirmationStatus, showToast,
   } = usePortal();
+  // Per-guest invite tokens are minted on demand (createGuestInvite Cloud
+  // Function); each guest gets a unique 90-day link, so there's no global
+  // adminFormLink to gate the buttons on anymore.
+  const sendAll = async (guestList) => {
+    if (guestList.length === 0) return;
+    showToast(t("admin_bulk_warn"));
+    for (let i = 0; i < guestList.length; i++) {
+      // Sequential awaits avoid hammering the rate limiter and let the
+      // browser keep popup permission alive between window.opens.
+      await sendInviteLink(guestList[i]);
+      if (i < guestList.length - 1) {
+        await new Promise(r => setTimeout(r, 300));
+      }
+    }
+  };
             const groomList = users.filter(u => u.role === "groom");
             const selectedGroomGuests = adminSelectedGroom
               ? guests.filter(g => g.groomUsername === adminSelectedGroom) : [];
@@ -21,16 +36,6 @@ export function AdminSendTab() {
                 <div style={{ fontSize: 12, color: C.dim, marginBottom: 16 }}>
                   {t("admin_send_hint")}
                 </div>
-
-                {!adminFormLink.trim() && (
-                  <div style={{
-                    marginBottom: 16, padding: "12px 14px", borderRadius: 10,
-                    background: "rgba(212,122,75,.08)", border: "1px solid rgba(212,122,75,.3)",
-                    fontSize: 12, color: C.red, lineHeight: 1.7,
-                  }}>
-                    ⚠ {lang === "he" ? "אנא הגדר את קישור טופס האישור בלשונית הגדרות תחילה" : "يرجى ضبط رابط نموذج التأكيد من تبويب الإعدادات أولاً"}
-                  </div>
-                )}
 
                 {/* Groom selector */}
                 <div style={{ fontSize: 12, color: C.goldDim, fontWeight: 700, marginBottom: 8 }}>
@@ -69,12 +74,11 @@ export function AdminSendTab() {
                 {adminSelectedGroom && (
                   <>
                     {selectedGroomGuests.length > 0 && (
-                      <button onClick={() => sendWaToAll(adminSelectedGroom)}
-                              disabled={!adminFormLink.trim()}
+                      <button onClick={() => sendAll(selectedGroomGuests)}
                               style={{
-                                width: "100%", padding: "13px 0", borderRadius: 12, cursor: adminFormLink.trim() ? "pointer" : "not-allowed",
-                                background: adminFormLink.trim() ? "linear-gradient(135deg,#25d366,#1ea84d)" : "rgba(255,255,255,.05)",
-                                color: adminFormLink.trim() ? "#fff" : "#5a5040",
+                                width: "100%", padding: "13px 0", borderRadius: 12, cursor: "pointer",
+                                background: "linear-gradient(135deg,#25d366,#1ea84d)",
+                                color: "#fff",
                                 border: "none", fontWeight: 900, fontSize: 14, fontFamily: "inherit", marginBottom: 18,
                               }}>
                         {t("admin_send_to_all")} ({selectedGroomGuests.length.toLocaleString("en")})
@@ -154,17 +158,19 @@ export function AdminSendTab() {
                                 </div>
                               )}
                             </div>
-                            <button onClick={() => sendWaToOne(g.phone)}
-                                    disabled={!adminFormLink.trim()}
+                            <button onClick={() => sendInviteLink(g)}
+                                    title={g.inviteLinkSentAt ? t("guests_invite_sent") : t("admin_send_to_one")}
                                     style={{
                                       padding: "8px 14px", borderRadius: 10, border: "none",
-                                      background: adminFormLink.trim() ? "linear-gradient(135deg,#25d366,#1ea84d)" : "rgba(255,255,255,.05)",
-                                      color: adminFormLink.trim() ? "#fff" : "#5a5040",
+                                      background: g.inviteLinkSentAt
+                                        ? "linear-gradient(135deg,#3a7fb0,#4b9fd4)"
+                                        : "linear-gradient(135deg,#25d366,#1ea84d)",
+                                      color: "#fff",
                                       fontSize: 12, fontWeight: 800, fontFamily: "inherit",
-                                      cursor: adminFormLink.trim() ? "pointer" : "not-allowed",
+                                      cursor: "pointer",
                                       alignSelf: "center",
                                     }}>
-                              {t("admin_send_to_one")}
+                              {g.inviteLinkSentAt ? "↻ " + t("admin_send_to_one") : t("admin_send_to_one")}
                             </button>
                           </div>
                           );

@@ -298,4 +298,18 @@ export const ar = {
   admin_conf_attach_pick: "— اختر المعزوم —",
   admin_conf_attach_btn: "📍 إرفاق الموقع بهذا المعزوم",
   admin_conf_attach_success: "✓ تم إرفاق الموقع بالمعزوم",
+  // Per-guest invite link (90-day token, sent via WhatsApp)
+  invite_title: "تأكيد بيانات الدعوة",
+  invite_expired: "انتهت صلاحية هذا الرابط",
+  invite_invalid: "رابط الدعوة غير صالح",
+  invite_used: "تم استخدام هذا الرابط مسبقاً",
+  invite_submit: "إرسال بياناتي",
+  invite_done_title: "شكراً! تم استلام بياناتك",
+  invite_done_body: "سيتواصل معك السائق قريباً لتسليم الدعوة",
+  invite_delivery_note: "ملاحظة للسائق (اختياري)",
+  invite_pick_map: "اختر موقعي على الخريطة",
+  invite_map_hint: "اضغط على الخريطة أو اسحب الدبوس لضبط موقعك بدقة",
+  guests_send_invite: "إرسال دعوة",
+  guests_invite_sent: "أُرسلت",
+  admin_form_link_auto_hint: "يتم إنشاء رابط فريد لكل مدعو تلقائياً عند الضغط على «إرسال دعوة» — لا حاجة لإدخاله يدوياً.",
 };

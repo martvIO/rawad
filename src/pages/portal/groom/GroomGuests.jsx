@@ -9,6 +9,7 @@ export function GroomGuests() {
   const {
     t, lang, myGuests,
     revealedId, setRevealedId, swipeStartRef, removeGuest, startEdit,
+    sendInviteLink,
   } = usePortal();
   return (
           <div style={{ animation: "fadeUp .3s ease" }}>
@@ -92,25 +93,39 @@ export function GroomGuests() {
                           color: g.inviteType==="vip" ? "#c084fc" : C.gold,
                         }}>{g.inviteType==="vip" ? t("type_vip") : t("type_premium")}</span>
                         {canDelete && (
-                          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                            <button onClick={() => startEdit(g)}
-                                    style={{ background: "rgba(201,168,76,.12)", border: "1px solid rgba(201,168,76,.3)",
-                                             color: C.gold, fontSize: 11, fontWeight: 700,
-                                             cursor: "pointer", padding: "3px 8px", borderRadius: 8, fontFamily: "inherit" }}>
-                              {t("guests_edit")}
-                            </button>
-                            <button onClick={() => setRevealedId(isRevealed ? null : g.id)}
-                                    title={t("guests_delete")}
+                          <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "stretch" }}>
+                            <button onClick={() => sendInviteLink(g)}
+                                    title={g.inviteLinkSentAt ? t("guests_invite_sent") : t("guests_send_invite")}
                                     style={{
-                                      background: isRevealed ? "rgba(212,80,58,.25)" : "rgba(212,80,58,.08)",
-                                      border: "1px solid rgba(212,80,58,.4)",
-                                      color: C.red, fontSize: 13, fontWeight: 900,
-                                      cursor: "pointer", padding: "3px 9px",
-                                      borderRadius: 8, fontFamily: "inherit",
-                                      transition: "all .2s",
+                                      background: g.inviteLinkSentAt ? "rgba(76,201,122,.12)" : "rgba(37,211,102,.14)",
+                                      border: `1px solid ${g.inviteLinkSentAt ? "rgba(76,201,122,.35)" : "rgba(37,211,102,.45)"}`,
+                                      color: g.inviteLinkSentAt ? "#4cc97a" : "#25d366",
+                                      fontSize: 11, fontWeight: 800,
+                                      cursor: "pointer", padding: "3px 8px", borderRadius: 8, fontFamily: "inherit",
+                                      whiteSpace: "nowrap",
                                     }}>
-                              {isRevealed ? "✕" : "←"}
+                              {g.inviteLinkSentAt ? "✓ " + t("guests_invite_sent") : "📲 " + t("guests_send_invite")}
                             </button>
+                            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                              <button onClick={() => startEdit(g)}
+                                      style={{ background: "rgba(201,168,76,.12)", border: "1px solid rgba(201,168,76,.3)",
+                                               color: C.gold, fontSize: 11, fontWeight: 700,
+                                               cursor: "pointer", padding: "3px 8px", borderRadius: 8, fontFamily: "inherit" }}>
+                                {t("guests_edit")}
+                              </button>
+                              <button onClick={() => setRevealedId(isRevealed ? null : g.id)}
+                                      title={t("guests_delete")}
+                                      style={{
+                                        background: isRevealed ? "rgba(212,80,58,.25)" : "rgba(212,80,58,.08)",
+                                        border: "1px solid rgba(212,80,58,.4)",
+                                        color: C.red, fontSize: 13, fontWeight: 900,
+                                        cursor: "pointer", padding: "3px 9px",
+                                        borderRadius: 8, fontFamily: "inherit",
+                                        transition: "all .2s",
+                                      }}>
+                                {isRevealed ? "✕" : "←"}
+                              </button>
+                            </div>
                           </div>
                         )}
                       </div>
