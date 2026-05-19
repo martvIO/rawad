@@ -230,7 +230,7 @@ function RequestCard({ req, lang, expanded, onToggle, inputRefs, uploading, onSt
 
           {/* Action area */}
           {req.status === "submitted" && (
-            <button onClick={() => onStart(req.id)} className="gold-btn"
+            <button onClick={() => onStart(req)} className="gold-btn"
                     style={{ width: "100%", padding: "10px 0", fontSize: 13 }}>
               🎨 {lang === "he" ? "התחל לעבוד" : "ابدأ العمل"}
             </button>

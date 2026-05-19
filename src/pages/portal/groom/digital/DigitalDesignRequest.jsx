@@ -83,7 +83,7 @@ export function DigitalDesignRequest() {
 
   const handleApprove = async (reqId) => {
     try {
-      await approveDesign(reqId);
+      await approveDesign(currentUid, reqId);
       showToast(tt(lang, "✓ تمت الموافقة", "✓ אושר"));
     } catch (err) {
       logErr("approveDesign", err);
@@ -97,7 +97,7 @@ export function DigitalDesignRequest() {
       return;
     }
     try {
-      await requestRevision(reqId, revText.trim());
+      await requestRevision(currentUid, reqId, revText.trim());
       setRevising(false);
       setRevText("");
       showToast(tt(lang, "✓ تم إرسال طلب التعديل", "✓ הבקשה לשינוי נשלחה"));
