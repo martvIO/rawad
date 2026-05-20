@@ -7,8 +7,12 @@ import {
   getLatestDigitalMediaFromStorage, healDigitalMedia,
 } from "../../../../services/digitalInvitation.js";
 import { logErr } from "../../../../utils/logger.js";
+import { load, save, removeKey } from "../../../../utils/storage.js";
 import { C } from "../../../../styles/theme.js";
 import { auth } from "../../../../firebase.js";
+import { SkeletonBlock } from "../../../../components/Skeleton.jsx";
+
+const cacheKey = (uid) => `dawa_bg_media_${uid}`;
 
 export function DigitalDashboard() {
   const { lang, currentUid, showToast } = usePortal();
@@ -21,7 +25,10 @@ export function DigitalDashboard() {
   const [confirmedMedia, setConfirmedMedia] = useState(null); // { url, type } | null
   // Storage-direct fallback — surfaces a previously-uploaded file even when the
   // Firestore metadata layer is silent (pre-deploy orphan or transient error).
-  const [storageMedia,   setStorageMedia]   = useState(null); // { url, type, storagePath } | null
+  // Lazy-initialized from localStorage so the first paint is instant on reload.
+  const [storageMedia,   setStorageMedia]   = useState(() => load(cacheKey(currentUid), null));
+  // True while the first Storage scan is in flight (and we have nothing else to show)
+  const [loadingStorage, setLoadingStorage] = useState(true);
   const localBlobRef = useRef(null);
   const healedRef = useRef(false);
 
@@ -38,12 +45,22 @@ export function DigitalDashboard() {
 
   // Storage-direct scan — runs once per uid. Reads the latest object in
   // digitalMedia/{uid}/ and shows it as a fallback when Firestore has nothing.
+  // Result is cached to localStorage so the next mount has data on first paint.
   useEffect(() => {
     if (!currentUid) return;
     let cancelled = false;
+    // Seed from cache for instant first paint (covers cold reload where the
+    // useState initializer ran with a falsy currentUid).
+    const cached = load(cacheKey(currentUid), null);
+    if (cached) setStorageMedia(cached);
+    setLoadingStorage(true);
     (async () => {
       const s = await getLatestDigitalMediaFromStorage(currentUid);
-      if (!cancelled) setStorageMedia(s);
+      if (cancelled) return;
+      setStorageMedia(s);
+      if (s) save(cacheKey(currentUid), s);
+      else   removeKey(cacheKey(currentUid));
+      setLoadingStorage(false);
     })();
     return () => { cancelled = true; };
   }, [currentUid]);
@@ -89,8 +106,11 @@ export function DigitalDashboard() {
       setLocalPreview(null);
       URL.revokeObjectURL(blobUrl);
       localBlobRef.current = null;
-      // Refresh Storage-direct fallback so it tracks the new upload
-      getLatestDigitalMediaFromStorage(uid).then(setStorageMedia).catch(() => {});
+      // Refresh Storage-direct fallback + cache so it tracks the new upload
+      getLatestDigitalMediaFromStorage(uid).then(s => {
+        setStorageMedia(s);
+        if (s) save(cacheKey(uid), s);
+      }).catch(() => {});
       showToast(lang === "he" ? "✓ הועלה בהצלחה" : "✓ تم الرفع بنجاح");
     } catch (err) {
       logErr("uploadDigitalMedia", err);
@@ -106,6 +126,7 @@ export function DigitalDashboard() {
     setLocalPreview(null);
     setConfirmedMedia(null);
     setStorageMedia(null); // prevent the Storage-direct fallback from resurfacing
+    removeKey(cacheKey(currentUid));
     if (localBlobRef.current) { URL.revokeObjectURL(localBlobRef.current); localBlobRef.current = null; }
     try { await removeDigitalMedia(currentUid); setMedia(null); }
     catch (err) { logErr("removeDigitalMedia", err); }
@@ -123,7 +144,9 @@ export function DigitalDashboard() {
 
       {/* ── الميديا الاحتفالية ──────────────────────────────────────────── */}
       <div style={{ marginBottom: 22 }}>
-        {display ? (
+        {!display && loadingStorage ? (
+          <SkeletonBlock height={280}/>
+        ) : display ? (
           <div style={{ position: "relative", borderRadius: 16, overflow: "hidden" }}>
             {display.type === "video" ? (
               <video

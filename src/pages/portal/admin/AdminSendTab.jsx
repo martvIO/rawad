@@ -10,7 +10,8 @@ import { REPLY_STATUS, replyStateOf } from "../../../data/status.js";
 export function AdminSendTab() {
   const {
     users, guests, adminSelectedGroom, setAdminSelectedGroom,
-    t, sendInviteLink, guestConfirmationStatus, showToast,
+    t, sendInviteLink, sendDigitalInviteLink, digitalGuestsForSelectedGroom,
+    guestConfirmationStatus, showToast,
   } = usePortal();
   // Per-guest invite tokens are minted on demand (createGuestInvite Cloud
   // Function); each guest gets a unique 90-day link, so there's no global
@@ -34,6 +35,13 @@ export function AdminSendTab() {
               ? guests.filter(g => g.groomUsername === adminSelectedGroom && !g.confirmedAt) : [];
             const withoutAddr = selectedGroomGuests.filter(g => !g.area || !g.area.trim());
             const withAddr    = selectedGroomGuests.filter(g =>  g.area &&  g.area.trim());
+            // Digital guests for the selected groom (Firestore-backed, subscribed
+            // in usePortalState). Hide confirmed ones — same convention as above.
+            const selectedGroomUser = adminSelectedGroom
+              ? users.find(u => u.username === adminSelectedGroom) : null;
+            const selectedGroomUid  = selectedGroomUser?.uid || selectedGroomUser?.id || null;
+            const digitalGuests = (digitalGuestsForSelectedGroom || [])
+              .filter(g => !g.confirmedAt);
 
             return (
               <div>
@@ -101,7 +109,15 @@ export function AdminSendTab() {
                     {[
                       { title: t("guests_without_address"), list: withoutAddr, color: C.red, bg: "rgba(212,122,75,.06)" },
                       { title: t("guests_with_address"),    list: withAddr,    color: "#4cc97a", bg: "rgba(76,201,122,.06)" },
-                    ].filter(s => s.list.length > 0).map(sec => (
+                    ].filter(s => s.list.length > 0).concat(
+                      digitalGuests.length > 0 ? [{
+                        title: "📱 " + t("admin_digital_guests"),
+                        list: digitalGuests,
+                        color: "#4b9fd4",
+                        bg: "rgba(75,159,212,.06)",
+                        digital: true,
+                      }] : []
+                    ).map(sec => (
                       <div key={sec.title}>
                         <div style={{
                           display: "flex", alignItems: "center", gap: 10,
@@ -112,9 +128,10 @@ export function AdminSendTab() {
                           <span style={{ fontSize: 11, color: sec.color, fontWeight: 700 }}>{sec.list.length.toLocaleString("en")}</span>
                         </div>
                         {sec.list.map(g => {
-                          // Phone-match-based confirmation status. Softly tinted card +
-                          // small badge when there's a mismatch or a clean match.
-                          const confStatus = guestConfirmationStatus(g);
+                          // Confirmation matching only runs for physical guests
+                          // (which live in /guestsByGroom). Digital guests get
+                          // a simpler card with the pending/sent pill only.
+                          const confStatus = sec.digital ? null : guestConfirmationStatus(g);
                           const isMatched   = confStatus?.status === "matched";
                           const isMismatch  = confStatus?.status === "mismatch";
                           // Reply lifecycle: confirmed guests are already filtered out,
@@ -178,7 +195,9 @@ export function AdminSendTab() {
                                 </div>
                               )}
                             </div>
-                            <button onClick={() => sendInviteLink(g)}
+                            <button onClick={() => sec.digital
+                                      ? sendDigitalInviteLink(g, selectedGroomUid)
+                                      : sendInviteLink(g)}
                                     title={g.inviteLinkSentAt ? t("guests_invite_sent") : t("admin_send_to_one")}
                                     style={{
                                       padding: "8px 14px", borderRadius: 10, border: "none",

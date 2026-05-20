@@ -7,8 +7,12 @@ import {
   listPhotographerFilesFromStorage, healPhotographerFiles,
 } from "../../../../services/digitalInvitation.js";
 import { logErr } from "../../../../utils/logger.js";
+import { load, save, removeKey } from "../../../../utils/storage.js";
 import { C } from "../../../../styles/theme.js";
 import { auth } from "../../../../firebase.js";
+import { SkeletonList } from "../../../../components/Skeleton.jsx";
+
+const cacheKey = (uid) => `dawa_photographer_${uid}`;
 
 const iconFor = (type = "") => {
   if (type.startsWith("image")) return "🖼";
@@ -31,7 +35,10 @@ export function DigitalPhotographer() {
   const [files,      setFiles]      = useState([]);
   // Storage-listed files (authoritative for "what exists"). Firestore docs are
   // an optional metadata layer joined to these via storagePath.
-  const [storageFiles, setStorageFiles] = useState([]);
+  // Lazy-initialized from localStorage so the first paint is instant on reload.
+  const [storageFiles, setStorageFiles] = useState(() => load(cacheKey(currentUid), []));
+  // True while the first Storage scan is in flight
+  const [loadingStorage, setLoadingStorage] = useState(true);
   const [uploading,  setUploading]  = useState(false);
   const [inProgress, setInProgress] = useState([]);
   const [deletingId, setDeletingId] = useState(null);
@@ -49,12 +56,21 @@ export function DigitalPhotographer() {
 
   // Storage-first listing — fires once per uid. Ensures the page shows files
   // even when the Firestore metadata layer is empty or temporarily errored.
+  // Result is cached to localStorage so the next mount has data on first paint.
   useEffect(() => {
     if (!currentUid) return;
     let cancelled = false;
+    // Seed from cache for instant first paint (covers cold reload).
+    const cached = load(cacheKey(currentUid), []);
+    if (cached.length) setStorageFiles(cached);
+    setLoadingStorage(true);
     (async () => {
       const list = await listPhotographerFilesFromStorage(currentUid);
-      if (!cancelled) setStorageFiles(list);
+      if (cancelled) return;
+      setStorageFiles(list);
+      if (list.length) save(cacheKey(currentUid), list);
+      else             removeKey(cacheKey(currentUid));
+      setLoadingStorage(false);
     })();
     return () => { cancelled = true; };
   }, [currentUid]);
@@ -129,8 +145,12 @@ export function DigitalPhotographer() {
       showToast(lang === "he"
         ? `✓ הועלו ${arr.length} קבצים`
         : `✓ تم رفع ${arr.length.toLocaleString("en")} ملف`);
-      // Refresh Storage-list so successful uploads show even if Firestore is silent
-      listPhotographerFilesFromStorage(currentUid).then(setStorageFiles).catch(() => {});
+      // Refresh Storage-list + cache so successful uploads show even if Firestore is silent
+      listPhotographerFilesFromStorage(currentUid).then(list => {
+        setStorageFiles(list);
+        if (list.length) save(cacheKey(currentUid), list);
+        else             removeKey(cacheKey(currentUid));
+      }).catch(() => {});
     } else {
       logErr("uploadPhotographerFiles", results[failedIdx[0]].reason);
       showToast(lang === "he"
@@ -158,7 +178,12 @@ export function DigitalPhotographer() {
         await removePhotographerFile(currentUid, item.id);
       }
       // Refresh Storage list so the deleted entry disappears from the merge
-      setStorageFiles(prev => prev.filter(s => s.storagePath !== (item.storagePath || item.id)));
+      setStorageFiles(prev => {
+        const next = prev.filter(s => s.storagePath !== (item.storagePath || item.id));
+        if (next.length) save(cacheKey(currentUid), next);
+        else             removeKey(cacheKey(currentUid));
+        return next;
+      });
       setDeletingId(null);
     } catch (err) {
       logErr("deletePhotographerFile", err);
@@ -275,11 +300,15 @@ export function DigitalPhotographer() {
       </div>
 
       {displayList.length === 0 ? (
-        <div className="card" style={{ textAlign: "center", padding: 28, color: C.dim }}>
-          {lang === "he"
-            ? "אין קבצים עדיין — העלה תמונות וסרטוני האירוע"
-            : "لا يوجد ملفات بعد — ارفع صور وفيديوهات من الحفل"}
-        </div>
+        loadingStorage ? (
+          <SkeletonList count={3}/>
+        ) : (
+          <div className="card" style={{ textAlign: "center", padding: 28, color: C.dim }}>
+            {lang === "he"
+              ? "אין קבצים עדיין — העלה תמונות וסרטוני האירוע"
+              : "لا يوجد ملفات بعد — ارفع صور وفيديوهات من الحفل"}
+          </div>
+        )
       ) : (
         displayList.map(f => {
           const isDeleting = deletingId === f.id;

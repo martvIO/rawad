@@ -188,6 +188,7 @@ export const ar = {
   admin_select_groom: "اختر العريس",
   admin_no_grooms: "لا يوجد عرسان في النظام بعد",
   admin_groom_guests_count: "عدد المدعوين:",
+  admin_digital_guests: "المدعوون الرقميون",
   admin_send_to_all: "📨 إرسال للجميع",
   admin_send_to_one: "📨 إرسال",
   admin_settings_title: "إعدادات الرسالة",

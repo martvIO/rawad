@@ -276,6 +276,22 @@ export const GlobalStyle = () => (
       background: rgba(201,168,76,.12); color: #c9a84c;
     }
 
+    /* ── Skeleton shimmer (loading placeholders) ───────────────────────── */
+    @keyframes shimmer {
+      0%   { background-position: -240px 0; }
+      100% { background-position: 240px 0; }
+    }
+    .skeleton {
+      background: linear-gradient(
+        90deg,
+        rgba(201,168,76,.05) 0%,
+        rgba(201,168,76,.12) 50%,
+        rgba(201,168,76,.05) 100%
+      );
+      background-size: 480px 100%;
+      animation: shimmer 1.4s ease-in-out infinite;
+    }
+
     /* ── Inline loading spinner (use beside text in buttons / toasts) ──── */
     .spinner {
       display: inline-block; width: 14px; height: 14px;

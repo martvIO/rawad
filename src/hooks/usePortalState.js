@@ -36,6 +36,9 @@ import {
 } from "../services/proofs.js";
 import { assignDriverToGroom } from "../services/assignments.js";
 import { createGuestInvite } from "../services/invites.js";
+import {
+  subscribeDigitalGuests, createDigitalGuestInvite,
+} from "../services/digitalInvitation.js";
 import { useGeolocation } from "./useGeolocation.js";
 
 export function usePortalState({ onBack, t, lang, setLang }) {
@@ -91,6 +94,10 @@ export function usePortalState({ onBack, t, lang, setLang }) {
 
   // ── Admin (UI only + subscriptions) ─────────────────────────────────────────
   const [adminSelectedGroom, setAdminSelectedGroom] = useState(null);
+
+  // Digital guests for the admin's currently-selected groom. Subscribed only
+  // while an admin is viewing that groom — empties otherwise.
+  const [digitalGuestsForSelectedGroom, setDigitalGuestsForSelectedGroom] = useState([]);
 
   // Admin settings (RTDB-backed, subscribed)
   const [adminMessageBody, setAdminMessageBodyState] = useState("");
@@ -200,6 +207,17 @@ export function usePortalState({ onBack, t, lang, setLang }) {
     }
     return [];
   }, [isAdmin, adminUsers, optimisticUsers, userType, driverServingGroom]);
+
+  // Admin Send tab — digital guests for the currently-selected groom. Only
+  // subscribed while admin is viewing a specific groom; we resolve the uid
+  // from the username via the users list.
+  useEffect(() => {
+    if (!isAdmin || !adminSelectedGroom) { setDigitalGuestsForSelectedGroom([]); return; }
+    const groom = users.find(u => u.username === adminSelectedGroom);
+    const groomUid = groom?.uid || groom?.id;
+    if (!groomUid) { setDigitalGuestsForSelectedGroom([]); return; }
+    return subscribeDigitalGuests(groomUid, setDigitalGuestsForSelectedGroom);
+  }, [isAdmin, adminSelectedGroom, users]);
 
   // Admin user-creation form
   const [newUserRole,  setNewUserRole]  = useState("groom");
@@ -411,6 +429,34 @@ export function usePortalState({ onBack, t, lang, setLang }) {
       );
     } catch (e) {
       logErr("sendInviteLink", e);
+      showToast(e?.message || t("share_invalid"));
+    }
+  };
+
+  // Per-guest DIGITAL invite link. Mirrors sendInviteLink but uses the
+  // digital token Cloud Function and routes through /invite/digital/{token}.
+  // Only the admin's Send tab calls this — grooms can no longer self-send.
+  const sendDigitalInviteLink = async (guest, groomUid) => {
+    if (!groomUid || !guest?.id) { showToast(t("share_invalid")); return; }
+    const intl = toIntlPhone(guest.phone);
+    if (!intl) { showToast(t("share_invalid")); return; }
+    try {
+      const { token } = await createDigitalGuestInvite({
+        groomUid,
+        guestId: guest.id,
+      });
+      if (!token) { showToast(t("share_invalid")); return; }
+      const baseUrl = (import.meta.env.VITE_INVITE_BASE_URL || "").replace(/\/+$/, "")
+                   || window.location.origin;
+      const url  = `${baseUrl}/invite/digital/${token}`;
+      const body = (adminMessageBody || "").trim();
+      const text = [body, url].filter(Boolean).join("\n\n");
+      window.open(
+        `https://wa.me/${intl}?text=${encodeURIComponent(text)}`,
+        "_blank", "noopener",
+      );
+    } catch (e) {
+      logErr("sendDigitalInviteLink", e);
       showToast(e?.message || t("share_invalid"));
     }
   };
@@ -846,7 +892,8 @@ export function usePortalState({ onBack, t, lang, setLang }) {
     editingGuest, startEdit, cancelEdit, saveEdit,
     eName, setEName, ePhone, setEPhone, eArea, setEArea, eType, setEType,
     revealedId, setRevealedId, swipeStartRef,
-    sendInviteLink,
+    sendInviteLink, sendDigitalInviteLink,
+    digitalGuestsForSelectedGroom,
 
     // delivery
     activeId, setActiveId, photoTaken, setPhotoTaken,

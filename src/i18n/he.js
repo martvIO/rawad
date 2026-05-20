@@ -180,6 +180,7 @@ export const he = {
   admin_select_groom: "בחר חתן",
   admin_no_grooms: "אין חתנים במערכת עדיין",
   admin_groom_guests_count: "מספר מוזמנים:",
+  admin_digital_guests: "מוזמנים דיגיטליים",
   admin_send_to_all: "📨 שלח לכולם",
   admin_send_to_one: "📨 שלח",
   admin_settings_title: "הגדרות הודעה",
