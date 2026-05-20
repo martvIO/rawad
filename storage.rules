@@ -21,23 +21,30 @@ service firebase.storage {
                    && request.auth.token.assignedGrooms[groomUid] == true;
     }
 
-    // Background media for the digital invitation (uploaded by the groom).
+    // Invitation media (multi-image/video gallery for the digital invitation).
+    // PUBLIC READ at all times — guests opening their invite link must be able
+    // to view these without auth. Write restricted to the groom/admin.
     match /digitalMedia/{groomUid}/{file} {
-      allow read: if request.auth != null
-                  && (request.auth.uid == groomUid || request.auth.token.role == 'admin');
+      allow read: if true;
       allow write: if request.auth != null
                    && (request.auth.uid == groomUid || request.auth.token.role == 'admin')
                    && request.resource.size < 50 * 1024 * 1024;
     }
 
     // Photographer uploads — photos, videos, and files from the wedding shoot.
+    // PUBLIC READ when the groom has set photographerPublished == true on
+    // their Firestore doc. The face-matching guest page reads images directly
+    // from Storage URLs, so the photos must be downloadable while published.
     match /photographerFiles/{groomUid}/{file} {
-      allow read: if request.auth != null
-                  && (request.auth.uid == groomUid || request.auth.token.role == 'admin');
+      allow read: if
+        firestore.get(/databases/(default)/documents/digitalInvitations/$(groomUid)).data.photographerPublished == true
+        || (request.auth != null
+            && (request.auth.uid == groomUid || request.auth.token.role == 'admin'));
       allow write: if request.auth != null
                    && (request.auth.uid == groomUid || request.auth.token.role == 'admin')
                    && request.resource.size < 200 * 1024 * 1024;
     }
+
 
     // Design mockups — admin/designer uploads, groom can read.
     match /designMockups/{groomUid}/{reqId}/{file} {

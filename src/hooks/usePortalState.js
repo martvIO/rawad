@@ -100,13 +100,19 @@ export function usePortalState({ onBack, t, lang, setLang }) {
   const [digitalGuestsForSelectedGroom, setDigitalGuestsForSelectedGroom] = useState([]);
 
   // Admin settings (RTDB-backed, subscribed)
-  const [adminMessageBody, setAdminMessageBodyState] = useState("");
-  const [adminFormLink,    setAdminFormLinkState]    = useState("");
+  const [adminMessageBody,    setAdminMessageBodyState]    = useState("");
+  const [adminFormLink,       setAdminFormLinkState]       = useState("");
+  const [adminMode,           setAdminModeState]           = useState("manual"); // "manual" | "digital"
+  const [adminDigitalBaseUrl, setAdminDigitalBaseUrlState] = useState("");
+  const [adminDigitalMessage, setAdminDigitalMessageState] = useState("");
   useEffect(() => {
     if (!authed) return;
     return subscribeSettings((s) => {
-      setAdminMessageBodyState(s.messageBody ?? "");
-      setAdminFormLinkState   (s.formLink    ?? "");
+      setAdminMessageBodyState   (s.messageBody    ?? "");
+      setAdminFormLinkState      (s.formLink       ?? "");
+      setAdminModeState          (s.mode           === "digital" ? "digital" : "manual");
+      setAdminDigitalBaseUrlState(s.digitalBaseUrl ?? "");
+      setAdminDigitalMessageState(s.digitalMessage ?? "");
     });
   }, [authed]);
   const setAdminMessageBody = (v) => {
@@ -116,6 +122,19 @@ export function usePortalState({ onBack, t, lang, setLang }) {
   const setAdminFormLink = (v) => {
     setAdminFormLinkState(v);
     saveSettings({ formLink: v }).catch((e) => showToast(e?.message || ""));
+  };
+  const setAdminMode = (v) => {
+    const mode = v === "digital" ? "digital" : "manual";
+    setAdminModeState(mode);
+    saveSettings({ mode }).catch((e) => showToast(e?.message || ""));
+  };
+  const setAdminDigitalBaseUrl = (v) => {
+    setAdminDigitalBaseUrlState(v);
+    saveSettings({ digitalBaseUrl: v }).catch((e) => showToast(e?.message || ""));
+  };
+  const setAdminDigitalMessage = (v) => {
+    setAdminDigitalMessageState(v);
+    saveSettings({ digitalMessage: v }).catch((e) => showToast(e?.message || ""));
   };
 
   // Confirmations (admin-only subscription)
@@ -400,24 +419,42 @@ export function usePortalState({ onBack, t, lang, setLang }) {
     });
   };
 
-  // Per-guest invite link. Mints a 90-day token on the server, then opens
-  // WhatsApp with a wa.me URL containing /invite/{token}. The guest's record
-  // is stamped with inviteLinkToken + inviteLinkSentAt so the groom's guest
-  // list can show a "sent" indicator.
+  // Per-guest invite link. Behaviour branches on adminMode:
+  //   - manual:   mints the existing /invite/{token} link + adminMessageBody
+  //   - digital:  mints a token via createDigitalGuestInvite + uses the
+  //               adminDigitalBaseUrl + adminDigitalMessage, with the guest's
+  //               groomUsername + token appended so the public landing page
+  //               can personalise the displayed guest name.
   const sendInviteLink = async (guest) => {
     if (!guest?.groomUid || !guest?.id) { showToast(t("share_invalid")); return; }
     const intl = toIntlPhone(guest.phone);
     if (!intl) { showToast(t("share_invalid")); return; }
     try {
+      if (adminMode === "digital") {
+        const { token } = await createDigitalGuestInvite({
+          groomUid: guest.groomUid,
+          guestId:  guest.id,
+        });
+        if (!token) { showToast(t("share_invalid")); return; }
+        const base = (adminDigitalBaseUrl || "").trim().replace(/\/+$/, "")
+                  || `${window.location.origin}/d`;
+        const groomUsername = guest.groomUsername || "";
+        const url  = groomUsername ? `${base}/${groomUsername}/${token}` : `${base}/${token}`;
+        const body = (adminDigitalMessage || "").trim();
+        const text = [body, url].filter(Boolean).join("\n\n");
+        window.open(
+          `https://wa.me/${intl}?text=${encodeURIComponent(text)}`,
+          "_blank", "noopener",
+        );
+        return;
+      }
+
+      // Manual mode — existing physical-invite flow.
       const { token } = await createGuestInvite({
         groomUid: guest.groomUid,
         guestId:  guest.id,
       });
       if (!token) { showToast(t("share_invalid")); return; }
-      // Always use the public Firebase Hosting origin for the invite URL —
-      // a localhost link inside a WhatsApp message would be useless on the
-      // guest's phone. Falls back to window.origin only in production builds
-      // where VITE_INVITE_BASE_URL was omitted.
       const baseUrl = (import.meta.env.VITE_INVITE_BASE_URL || "").replace(/\/+$/, "")
                    || window.location.origin;
       const url  = `${baseUrl}/invite/${token}`;
@@ -912,6 +949,9 @@ export function usePortalState({ onBack, t, lang, setLang }) {
     // admin
     adminSelectedGroom, setAdminSelectedGroom,
     adminMessageBody, setAdminMessageBody, adminFormLink, setAdminFormLink,
+    adminMode, setAdminMode,
+    adminDigitalBaseUrl, setAdminDigitalBaseUrl,
+    adminDigitalMessage, setAdminDigitalMessage,
     confirmations, editingConf, setEditingConf,
     sendWaToOne, sendWaToAll,
     matchedGuestFor, matchColor, useConfirmationData, guestConfirmationStatus,

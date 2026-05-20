@@ -10,8 +10,8 @@ import { REPLY_STATUS, replyStateOf } from "../../../data/status.js";
 export function AdminSendTab() {
   const {
     users, guests, adminSelectedGroom, setAdminSelectedGroom,
-    t, sendInviteLink, sendDigitalInviteLink, digitalGuestsForSelectedGroom,
-    guestConfirmationStatus, showToast,
+    t, lang, sendInviteLink, sendDigitalInviteLink, digitalGuestsForSelectedGroom,
+    guestConfirmationStatus, showToast, adminMode,
   } = usePortal();
   // Per-guest invite tokens are minted on demand (createGuestInvite Cloud
   // Function); each guest gets a unique 90-day link, so there's no global
@@ -33,6 +33,9 @@ export function AdminSendTab() {
             // the Send list is a true "outstanding invites" view.
             const selectedGroomGuests = adminSelectedGroom
               ? guests.filter(g => g.groomUsername === adminSelectedGroom && !g.confirmedAt) : [];
+            // Manual mode splits the list by address; Digital mode shows a single
+            // unified list (address is irrelevant for a digital invite link).
+            const isDigital = adminMode === "digital";
             const withoutAddr = selectedGroomGuests.filter(g => !g.area || !g.area.trim());
             const withAddr    = selectedGroomGuests.filter(g =>  g.area &&  g.area.trim());
             // Digital guests for the selected groom (Firestore-backed, subscribed
@@ -42,14 +45,36 @@ export function AdminSendTab() {
             const selectedGroomUid  = selectedGroomUser?.uid || selectedGroomUser?.id || null;
             const digitalGuests = (digitalGuestsForSelectedGroom || [])
               .filter(g => !g.confirmedAt);
+            const sections = isDigital
+              ? [{ title: (lang === "he" ? "כל המוזמנים" : "كل المدعوين"),
+                   list: selectedGroomGuests, color: C.gold, bg: "rgba(201,168,76,.06)" }]
+              : [
+                  { title: t("guests_without_address"), list: withoutAddr, color: C.red, bg: "rgba(212,122,75,.06)" },
+                  { title: t("guests_with_address"),    list: withAddr,    color: "#4cc97a", bg: "rgba(76,201,122,.06)" },
+                ];
 
             return (
               <div>
                 <div style={{ fontSize: 19, fontWeight: 900, color: C.gold, fontFamily: "'Amiri',serif", marginBottom: 4 }}>
                   📨 {t("admin_tab_send")}
                 </div>
-                <div style={{ fontSize: 12, color: C.dim, marginBottom: 16 }}>
+                <div style={{ fontSize: 12, color: C.dim, marginBottom: 10 }}>
                   {t("admin_send_hint")}
+                </div>
+                <div style={{
+                  display: "inline-flex", alignItems: "center", gap: 8,
+                  padding: "6px 12px", borderRadius: 20, marginBottom: 18,
+                  background: isDigital ? "rgba(75,159,212,.1)" : "rgba(201,168,76,.1)",
+                  border: `1px solid ${isDigital ? "rgba(75,159,212,.3)" : "rgba(201,168,76,.3)"}`,
+                  fontSize: 11, fontWeight: 800,
+                  color: isDigital ? C.blue : C.gold,
+                }}>
+                  <span>{isDigital ? "🌐" : "📝"}</span>
+                  <span>
+                    {isDigital
+                      ? (lang === "he" ? "מצב: הזמנה דיגיטלית" : "الوضع: دعوة رقمية")
+                      : (lang === "he" ? "מצב: ידני" : "الوضع: يدوي")}
+                  </span>
                 </div>
 
                 {/* Groom selector */}

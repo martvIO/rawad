@@ -14,3 +14,4 @@ export { attachConfirmationLocationToGuest } from "./attachLocation";
 export { resetPassword }       from "./resetPassword";
 export { createGuestInvite, submitGuestInvite } from "./invite";
 export { createDigitalGuestInvite, submitDigitalGuestInvite } from "./digitalInvite";
+export { digitalInvitePreview } from "./digitalInvitePreview";

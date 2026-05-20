@@ -1,77 +1,47 @@
-// Digital invitation — Dashboard: stats + background media upload.
+// Digital invitation — Dashboard: stats + multi-media gallery + wedding date.
 import { useState, useEffect, useMemo, useRef } from "react";
 import { usePortal } from "../../../../context/PortalContext.jsx";
 import {
   subscribeDigitalGuests, subscribeDigitalMedia,
-  saveDigitalMediaFile, removeDigitalMedia,
-  getLatestDigitalMediaFromStorage, healDigitalMedia,
+  addInvitationMedia, removeInvitationMedia, setWeddingDate,
+  setGuestRanks,
 } from "../../../../services/digitalInvitation.js";
 import { logErr } from "../../../../utils/logger.js";
-import { load, save, removeKey } from "../../../../utils/storage.js";
 import { C } from "../../../../styles/theme.js";
 import { auth } from "../../../../firebase.js";
-import { SkeletonBlock } from "../../../../components/Skeleton.jsx";
 
-const cacheKey = (uid) => `dawa_bg_media_${uid}`;
+const tt = (lang, ar, he) => (lang === "he" ? he : ar);
+
+// Convert epoch ms ⇄ <input type="datetime-local"> value (in user's local zone).
+function epochToInputValue(epoch) {
+  if (!epoch) return "";
+  const d = new Date(epoch);
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+function inputValueToEpoch(v) {
+  if (!v) return null;
+  const t = new Date(v).getTime();
+  return Number.isFinite(t) ? t : null;
+}
 
 export function DigitalDashboard() {
   const { lang, currentUid, showToast } = usePortal();
-  const [guests,        setGuests]        = useState([]);
-  const [media,         setMedia]         = useState(null);
-  const [uploading,     setUploading]     = useState(false);
-  // Immediate local preview shown while the file is uploading (blob URL)
-  const [localPreview,  setLocalPreview]  = useState(null); // { url, type } | null
-  // Confirmed remote URL stored directly from upload response (no subscription dependency)
-  const [confirmedMedia, setConfirmedMedia] = useState(null); // { url, type } | null
-  // Storage-direct fallback — surfaces a previously-uploaded file even when the
-  // Firestore metadata layer is silent (pre-deploy orphan or transient error).
-  // Lazy-initialized from localStorage so the first paint is instant on reload.
-  const [storageMedia,   setStorageMedia]   = useState(() => load(cacheKey(currentUid), null));
-  // True while the first Storage scan is in flight (and we have nothing else to show)
-  const [loadingStorage, setLoadingStorage] = useState(true);
-  const localBlobRef = useRef(null);
-  const healedRef = useRef(false);
+  const [guests, setGuests] = useState([]);
+  const [doc,    setDoc]    = useState(null);     // full invitation doc
+  const [busy,   setBusy]   = useState(false);
+  // Pending uploads — shown in the gallery while uploading completes.
+  const [pendingMedia, setPendingMedia] = useState([]); // [{ id, url, kind, pending: true }]
+  const [newRank, setNewRank] = useState("");
+  const inputRef = useRef(null);
 
   useEffect(() => {
     if (!currentUid) return;
-    const u1 = subscribeDigitalGuests(currentUid, setGuests);
-    const u2 = subscribeDigitalMedia(currentUid, (m) => {
-      setMedia(m);
-      // If subscription fires with valid data, clear our local confirmed copy
-      if (m?.backgroundUrl) setConfirmedMedia(null);
-    });
+    const onErr = (err) => showToast(`✗ ${err?.code || err?.message || "read failed"}`);
+    const u1 = subscribeDigitalGuests(currentUid, setGuests, onErr);
+    const u2 = subscribeDigitalMedia(currentUid, setDoc, onErr);
     return () => { u1(); u2(); };
   }, [currentUid]);
-
-  // Storage-direct scan — runs once per uid. Reads the latest object in
-  // digitalMedia/{uid}/ and shows it as a fallback when Firestore has nothing.
-  // Result is cached to localStorage so the next mount has data on first paint.
-  useEffect(() => {
-    if (!currentUid) return;
-    let cancelled = false;
-    // Seed from cache for instant first paint (covers cold reload where the
-    // useState initializer ran with a falsy currentUid).
-    const cached = load(cacheKey(currentUid), null);
-    if (cached) setStorageMedia(cached);
-    setLoadingStorage(true);
-    (async () => {
-      const s = await getLatestDigitalMediaFromStorage(currentUid);
-      if (cancelled) return;
-      setStorageMedia(s);
-      if (s) save(cacheKey(currentUid), s);
-      else   removeKey(cacheKey(currentUid));
-      setLoadingStorage(false);
-    })();
-    return () => { cancelled = true; };
-  }, [currentUid]);
-
-  // Auto-heal — once both layers settle, write a Firestore doc for the latest
-  // Storage object if Firestore is missing it.
-  useEffect(() => {
-    if (!currentUid || healedRef.current || !storageMedia) return;
-    healedRef.current = true;
-    healDigitalMedia(currentUid, storageMedia, media).catch(() => {});
-  }, [currentUid, storageMedia, media]);
 
   const stats = useMemo(() => {
     const total     = guests.length;
@@ -81,154 +51,241 @@ export function DigitalDashboard() {
     return { total, attending, absent, pending };
   }, [guests]);
 
-  const handleUpload = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const media = doc?.media || [];
 
-    // ── Immediate local preview — no auth needed, pure client-side ──
-    if (localBlobRef.current) URL.revokeObjectURL(localBlobRef.current);
-    const blobUrl = URL.createObjectURL(file);
-    localBlobRef.current = blobUrl;
-    setLocalPreview({ url: blobUrl, type: file.type.startsWith("video") ? "video" : "image" });
+  // ── Media upload ─────────────────────────────────────────────────────────────
+  const handleAddMedia = async (e) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    if (inputRef.current) inputRef.current.value = "";
 
-    // Auth fallback: use auth.currentUser.uid if React state lags
+    // Build immediate previews so the gallery shows the upload progress.
+    const previews = files.map(f => ({
+      id:          `pending_${Date.now()}_${Math.random()}`,
+      url:         URL.createObjectURL(f),
+      kind:        f.type.startsWith("video") ? "video" : f.type === "image/gif" ? "gif" : "image",
+      pending:     true,
+    }));
+    setPendingMedia(prev => [...prev, ...previews]);
+
     const uid = currentUid || auth.currentUser?.uid;
     if (!uid) {
-      showToast(lang === "he" ? "אנא התחבר מחדש" : "يرجى إعادة تسجيل الدخول");
+      showToast(tt(lang, "يرجى إعادة تسجيل الدخول", "אנא התחבר מחדש"));
+      previews.forEach(p => URL.revokeObjectURL(p.url));
+      setPendingMedia(prev => prev.filter(p => !previews.some(pp => pp.id === p.id)));
       return;
     }
 
-    setUploading(true);
-    try {
-      const { url, type } = await saveDigitalMediaFile(uid, file);
-      // Store confirmed URL directly — no subscription dependency
-      setConfirmedMedia({ url, type });
-      setLocalPreview(null);
-      URL.revokeObjectURL(blobUrl);
-      localBlobRef.current = null;
-      // Refresh Storage-direct fallback + cache so it tracks the new upload
-      getLatestDigitalMediaFromStorage(uid).then(s => {
-        setStorageMedia(s);
-        if (s) save(cacheKey(uid), s);
-      }).catch(() => {});
-      showToast(lang === "he" ? "✓ הועלה בהצלחה" : "✓ تم الرفع بنجاح");
-    } catch (err) {
-      logErr("uploadDigitalMedia", err);
-      showToast(err?.message || (lang === "he" ? "שגיאה בהעלאה" : "فشل الرفع"));
-      // Keep localPreview on error so user can still see their selected file
-    } finally {
-      setUploading(false);
-      e.target.value = "";
+    setBusy(true);
+    const results = await Promise.allSettled(files.map(f => addInvitationMedia(uid, f)));
+    setBusy(false);
+
+    const succeededIds = previews
+      .filter((_, i) => results[i].status === "fulfilled")
+      .map(p => p.id);
+    const failedIds = previews
+      .filter((_, i) => results[i].status === "rejected")
+      .map(p => p.id);
+
+    // Revoke blob URLs of completed uploads (Firestore subscription will fill in).
+    previews.forEach(p => {
+      if (succeededIds.includes(p.id) || failedIds.includes(p.id)) URL.revokeObjectURL(p.url);
+    });
+    setPendingMedia(prev => prev.filter(p => !succeededIds.includes(p.id) && !failedIds.includes(p.id)));
+
+    if (failedIds.length) {
+      const reason = results.find(r => r.status === "rejected")?.reason;
+      logErr("addInvitationMedia", reason);
+      showToast(reason?.message || tt(lang, "فشل الرفع", "ההעלאה נכשלה"));
+    } else {
+      showToast(tt(lang, "✓ تم الرفع", "✓ הועלה"));
     }
   };
 
-  const handleRemove = async () => {
-    setLocalPreview(null);
-    setConfirmedMedia(null);
-    setStorageMedia(null); // prevent the Storage-direct fallback from resurfacing
-    removeKey(cacheKey(currentUid));
-    if (localBlobRef.current) { URL.revokeObjectURL(localBlobRef.current); localBlobRef.current = null; }
-    try { await removeDigitalMedia(currentUid); setMedia(null); }
-    catch (err) { logErr("removeDigitalMedia", err); }
+  const handleRemoveMedia = async (item) => {
+    try {
+      await removeInvitationMedia(currentUid, item);
+    } catch (err) {
+      logErr("removeInvitationMedia", err);
+      showToast(err?.message || tt(lang, "خطأ", "שגיאה"));
+    }
   };
 
-  // Priority: localPreview (blob during upload) > confirmedMedia (upload response)
-  //           > Firestore subscription > Storage-direct fallback > nothing
-  const display = localPreview
-    ?? confirmedMedia
-    ?? (media?.backgroundUrl ? { url: media.backgroundUrl, type: media.backgroundType } : null)
-    ?? (storageMedia ? { url: storageMedia.url, type: storageMedia.type } : null);
+  // ── Guest ranks ──────────────────────────────────────────────────────────────
+  const ranks = doc?.guestRanks || [];
+  const handleAddRank = async () => {
+    const v = newRank.trim();
+    if (!v) return;
+    if (ranks.includes(v)) {
+      showToast(tt(lang, "موجود مسبقاً", "כבר קיים"));
+      setNewRank("");
+      return;
+    }
+    try {
+      await setGuestRanks(currentUid, [...ranks, v]);
+      setNewRank("");
+    } catch (err) {
+      logErr("setGuestRanks", err);
+      showToast(err?.message || tt(lang, "خطأ", "שגיאה"));
+    }
+  };
+  const handleRemoveRank = async (r) => {
+    try {
+      await setGuestRanks(currentUid, ranks.filter(x => x !== r));
+    } catch (err) {
+      logErr("setGuestRanks", err);
+      showToast(err?.message || tt(lang, "خطأ", "שגיאה"));
+    }
+  };
+
+  // ── Wedding date ─────────────────────────────────────────────────────────────
+  const handleDateChange = async (e) => {
+    const epoch = inputValueToEpoch(e.target.value);
+    try {
+      await setWeddingDate(currentUid, epoch);
+      showToast(tt(lang, "✓ تم حفظ التاريخ", "✓ התאריך נשמר"));
+    } catch (err) {
+      logErr("setWeddingDate", err);
+      showToast(err?.message || tt(lang, "خطأ", "שגיאה"));
+    }
+  };
+
+  // ── Render ───────────────────────────────────────────────────────────────────
+  const galleryItems = [...media, ...pendingMedia];
 
   return (
     <div style={{ animation: "fadeUp .3s ease" }}>
 
-      {/* ── الميديا الاحتفالية ──────────────────────────────────────────── */}
+      {/* ── معرض الوسائط ─────────────────────────────────────────── */}
       <div style={{ marginBottom: 22 }}>
-        {!display && loadingStorage ? (
-          <SkeletonBlock height={280}/>
-        ) : display ? (
-          <div style={{ position: "relative", borderRadius: 16, overflow: "hidden" }}>
-            {display.type === "video" ? (
-              <video
-                src={display.url}
-                autoPlay muted loop playsInline
-                style={{ width: "100%", maxHeight: 340, objectFit: "cover", display: "block" }}
-              />
-            ) : (
-              <img
-                src={display.url}
-                alt="background"
-                style={{ width: "100%", maxHeight: 340, objectFit: "cover", display: "block" }}
-              />
-            )}
-            {/* Uploading overlay */}
-            {uploading && (
-              <div style={{
-                position: "absolute", inset: 0, display: "flex",
-                alignItems: "center", justifyContent: "center",
-                background: "rgba(0,0,0,.45)", backdropFilter: "blur(2px)",
-              }}>
-                <div style={{ color: "#fff", fontSize: 14, fontWeight: 800 }}>
-                  {lang === "he" ? "⏳ מעלה..." : "⏳ جاري الرفع..."}
-                </div>
-              </div>
-            )}
-            {!uploading && (
-              <div style={{
-                position: "absolute", bottom: 0, insetInline: 0,
-                padding: "14px 14px 12px",
-                background: "linear-gradient(transparent, rgba(0,0,0,.72))",
-                display: "flex", gap: 8,
-              }}>
-                <label style={{
-                  flex: 1, padding: "8px 0", borderRadius: 8, textAlign: "center",
-                  background: "rgba(255,255,255,.14)", backdropFilter: "blur(4px)",
-                  color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer",
-                }}>
-                  <input type="file" accept="image/*,image/gif,video/*" style={{ display: "none" }} onChange={handleUpload} />
-                  {lang === "he" ? "🔄 החלף" : "🔄 استبدال"}
-                </label>
-                <button onClick={handleRemove} style={{
-                  flex: 1, padding: "8px 0", borderRadius: 8, border: "none",
-                  background: "rgba(212,80,58,.45)", backdropFilter: "blur(4px)",
-                  color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
-                }}>
-                  {lang === "he" ? "✕ הסר" : "✕ إزالة"}
-                </button>
-              </div>
-            )}
-          </div>
-        ) : (
+        <div style={{ fontSize: 13, fontWeight: 800, color: C.goldLight, marginBottom: 10 }}>
+          🎬 {tt(lang, "وسائط الدعوة", "מדיית ההזמנה")}
+          <span style={{ fontSize: 11, color: C.dim, fontWeight: 600, marginInlineStart: 8 }}>
+            ({media.length.toLocaleString("en")})
+          </span>
+        </div>
+        <div style={{ fontSize: 11, color: C.dim, marginBottom: 12, lineHeight: 1.7 }}>
+          {tt(lang,
+            "ارفع عدة صور / فيديوهات / GIF — ستظهر للضيوف على صفحة الدعوة",
+            "העלה מספר תמונות / סרטונים / GIF — יוצגו לאורחים בעמוד ההזמנה")}
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(110px,1fr))", gap: 8 }}>
+          {galleryItems.map((m, i) => (
+            <MediaTile key={m.storagePath || m.id || i} item={m}
+                       onRemove={m.pending ? null : () => handleRemoveMedia(m)} />
+          ))}
+
+          {/* Add tile */}
           <label style={{
-            display: "block", borderRadius: 16,
-            border: `2px dashed ${uploading ? "rgba(75,159,212,.7)" : "rgba(75,159,212,.28)"}`,
-            background: uploading ? "rgba(75,159,212,.04)" : "rgba(75,159,212,.02)",
-            padding: "44px 24px", textAlign: "center", cursor: "pointer",
-            transition: "all .2s",
+            aspectRatio: "1", display: "flex", alignItems: "center", justifyContent: "center",
+            flexDirection: "column", gap: 4,
+            background: busy ? "rgba(75,159,212,.06)" : "rgba(75,159,212,.03)",
+            border: `2px dashed ${busy ? "rgba(75,159,212,.65)" : "rgba(75,159,212,.32)"}`,
+            borderRadius: 12, cursor: busy ? "wait" : "pointer", transition: "all .2s",
           }}>
-            <input type="file" accept="image/*,image/gif,video/*" style={{ display: "none" }} onChange={handleUpload} />
-            <div style={{ fontSize: 56, marginBottom: 12 }}>{uploading ? "⏳" : "🎬"}</div>
-            <div style={{ fontSize: 16, fontWeight: 800, color: C.blue, marginBottom: 8 }}>
-              {uploading
-                ? (lang === "he" ? "מעלה..." : "جاري الرفع...")
-                : (lang === "he" ? "הוסף תמונה / GIF / וידאו" : "أضف صورة / GIF / فيديو")}
-            </div>
-            <div style={{ fontSize: 12, color: C.dim, lineHeight: 1.8 }}>
-              {lang === "he"
-                ? "תמונה, GIF, או וידאו חגיגי יוצג כרקע בולט בלוח הבקרה"
-                : "صورة أو GIF أو فيديو احتفالي يظهر كعنصر بارز في لوحة التحكم"}
+            <input ref={inputRef} type="file" multiple style={{ display: "none" }}
+                   accept="image/*,image/gif,video/*"
+                   disabled={busy} onChange={handleAddMedia}/>
+            <div style={{ fontSize: 28 }}>{busy ? "⏳" : "➕"}</div>
+            <div style={{ fontSize: 10, color: C.blue, fontWeight: 800 }}>
+              {busy ? tt(lang, "جاري الرفع", "מעלה") : tt(lang, "أضف", "הוסף")}
             </div>
           </label>
+        </div>
+      </div>
+
+      {/* ── تاريخ الزفاف ─────────────────────────────────────────── */}
+      <div className="gold-card" style={{ marginBottom: 22 }}>
+        <div style={{ fontSize: 13, fontWeight: 800, color: C.goldLight, marginBottom: 6 }}>
+          📅 {tt(lang, "تاريخ ووقت الزفاف", "תאריך ושעת החתונה")}
+        </div>
+        <div style={{ fontSize: 11, color: C.dim, marginBottom: 10, lineHeight: 1.7 }}>
+          {tt(lang,
+            "سيتم استخدامه للعد التنازلي في صفحة الدعوة",
+            "ישמש לעד-לאחור בעמוד ההזמנה")}
+        </div>
+        <input
+          type="datetime-local"
+          className="input-field"
+          value={epochToInputValue(doc?.weddingDate)}
+          onChange={handleDateChange}
+          style={{ direction: "ltr", textAlign: "right" }}
+        />
+        {doc?.weddingDate && (
+          <div style={{ fontSize: 11, color: C.gold, marginTop: 8 }}>
+            {new Date(doc.weddingDate).toLocaleString(lang === "he" ? "he-IL" : "ar-SA", {
+              weekday: "long", year: "numeric", month: "long", day: "numeric",
+              hour: "2-digit", minute: "2-digit",
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* ── رتب المدعوين ─────────────────────────────────────────── */}
+      <div className="gold-card" style={{ marginBottom: 22 }}>
+        <div style={{ fontSize: 13, fontWeight: 800, color: C.goldLight, marginBottom: 6 }}>
+          🏷 {tt(lang, "رتب المدعوين", "רמות מוזמנים")}
+        </div>
+        <div style={{ fontSize: 11, color: C.dim, marginBottom: 10, lineHeight: 1.7 }}>
+          {tt(lang,
+            "أضف رتباً مخصصة (مثل «العرس فقط»، «العرس والزيانة») لتختار منها عند إضافة مدعو",
+            "הוסף רמות מותאמות אישית (כגון «רק החתונה», «החתונה והכרעה») לבחירה בעת הוספת מוזמן")}
+        </div>
+        <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+          <input
+            type="text"
+            className="input-field"
+            value={newRank}
+            onChange={e => setNewRank(e.target.value)}
+            onKeyDown={e => { if (e.key === "Enter") handleAddRank(); }}
+            placeholder={tt(lang, "اسم الرتبة", "שם הרמה")}
+            style={{ flex: 1 }}
+          />
+          <button onClick={handleAddRank} className="gold-btn"
+                  style={{ padding: "8px 16px", fontSize: 12, whiteSpace: "nowrap" }}
+                  disabled={!newRank.trim()}>
+            ➕ {tt(lang, "إضافة", "הוסף")}
+          </button>
+        </div>
+        {ranks.length === 0 ? (
+          <div style={{ fontSize: 11, color: C.dim, fontStyle: "italic", textAlign: "center", padding: "8px 0" }}>
+            {tt(lang, "لا توجد رتب بعد", "אין רמות עדיין")}
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {ranks.map(r => (
+              <div key={r} style={{
+                display: "inline-flex", alignItems: "center", gap: 8,
+                padding: "6px 6px 6px 12px", borderRadius: 999,
+                background: "rgba(201,168,76,.08)",
+                border: "1px solid rgba(201,168,76,.3)",
+                fontSize: 12, color: C.goldLight, fontWeight: 700,
+              }}>
+                <span>{r}</span>
+                <button onClick={() => handleRemoveRank(r)}
+                        title={tt(lang, "حذف", "מחק")}
+                        style={{
+                          background: "rgba(212,80,58,.15)",
+                          border: "none",
+                          color: C.red,
+                          width: 20, height: 20, borderRadius: 999,
+                          fontSize: 11, fontWeight: 900, cursor: "pointer",
+                          fontFamily: "inherit", lineHeight: 1, padding: 0,
+                        }}>✕</button>
+              </div>
+            ))}
+          </div>
         )}
       </div>
 
       {/* ── الإحصائيات ─────────────────────────────────────────────────── */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 12, marginBottom: 20 }}>
         {[
-          { label: lang === "he" ? "סה״כ מוזמנים" : "الإجمالي",  val: stats.total,     color: C.goldLight, icon: "📋" },
-          { label: lang === "he" ? "נוכחים"        : "حضور",      val: stats.attending, color: "#4cc97a",   icon: "✓" },
-          { label: lang === "he" ? "נעדרים"         : "غياب",      val: stats.absent,    color: C.red,       icon: "✗" },
-          { label: lang === "he" ? "טרם ענו"        : "لم يرد",   val: stats.pending,   color: C.gold,      icon: "⌛" },
+          { label: tt(lang, "الإجمالي", "סה״כ מוזמנים"), val: stats.total,     color: C.goldLight, icon: "📋" },
+          { label: tt(lang, "حضور",     "נוכחים"),        val: stats.attending, color: "#4cc97a",   icon: "✓" },
+          { label: tt(lang, "غياب",     "נעדרים"),        val: stats.absent,    color: C.red,       icon: "✗" },
+          { label: tt(lang, "لم يرد",   "טרם ענו"),       val: stats.pending,   color: C.gold,      icon: "⌛" },
         ].map(s => (
           <div key={s.label} className="card" style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <div style={{ fontSize: 26 }}>{s.icon}</div>
@@ -240,12 +297,11 @@ export function DigitalDashboard() {
         ))}
       </div>
 
-      {/* ── شريط نسبة الحضور ───────────────────────────────────────────── */}
       {stats.total > 0 && (
         <div className="gold-card">
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
             <span style={{ fontSize: 13, color: C.goldDim, fontWeight: 700 }}>
-              {lang === "he" ? "אחוז נוכחות" : "نسبة الحضور"}
+              {tt(lang, "نسبة الحضور", "אחוז נוכחות")}
             </span>
             <span style={{ fontSize: 20, fontWeight: 900, color: "#4cc97a" }}>
               {Math.round(stats.attending / stats.total * 100)}%
@@ -260,6 +316,53 @@ export function DigitalDashboard() {
             }}/>
           </div>
         </div>
+      )}
+    </div>
+  );
+}
+
+function MediaTile({ item, onRemove }) {
+  const isVideo = item.kind === "video";
+  return (
+    <div style={{
+      position: "relative", aspectRatio: "1", borderRadius: 12, overflow: "hidden",
+      border: `1px solid ${item.pending ? "rgba(201,168,76,.3)" : "rgba(255,255,255,.08)"}`,
+      background: "#0f0f15",
+    }}>
+      {isVideo ? (
+        <video src={item.url} muted playsInline
+               style={{ width: "100%", height: "100%", objectFit: "cover" }}/>
+      ) : (
+        <img src={item.url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }}/>
+      )}
+      {item.kind === "gif" && (
+        <span style={{
+          position: "absolute", top: 6, insetInlineStart: 6,
+          background: "rgba(0,0,0,.65)", color: "#fff",
+          fontSize: 9, fontWeight: 800, padding: "2px 6px", borderRadius: 5,
+        }}>GIF</span>
+      )}
+      {isVideo && (
+        <span style={{
+          position: "absolute", top: 6, insetInlineStart: 6,
+          background: "rgba(0,0,0,.65)", color: "#fff",
+          fontSize: 11, padding: "1px 6px", borderRadius: 5,
+        }}>▶</span>
+      )}
+      {item.pending && (
+        <div style={{
+          position: "absolute", inset: 0, background: "rgba(0,0,0,.45)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          color: "#fff", fontSize: 11, fontWeight: 800,
+        }}>⏳</div>
+      )}
+      {onRemove && (
+        <button onClick={onRemove} style={{
+          position: "absolute", top: 4, insetInlineEnd: 4,
+          width: 24, height: 24, padding: 0, borderRadius: 12,
+          background: "rgba(0,0,0,.65)", border: "none", color: "#fff",
+          fontSize: 12, fontWeight: 900, cursor: "pointer", fontFamily: "inherit",
+        }}>✕</button>
       )}
     </div>
   );

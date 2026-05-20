@@ -3,10 +3,11 @@
 // Called from firebase.json "predeploy" so firebase-tools doesn't have to
 // invoke npm through a shell (which breaks on Windows with cross-spawn).
 const { execSync } = require("child_process");
-const { rmSync } = require("fs");
+const { rmSync, existsSync, copyFileSync, mkdirSync } = require("fs");
 const path = require("path");
 
-const functionsDir = path.join(__dirname, "..", "functions");
+const projectRoot  = path.join(__dirname, "..");
+const functionsDir = path.join(projectRoot, "functions");
 
 // Wipe the previous build + tsc's incremental cache before every deploy.
 // `composite: true` in functions/tsconfig.json writes tsconfig.tsbuildinfo.
@@ -30,3 +31,18 @@ execSync(`"${tsc}" -p tsconfig.json`, {
   cwd: functionsDir,
   stdio: ["ignore", "inherit", "inherit"],
 });
+
+// Bundle dist/index.html with the function so digitalInvitePreview can read
+// it at runtime to inject Open Graph tags. Only copy if dist exists — when
+// deploying only functions (without a fresh hosting build), the previously
+// bundled copy stays valid.
+const distHtml = path.join(projectRoot, "dist", "index.html");
+const bundledHtmlDir  = path.join(functionsDir, "lib");
+const bundledHtmlPath = path.join(bundledHtmlDir, "index.html");
+if (existsSync(distHtml)) {
+  if (!existsSync(bundledHtmlDir)) mkdirSync(bundledHtmlDir, { recursive: true });
+  copyFileSync(distHtml, bundledHtmlPath);
+  console.log("[build-functions] bundled dist/index.html → functions/lib/index.html");
+} else {
+  console.log("[build-functions] dist/index.html not found — skipping bundle (run vite build first if you need OG preview)");
+}

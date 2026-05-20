@@ -2,26 +2,43 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // ─── digitalInvitations/{groomUid} ────────────────────────────────────────
     // All digital invitation data for a groom lives under one path:
-    //   digitalInvitations/{groomUid}                         — background media (doc)
+    //   digitalInvitations/{groomUid}                         — background/media (doc)
     //   digitalInvitations/{groomUid}/guests/{guestId}        — RSVP list
     //   digitalInvitations/{groomUid}/photographerFiles/{id}  — photographer uploads
     //   digitalInvitations/{groomUid}/designRequests/{reqId}  — design workflow
     //
-    // The groom (matching uid) or any admin may read/write everything in their tree.
+    // Public read of the parent doc itself is allowed: guests opening their
+    // invite link need to fetch wedding date + media without authentication.
     match /digitalInvitations/{groomUid} {
-      allow read, write: if request.auth != null
+      allow read: if true;
+      allow write: if request.auth != null
         && (request.auth.uid == groomUid || request.auth.token.role == 'admin');
 
-      match /{document=**} {
+      // Photographer files are public READ only when the groom has flipped the
+      // photographerPublished flag. The face-matching guest page relies on this.
+      match /photographerFiles/{fileId} {
+        allow read: if
+          get(/databases/$(database)/documents/digitalInvitations/$(groomUid)).data.photographerPublished == true
+          || (request.auth != null
+              && (request.auth.uid == groomUid || request.auth.token.role == 'admin'));
+        allow write: if request.auth != null
+          && (request.auth.uid == groomUid || request.auth.token.role == 'admin');
+      }
+
+      // Guests + designRequests + everything else: groom/admin only.
+      match /guests/{guestId} {
+        allow read, write: if request.auth != null
+          && (request.auth.uid == groomUid || request.auth.token.role == 'admin');
+      }
+      match /designRequests/{reqId} {
         allow read, write: if request.auth != null
           && (request.auth.uid == groomUid || request.auth.token.role == 'admin');
       }
     }
 
-    // Admin sees all design requests across all grooms via a collectionGroup
-    // query. This rule lets ONLY admins read across the group; the per-doc
-    // write check is already enforced by the parent rule above.
+    // Admin reads every design request across all grooms via collectionGroup.
     match /{path=**}/designRequests/{reqId} {
       allow read: if request.auth != null && request.auth.token.role == 'admin';
     }

@@ -39,13 +39,19 @@ export function DigitalGuests() {
   // ── Firestore onSnapshot: server-confirmed reads, offline cache, auto-retry ───
   useEffect(() => {
     if (!currentUid) return;
-    return subscribeDigitalGuests(currentUid, (list) => {
-      setGuests(prev => {
-        const serverIds = new Set(list.map(g => g.id));
-        const pending   = prev.filter(g => !serverIds.has(g.id));
-        return [...list, ...pending].sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
-      });
-    });
+    return subscribeDigitalGuests(
+      currentUid,
+      (list) => {
+        setGuests(prev => {
+          const serverIds = new Set(list.map(g => g.id));
+          const pending   = prev.filter(g => !serverIds.has(g.id));
+          return [...list, ...pending].sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+        });
+      },
+      // Surface read failures so the user knows their data is saved but
+      // the listener was rejected (almost always a Firestore rule mismatch).
+      (err) => showToast(`✗ ${err?.code || err?.message || "read failed"}`),
+    );
   }, [currentUid]);
 
   // ── Edit ─────────────────────────────────────────────────────────────────────
