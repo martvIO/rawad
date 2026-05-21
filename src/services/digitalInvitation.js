@@ -233,17 +233,6 @@ export async function removePhotographerFile(groomUid, fileId) {
   return api.delete(`/digital/${uid}/photographer/${fileId}`);
 }
 
-/**
- * Storage-only orphan path — kept for back-compat with prior callers that
- * pass a storagePath. The new server handles deletion uniformly when given
- * a fileId, so this just delegates.
- */
-export async function removePhotographerFileByPath(groomUid, storagePath) {
-  const uid = resolveUid(groomUid);
-  if (!storagePath) return;
-  return api.delete(`/digital/${uid}/photographer/${encodeURIComponent(storagePath)}`);
-}
-
 // ─── Auto-heal stubs (no longer needed) ───────────────────────────────────────
 //
 // Pre-migration the client walked Storage directly to recover orphans. With

@@ -59,6 +59,13 @@ app.use(cors({
 
 app.use(express.json({ limit: JSON_BODY_LIMIT }));
 
+// Firebase Hosting rewrites preserve the full path, so a request to
+// /api/auth/login arrives at this function with req.url = "/api/auth/login".
+// Direct Cloud Functions URLs (https://.../api/auth/login) strip the function
+// name and arrive as "/auth/login". Normalize both shapes by removing a
+// leading "/api" so routers can be mounted at "/auth" once.
+app.use(stripApiPrefix);
+
 // ─── Routers ──────────────────────────────────────────────────────────────────
 
 app.use("/auth", authRouter);

@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import { usePortal } from "../../../../context/PortalContext.jsx";
 import {
   subscribePhotographerFiles, uploadPhotographerFile, removePhotographerFile,
-  removePhotographerFileByPath, renamePhotographerFile,
+  renamePhotographerFile,
   listPhotographerFilesFromStorage, healPhotographerFiles,
   subscribeDigitalMedia, setPhotographerPublished,
 } from "../../../../services/digitalInvitation.js";
@@ -189,14 +189,7 @@ export function DigitalPhotographer() {
 
   const confirmDelete = async (item) => {
     try {
-      // Storage-only orphans use their storagePath as the React key; Firestore
-      // docs have a real id and a separate storagePath field.
-      const isOrphan = !files.some(f => f.id === item.id);
-      if (isOrphan) {
-        await removePhotographerFileByPath(currentUid, item.storagePath || item.id);
-      } else {
-        await removePhotographerFile(currentUid, item.id);
-      }
+      await removePhotographerFile(currentUid, item.id);
       // Refresh Storage list so the deleted entry disappears from the merge
       setStorageFiles(prev => {
         const next = prev.filter(s => s.storagePath !== (item.storagePath || item.id));

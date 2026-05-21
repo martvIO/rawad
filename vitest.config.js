@@ -14,6 +14,7 @@ export default defineConfig({
           include: [
             "src/__tests__/utils/**/*.test.{js,ts}",
             "src/__tests__/data/**/*.test.{js,ts}",
+            "src/__tests__/services/**/*.test.{js,ts}",
             "tests/functions/helpers.test.ts",
             "tests/functions/rateLimit.test.ts",
           ],
