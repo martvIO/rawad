@@ -1,76 +1,110 @@
-// Users service — admin-only management calls + a subscription for the user list.
-// Creates / deletes are routed through Cloud Functions so the server can mint
-// custom claims, write the index nodes, and audit-log.
-import { ref, set, update, remove } from "firebase/database";
-import { db } from "../firebase.js";
-import { subscribeList, callable } from "./_helpers.js";
+// Users service — admin-only CRUD over portal accounts plus a list subscription
+// usable by drivers (groom-profile slice only).
+//
+// REST endpoints (all under /api/users):
+//   GET    /users                     admin: full user list
+//   GET    /users/groom-profiles      any authed: { username, displayName }[]
+//   PATCH  /users/:uid                admin: direct field patch (displayName, …)
+//   PUT    /users/groom-profiles/:uid admin: upsert public profile mirror
+//   DELETE /users/groom-profiles/:uid admin: remove mirror
+//   POST   /users                     admin: create
+//   DELETE /users/:uid                admin: cascade delete
+//   PUT    /users/:uid                admin: full update
+//   PUT    /users/:uid/password       admin: set password
+//   POST   /users/:uid/admin-claim    admin: promote/demote
 
-// Live list of every portal user. Returns an array of { uid, id, username, role, phoneE164, ... }.
-// Rule-restricted: only admins receive non-empty snapshots. (`id` mirrors `uid` so legacy
-// JSX that keys by `u.id` keeps working.)
+import { api } from "../utils/apiClient.js";
+import { subscribeList } from "./_helpers.js";
+
+// ─── Subscriptions ────────────────────────────────────────────────────────────
+
+/**
+ * Admin-only live list of every portal user.
+ * Items shape: `{ uid, id, username, role, phoneE164, displayName? }` — `id`
+ * mirrors `uid` to keep legacy JSX keyed by `u.id` working.
+ *
+ * @param {(users: object[]) => void} cb
+ * @returns {() => void} unsubscribe
+ */
 export function subscribeUsers(cb) {
-  return subscribeList("users", cb, (c) => ({ uid: c.key, id: c.key, ...c.val() }));
+  return subscribeList("/users", (users) => {
+    cb(users.map((u) => ({ ...u, id: u.uid })));
+  });
 }
 
-// قائمة حيّة بالعرسان المتاحين (username + displayName فقط).
-// مرئية لأيّ مستخدم مسجّل دخوله (مرسلين + عرسان + أدمن) بخلاف /users
-// التي تقرأها الأدمن فقط. مفيدة للمرسل ليختار من يشارك معهم موقعه.
+/**
+ * Public-ish (any-authed) list of groom profiles. Used by drivers to pick a
+ * groom to serve, and by the admin send tab to render the list.
+ *
+ * @param {(profiles: object[]) => void} cb
+ * @returns {() => void} unsubscribe
+ */
 export function subscribeGroomProfiles(cb) {
-  return subscribeList("groomProfiles", cb, (c) => ({ uid: c.key, id: c.key, ...c.val() }));
+  return subscribeList("/users/groom-profiles", (profiles) => {
+    cb(profiles.map((p) => ({ ...p, id: p.uid })));
+  });
 }
 
-// يكتب حقلاً أو أكثر مباشرةً في RTDB /users/{uid} (الأدمن يملك .write هناك).
-// يُستخدم للحقول التي لا تحتاج مزامنة Firebase Auth مثل displayName.
+// ─── Direct field writes ──────────────────────────────────────────────────────
+
+/**
+ * Patch a portal user record (server-side validation; admin only).
+ * Pre-migration this hit RTDB directly; now it's a typed PATCH endpoint.
+ */
 export async function patchUserInRTDB(uid, patch) {
-  return update(ref(db, `users/${uid}`), patch);
+  return api.patch(`/users/${uid}`, patch);
 }
 
-// يكتب أو يُحدِّث سجل عريس في /groomProfiles مباشرةً من الكلايَنت.
-// لا يحتاج نشر Cloud Function لأنّ قاعدة RTDB تسمح للأدمن بالكتابة هناك.
-// يُستدعى بعد إنشاء / تعديل عريس حتى يتحدّث groomProfiles في الحال.
+/**
+ * Upsert the public groom profile mirror (server validates schema).
+ */
 export async function upsertGroomProfile(uid, { username, displayName }) {
-  const data = { username };
-  if (displayName) data.displayName = displayName;
-  return set(ref(db, `groomProfiles/${uid}`), data);
+  const body = { username };
+  if (displayName) body.displayName = displayName;
+  return api.put(`/users/groom-profiles/${uid}`, body);
 }
 
-// يحذف سجل عريس من /groomProfiles (عند حذف الحساب أو تغيير دوره).
 export async function removeGroomProfile(uid) {
-  return remove(ref(db, `groomProfiles/${uid}`));
+  return api.delete(`/users/groom-profiles/${uid}`);
 }
 
-const _createPortalUser = callable("createPortalUser");
-const _deletePortalUser = callable("deletePortalUser");
-const _updatePortalUser = callable("updatePortalUser");
-const _adminSetPassword = callable("adminSetPassword");
-const _setAdminClaim    = callable("setAdminClaim");
-const _resetPassword    = callable("resetPassword");
+// ─── Admin operations (replaced onCalls) ──────────────────────────────────────
 
+/**
+ * Create a portal user. Server validates uniqueness on username + phone,
+ * mints custom claims, writes /users + indices + groom profile.
+ *
+ * @param {{username, password, role, phoneE164?, displayName?}} input
+ */
 export async function createPortalUser(input) {
-  return _createPortalUser(input);
+  return api.post("/users", input);
 }
 
 export async function deletePortalUser(uid) {
-  return _deletePortalUser({ uid });
+  return api.delete(`/users/${uid}`);
 }
 
-// Admin-only: patch any combination of username, displayName, phoneE164, role.
-// Cloud Function validates each field and keeps Auth + indices + claims in sync.
+/**
+ * Patch any combination of username/displayName/phoneE164/role.
+ * Server keeps Auth + RTDB + indices + claims in sync atomically.
+ */
 export async function updatePortalUser(input) {
-  return _updatePortalUser(input);
+  const { uid, ...rest } = input;
+  return api.put(`/users/${uid}`, rest);
 }
 
-// Admin-only: set another user's password (forces re-login on next request).
 export async function adminSetPassword(uid, newPassword) {
-  return _adminSetPassword({ uid, newPassword });
+  return api.put(`/users/${uid}/password`, { newPassword });
 }
 
 export async function setAdminClaim(uid, isAdmin) {
-  return _setAdminClaim({ uid, isAdmin });
+  return api.post(`/users/${uid}/admin-claim`, { isAdmin });
 }
 
-// Called AFTER a phone-OTP confirmation. The phone-auth ID token (set by
-// confirmPasswordResetCode) is what authorises this call server-side.
-export async function callResetPassword(newPassword) {
-  return _resetPassword({ newPassword });
-}
+// ─── Password reset (Phone OTP path) ──────────────────────────────────────────
+
+/**
+ * Finalize a phone-OTP-authorized password reset. Imports the auth-service
+ * helper to keep the call site identical to the legacy export.
+ */
+export { callResetPassword } from "./auth.js";

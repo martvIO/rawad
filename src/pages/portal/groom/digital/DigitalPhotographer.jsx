@@ -10,7 +10,7 @@ import {
 import { logErr } from "../../../../utils/logger.js";
 import { load, save, removeKey } from "../../../../utils/storage.js";
 import { C } from "../../../../styles/theme.js";
-import { auth } from "../../../../firebase.js";
+import { getStoredUid } from "../../../../utils/tokenManager.js";
 import { SkeletonList } from "../../../../components/Skeleton.jsx";
 
 const cacheKey = (uid) => `dawa_photographer_${uid}`;
@@ -135,7 +135,7 @@ export function DigitalPhotographer() {
     setPendingFiles(prev => [...prev, ...previews]);
 
     // Auth fallback
-    const uid = currentUid || auth.currentUser?.uid;
+    const uid = currentUid || getStoredUid();
     if (!uid) {
       showToast(lang === "he" ? "אנא התחבר מחדש" : "يرجى إعادة تسجيل الدخول");
       // Clean up the previews we just added

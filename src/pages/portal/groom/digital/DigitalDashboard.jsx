@@ -8,7 +8,7 @@ import {
 } from "../../../../services/digitalInvitation.js";
 import { logErr } from "../../../../utils/logger.js";
 import { C } from "../../../../styles/theme.js";
-import { auth } from "../../../../firebase.js";
+import { getStoredUid } from "../../../../utils/tokenManager.js";
 
 const tt = (lang, ar, he) => (lang === "he" ? he : ar);
 
@@ -68,7 +68,7 @@ export function DigitalDashboard() {
     }));
     setPendingMedia(prev => [...prev, ...previews]);
 
-    const uid = currentUid || auth.currentUser?.uid;
+    const uid = currentUid || getStoredUid();
     if (!uid) {
       showToast(tt(lang, "يرجى إعادة تسجيل الدخول", "אנא התחבר מחדש"));
       previews.forEach(p => URL.revokeObjectURL(p.url));

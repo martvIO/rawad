@@ -1,143 +1,214 @@
-// Auth service — wraps Firebase Auth in the small surface the app actually needs.
-// Login uses synthetic emails of the form `<username>@dawa.local` so the rest
-// of the app can keep its "username + password" UX.
+// Auth service — REST-based replacement for the Firebase Auth SDK calls.
 //
-// Source of truth for "what role is this user?" is the JWT custom claim
-// `role` ("admin" | "driver" | "groom"). The RTDB profile mirror at
-// /users/{uid}/role is used only as a fallback if the claim is missing
-// (mid-migration / legacy users). The server-side rule check is
-// `auth.token.role === 'admin'`, so the client matches that.
+// All token lifecycle lives in `src/utils/tokenManager.js`. This module is
+// a thin orchestrator that:
+//   - Hits /api/auth/* endpoints
+//   - Stores / clears tokens via tokenManager
+//   - Polls /api/auth/me to keep the role/claims fresh (replaces
+//     onAuthStateChanged + onIdTokenChanged from the SDK)
+//
+// Source of truth for "what role is this user?" remains the JWT custom claim
+// `role`, which the server returns inside /auth/me's `claims` field.
+
+import { api } from "../utils/apiClient.js";
+import { createPoller } from "../utils/poller.js";
 import {
-  signInWithEmailAndPassword,
-  signOut,
-  onAuthStateChanged,
-  onIdTokenChanged,
-  signInWithPhoneNumber,
-  RecaptchaVerifier,
-} from "firebase/auth";
-import { ref, get } from "firebase/database";
-import { auth, db } from "../firebase.js";
+  clearTokens,
+  loadStoredTokens,
+  refreshIdToken,
+  storeTokens,
+  getStoredUid,
+} from "../utils/tokenManager.js";
 import { logWarn } from "../utils/logger.js";
 
-const SYNTHETIC_DOMAIN = "@dawa.local";
+// ─── Constants ────────────────────────────────────────────────────────────────
 
-const syntheticEmail = (username) => `${username.trim().toLowerCase()}${SYNTHETIC_DOMAIN}`;
+/** Frequency at which /auth/me is polled to refresh role/claims. */
+const ME_POLL_INTERVAL_MS = 30 * 1000;
 
-// Sign in with username + password.
+// ─── Login / logout ───────────────────────────────────────────────────────────
+
+/**
+ * Sign in with username + password. On success, persists the tokens and
+ * returns the user-shaped object used by usePortalState.
+ *
+ * @param {string} username
+ * @param {string} password
+ * @returns {Promise<{uid, role, username, displayName, phoneE164}>}
+ */
 export async function signIn(username, password) {
-  return signInWithEmailAndPassword(auth, syntheticEmail(username), password);
-}
-
-export function signOutNow() {
-  return signOut(auth);
-}
-
-// Force-refresh the ID token. Used by the callable() retry path when a server
-// call returns permission-denied/unauthenticated — most likely cause is a
-// stale token that doesn't yet carry a freshly-granted custom claim.
-export async function forceRefreshToken() {
-  if (!auth.currentUser) return null;
-  return auth.currentUser.getIdToken(true);
-}
-
-// Fetch the portal profile for a given uid (role, username, phone, ...).
-// On Firebase RTDB "permission-denied" we retry once after a short delay —
-// the RTDB SDK's internal auth listener can lag a moment behind
-// onAuthStateChanged / onIdTokenChanged, so the first read can hit the
-// rule with `auth == null` even though the user is signed in. The retry
-// gives the SDK a tick to catch up. If it still fails we return null so
-// the caller can degrade to a claims-only profile instead of crashing.
-export async function fetchProfile(uid) {
-  if (!uid) return null;
-  const read = () => get(ref(db, `users/${uid}`));
-  let snap;
-  try {
-    snap = await read();
-  } catch (e) {
-    if (e?.code === "PERMISSION_DENIED" || /permission[_ ]denied/i.test(e?.message || "")) {
-      await new Promise((r) => setTimeout(r, 250));
-      try { snap = await read(); }
-      catch (e2) {
-        logWarn("fetchProfile", e2);
-        return null;
-      }
-    } else {
-      logWarn("fetchProfile", e);
-      return null;
-    }
-  }
-  return snap.exists() ? { uid, ...snap.val() } : null;
-}
-
-// Build the auth-user object the rest of the app consumes. `role` and
-// `username` prefer the JWT claim (canonical) and fall back to the RTDB
-// profile (mid-migration safety net).
-function shapeAuthUser(fbUser, profile, claims) {
+  const data = await api.post(
+    "/auth/login",
+    { username, password },
+    { skipAuth: true },
+  );
+  storeTokens({
+    idToken: data.idToken,
+    refreshToken: data.refreshToken,
+    expiresIn: data.expiresIn,
+    uid: data.uid,
+  });
   return {
-    uid:       fbUser.uid,
-    username:  claims?.username ?? profile?.username  ?? null,
-    role:      claims?.role     ?? profile?.role      ?? null,
-    phoneE164: profile?.phoneE164 ?? null,
-    claims:    claims ?? {},
+    uid: data.uid,
+    role: data.role,
+    username: data.username,
+    displayName: data.displayName ?? null,
+    phoneE164: data.phoneE164 ?? null,
+    claims: { role: data.role, username: data.username },
   };
 }
 
-// Run the auth-enrichment pipeline (profile read + token decode) and hand the
-// result to `cb`. Any error is contained here so the listener never surfaces
-// an unhandled promise rejection; if the profile read failed we still call
-// `cb` with the token claims alone — the rest of the app reads `role` and
-// `username` from claims first anyway.
-async function emitAuthSnapshot(fbUser, cb, { forceRefresh }) {
+/**
+ * Sign out. Best-effort hits /auth/logout; clears tokens unconditionally
+ * so a network failure can't strand the user signed-in.
+ */
+export async function signOutNow() {
   try {
-    const [profile, tokenResult] = await Promise.all([
-      fetchProfile(fbUser.uid),
-      fbUser.getIdTokenResult(forceRefresh),
-    ]);
-    cb(shapeAuthUser(fbUser, profile, tokenResult.claims));
-  } catch (e) {
-    logWarn("emitAuthSnapshot", e);
-    try {
-      const tokenResult = await fbUser.getIdTokenResult();
-      cb(shapeAuthUser(fbUser, null, tokenResult.claims));
-    } catch (e2) {
-      logWarn("emitAuthSnapshot fallback", e2);
-      cb(shapeAuthUser(fbUser, null, {}));
-    }
+    await api.post("/auth/logout", {});
+  } catch (err) {
+    logWarn("signOutNow:logout", err);
+  } finally {
+    clearTokens();
   }
 }
 
-// Subscribe to authentication state changes, enriched with the user's profile
-// and custom claims. `cb` receives `null` when signed out, otherwise the
-// shape produced by `shapeAuthUser` above.
+/**
+ * Force a token refresh. Existed in the old Firebase service to handle
+ * post-claim-grant retries; in REST, /auth/refresh does the same.
+ *
+ * @returns {Promise<string|null>}
+ */
+export async function forceRefreshToken() {
+  try {
+    return await refreshIdToken();
+  } catch {
+    return null;
+  }
+}
+
+// ─── Profile ──────────────────────────────────────────────────────────────────
+
+/**
+ * Read the authenticated user's profile. The legacy version read
+ * /users/{uid} directly from RTDB; now we delegate to /auth/me which
+ * does the same on the server.
+ *
+ * @returns {Promise<{uid, role, username, displayName, phoneE164, claims} | null>}
+ */
+export async function fetchProfile() {
+  try {
+    return await api.get("/auth/me");
+  } catch {
+    return null;
+  }
+}
+
+// ─── Subscriptions ────────────────────────────────────────────────────────────
+
+/**
+ * Subscribe to "the current auth state". Replaces both
+ * `onAuthStateChanged` AND `onIdTokenChanged` from the SDK — REST does not
+ * distinguish the two events because there is no live SDK to fire them.
+ *
+ * Implementation: fire once immediately with whatever stored tokens we have,
+ * then poll /auth/me every 30s. On 401 or auth-cleared (handled by apiClient),
+ * the callback receives null so the UI can route to login.
+ *
+ * @param {(user: object|null) => void} cb
+ * @returns {() => void} unsubscribe
+ */
 export function subscribeAuth(cb) {
-  return onAuthStateChanged(auth, (fbUser) => {
-    if (!fbUser) { cb(null); return; }
-    emitAuthSnapshot(fbUser, cb, { forceRefresh: true });
-  });
+  loadStoredTokens();
+  const uid = getStoredUid();
+  if (!uid) {
+    // Not signed in — fire null synchronously and don't bother polling.
+    queueMicrotask(() => cb(null));
+    return () => {};
+  }
+  return createPoller(
+    () => api.get("/auth/me"),
+    (value) => {
+      if (!value) {
+        cb(null);
+        return;
+      }
+      cb({
+        uid: value.uid,
+        role: value.role,
+        username: value.username,
+        displayName: value.displayName ?? null,
+        phoneE164: value.phoneE164 ?? null,
+        claims: value.claims ?? {},
+      });
+    },
+    { intervalMs: ME_POLL_INTERVAL_MS },
+  );
 }
 
-// Subscribe to ID-token refreshes so callers see fresh custom claims (role
-// changes, new driver assignments, …) without forcing a sign-out / sign-in.
-// `cb` gets the same shape as subscribeAuth — the consumer can replace its
-// auth-user state with whatever fires last.
+/**
+ * Backwards-compat shim. The old SDK exposed `onIdTokenChanged` separately
+ * to deliver token-only refreshes (custom-claim updates). With REST, polling
+ * /auth/me already includes the freshest claims, so this is now an alias
+ * for subscribeAuth.
+ */
 export function subscribeIdToken(cb) {
-  return onIdTokenChanged(auth, (fbUser) => {
-    if (!fbUser) { cb(null); return; }
-    emitAuthSnapshot(fbUser, cb, { forceRefresh: false });
+  return subscribeAuth(cb);
+}
+
+// ─── Password reset (Phone OTP) ───────────────────────────────────────────────
+
+/**
+ * Step 1 of password reset — send an SMS code. The frontend renders a
+ * reCAPTCHA v2 widget; pass the resulting token here. Returns the
+ * opaque `sessionInfo` needed for confirm.
+ *
+ * Signature kept identical to legacy `sendPasswordResetCode` except for
+ * an extra `recaptchaToken` argument (the SDK obtained it transparently
+ * via RecaptchaVerifier, but the REST endpoint can't).
+ *
+ * @param {string} phoneE164
+ * @param {string} _containerIdUnused  kept for backwards compat with callers
+ * @param {string} recaptchaToken      v2 token from grecaptcha.getResponse()
+ * @returns {Promise<{sessionInfo: string}>}
+ */
+export async function sendPasswordResetCode(
+  phoneE164,
+  _containerIdUnused,
+  recaptchaToken,
+) {
+  return api.post(
+    "/auth/send-otp",
+    { phoneE164, recaptchaToken },
+    { skipAuth: true },
+  );
+}
+
+/**
+ * Step 2 of password reset — verify the code and obtain a phone-auth ID
+ * token. The token is stored so the next REST call (reset-password) is
+ * authenticated.
+ *
+ * @param {{sessionInfo: string}} sendResult  the object returned by sendPasswordResetCode
+ * @param {string} code
+ */
+export async function confirmPasswordResetCode(sendResult, code) {
+  const data = await api.post(
+    "/auth/verify-otp",
+    { sessionInfo: sendResult.sessionInfo, code },
+    { skipAuth: true },
+  );
+  storeTokens({
+    idToken: data.idToken,
+    refreshToken: data.refreshToken,
+    expiresIn: data.expiresIn,
   });
+  return data;
 }
 
-// ── Password-reset flow (Phone OTP) ───────────────────────────────────────────
-// Step 1: send an SMS code to the given phone. The `containerId` is the DOM
-// id of an empty <div> the invisible reCAPTCHA mounts into.
-export async function sendPasswordResetCode(phoneE164, containerId) {
-  const verifier = new RecaptchaVerifier(auth, containerId, { size: "invisible" });
-  return signInWithPhoneNumber(auth, phoneE164, verifier);
-}
-
-// Step 2: confirm the code; on success the user is signed in as a phone-auth
-// user. Pair this with services/users.callResetPassword to update the real
-// portal-user's password.
-export async function confirmPasswordResetCode(confirmationResult, code) {
-  return confirmationResult.confirm(code);
+/**
+ * Finalize a phone-OTP-authorized password reset. Must be called with the
+ * phone-auth idToken active (i.e. immediately after confirmPasswordResetCode).
+ */
+export async function callResetPassword(newPassword) {
+  return api.post("/auth/reset-password", { newPassword });
 }

@@ -1,25 +1,54 @@
-// Guest-confirmation service. Admins subscribe to /confirmations and may
-// update existing records (rules allow admin .write only when data.exists()).
-// New records are created exclusively by the submitConfirmation Cloud Function.
-import { ref, update } from "firebase/database";
-import { db } from "../firebase.js";
-import { subscribeList, callable } from "./_helpers.js";
+// Confirmations service — REST replacement.
+//
+// Endpoints (all under /api/confirmations):
+//   GET    /confirmations               admin: list (replaces RTDB subscribe)
+//   PATCH  /confirmations/:id           admin: edit a row
+//   POST   /confirmations               PUBLIC (5/hr/IP): guest submission
+//   POST   /confirmations/attach-location  admin (30/hr): manual attach
 
+import { api } from "../utils/apiClient.js";
+import { subscribeList } from "./_helpers.js";
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const CONFIRMATIONS_POLL_INTERVAL_MS = 15 * 1000;
+
+// ─── Subscriptions ────────────────────────────────────────────────────────────
+
+/**
+ * Admin-only live feed of every confirmation row. Server returns
+ * `[{ id, ...record }]`.
+ */
 export function subscribeConfirmations(cb) {
-  return subscribeList("confirmations", cb);
+  return subscribeList("/confirmations", cb, {
+    intervalMs: CONFIRMATIONS_POLL_INTERVAL_MS,
+  });
 }
 
-// Payload shape: { groomUsername, submittedName, submittedPhone, submittedCity,
-//                   submittedStreet, submittedHouse, lat?, lng?, locationAccuracy? }
-// Returns: { ok: true, id, attachedGuestId: string|null }
-export const submitConfirmation = callable("submitConfirmation");
+// ─── Mutations ────────────────────────────────────────────────────────────────
 
-// Admin-only: copy a confirmation's stored lat/lng/accuracy onto a specific
-// guest record. Used when auto-attach couldn't decide (no match or multiple).
-export const attachConfirmationLocationToGuest = callable("attachConfirmationLocationToGuest");
+/**
+ * Public guest submission. No auth needed. Payload shape mirrors the legacy
+ * onCall: `{ groomUsername, submittedName, submittedPhone, submittedCity,
+ * submittedStreet?, submittedHouse?, lat?, lng?, locationAccuracy? }`.
+ * Server resolves groomUid, writes the record, and best-effort auto-attaches
+ * to a matching guest.
+ */
+export async function submitConfirmation(payload) {
+  return api.post("/confirmations", payload, { skipAuth: true });
+}
 
-// Admin-only: patch fields on an existing confirmation. RTDB rules enforce
-// that only authenticated admins can write here, and only to existing records.
+/**
+ * Admin-only: copy a confirmation's stored coords onto a specific guest.
+ * Body shape: `{ confirmationId, guestId }`.
+ */
+export async function attachConfirmationLocationToGuest(input) {
+  return api.post("/confirmations/attach-location", input);
+}
+
+/**
+ * Admin-only: patch a confirmation row. Server enforces allowed fields.
+ */
 export async function updateConfirmation(id, patch) {
-  return update(ref(db, `confirmations/${id}`), patch);
+  return api.patch(`/confirmations/${id}`, patch);
 }

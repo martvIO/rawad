@@ -1,460 +1,267 @@
-// Digital invitation service — Cloud Firestore for data, Firebase Storage for files.
+// Digital-invitation service — REST replacement for the Firestore + Storage
+// SDK calls. All endpoints sit under /api/digital. See routes/digital.ts for
+// the server contract.
 //
-// WHY Firestore (not RTDB):
-//   Firebase RTDB SDK writes can be silently rejected by the server when the
-//   SDK's WebSocket hasn't re-authenticated yet (happens briefly after login).
-//   The SDK applies writes to the local cache, resolves the Promise as "success",
-//   then rolls back silently when the server rejects — data disappears on refresh.
-//   Firestore SDK has a separate, more reliable auth layer: addDoc/setDoc/updateDoc
-//   all wait for confirmed server writes and throw real errors on rejection.
-//
-// Firestore layout — all digital invitation data nested under one path per groom:
-//   digitalInvitations/{groomUid}                              — doc: media[], weddingDate, flags
-//   digitalInvitations/{groomUid}/guests/{guestId}             — RSVP list
-//   digitalInvitations/{groomUid}/photographerFiles/{fileId}   — photographer uploads
-//   digitalInvitations/{groomUid}/designRequests/{reqId}       — design workflow (see designRequests.js)
+// Data layout (server-side, exposed via REST):
+//   /digital/:uid/guests                       — RSVP list
+//   /digital/:uid/media                        — invite-doc projection
+//   /digital/:uid/media/settings               — wedding date / ranks / flags
+//   /digital/:uid/media/upload                 — multipart background upload
+//   /digital/:uid/media/delete-item            — remove one media[] entry
+//   /digital/:uid/photographer                 — photographer files list
+//   /digital/:uid/photographer/upload          — multipart upload
+//   /digital/:uid/photographer/:fileId         — patch (rename) / delete
+//   /digital/:uid/design-requests              — design workflow (groom view)
+//   /digital/design-requests                   — design workflow (admin global)
+//   /digital/:uid/design-requests/:reqId       — patch
+//   /digital/:uid/design-requests/:reqId/mockup — admin mockup upload
+//   /digital/:uid/public                       — unauthenticated read
 
-import {
-  collection, doc, addDoc, setDoc, updateDoc, deleteDoc, getDoc, getDocs,
-  onSnapshot, query, orderBy,
-} from "firebase/firestore";
-import {
-  ref as storageRef, uploadBytes, getDownloadURL, listAll, getMetadata,
-  deleteObject,
-} from "firebase/storage";
-import { firestore, storage, auth } from "../firebase.js";
-import { callable } from "./_helpers.js";
-import { logErr, logWarn, log } from "../utils/logger.js";
+import { api } from "../utils/apiClient.js";
+import { createPoller } from "../utils/poller.js";
+import { getStoredUid } from "../utils/tokenManager.js";
+import { logErr } from "../utils/logger.js";
 
-// Subscription error callbacks: callers can pass a second `onError` arg to
-// surface Firestore-side failures (rule denial, network, etc.) in the UI
-// instead of silently rendering an empty list.
-function onError(tag, onErrCb) {
-  return (err) => {
-    logErr(`firestore:${tag}`, err);
-    if (typeof onErrCb === "function") onErrCb(err);
-  };
-}
+// ─── Constants ────────────────────────────────────────────────────────────────
 
-// ── Per-guest digital invite tokens (callable Cloud Functions) ────────────────
-export const createDigitalGuestInvite = callable("createDigitalGuestInvite");
-export const submitDigitalGuestInvite = callable("submitDigitalGuestInvite");
+const DIGITAL_POLL_INTERVAL_MS = 15 * 1000;
 
-// ── Collection / document references ─────────────────────────────────────────
-const guestsCol = (uid) => collection(firestore, "digitalInvitations", uid, "guests");
-const mediaDoc  = (uid) => doc(firestore, "digitalInvitations", uid);
-const filesCol  = (uid) => collection(firestore, "digitalInvitations", uid, "photographerFiles");
+// ─── Re-exports kept for back-compat with prior callsites ─────────────────────
 
+export { createDigitalGuestInvite, submitDigitalGuestInvite } from "./invites.js";
+
+// ─── Shared helpers ───────────────────────────────────────────────────────────
+
+/**
+ * Resolve the groomUid used in path params. Pre-migration this read from
+ * `auth.currentUser`; now it falls back to the locally-stored UID. Throws
+ * the same error message so the UI's error toast stays consistent.
+ */
 function resolveUid(groomUid) {
-  const uid = groomUid || auth.currentUser?.uid;
+  const uid = groomUid || getStoredUid();
   if (!uid) throw new Error("Not authenticated — please reload and log in again");
   return uid;
 }
 
-function kindOf(file) {
-  if (file.type?.startsWith("video")) return "video";
-  if (file.type === "image/gif")      return "gif";
-  return "image";
+/**
+ * Build a poller that surfaces errors through the consumer-provided cb.
+ * Mirrors the legacy onSnapshot signature `(cb, onErrCb)`.
+ */
+function pollList(endpoint, cb, onErrCb) {
+  return createPoller(
+    async () => {
+      try {
+        return await api.get(endpoint);
+      } catch (err) {
+        logErr(`pollList(${endpoint})`, err);
+        if (typeof onErrCb === "function") onErrCb(err);
+        return [];
+      }
+    },
+    (value) => cb(Array.isArray(value) ? value : []),
+    { intervalMs: DIGITAL_POLL_INTERVAL_MS },
+  );
 }
 
-// ── Digital Guests ─────────────────────────────────────────────────────────────
+// ─── Digital Guests ───────────────────────────────────────────────────────────
 
 export function subscribeDigitalGuests(groomUid, cb, onErrCb) {
-  const path = `digitalInvitations/${groomUid}/guests`;
-  log("subscribeDigitalGuests →", path);
-  const q = query(guestsCol(groomUid), orderBy("createdAt", "asc"));
-  return onSnapshot(
-    q,
-    (snap) => {
-      const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      log(`subscribeDigitalGuests fired (${list.length} docs) ←`, path);
-      cb(list);
-    },
-    onError(`subscribeDigitalGuests(${path})`, onErrCb),
-  );
+  const uid = resolveUid(groomUid);
+  return pollList(`/digital/${uid}/guests`, cb, onErrCb);
 }
 
 export async function addDigitalGuest(groomUid, { name, phone, rank }) {
   const uid = resolveUid(groomUid);
-  const path = `digitalInvitations/${uid}/guests`;
-  log("addDigitalGuest →", path, { name, phone, rank });
-  try {
-    const payload = {
-      name, phone, status: "pending", createdAt: Date.now(),
-    };
-    const cleanRank = (rank || "").trim();
-    if (cleanRank) payload.rank = cleanRank;
-    const ref = await addDoc(guestsCol(uid), payload);
-    log("addDigitalGuest ✓ saved", `${path}/${ref.id}`);
-    return ref.id;
-  } catch (err) {
-    logErr(`addDigitalGuest(${path})`, err);
-    throw err;
-  }
+  const body = { name, phone };
+  const cleanRank = (rank || "").trim();
+  if (cleanRank) body.rank = cleanRank;
+  const result = await api.post(`/digital/${uid}/guests`, body);
+  return result?.id ?? null;
 }
 
 export async function updateDigitalGuest(groomUid, guestId, patch) {
   const uid = resolveUid(groomUid);
-  await updateDoc(doc(guestsCol(uid), guestId), patch);
+  return api.patch(`/digital/${uid}/guests/${guestId}`, patch);
 }
 
 export async function removeDigitalGuest(groomUid, guestId) {
   const uid = resolveUid(groomUid);
-  await deleteDoc(doc(guestsCol(uid), guestId));
+  return api.delete(`/digital/${uid}/guests/${guestId}`);
 }
 
-export async function fetchDigitalGuests() { return []; }
+/**
+ * Legacy one-shot fetch — most code uses the subscription. Retained as a
+ * no-op stub since the call site was already a placeholder.
+ */
+export async function fetchDigitalGuests() {
+  return [];
+}
 
-// ── Invitation Doc (media[] + wedding date + flags) ───────────────────────────
-//
-// Document shape (all fields optional):
-//   media:                 [{ url, kind, storagePath, order }]
-//   weddingDate:           number (epoch ms)
-//   photographerPublished: boolean
-//   brideName:             string
-//   groomDisplayName:      string
-//
-// Legacy single-background fields (auto-migrated on first save):
-//   backgroundUrl, backgroundType, storagePath
+// ─── Invitation Media doc ─────────────────────────────────────────────────────
 
-// Subscribe to the parent doc and project a normalised view to consumers.
-// Auto-migrates the legacy single-background shape on the fly so existing
-// docs continue rendering without a separate migration pass.
+/**
+ * Subscribe to the parent invitation doc (background media + flags +
+ * wedding date). Server returns the projected shape with the legacy
+ * single-background field auto-folded into media[0].
+ */
 export function subscribeDigitalMedia(groomUid, cb, onErrCb) {
-  const path = `digitalInvitations/${groomUid}`;
-  log("subscribeDigitalMedia →", path);
-  return onSnapshot(
-    mediaDoc(groomUid),
-    (snap) => {
-      const exists = snap.exists();
-      log(`subscribeDigitalMedia fired (exists=${exists}) ←`, path);
-      cb(exists ? projectMediaDoc(snap.data()) : null);
+  const uid = resolveUid(groomUid);
+  return createPoller(
+    async () => {
+      try {
+        return await api.get(`/digital/${uid}/media`);
+      } catch (err) {
+        logErr(`subscribeDigitalMedia(${uid})`, err);
+        if (typeof onErrCb === "function") onErrCb(err);
+        return null;
+      }
     },
-    onError(`subscribeDigitalMedia(${path})`, onErrCb),
+    (value) => cb(value ?? null),
+    { intervalMs: DIGITAL_POLL_INTERVAL_MS },
   );
 }
 
-function projectMediaDoc(data) {
-  if (!data) return null;
-  // If `media` array already exists, return as-is.
-  if (Array.isArray(data.media) && data.media.length > 0) return data;
-  // Legacy single-background → synthesise a one-item media array.
-  if (data.backgroundUrl) {
-    return {
-      ...data,
-      media: [{
-        url:         data.backgroundUrl,
-        kind:        data.backgroundType === "video" ? "video" : data.backgroundType === "gif" ? "gif" : "image",
-        storagePath: data.storagePath || "",
-        order:       0,
-      }],
-    };
-  }
-  return data;
-}
-
-// Add a new media item to the gallery.
+/**
+ * Upload a new background media item. Returns the newly created media[]
+ * entry shape `{ url, kind, storagePath, order }`.
+ */
 export async function addInvitationMedia(groomUid, file) {
-  const uid  = resolveUid(groomUid);
-  const ext  = (file.name.split(".").pop() || "bin").toLowerCase();
-  const path = `digitalMedia/${uid}/m_${Date.now()}.${ext}`;
-  const docPath = `digitalInvitations/${uid}`;
-  log("addInvitationMedia → storage:", path);
-  try {
-    const sr = storageRef(storage, path);
-    await uploadBytes(sr, file, { contentType: file.type });
-    const url = await getDownloadURL(sr);
-    const item = { url, kind: kindOf(file), storagePath: path, order: Date.now() };
-
-    // Merge into media[] — read-modify-write so concurrent uploads don't clobber.
-    log("addInvitationMedia → firestore:", docPath);
-    const snap     = await getDoc(mediaDoc(uid));
-    const existing = snap.exists() ? (snap.data().media || []) : [];
-    // Carry forward legacy single-background as media[0] on first multi-upload.
-    let migrated = existing;
-    if (existing.length === 0 && snap.exists() && snap.data().backgroundUrl) {
-      const d = snap.data();
-      migrated = [{
-        url: d.backgroundUrl,
-        kind: d.backgroundType === "video" ? "video" : d.backgroundType === "gif" ? "gif" : "image",
-        storagePath: d.storagePath || "",
-        order: 0,
-      }];
-    }
-    const media = [...migrated, item];
-    await setDoc(mediaDoc(uid), { media }, { merge: true });
-    log("addInvitationMedia ✓ saved media[] length =", media.length);
-    return item;
-  } catch (err) {
-    logErr(`addInvitationMedia(${docPath})`, err);
-    throw err;
-  }
+  const uid = resolveUid(groomUid);
+  const formData = new FormData();
+  formData.append("file", file, file.name);
+  return api.upload(`/digital/${uid}/media/upload`, formData);
 }
 
-// Remove a specific media item (by storagePath).
+/**
+ * Remove one media[] entry by storagePath. Server prunes the array AND
+ * best-effort deletes the Storage object.
+ */
 export async function removeInvitationMedia(groomUid, item) {
-  const uid  = resolveUid(groomUid);
-  const snap = await getDoc(mediaDoc(uid));
-  if (!snap.exists()) return;
-  const existing = snap.data().media || [];
-  const filtered = existing.filter(m => m.storagePath !== item.storagePath);
-  await setDoc(mediaDoc(uid), { media: filtered }, { merge: true });
-  // Best-effort Storage cleanup; tolerate missing files.
-  try { if (item.storagePath) await deleteObject(storageRef(storage, item.storagePath)); }
-  catch { /* ignore */ }
+  const uid = resolveUid(groomUid);
+  if (!item?.storagePath) return;
+  return api.post(`/digital/${uid}/media/delete-item`, {
+    storagePath: item.storagePath,
+  });
 }
 
-// Set the wedding date (epoch ms or null to clear).
 export async function setWeddingDate(groomUid, epochMs) {
   const uid = resolveUid(groomUid);
-  await setDoc(mediaDoc(uid), { weddingDate: epochMs ?? null }, { merge: true });
+  return api.patch(`/digital/${uid}/media/settings`, {
+    weddingDate: epochMs ?? null,
+  });
 }
 
-// Toggle the photographer-published flag.
 export async function setPhotographerPublished(groomUid, published) {
   const uid = resolveUid(groomUid);
-  await setDoc(mediaDoc(uid), { photographerPublished: !!published }, { merge: true });
+  return api.patch(`/digital/${uid}/media/settings`, {
+    photographerPublished: !!published,
+  });
 }
 
-// Save the groom's custom guest ranks (e.g. "العرس فقط", "العرس والزيانة").
-// Stored as a string[] on the parent invitation doc; the Add Guest dropdown
-// reads from the same field via subscribeDigitalMedia.
 export async function setGuestRanks(groomUid, ranks) {
   const uid = resolveUid(groomUid);
-  const clean = Array.from(new Set(
-    (ranks || []).map(r => (r || "").trim()).filter(Boolean),
-  ));
-  await setDoc(mediaDoc(uid), { guestRanks: clean }, { merge: true });
+  return api.patch(`/digital/${uid}/media/settings`, {
+    guestRanks: Array.isArray(ranks) ? ranks : [],
+  });
 }
 
-// One-time read for the public landing page (no subscription, no auth gate).
-// Used by the unauthenticated /d/{groomUsername}/{token} route.
+/**
+ * Unauthenticated read of the parent invitation doc. Used by the guest-
+ * facing /d/{groomUsername}/{token} page.
+ */
 export async function getDigitalInvitationPublic(groomUid) {
-  const snap = await getDoc(mediaDoc(groomUid));
-  return snap.exists() ? projectMediaDoc(snap.data()) : null;
+  if (!groomUid) return null;
+  try {
+    return await api.get(`/digital/${groomUid}/public`, { skipAuth: true });
+  } catch {
+    return null;
+  }
 }
 
-// Legacy single-file API — keep for any callers still using it (none after
-// DigitalDashboard rewrite, but harmless to keep one release).
+/** Backwards-compat alias for the prior single-file upload entrypoint. */
 export async function saveDigitalMediaFile(groomUid, file) {
   return addInvitationMedia(groomUid, file);
 }
 
+/**
+ * Full removal — clears the entire invitation doc and every file under
+ * digitalMedia/{uid}. Server handles both layers atomically.
+ */
 export async function removeDigitalMedia(groomUid) {
   const uid = resolveUid(groomUid);
-  try { await deleteDoc(mediaDoc(uid)); }
-  catch (err) { logErr("removeDigitalMedia:deleteDoc", err); }
-  try {
-    const folder = storageRef(storage, `digitalMedia/${uid}`);
-    const listing = await listAll(folder);
-    await Promise.all(listing.items.map(it =>
-      deleteObject(it).catch(err => logErr("removeDigitalMedia:deleteObject", err))
-    ));
-  } catch (err) {
-    logErr("removeDigitalMedia:listAll", err);
-  }
+  return api.delete(`/digital/${uid}/media`);
 }
 
-// ── Photographer Files ─────────────────────────────────────────────────────────
+// ─── Photographer Files ───────────────────────────────────────────────────────
 
 export function subscribePhotographerFiles(groomUid, cb, onErrCb) {
-  const path = `digitalInvitations/${groomUid}/photographerFiles`;
-  log("subscribePhotographerFiles →", path);
-  const q = query(filesCol(groomUid), orderBy("uploadedAt", "desc"));
-  return onSnapshot(
-    q,
-    (snap) => {
-      const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      log(`subscribePhotographerFiles fired (${list.length} docs) ←`, path);
-      cb(list);
-    },
-    onError(`subscribePhotographerFiles(${path})`, onErrCb),
-  );
+  const uid = resolveUid(groomUid);
+  return pollList(`/digital/${uid}/photographer`, cb, onErrCb);
 }
 
-// Public, unauthenticated read — used by /d/{groomUsername}/{token}/photos.
-// Only succeeds when photographerPublished == true (enforced by Firestore rules).
+/**
+ * Public, unauthenticated read used by /d/{groomUsername}/{token}/photos.
+ * The server only returns rows when `photographerPublished` is true on the
+ * parent doc — otherwise responds with 403, surfaced here as an empty array.
+ */
 export async function fetchPublishedPhotographerFiles(groomUid) {
-  const snap = await getDoc(mediaDoc(groomUid));
-  if (!snap.exists() || snap.data().photographerPublished !== true) return [];
-  const q = query(filesCol(groomUid), orderBy("uploadedAt", "desc"));
-  const r = await getDocs(q);
-  return r.docs.map(d => ({ id: d.id, ...d.data() }));
+  if (!groomUid) return [];
+  try {
+    return await api.get(`/digital/${groomUid}/photographer`, { skipAuth: true });
+  } catch {
+    return [];
+  }
 }
 
 export async function uploadPhotographerFile(groomUid, file) {
-  const uid      = resolveUid(groomUid);
-  const safeName = file.name.replace(/[^\w.\-]/g, "_");
-  const path     = `photographerFiles/${uid}/${Date.now()}_${safeName}`;
-  const docPath  = `digitalInvitations/${uid}/photographerFiles`;
-  log("uploadPhotographerFile → storage:", path);
-  try {
-    const sr = storageRef(storage, path);
-    await uploadBytes(sr, file, { contentType: file.type || "application/octet-stream" });
-    const url = await getDownloadURL(sr);
-    log("uploadPhotographerFile → firestore:", docPath);
-    const docRef = await addDoc(filesCol(uid), {
-      name: file.name, url, type: file.type || "",
-      storagePath: path, uploadedAt: Date.now(),
-    });
-    log("uploadPhotographerFile ✓ saved", `${docPath}/${docRef.id}`);
-    return { url, key: docRef.id };
-  } catch (err) {
-    logErr(`uploadPhotographerFile(${docPath})`, err);
-    throw err;
-  }
+  const uid = resolveUid(groomUid);
+  const formData = new FormData();
+  formData.append("file", file, file.name);
+  const data = await api.upload(`/digital/${uid}/photographer/upload`, formData);
+  return { url: data?.url ?? null, key: data?.id ?? null };
 }
 
 export async function renamePhotographerFile(groomUid, fileId, newName) {
-  const uid  = resolveUid(groomUid);
+  const uid = resolveUid(groomUid);
   const name = (newName || "").trim();
   if (!name) throw new Error("Name cannot be empty");
-  await updateDoc(doc(filesCol(uid), fileId), { name });
+  return api.patch(`/digital/${uid}/photographer/${fileId}`, { name });
 }
 
 export async function removePhotographerFile(groomUid, fileId) {
   const uid = resolveUid(groomUid);
-  // Read first to find the Storage path, then delete both layers. If the
-  // Firestore doc is missing (orphan case), fileId is itself the storagePath.
-  const ref = doc(filesCol(uid), fileId);
-  let storagePath = null;
-  try {
-    const snap = await getDoc(ref);
-    if (snap.exists()) storagePath = snap.data().storagePath || null;
-  } catch (err) {
-    logErr("removePhotographerFile:getDoc", err);
-  }
-  try { await deleteDoc(ref); }
-  catch (err) { logErr("removePhotographerFile:deleteDoc", err); }
-  if (storagePath) {
-    try { await deleteObject(storageRef(storage, storagePath)); }
-    catch (err) { logErr("removePhotographerFile:deleteObject", err); }
-  }
+  return api.delete(`/digital/${uid}/photographer/${fileId}`);
 }
 
-// Delete a Storage-only orphan (no Firestore doc). Used when the user deletes
-// an entry that came from listPhotographerFilesFromStorage and was never healed.
+/**
+ * Storage-only orphan path — kept for back-compat with prior callers that
+ * pass a storagePath. The new server handles deletion uniformly when given
+ * a fileId, so this just delegates.
+ */
 export async function removePhotographerFileByPath(groomUid, storagePath) {
-  resolveUid(groomUid);
+  const uid = resolveUid(groomUid);
   if (!storagePath) return;
-  try { await deleteObject(storageRef(storage, storagePath)); }
-  catch (err) { logErr("removePhotographerFileByPath", err); }
+  return api.delete(`/digital/${uid}/photographer/${encodeURIComponent(storagePath)}`);
 }
 
-// ── Storage-direct listing (source of truth for display) ──────────────────────
+// ─── Auto-heal stubs (no longer needed) ───────────────────────────────────────
 //
-// Firestore docs are an optional metadata layer. Storage is authoritative — if a
-// file exists in Storage, the user should see it, even when the Firestore doc
-// hasn't been written yet (pre-deploy orphans) or a transient subscribe error
-// happened. These helpers walk Storage directly via listAll().
+// Pre-migration the client walked Storage directly to recover orphans. With
+// the REST backend the server owns both layers, so these become no-ops.
+// Kept as exports so existing callers don't break.
 
-// Photographer folder list. Each item gets a fresh download URL and metadata.
-// Returns: [{ key, name, url, type, storagePath, uploadedAt }]
-export async function listPhotographerFilesFromStorage(groomUid) {
-  const uid = resolveUid(groomUid);
-  const folder = storageRef(storage, `photographerFiles/${uid}`);
-  let listing;
-  try {
-    listing = await listAll(folder);
-  } catch (err) {
-    logErr("listPhotographerFilesFromStorage:listAll", err);
-    return [];
-  }
-  const items = await Promise.all(listing.items.map(async (it) => {
-    try {
-      const [url, meta] = await Promise.all([getDownloadURL(it), getMetadata(it)]);
-      // Filename pattern uploadPhotographerFile uses: `${Date.now()}_${safeName}`
-      const tsMatch = it.name.match(/^(\d{10,})_/);
-      const uploadedAt = tsMatch ? Number(tsMatch[1])
-        : (meta.timeCreated ? Date.parse(meta.timeCreated) : null);
-      // Strip the timestamp prefix for display
-      const displayName = it.name.replace(/^\d{10,}_/, "");
-      return {
-        key:         it.fullPath,
-        name:        displayName,
-        url,
-        type:        meta.contentType || "",
-        storagePath: it.fullPath,
-        uploadedAt,
-      };
-    } catch (err) {
-      logErr("listPhotographerFilesFromStorage:item", err);
-      return null;
-    }
-  }));
-  return items.filter(Boolean);
+export async function listPhotographerFilesFromStorage() {
+  return [];
 }
 
-// Latest background-media file in the digitalMedia folder for this groom.
-// uploadName pattern: `background_${Date.now()}.${ext}`
-// Returns: { url, type, storagePath } | null
-export async function getLatestDigitalMediaFromStorage(groomUid) {
-  const uid = resolveUid(groomUid);
-  const folder = storageRef(storage, `digitalMedia/${uid}`);
-  let listing;
-  try {
-    listing = await listAll(folder);
-  } catch (err) {
-    logErr("getLatestDigitalMediaFromStorage:listAll", err);
-    return null;
-  }
-  if (!listing.items.length) return null;
-  // Latest by embedded timestamp in filename, fallback to lexicographic.
-  const tsOf = (n) => { const m = n.match(/background_(\d{10,})\./); return m ? Number(m[1]) : 0; };
-  const latest = listing.items.slice().sort((a, b) => tsOf(b.name) - tsOf(a.name))[0];
-  try {
-    const [url, meta] = await Promise.all([getDownloadURL(latest), getMetadata(latest)]);
-    const ct = meta.contentType || "";
-    const type = ct.startsWith("video") ? "video"
-               : ct === "image/gif"     ? "gif"
-               : "image";
-    return { url, type, storagePath: latest.fullPath };
-  } catch (err) {
-    logErr("getLatestDigitalMediaFromStorage:item", err);
-    return null;
-  }
+export async function getLatestDigitalMediaFromStorage() {
+  return null;
 }
 
-// ── Auto-heal: write missing Firestore docs for orphan Storage objects ───────
-//
-// Pre-deploy uploads landed in Storage but their Firestore metadata writes were
-// rejected by default-deny. After the rules deploy, on the next page load we
-// reconcile by `addDoc` / `setDoc`-ing matching metadata. Idempotent — each call
-// only writes what's missing.
-
-export async function healPhotographerFiles(groomUid, storageList, firestoreList) {
-  const uid = resolveUid(groomUid);
-  const known = new Set((firestoreList || []).map(f => f.storagePath).filter(Boolean));
-  const orphans = (storageList || []).filter(s => !known.has(s.storagePath));
-  for (const o of orphans) {
-    try {
-      await addDoc(filesCol(uid), {
-        name:        o.name,
-        url:         o.url,
-        type:        o.type || "",
-        storagePath: o.storagePath,
-        uploadedAt:  o.uploadedAt ?? Date.now(),
-      });
-    } catch (err) {
-      logErr("healPhotographerFiles:addDoc", err);
-    }
-  }
-  return orphans.length;
+export async function healPhotographerFiles() {
+  return 0;
 }
 
-export async function healDigitalMedia(groomUid, storageLatest, firestoreDoc) {
-  if (!storageLatest) return false;
-  const uid = resolveUid(groomUid);
-  if (firestoreDoc?.storagePath === storageLatest.storagePath) return false;
-  try {
-    await setDoc(mediaDoc(uid), {
-      backgroundUrl:  storageLatest.url,
-      backgroundType: storageLatest.type,
-      storagePath:    storageLatest.storagePath,
-    });
-    return true;
-  } catch (err) {
-    logErr("healDigitalMedia:setDoc", err);
-    return false;
-  }
+export async function healDigitalMedia() {
+  return false;
 }

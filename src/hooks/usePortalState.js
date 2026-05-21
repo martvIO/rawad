@@ -11,7 +11,8 @@ import { validateName } from "../utils/validation.js";
 import { isStrongPassword } from "../utils/password.js";
 import { logErr } from "../utils/logger.js";
 
-import { subscribeAuth, subscribeIdToken, signIn, signOutNow, forceRefreshToken } from "../services/auth.js";
+import { subscribeAuth, signIn, signOutNow, forceRefreshToken } from "../services/auth.js";
+import { setAuthChangeCallback } from "../utils/apiClient.js";
 import {
   subscribeAllGuests, subscribeGuestsForGroom,
   addGuest as addGuestSrv, updateGuest as updateGuestSrv, removeGuest as removeGuestSrv,
@@ -51,9 +52,23 @@ export function usePortalState({ onBack, t, lang, setLang }) {
   const [authUser, setAuthUser] = useState(null);
   const [authReady, setAuthReady] = useState(false);
   useEffect(() => {
-    const unsubAuth  = subscribeAuth((u)  => { setAuthUser(u); setAuthReady(true); });
-    const unsubToken = subscribeIdToken((u) => { setAuthUser(u); setAuthReady(true); });
-    return () => { unsubAuth(); unsubToken(); };
+    // REST polling auth — subscribeAuth handles both the initial state and
+    // every periodic /auth/me refresh (replaces SDK onAuthStateChanged +
+    // onIdTokenChanged).
+    const unsubAuth = subscribeAuth((u) => {
+      setAuthUser(u);
+      setAuthReady(true);
+    });
+    // When apiClient detects an unrecoverable 401 it fires this callback so
+    // the portal can drop the local user state and route to login.
+    setAuthChangeCallback(() => {
+      setAuthUser(null);
+      setAuthReady(true);
+    });
+    return () => {
+      unsubAuth();
+      setAuthChangeCallback(null);
+    };
   }, []);
 
   const authed = !!authUser;

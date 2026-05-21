@@ -1,122 +1,122 @@
-// Design request service — Firestore-backed.
+// Design-request service — REST replacement.
 //
-// Workflow:
-//   [groom]   submitted          → groom filed a template
-//   [admin]   designing          → admin/designer started working
-//   [admin]   review             → admin uploaded mockups, awaiting groom review
-//   [groom]   revision_requested → groom asked for changes
-//   [groom]   approved           → groom approved the design (terminal)
+// Endpoints (all under /api/digital):
+//   GET   /digital/design-requests                                 admin: global list
+//   GET   /digital/:uid/design-requests                            groom: own list
+//   POST  /digital/:uid/design-requests                            groom: submit template
+//   PATCH /digital/:uid/design-requests/:reqId                     status updates
+//   POST  /digital/:uid/design-requests/:reqId/mockup              admin: upload mockup
 //
-// Firestore layout — subcollection under each groom's digital invitation doc:
-//   digitalInvitations/{groomUid}/designRequests/{reqId}
-//     groomUid, groomUsername, status, templateData, mockups[],
-//     revisionNotes, createdAt, updatedAt, approvedAt
-import {
-  collection, collectionGroup, doc, addDoc, updateDoc, onSnapshot, query, orderBy,
-} from "firebase/firestore";
-import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
-import { firestore, storage, auth } from "../firebase.js";
+// The status-transition rules from the legacy code are now enforced on the
+// server (admin can transition to any value; groom can only set
+// approved / revision_requested).
 
-// Subcollection path for a specific groom.
-const designCol = (groomUid) =>
-  collection(firestore, "digitalInvitations", groomUid, "designRequests");
+import { api } from "../utils/apiClient.js";
+import { createPoller } from "../utils/poller.js";
+import { getStoredUid } from "../utils/tokenManager.js";
 
-// Document ref helper.
-const designDoc = (groomUid, reqId) =>
-  doc(firestore, "digitalInvitations", groomUid, "designRequests", reqId);
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const DESIGN_REQ_POLL_INTERVAL_MS = 15 * 1000;
 
 function uid(groomUid) {
-  const u = groomUid || auth.currentUser?.uid;
+  const u = groomUid || getStoredUid();
   if (!u) throw new Error("Not authenticated");
   return u;
 }
 
-// Groom view — only this groom's requests, newest first.
+// ─── Subscriptions ────────────────────────────────────────────────────────────
+
+/**
+ * Groom view — newest-first list of their own design requests.
+ */
 export function subscribeDesignRequests(groomUid, cb) {
-  const q = query(designCol(groomUid), orderBy("createdAt", "desc"));
-  return onSnapshot(
-    q,
-    (snap) => cb(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
-    () => cb([]),
+  return createPoller(
+    () => api.get(`/digital/${uid(groomUid)}/design-requests`),
+    (value) => cb(Array.isArray(value) ? value : []),
+    { intervalMs: DESIGN_REQ_POLL_INTERVAL_MS },
   );
 }
 
-// Admin view — every design request across all grooms via collectionGroup.
-// Each doc still carries `groomUid` as a denormalised field so admin UI doesn't
-// need to walk the path to identify which groom owns the request.
+/**
+ * Admin view — every design request across all grooms (server uses Firestore
+ * collectionGroup). Each row carries `groomUid` so the admin UI can render
+ * without joining on a profile lookup.
+ */
 export function subscribeAllDesignRequests(cb) {
-  const q = query(collectionGroup(firestore, "designRequests"), orderBy("createdAt", "desc"));
-  return onSnapshot(
-    q,
-    (snap) => cb(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
-    () => cb([]),
+  return createPoller(
+    () => api.get("/digital/design-requests"),
+    (value) => cb(Array.isArray(value) ? value : []),
+    { intervalMs: DESIGN_REQ_POLL_INTERVAL_MS },
   );
 }
 
-// Groom — submit a new design template.
-// `templateData` shape: { brideName, groomName, weddingDate, colors, style, notes }
+// ─── Groom workflow ───────────────────────────────────────────────────────────
+
+/**
+ * Submit a brand-new design template.
+ * `templateData` shape: `{ brideName, groomName, weddingDate, colors, style, notes }`.
+ */
 export async function submitDesignTemplate(groomUid, groomUsername, templateData) {
-  const u   = uid(groomUid);
-  const now = Date.now();
-  const ref = await addDoc(designCol(u), {
-    groomUid: u,                  // denormalised — admin reads it from collectionGroup
+  const result = await api.post(`/digital/${uid(groomUid)}/design-requests`, {
     groomUsername: groomUsername || "",
-    status: "submitted",
     templateData: templateData || {},
-    mockups: [],
-    revisionNotes: null,
-    createdAt: now,
-    updatedAt: now,
-    approvedAt: null,
   });
-  return ref.id;
+  return result?.id ?? null;
 }
 
-// Admin — mark "designing" once they pick up the request.
-export async function startDesigning(groomUid, reqId) {
-  await updateDoc(designDoc(groomUid, reqId), {
-    status: "designing",
-    updatedAt: Date.now(),
-  });
-}
-
-// Admin — upload a mockup image to Storage. Returns the mockup metadata; the
-// caller commits it to the Firestore doc via commitMockup.
-export async function uploadMockup(groomUid, reqId, file) {
-  const u        = uid(groomUid);
-  const safeName = file.name.replace(/[^\w.\-]/g, "_");
-  const path     = `designMockups/${u}/${reqId}/${Date.now()}_${safeName}`;
-  const sr       = storageRef(storage, path);
-  await uploadBytes(sr, file, { contentType: file.type || "application/octet-stream" });
-  const url = await getDownloadURL(sr);
-  return { url, storagePath: path, uploadedAt: Date.now(), name: file.name };
-}
-
-// Admin — commit a freshly-uploaded mockup to the request.
-export async function commitMockup(groomUid, reqId, existingMockups, newMockup) {
-  await updateDoc(designDoc(groomUid, reqId), {
-    mockups: [...(existingMockups || []), newMockup],
-    status: "review",
-    revisionNotes: null,
-    updatedAt: Date.now(),
-  });
-}
-
-// Groom — approve the design.
+/**
+ * Groom marks a request approved.
+ */
 export async function approveDesign(groomUid, reqId) {
-  const now = Date.now();
-  await updateDoc(designDoc(groomUid, reqId), {
+  return api.patch(`/digital/${uid(groomUid)}/design-requests/${reqId}`, {
     status: "approved",
-    approvedAt: now,
-    updatedAt: now,
+    approvedAt: Date.now(),
   });
 }
 
-// Groom — request a revision with free-text notes.
+/**
+ * Groom asks for a revision with free-text notes.
+ */
 export async function requestRevision(groomUid, reqId, notes) {
-  await updateDoc(designDoc(groomUid, reqId), {
+  return api.patch(`/digital/${uid(groomUid)}/design-requests/${reqId}`, {
     status: "revision_requested",
     revisionNotes: (notes || "").trim() || null,
-    updatedAt: Date.now(),
   });
+}
+
+// ─── Admin workflow ───────────────────────────────────────────────────────────
+
+/**
+ * Admin marks a request as actively being designed.
+ */
+export async function startDesigning(groomUid, reqId) {
+  return api.patch(`/digital/${uid(groomUid)}/design-requests/${reqId}`, {
+    status: "designing",
+  });
+}
+
+/**
+ * Admin uploads a mockup. Server appends it to the request's mockups[] and
+ * flips status to "review" (clearing any prior revisionNotes).
+ *
+ * Returns the new mockup record `{ url, storagePath, uploadedAt, name }`.
+ */
+export async function uploadMockup(groomUid, reqId, file) {
+  const formData = new FormData();
+  formData.append("file", file, file.name);
+  return api.upload(
+    `/digital/${uid(groomUid)}/design-requests/${reqId}/mockup`,
+    formData,
+  );
+}
+
+/**
+ * Legacy compat: in the SDK version the client read the existing mockups,
+ * appended the new one, and wrote the union. The server now owns that
+ * read-modify-write inside the mockup-upload endpoint, so this is a no-op
+ * kept for callers that haven't been updated yet.
+ */
+export async function commitMockup() {
+  return null;
 }

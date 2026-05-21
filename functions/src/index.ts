@@ -1,17 +1,50 @@
-// Cloud Functions entry — initializes the Admin SDK once and re-exports every
-// callable function. Each function file is self-contained: validation,
-// authz, rate limiting and audit logging all live next to the handler.
+// Cloud Functions entry — initializes the Admin SDK once and exports every
+// deployable function.
+//
+// Two function families live here:
+//   1. The new Express REST API, exported as `api`. This is the long-term
+//      home for all frontend → backend traffic. See `./api/index.ts`.
+//   2. The legacy onCall + onRequest functions, re-exported below.
+//      These are being progressively migrated into the Express router and
+//      will be removed file-by-file (see Step 37 of the migration plan).
+//
+// The migration sequence: each route handler is duplicated into the Express
+// router with identical semantics. Once the frontend points exclusively at
+// the REST endpoint, the legacy export is deleted. `digitalInvitePreview`
+// is the one exception — it stays as an onRequest because it has its own
+// hosting rewrite (`/d/**`) and its own caching strategy.
 import { initializeApp } from "firebase-admin/app";
+import { onRequest } from "firebase-functions/v2/https";
 
 initializeApp();
 
-export { createPortalUser, deletePortalUser, setAdminClaim } from "./users";
-export { updatePortalUser }    from "./updateUser";
-export { adminSetPassword }    from "./adminSetPassword";
-export { assignDriverToGroom } from "./assignments";
-export { submitConfirmation }  from "./confirmations";
-export { attachConfirmationLocationToGuest } from "./attachLocation";
-export { resetPassword }       from "./resetPassword";
-export { createGuestInvite, submitGuestInvite } from "./invite";
-export { createDigitalGuestInvite, submitDigitalGuestInvite } from "./digitalInvite";
+import { app as expressApp } from "./api/index";
+
+/**
+ * The new Express-backed REST API.
+ *
+ * `timeoutSeconds: 3600` (60 minutes — the v2 maximum) is required because
+ * the live-locations SSE stream holds the response open for the duration
+ * of the groom's session. All other routes finish in milliseconds; the
+ * long timeout has no effect on their billing or behavior.
+ *
+ * `memory: "512MiB"` is a modest bump above the default to keep the SSE
+ * listener responsive when many grooms watch concurrently.
+ */
+export const api = onRequest(
+  {
+    region: "us-central1",
+    timeoutSeconds: 3600,
+    memory: "512MiB",
+    cors: false, // CORS is handled inside the Express app, not by the framework.
+  },
+  expressApp,
+);
+
+// ─── Standalone onRequest functions (kept outside the Express router) ───────
+//
+// `digitalInvitePreview` is its own hosting rewrite (`/d/**`) and has its
+// own caching strategy distinct from the REST API. Keeping it as a separate
+// `onRequest` export lets it scale and cache independently of the `api`
+// function above.
 export { digitalInvitePreview } from "./digitalInvitePreview";

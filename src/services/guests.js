@@ -1,54 +1,59 @@
-// Guests service — data sharded by groomUid so rules permit per-groom listeners.
+// Guests service — REST replacement for the RTDB CRUD layer.
 //
-// Data lives at /guestsByGroom/{groomUid}/{guestId}. The owning groom listens
-// at their own subtree; a driver listens at the groom's subtree they're
-// currently assigned to; admins listen at the root.
-import { ref, push, set, update, remove, onValue } from "firebase/database";
-import { db } from "../firebase.js";
+// Endpoints (all under /api/guests):
+//   GET    /guests                       admin: flat list across grooms
+//   GET    /guests/:groomUid             admin / owning groom / assigned driver
+//   POST   /guests/:groomUid             admin / owning groom
+//   PATCH  /guests/:groomUid/:id         admin / owning groom / assigned driver
+//   DELETE /guests/:groomUid/:id         admin / owning groom
+
+import { api } from "../utils/apiClient.js";
+import { createPoller } from "../utils/poller.js";
 import { subscribeList } from "./_helpers.js";
-import { logErr } from "../utils/logger.js";
 
-// Admin-only: every groom's guests, flattened. Two-level snapshot so we can't
-// use `subscribeList` directly — the outer key is the groomUid, inner is the
-// guest record.
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+/** Poll interval for guest-list subscriptions (matches the old onValue feel). */
+const GUEST_POLL_INTERVAL_MS = 15 * 1000;
+
+// ─── Subscriptions ────────────────────────────────────────────────────────────
+
+/**
+ * Admin-only: flat list of every guest across every groom. Server returns
+ * `[{ id, groomUid, ...fields }]` already flattened.
+ */
 export function subscribeAllGuests(cb) {
-  return onValue(
-    ref(db, "guestsByGroom"),
-    (snap) => {
-      const out = [];
-      snap.forEach((groomBucket) => {
-        const groomUid = groomBucket.key;
-        groomBucket.forEach((g) => {
-          out.push({ id: g.key, groomUid, ...g.val() });
-        });
-      });
-      cb(out);
-    },
-    (err) => { logErr("subscribeAllGuests", err); cb([]); },
+  return subscribeList("/guests", cb, { intervalMs: GUEST_POLL_INTERVAL_MS });
+}
+
+/**
+ * One groom's guests. Same payload shape as subscribeAllGuests but scoped.
+ * Falls back to `cb([])` when no groomUid is provided so the consumer can
+ * always treat the value as an array.
+ */
+export function subscribeGuestsForGroom(groomUid, cb) {
+  if (!groomUid) {
+    queueMicrotask(() => cb([]));
+    return () => {};
+  }
+  return createPoller(
+    () => api.get(`/guests/${groomUid}`),
+    (value) => cb(Array.isArray(value) ? value : []),
+    { intervalMs: GUEST_POLL_INTERVAL_MS },
   );
 }
 
-// Live list of one groom's guests (used by the groom themselves and by the
-// driver assigned to that groom).
-export function subscribeGuestsForGroom(groomUid, cb) {
-  if (!groomUid) { cb([]); return () => {}; }
-  return subscribeList(
-    `guestsByGroom/${groomUid}`,
-    cb,
-    (g) => ({ id: g.key, groomUid, ...g.val() }),
-  );
-}
+// ─── Mutations ────────────────────────────────────────────────────────────────
 
 export async function addGuest(groomUid, guest) {
-  const r = push(ref(db, `guestsByGroom/${groomUid}`));
-  await set(r, { ...guest, createdAt: Date.now() });
-  return r.key;
+  const result = await api.post(`/guests/${groomUid}`, guest);
+  return result?.id ?? null;
 }
 
 export async function updateGuest(groomUid, id, patch) {
-  return update(ref(db, `guestsByGroom/${groomUid}/${id}`), patch);
+  return api.patch(`/guests/${groomUid}/${id}`, patch);
 }
 
 export async function removeGuest(groomUid, id) {
-  return remove(ref(db, `guestsByGroom/${groomUid}/${id}`));
+  return api.delete(`/guests/${groomUid}/${id}`);
 }

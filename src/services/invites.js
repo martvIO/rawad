@@ -1,29 +1,78 @@
-// Per-guest invite-link service. Mirrors confirmations.js: write goes through
-// a callable, read goes straight to RTDB. Token records are publicly readable
-// (rule allows it), so the InviteForm page works without authentication.
-import { ref, onValue } from "firebase/database";
-import { db } from "../firebase.js";
-import { callable } from "./_helpers.js";
-import { logErr } from "../utils/logger.js";
+// Per-guest invite-link service (physical + digital).
+//
+// Endpoints (all under /api/invites):
+//   POST /invites                  groom/admin: mint physical token
+//   POST /invites/submit           PUBLIC: submit physical reply
+//   POST /invites/digital          groom/admin: mint digital token
+//   POST /invites/digital/submit   PUBLIC: submit digital reply
+//   GET  /invites/token/:token     PUBLIC: fetch a token record
 
-// Groom/admin → mint a new token for one guest.
-// Payload: { groomUid, guestId }
-// Returns: { token, expiresAt }
-export const createGuestInvite = callable("createGuestInvite");
+import { api } from "../utils/apiClient.js";
+import { createPoller } from "../utils/poller.js";
 
-// Public → submit the invite form.
-// Payload: { token, submittedName, submittedPhone, submittedCity,
-//            submittedStreet?, submittedHouse?, deliveryNote?,
-//            lat?, lng?, locationAccuracy?, locationSource? }
-export const submitGuestInvite = callable("submitGuestInvite");
+// ─── Constants ────────────────────────────────────────────────────────────────
 
-// Public read of the token record. Used by the InviteForm page to pre-fill
-// the guest's name/phone and to check expiry before rendering the form.
+/** Aggressive interval — invite pages need to detect "used" quickly. */
+const INVITE_TOKEN_POLL_INTERVAL_MS = 3 * 1000;
+
+// ─── Token mint / submit ──────────────────────────────────────────────────────
+
+/**
+ * Mint a physical invite token. Body: `{ groomUid, guestId }`.
+ * @returns {Promise<{token, expiresAt}>}
+ */
+export async function createGuestInvite(input) {
+  return api.post("/invites", input);
+}
+
+/**
+ * Submit a physical invite reply. Public; no auth.
+ */
+export async function submitGuestInvite(input) {
+  return api.post("/invites/submit", input, { skipAuth: true });
+}
+
+/**
+ * Mint a digital invite token. Body: `{ groomUid, guestId }`.
+ */
+export async function createDigitalGuestInvite(input) {
+  return api.post("/invites/digital", input);
+}
+
+/**
+ * Submit a digital invite reply. Public; no auth.
+ * Body: `{ token, rsvp: "attending"|"absent", note? }`.
+ */
+export async function submitDigitalGuestInvite(input) {
+  return api.post("/invites/digital/submit", input, { skipAuth: true });
+}
+
+// ─── Token read ───────────────────────────────────────────────────────────────
+
+/**
+ * Subscribe to a token record. The InviteForm page uses this to detect
+ * `usedAt` (one-shot guard) and expiry. Fires `cb(null)` when the token
+ * doesn't exist.
+ *
+ * @param {string} token
+ * @param {(record: object|null) => void} cb
+ * @returns {() => void} unsubscribe
+ */
 export function subscribeInviteToken(token, cb) {
-  if (!token) { cb(null); return () => {}; }
-  return onValue(
-    ref(db, `inviteTokens/${token}`),
-    (snap) => cb(snap.exists() ? snap.val() : null),
-    (err) => { logErr(`subscribeInviteToken(${token})`, err); cb(null); },
+  if (!token) {
+    queueMicrotask(() => cb(null));
+    return () => {};
+  }
+  return createPoller(
+    async () => {
+      try {
+        return await api.get(`/invites/token/${token}`, { skipAuth: true });
+      } catch (err) {
+        if (err?.status === 404) return null;
+        throw err;
+      }
+    },
+    (value) => cb(value ?? null),
+    { intervalMs: INVITE_TOKEN_POLL_INTERVAL_MS },
   );
 }

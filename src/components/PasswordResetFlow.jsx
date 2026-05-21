@@ -1,16 +1,31 @@
-﻿// Three-step password reset: phone → SMS code → new password.
-// Uses Firebase Phone Auth on steps 1–2 and the `resetPassword` Cloud
-// Function on step 3 (server-side verifies that the phone-OTP session
-// matches the target portal user's stored phoneE164).
+// Three-step password reset: phone → SMS code → new password.
+//
+// In the SDK era this used Firebase's `RecaptchaVerifier` (which renders
+// an invisible reCAPTCHA AND mints a token in one shot). In the REST era
+// the backend wants an explicit reCAPTCHA v2 token, so we render a
+// standard reCAPTCHA v2 widget on step 1 and pass `grecaptcha.getResponse()`
+// to `sendPasswordResetCode`.
 import { useState, useRef, useEffect, useMemo } from "react";
-import { sendPasswordResetCode, confirmPasswordResetCode, signOutNow } from "../services/auth.js";
-import { callResetPassword } from "../services/users.js";
+import {
+  sendPasswordResetCode,
+  confirmPasswordResetCode,
+  signOutNow,
+  callResetPassword,
+} from "../services/auth.js";
 import { PasswordRules } from "./PasswordRules.jsx";
 import { PhoneInput } from "./PhoneInput.jsx";
 import { isStrongPassword } from "../utils/password.js";
 import { logErr } from "../utils/logger.js";
 import { makeT } from "../i18n/index.js";
 import { C } from "../styles/theme.js";
+
+// ─── reCAPTCHA constants ──────────────────────────────────────────────────────
+
+/** Public reCAPTCHA v2 site key configured at build time. */
+const RECAPTCHA_SITE_KEY = import.meta.env?.VITE_RECAPTCHA_V2_SITE_KEY ?? "";
+
+/** Google's hosted reCAPTCHA script. Loaded once on demand. */
+const RECAPTCHA_SCRIPT_SRC = "https://www.google.com/recaptcha/api.js";
 
 const STRINGS = {
   ar: {
@@ -28,6 +43,7 @@ const STRINGS = {
     invalid_phone: "رقم هاتف غير صالح (الصيغة E.164 مثل ‎+972…)",
     invalid_code: "رمز التحقق غير صحيح",
     invalid_password: "كلمة المرور يجب أن تكون ٨ أحرف على الأقل",
+    captcha_required: "يرجى إكمال التحقق",
     close: "إغلاق",
     back: "← رجوع",
   },
@@ -46,59 +62,143 @@ const STRINGS = {
     invalid_phone: "מספר טלפון לא תקין (פורמט E.164, למשל ‎+972…)",
     invalid_code: "קוד שגוי",
     invalid_password: "הסיסמה חייבת להיות לפחות 8 תווים",
+    captcha_required: "נא לאשר את האימות",
     close: "סגירה",
     back: "← חזרה",
   },
 };
-const tr = (lang, key) => (STRINGS[lang] || STRINGS.ar)[key] || STRINGS.ar[key] || key;
+const tr = (lang, key) =>
+  (STRINGS[lang] || STRINGS.ar)[key] || STRINGS.ar[key] || key;
+
+/**
+ * Ensure the reCAPTCHA v2 script has been added to the document. Resolves
+ * when `window.grecaptcha` is available. Safe to call multiple times — only
+ * one script tag is ever inserted.
+ */
+function loadRecaptchaScript() {
+  return new Promise((resolve, reject) => {
+    if (typeof window === "undefined") {
+      reject(new Error("no_window"));
+      return;
+    }
+    if (window.grecaptcha && window.grecaptcha.render) {
+      resolve();
+      return;
+    }
+    const existing = document.querySelector(
+      `script[src^="${RECAPTCHA_SCRIPT_SRC}"]`,
+    );
+    if (existing) {
+      existing.addEventListener("load", () => resolve(), { once: true });
+      existing.addEventListener("error", reject, { once: true });
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = `${RECAPTCHA_SCRIPT_SRC}?render=explicit`;
+    script.async = true;
+    script.defer = true;
+    script.onload = () => resolve();
+    script.onerror = reject;
+    document.head.appendChild(script);
+  });
+}
 
 export function PasswordResetFlow({ lang, onClose }) {
   const T = (k) => tr(lang, k);
   const tGlobal = useMemo(() => makeT(lang), [lang]);
-  const [step, setStep]   = useState(1);
+  const [step, setStep] = useState(1);
   const [phone, setPhone] = useState("");
-  const [code, setCode]   = useState("");
-  const [pass, setPass]   = useState("");
+  const [code, setCode] = useState("");
+  const [pass, setPass] = useState("");
   const [error, setError] = useState("");
-  const [busy,  setBusy]  = useState(false);
-  const confirmationRef = useRef(null);
+  const [busy, setBusy] = useState(false);
+  const sendResultRef = useRef(null);
   const captchaContainerId = "dawa-reset-recaptcha";
+  const captchaWidgetIdRef = useRef(null);
 
-  // Sign out any lingering phone-auth user when the modal unmounts so it
-  // never leaks into the portal session.
+  // Sign out any lingering phone-auth session when the modal unmounts so
+  // that the phone-token doesn't leak into a subsequent portal login.
   useEffect(() => () => { signOutNow().catch(() => {}); }, []);
+
+  // Render the reCAPTCHA v2 widget when entering step 1. Re-mounting on
+  // back-navigation gives the widget a fresh token each visit.
+  useEffect(() => {
+    if (step !== 1) return;
+    let cancelled = false;
+    loadRecaptchaScript()
+      .then(() => {
+        if (cancelled || !window.grecaptcha?.render) return;
+        const container = document.getElementById(captchaContainerId);
+        if (!container || container.childElementCount > 0) return;
+        captchaWidgetIdRef.current = window.grecaptcha.render(captchaContainerId, {
+          sitekey: RECAPTCHA_SITE_KEY,
+        });
+      })
+      .catch((err) => logErr("loadRecaptchaScript", err));
+    return () => {
+      cancelled = true;
+    };
+  }, [step]);
 
   const sendCode = async () => {
     setError("");
     if (!/^\+[1-9][0-9]{6,14}$/.test(phone.trim())) {
-      setError(T("invalid_phone")); return;
+      setError(T("invalid_phone"));
+      return;
+    }
+    const recaptchaToken = window.grecaptcha?.getResponse?.(
+      captchaWidgetIdRef.current,
+    );
+    if (!recaptchaToken) {
+      setError(T("captcha_required"));
+      return;
     }
     setBusy(true);
     try {
-      confirmationRef.current = await sendPasswordResetCode(phone.trim(), captchaContainerId);
+      sendResultRef.current = await sendPasswordResetCode(
+        phone.trim(),
+        captchaContainerId,
+        recaptchaToken,
+      );
       setStep(2);
     } catch (e) {
       logErr("sendPasswordResetCode", e);
       setError(e?.message || T("invalid_phone"));
-    } finally { setBusy(false); }
+      // Reset the widget so the user can re-solve before retrying.
+      try {
+        window.grecaptcha?.reset?.(captchaWidgetIdRef.current);
+      } catch {
+        // noop
+      }
+    } finally {
+      setBusy(false);
+    }
   };
 
   const verifyCode = async () => {
     setError("");
-    if (!code.trim()) { setError(T("invalid_code")); return; }
+    if (!code.trim()) {
+      setError(T("invalid_code"));
+      return;
+    }
     setBusy(true);
     try {
-      await confirmPasswordResetCode(confirmationRef.current, code.trim());
+      await confirmPasswordResetCode(sendResultRef.current, code.trim());
       setStep(3);
     } catch (e) {
       logErr("confirmPasswordResetCode", e);
       setError(e?.message || T("invalid_code"));
-    } finally { setBusy(false); }
+    } finally {
+      setBusy(false);
+    }
   };
 
   const updatePassword = async () => {
     setError("");
-    if (!isStrongPassword(pass)) { setError(tGlobal("pwd_weak")); return; }
+    if (!isStrongPassword(pass)) {
+      setError(tGlobal("pwd_weak"));
+      return;
+    }
     setBusy(true);
     try {
       await callResetPassword(pass);
@@ -106,7 +206,9 @@ export function PasswordResetFlow({ lang, onClose }) {
     } catch (e) {
       logErr("callResetPassword", e);
       setError(e?.message || tGlobal("pwd_weak"));
-    } finally { setBusy(false); }
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -136,6 +238,7 @@ export function PasswordResetFlow({ lang, onClose }) {
             <div style={{ marginBottom: 12 }}>
               <PhoneInput value={phone} onChange={(v) => { setPhone(v); setError(""); }} t={tGlobal} lang={lang} autoFocus />
             </div>
+            <div id={captchaContainerId} style={{ marginBottom: 12 }} />
             {error && <div style={{ color: C.red, fontSize: 12, marginBottom: 10 }}>{error}</div>}
             <button className="gold-btn" style={{ width: "100%" }} disabled={busy || !phone} onClick={sendCode}>
               {T("step1_submit")}
@@ -184,9 +287,6 @@ export function PasswordResetFlow({ lang, onClose }) {
             </button>
           </>
         )}
-
-        {/* Invisible reCAPTCHA mounts here on step 1. */}
-        <div id={captchaContainerId} style={{ marginTop: 16 }} />
       </div>
     </div>
   );

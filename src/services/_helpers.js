@@ -1,62 +1,52 @@
-// Shared service-layer helpers. Collapse the two patterns every service was
-// repeating: onValue → forEach → push → cb, and httpsCallable → await → .data.
-import { ref, onValue } from "firebase/database";
-import { httpsCallable } from "firebase/functions";
-import { db, functions } from "../firebase.js";
-import { forceRefreshToken } from "./auth.js";
-import { logErr, logWarn } from "../utils/logger.js";
+// Shared service helpers for the REST-based services layer.
+//
+// Pre-migration this file wrapped two Firebase patterns:
+//   1. RTDB onValue → list array  (subscribeList)
+//   2. httpsCallable + claim-refresh retry  (callable)
+//
+// In the REST world both are gone:
+//   - Real-time RTDB subscriptions are replaced by api.get() + createPoller().
+//   - Callable functions are replaced by api.post() with Bearer tokens
+//     (token refresh + retry on 401 is handled inside apiClient.js).
+//
+// This module now exports one helper:
+//   - subscribeList(endpoint, callback, opts?) → polling wrapper around api.get
+//
+// Service files import this when they need polling behaviour. For non-list
+// reads (one-shot, no subscription) they use api.get() directly.
 
-// Subscribe to a list-shaped RTDB path. `mapItem` is optional; by default each
-// child becomes { id: key, ...val }. Errors call `cb([])` so the UI degrades
-// to "empty list" instead of staying stuck on a loader.
-export function subscribeList(path, cb, mapItem) {
-  return onValue(
-    ref(db, path),
-    (snap) => {
-      const out = [];
-      snap.forEach((c) => {
-        out.push(mapItem ? mapItem(c) : { id: c.key, ...c.val() });
-      });
-      cb(out);
-    },
-    (err) => {
-      logErr(`subscribeList(${path})`, err);
-      cb([]);
-    },
-  );
-}
+import { api } from "../utils/apiClient.js";
+import { createPoller } from "../utils/poller.js";
 
-// Codes that usually mean "your token is stale" — most commonly because a
-// custom claim was granted after the token was minted (e.g. admin promotion).
-const REFRESHABLE_CODES = new Set([
-  "functions/permission-denied",
-  "functions/unauthenticated",
-  "permission-denied",
-  "unauthenticated",
-]);
+// ─── Constants ────────────────────────────────────────────────────────────────
 
-// Wrap a Cloud Function callable. Returns an async fn that resolves to the
-// unwrapped `.data` payload. On the first permission-denied / unauthenticated
-// failure we force a token refresh and retry once — handles the case where
-// the user was just promoted while signed in.
-export function callable(name) {
-  const fn = httpsCallable(functions, name);
-  return async (input) => {
-    try {
-      return (await fn(input)).data;
-    } catch (e) {
-      if (REFRESHABLE_CODES.has(e?.code)) {
-        logWarn(`callable(${name}) ${e.code} — refreshing token and retrying`);
-        try {
-          await forceRefreshToken();
-          return (await fn(input)).data;
-        } catch (e2) {
-          logErr(`callable(${name}) retry`, e2);
-          throw e2;
-        }
+/** Default poll interval matches the legacy onValue cadence for list views. */
+const DEFAULT_LIST_INTERVAL_MS = 15 * 1000;
+
+// ─── Public API ───────────────────────────────────────────────────────────────
+
+/**
+ * Subscribe to a list endpoint by polling. Fires `callback(items)` on the
+ * first response and then on every successful tick. Returns the standard
+ * unsubscribe function.
+ *
+ * @param {string} endpoint  API path (starts with `/`)
+ * @param {(items: any[]) => void} callback
+ * @param {Object} [opts]
+ * @param {number} [opts.intervalMs=15000]
+ * @returns {() => void}
+ */
+export function subscribeList(endpoint, callback, opts) {
+  return createPoller(
+    () => api.get(endpoint),
+    (value) => {
+      // Match legacy semantics: null/undefined → empty list.
+      if (value === null || value === undefined) {
+        callback([]);
+        return;
       }
-      logErr(`callable(${name})`, e);
-      throw e;
-    }
-  };
+      callback(Array.isArray(value) ? value : []);
+    },
+    { intervalMs: opts?.intervalMs ?? DEFAULT_LIST_INTERVAL_MS },
+  );
 }
