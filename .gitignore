@@ -21,3 +21,4 @@ functions/node_modules/
 *-adminsdk-*.json
 *-service-account*.json
 serviceAccountKey.json
+/functions/tsconfig.tsbuildinfo
