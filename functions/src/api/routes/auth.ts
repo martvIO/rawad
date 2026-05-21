@@ -2,7 +2,7 @@
 //
 // The frontend has no Firebase Auth SDK; this router is how it obtains a
 // Firebase ID token. All six endpoints proxy to the Firebase Auth REST API
-// using `FIREBASE_API_KEY` (a SERVER-ONLY env var — never expose in the
+// using `WEB_API_KEY` (a SERVER-ONLY env var — never expose in the
 // `VITE_*` namespace).
 //
 //   POST  /auth/login        — username/password → { idToken, refreshToken, ... }
@@ -66,7 +66,7 @@ export const authRouter = Router();
  *
  * Errors:  401 `invalid_credentials` on bad username/password.
  *          400 with Firebase's raw error code on other failures.
- *          500 `server_misconfigured` if FIREBASE_API_KEY is unset.
+ *          500 `server_misconfigured` if WEB_API_KEY is unset.
  */
 authRouter.post(
   "/login",
@@ -78,7 +78,7 @@ authRouter.post(
       return;
     }
 
-    const apiKey = process.env.FIREBASE_API_KEY;
+    const apiKey = process.env.WEB_API_KEY;
     if (!apiKey) {
       res.status(500).json({ error: "server_misconfigured" });
       return;
@@ -156,7 +156,7 @@ authRouter.post(
       return;
     }
 
-    const apiKey = process.env.FIREBASE_API_KEY;
+    const apiKey = process.env.WEB_API_KEY;
     if (!apiKey) {
       res.status(500).json({ error: "server_misconfigured" });
       return;
@@ -228,7 +228,7 @@ authRouter.post(
       return;
     }
 
-    const apiKey = process.env.FIREBASE_API_KEY;
+    const apiKey = process.env.WEB_API_KEY;
     if (!apiKey) {
       res.status(500).json({ error: "server_misconfigured" });
       return;
@@ -274,7 +274,7 @@ authRouter.post(
       return;
     }
 
-    const apiKey = process.env.FIREBASE_API_KEY;
+    const apiKey = process.env.WEB_API_KEY;
     if (!apiKey) {
       res.status(500).json({ error: "server_misconfigured" });
       return;
