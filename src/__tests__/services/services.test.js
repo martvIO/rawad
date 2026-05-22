@@ -692,8 +692,21 @@ describe("digitalInvitation — photographer", () => {
     expect(api.upload).toHaveBeenCalledWith(
       "/digital/g1/photographer/upload",
       expect.any(FormData),
+      undefined,
     );
     expect(out).toEqual({ url: "u", key: "pf1" });
+  });
+
+  it("uploadPhotographerFile forwards an abort signal", async () => {
+    api.upload.mockResolvedValueOnce({ url: "u", id: "pf2" });
+    const file = new File(["x"], "p.jpg", { type: "image/jpeg" });
+    const controller = new AbortController();
+    await digital.uploadPhotographerFile("g1", file, { signal: controller.signal });
+    expect(api.upload).toHaveBeenCalledWith(
+      "/digital/g1/photographer/upload",
+      expect.any(FormData),
+      { signal: controller.signal },
+    );
   });
 
   it("renamePhotographerFile PATCHes /digital/:uid/photographer/:fileId", async () => {
