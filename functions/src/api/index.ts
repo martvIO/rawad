@@ -117,6 +117,26 @@ app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
   res.status(500).json({ error: "internal_error" });
 });
 
+// ─── /api prefix normalizer ──────────────────────────────────────────────────
+
+/**
+ * Strip a leading "/api" segment from req.url so resource routers can be
+ * mounted at "/auth", "/users", etc. regardless of whether the request
+ * arrived via Firebase Hosting rewrite (preserves "/api/...") or via a
+ * direct Cloud Functions URL (strips the function name, so "/auth/...").
+ *
+ * Exported so the behavior is unit-testable without booting the full app.
+ */
+export function stripApiPrefix(
+  req: Request,
+  _res: Response,
+  next: NextFunction,
+): void {
+  if (req.url === "/api") req.url = "/";
+  else if (req.url.startsWith("/api/")) req.url = req.url.slice(4);
+  next();
+}
+
 // ─── CORS helper ──────────────────────────────────────────────────────────────
 
 type CorsOriginCallback = (err: Error | null, allow?: boolean) => void;

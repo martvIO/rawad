@@ -17,6 +17,7 @@ export default defineConfig({
             "src/__tests__/services/**/*.test.{js,ts}",
             "tests/functions/helpers.test.ts",
             "tests/functions/rateLimit.test.ts",
+            "tests/functions/stripApiPrefix.test.ts",
           ],
           environment: "jsdom",
           testTimeout: 10000,
