@@ -22,3 +22,4 @@ functions/node_modules/
 *-service-account*.json
 serviceAccountKey.json
 /functions/tsconfig.tsbuildinfo
+/postman
