@@ -5,11 +5,12 @@ import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
 import { GroomTypeSelect } from "./GroomTypeSelect.jsx";
 import { GroomHandwrittenShell } from "./GroomHandwrittenShell.jsx";
 import { DigitalPortal } from "./digital/DigitalPortal.jsx";
+import { STORAGE_KEYS } from "../../../constants/storageKeys.js";
 
 function GroomTypeGate() {
   const navigate = useNavigate();
   useEffect(() => {
-    const type = localStorage.getItem("dawa_groom_type");
+    const type = localStorage.getItem(STORAGE_KEYS.GROOM_TYPE);
     if      (type === "handwritten") navigate("/portal/groom/handwritten/dashboard", { replace: true });
     else if (type === "digital")     navigate("/portal/groom/digital/dashboard",     { replace: true });
     else                              navigate("/portal/groom/type-select",            { replace: true });

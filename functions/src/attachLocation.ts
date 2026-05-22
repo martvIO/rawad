@@ -5,12 +5,17 @@ import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { getDatabase } from "firebase-admin/database";
 import { assertAdmin } from "./helpers";
 import { allow } from "./rateLimit";
+import { RATE } from "./constants/rateLimits";
 
 export const attachConfirmationLocationToGuest = onCall(async (req) => {
   const adminUid = assertAdmin(req);
 
   // Mirrors the limit on other admin mutations — 30 per hour per admin.
-  if (!allow(`attach:${adminUid}`, 30, 60 * 60 * 1000)) {
+  if (!allow(
+    `attach:${adminUid}`,
+    RATE.ATTACH_LOC_PER_ADMIN.limit,
+    RATE.ATTACH_LOC_PER_ADMIN.windowMs,
+  )) {
     throw new HttpsError("resource-exhausted", "Too many attach operations; try again later.");
   }
 

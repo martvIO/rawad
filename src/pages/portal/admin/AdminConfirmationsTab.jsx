@@ -4,6 +4,8 @@
 // Edit button that opens EditConfirmationModal.
 import { usePortal } from "../../../context/PortalContext.jsx";
 import { C } from "../../../styles/theme.js";
+import { formatAddress } from "../../../utils/geo.js";
+import { MATCH_STATUS } from "../../../constants/matchStatuses.js";
 
 export function AdminConfirmationsTab() {
   const {
@@ -12,25 +14,24 @@ export function AdminConfirmationsTab() {
     t, lang,
   } = usePortal();
 
-  const matched  = confirmations.filter(c => matchColor(c) === "green");
-  const mismatch = confirmations.filter(c => matchColor(c) === "red");
-  const unknown  = confirmations.filter(c => matchColor(c) === "unknown");
+  const matched  = confirmations.filter(c => matchColor(c) === MATCH_STATUS.GREEN);
+  const mismatch = confirmations.filter(c => matchColor(c) === MATCH_STATUS.RED);
+  const unknown  = confirmations.filter(c => matchColor(c) === MATCH_STATUS.UNKNOWN);
 
   const renderConf = (conf) => {
     const guest = matchedGuestFor(conf);
     const color = matchColor(conf);
-    const isUnknown = color === "unknown";
-    const borderColor = color === "green" ? "rgba(76,201,122,.5)" : "rgba(212,122,75,.45)";
-    const bgColor     = color === "green" ? "rgba(76,201,122,.05)" : "rgba(212,122,75,.06)";
+    const isUnknown = color === MATCH_STATUS.UNKNOWN;
+    const borderColor = color === MATCH_STATUS.GREEN ? "rgba(76,201,122,.5)" : "rgba(212,122,75,.45)";
+    const bgColor     = color === MATCH_STATUS.GREEN ? "rgba(76,201,122,.05)" : "rgba(212,122,75,.06)";
     const reasons = guest ? confirmationReasons(conf) : [];
-    const fullAddress = [conf.submittedCity, conf.submittedStreet, conf.submittedHouse]
-      .filter(Boolean).join("، ");
+    const fullAddress = formatAddress(conf.submittedCity, conf.submittedStreet, conf.submittedHouse);
 
     return (
       <div key={conf.id} style={{
         marginBottom: 12, padding: 14, borderRadius: 14,
         background: bgColor, border: `1.5px solid ${borderColor}`,
-        boxShadow: color !== "green" ? "0 0 0 1px rgba(212,122,75,.08) inset" : "none",
+        boxShadow: color !== MATCH_STATUS.GREEN ? "0 0 0 1px rgba(212,122,75,.08) inset" : "none",
       }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, gap: 8, flexWrap: "wrap" }}>
           <div style={{ fontSize: 11, color: C.dim }}>

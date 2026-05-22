@@ -30,28 +30,28 @@ import {
 import { ipRateLimit, uidRateLimit } from "../middleware/rateLimit";
 import { isFiniteInRange, normalisePhone } from "../../helpers";
 import { writeAudit } from "../../audit";
+import { MAX_LEN } from "../../constants/limits";
+import { HOUR_MS } from "../../constants/time";
+import { RATE } from "../../constants/rateLimits";
+import { TOKEN_BYTES, TOKEN_HEX_RE, TOKEN_TTL_MS } from "../../constants/tokens";
+import { ADDRESS_JOINER } from "../../constants/format";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const TOKEN_BYTES = 16;
-const TOKEN_HEX_RE = /^[a-f0-9]{32}$/;
-const TOKEN_TTL_MS = 90 * 24 * 60 * 60 * 1000;
-const HOUR_MS = 60 * 60 * 1000;
+const CREATE_INVITE_MAX_PER_HOUR = RATE.CREATE_INVITE_PER_USER.limit;
+const SUBMIT_PHYSICAL_MAX_PER_HOUR_IP = RATE.SUBMIT_INVITE_PER_IP.limit;
+const SUBMIT_DIGITAL_MAX_PER_HOUR_IP = RATE.SUBMIT_DIGITAL_INVITE_PER_IP.limit;
 
-const CREATE_INVITE_MAX_PER_HOUR = 60;
-const SUBMIT_PHYSICAL_MAX_PER_HOUR_IP = 5;
-const SUBMIT_DIGITAL_MAX_PER_HOUR_IP = 10;
-
-const MAX_GUEST_NAME_LEN = 120;
-const MAX_GUEST_PHONE_LEN = 30;
-const MAX_GUEST_USERNAME_LEN = 60;
-const MAX_NOTE_LEN = 500;
-const MAX_CITY_LEN = 80;
-const MAX_STREET_LEN = 120;
-const MAX_HOUSE_LEN = 20;
-const MAX_NAME_LEN = 120;
-const MAX_PHONE_LEN = 30;
-const MAX_DELIVERY_NOTE_LEN = 240;
+const MAX_GUEST_NAME_LEN = MAX_LEN.NAME;
+const MAX_GUEST_PHONE_LEN = MAX_LEN.PHONE;
+const MAX_GUEST_USERNAME_LEN = MAX_LEN.USERNAME;
+const MAX_NOTE_LEN = MAX_LEN.NOTE;
+const MAX_CITY_LEN = MAX_LEN.CITY;
+const MAX_STREET_LEN = MAX_LEN.STREET;
+const MAX_HOUSE_LEN = MAX_LEN.HOUSE;
+const MAX_NAME_LEN = MAX_LEN.NAME;
+const MAX_PHONE_LEN = MAX_LEN.PHONE;
+const MAX_DELIVERY_NOTE_LEN = MAX_LEN.AREA;
 
 const MIN_LAT = -90;
 const MAX_LAT = 90;
@@ -60,7 +60,7 @@ const MAX_LNG = 180;
 const MIN_ACCURACY_M = 0;
 const MAX_ACCURACY_M = 100_000;
 
-const ARABIC_ADDRESS_SEPARATOR = "، ";
+const ARABIC_ADDRESS_SEPARATOR = ADDRESS_JOINER;
 const RSVP_VALUES = new Set(["attending", "absent"]);
 
 export const invitesRouter = Router();

@@ -26,6 +26,8 @@ import { writeAudit } from "../../audit";
 import { AuthRequest, requireAuth } from "../middleware/auth";
 import { ipRateLimit } from "../middleware/rateLimit";
 import { allow } from "../../rateLimit";
+import { HOUR_MS } from "../../constants/time";
+import { RATE } from "../../constants/rateLimits";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -34,12 +36,12 @@ const IDENTITY_TOOLKIT_BASE = "https://identitytoolkit.googleapis.com/v1/account
 const SECURE_TOKEN_BASE = "https://securetoken.googleapis.com/v1/token";
 
 /** Rate-limit windows. */
-const ONE_HOUR_MS = 60 * 60 * 1000;
+const ONE_HOUR_MS = HOUR_MS;
 const LOGIN_RATE_PER_HOUR = 10;
 const REFRESH_RATE_PER_HOUR = 60;
 const OTP_RATE_PER_HOUR = 5;
 const VERIFY_OTP_RATE_PER_HOUR = 5;
-const RESET_PASSWORD_MAX_PER_HOUR_PER_PHONE = 5;
+const RESET_PASSWORD_MAX_PER_HOUR_PER_PHONE = RATE.RESET_PER_PHONE.limit;
 
 /**
  * Mapping of Firebase Auth REST API error codes to our app-level codes.

@@ -14,10 +14,11 @@
 import { api } from "../utils/apiClient.js";
 import { createPoller } from "../utils/poller.js";
 import { getStoredUid } from "../utils/tokenManager.js";
+import { POLL_MS } from "../config/index.js";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const DESIGN_REQ_POLL_INTERVAL_MS = 15 * 1000;
+const DESIGN_REQ_POLL_INTERVAL_MS = POLL_MS.DESIGN_REQUESTS;
 
 function uid(groomUid) {
   const u = groomUid || getStoredUid();

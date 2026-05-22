@@ -23,10 +23,9 @@ import {
   setAuthClearedCallback,
 } from "./tokenManager.js";
 import { logErr, log } from "./logger.js";
+import { API_BASE_URL } from "../config/index.js";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-
-const API_BASE_URL = (import.meta.env?.VITE_API_BASE_URL ?? "/api").replace(/\/$/, "");
 
 const HEADER_AUTH = "Authorization";
 const HEADER_CONTENT_TYPE = "Content-Type";

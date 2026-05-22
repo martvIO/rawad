@@ -10,6 +10,8 @@ import {
   assertAdmin, isE164, isRole, isStrongPassword, isUsername,
   phoneIndexKey, syntheticEmail,
 } from "./helpers";
+import { MAX_LEN } from "./constants/limits";
+import { RATE } from "./constants/rateLimits";
 
 interface CreateInput {
   username: string;
@@ -30,7 +32,7 @@ export const createPortalUser = onCall(
   { enforceAppCheck: false },
   async (req) => {
     const callerUid = assertAdmin(req);
-    if (!allow(`createUser:${callerUid}`, 30, 60 * 60 * 1000)) {
+    if (!allow(`createUser:${callerUid}`, RATE.CREATE_USER_PER_ADMIN.limit, RATE.CREATE_USER_PER_ADMIN.windowMs)) {
       throw new HttpsError("resource-exhausted", "Too many user-creation attempts.");
     }
 
@@ -65,7 +67,7 @@ export const createPortalUser = onCall(
     const createUserPayload: Record<string, unknown> = {
       email,
       password: input.password,
-      displayName: input.displayName?.slice(0, 120),
+      displayName: input.displayName?.slice(0, MAX_LEN.NAME),
       disabled: false,
     };
     if (hasPhone) createUserPayload.phoneNumber = input.phoneE164;
@@ -110,7 +112,7 @@ export const deletePortalUser = onCall(
     if (uid === callerUid) {
       throw new HttpsError("failed-precondition", "Admins can't delete themselves.");
     }
-    if (!allow(`deleteUser:${callerUid}`, 30, 60 * 60 * 1000)) {
+    if (!allow(`deleteUser:${callerUid}`, RATE.DELETE_USER_PER_ADMIN.limit, RATE.DELETE_USER_PER_ADMIN.windowMs)) {
       throw new HttpsError("resource-exhausted", "Too many user-deletions.");
     }
 

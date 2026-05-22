@@ -37,15 +37,18 @@ import {
   requireAdmin,
 } from "../middleware/auth";
 import { uidRateLimit } from "../middleware/rateLimit";
+import { MAX_LEN } from "../../constants/limits";
+import { HOUR_MS } from "../../constants/time";
+import { RATE } from "../../constants/rateLimits";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const ONE_HOUR_MS = 60 * 60 * 1000;
-const CREATE_USER_RATE_PER_HOUR = 30;
-const DELETE_USER_RATE_PER_HOUR = 30;
-const UPDATE_USER_RATE_PER_HOUR = 60;
-const SET_PASSWORD_RATE_PER_HOUR = 30;
-const MAX_DISPLAY_NAME_LEN = 120;
+const ONE_HOUR_MS = HOUR_MS;
+const CREATE_USER_RATE_PER_HOUR = RATE.CREATE_USER_PER_ADMIN.limit;
+const DELETE_USER_RATE_PER_HOUR = RATE.DELETE_USER_PER_ADMIN.limit;
+const UPDATE_USER_RATE_PER_HOUR = RATE.UPDATE_USER_PER_ADMIN.limit;
+const SET_PASSWORD_RATE_PER_HOUR = RATE.SET_PASSWORD_PER_ADMIN.limit;
+const MAX_DISPLAY_NAME_LEN = MAX_LEN.NAME;
 
 export const usersRouter = Router();
 

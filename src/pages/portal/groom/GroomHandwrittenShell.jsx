@@ -14,6 +14,7 @@ import { GroomProofs } from "./GroomProofs.jsx";
 import { GroomLiveMap } from "./GroomLiveMap.jsx";
 import { GroomGuestsMap } from "./GroomGuestsMap.jsx";
 import { C } from "../../../styles/theme.js";
+import { STORAGE_KEYS } from "../../../constants/storageKeys.js";
 
 const navClass = ({ isActive }) => `nav-tab${isActive ? " active" : ""}`;
 const navStyle = { fontSize: 12, padding: "6px 10px", textDecoration: "none", display: "inline-block" };
@@ -27,7 +28,7 @@ export function GroomHandwrittenShell() {
   const navigate = useNavigate();
 
   const changeType = () => {
-    localStorage.removeItem("dawa_groom_type");
+    localStorage.removeItem(STORAGE_KEYS.GROOM_TYPE);
     navigate("/portal/groom/type-select", { replace: true });
   };
 

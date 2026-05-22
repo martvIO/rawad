@@ -11,14 +11,8 @@ import { allow }       from "./rateLimit";
 import {
   isUsername, normalisePhone, isFiniteInRange, normalisePhoneForMatching,
 } from "./helpers";
-
-const MAX_LEN = {
-  submittedName:   120,
-  submittedPhone:  30,
-  submittedCity:   80,
-  submittedStreet: 120,
-  submittedHouse:  20,
-};
+import { MAX_LEN } from "./constants/limits";
+import { RATE } from "./constants/rateLimits";
 
 function clampStr(v: unknown, max: number): string {
   return (typeof v === "string" ? v.trim() : "").slice(0, max);
@@ -29,7 +23,7 @@ export const submitConfirmation = onCall(
   async (req) => {
     // Per-IP rate limit: 5 submissions per hour, per IP.
     const ip = (req.rawRequest?.ip ?? "unknown").toString();
-    if (!allow(`confirm:${ip}`, 5, 60 * 60 * 1000)) {
+    if (!allow(`confirm:${ip}`, RATE.CONFIRM_PER_IP.limit, RATE.CONFIRM_PER_IP.windowMs)) {
       throw new HttpsError("resource-exhausted", "Too many submissions; please try again later.");
     }
 
@@ -38,11 +32,11 @@ export const submitConfirmation = onCall(
     if (!isUsername(groomUsername)) {
       throw new HttpsError("invalid-argument", "Invalid groom.");
     }
-    const submittedName   = clampStr(data.submittedName,   MAX_LEN.submittedName);
-    const submittedPhone  = clampStr(data.submittedPhone,  MAX_LEN.submittedPhone);
-    const submittedCity   = clampStr(data.submittedCity,   MAX_LEN.submittedCity);
-    const submittedStreet = clampStr(data.submittedStreet, MAX_LEN.submittedStreet);
-    const submittedHouse  = clampStr(data.submittedHouse,  MAX_LEN.submittedHouse);
+    const submittedName   = clampStr(data.submittedName,   MAX_LEN.NAME);
+    const submittedPhone  = clampStr(data.submittedPhone,  MAX_LEN.PHONE);
+    const submittedCity   = clampStr(data.submittedCity,   MAX_LEN.CITY);
+    const submittedStreet = clampStr(data.submittedStreet, MAX_LEN.STREET);
+    const submittedHouse  = clampStr(data.submittedHouse,  MAX_LEN.HOUSE);
 
     if (!submittedName || !submittedPhone || !submittedCity) {
       throw new HttpsError("invalid-argument", "Name, phone and city are required.");

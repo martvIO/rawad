@@ -3,6 +3,9 @@
 // — see <PhoneInput>. Legacy local-format strings ("0501234567" / digits-only)
 // still parse correctly for matching and link-building.
 
+// WhatsApp web URL prefix. `intl` digits + optional `?text=...` are appended.
+const WA_LINK_PREFIX = "https://wa.me/";
+
 // Convert any phone string to international digits (no `+`) for wa.me URLs.
 // Numbers already in 972/970 form are passed through; local "0…" becomes "972…".
 export const toIntlPhone = (raw) => {
@@ -21,6 +24,21 @@ export const telLink = (phone) => `tel:${(phone || "").replace(/\s+/g, "")}`;
 // الخيالي/الاختباري في NANP وتقبله libphonenumber كرقم صالح الشكل.
 export const isPlaceholderPhone = (p) =>
   typeof p === "string" && p.startsWith("+1202555");
+
+// Build a WhatsApp chat URL for a phone number, optionally pre-filling a
+// text body (and/or a URL appended on a separate line). Returns null when
+// the phone is empty / cannot be converted to international form.
+//
+// Used by every "send via WhatsApp" code path (bulk send, per-guest invite
+// link, digital invite, manual share). Previously inlined in 4+ places.
+export const buildWaLink = (phone, body, url) => {
+  const intl = toIntlPhone(phone);
+  if (!intl) return null;
+  const text = [body, url].filter(Boolean).join("\n\n");
+  return text
+    ? `${WA_LINK_PREFIX}${intl}?text=${encodeURIComponent(text)}`
+    : `${WA_LINK_PREFIX}${intl}`;
+};
 
 // Validate a phone number. Accepts both E.164 ("+972…") and the legacy
 // 10-digit local format. Returns a localised error string, or null when valid.

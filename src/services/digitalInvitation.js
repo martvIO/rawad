@@ -21,10 +21,11 @@ import { api } from "../utils/apiClient.js";
 import { createPoller } from "../utils/poller.js";
 import { getStoredUid } from "../utils/tokenManager.js";
 import { logErr } from "../utils/logger.js";
+import { POLL_MS } from "../config/index.js";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const DIGITAL_POLL_INTERVAL_MS = 15 * 1000;
+const DIGITAL_POLL_INTERVAL_MS = POLL_MS.DIGITAL;
 
 // ─── Re-exports kept for back-compat with prior callsites ─────────────────────
 

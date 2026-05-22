@@ -5,11 +5,12 @@
 
 import { api } from "../utils/apiClient.js";
 import { createPoller } from "../utils/poller.js";
+import { POLL_MS } from "../config/index.js";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 /** Settings change rarely; 30s polling is more than enough. */
-const SETTINGS_POLL_INTERVAL_MS = 30 * 1000;
+const SETTINGS_POLL_INTERVAL_MS = POLL_MS.SETTINGS;
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 

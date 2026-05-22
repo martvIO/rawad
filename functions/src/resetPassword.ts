@@ -21,6 +21,7 @@ import { getDatabase } from "firebase-admin/database";
 import { writeAudit }  from "./audit";
 import { allow }       from "./rateLimit";
 import { isStrongPassword, phoneIndexKey } from "./helpers";
+import { RATE } from "./constants/rateLimits";
 
 // App Check is OFF — the phone-OTP requirement is itself a strong gate
 // (you need to receive an SMS at the phone registered to a portal user),
@@ -46,7 +47,7 @@ export const resetPassword = onCall(
       );
     }
 
-    if (!allow(`reset:${phoneE164}`, 5, 60 * 60 * 1000)) {
+    if (!allow(`reset:${phoneE164}`, RATE.RESET_PER_PHONE.limit, RATE.RESET_PER_PHONE.windowMs)) {
       throw new HttpsError("resource-exhausted", "Too many reset attempts; try again later.");
     }
 

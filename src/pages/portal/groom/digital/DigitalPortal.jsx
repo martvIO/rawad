@@ -10,6 +10,7 @@ import { DigitalAddGuest } from "./DigitalAddGuest.jsx";
 import { DigitalPhotographer } from "./DigitalPhotographer.jsx";
 import { DigitalDesignRequest } from "./DigitalDesignRequest.jsx";
 import { C } from "../../../../styles/theme.js";
+import { STORAGE_KEYS } from "../../../../constants/storageKeys.js";
 
 const navClass = ({ isActive }) => `nav-tab${isActive ? " active" : ""}`;
 const navStyle = { fontSize: 12, padding: "6px 10px", textDecoration: "none", display: "inline-block" };
@@ -23,7 +24,7 @@ export function DigitalPortal() {
   const navigate = useNavigate();
 
   const changeType = () => {
-    localStorage.removeItem("dawa_groom_type");
+    localStorage.removeItem(STORAGE_KEYS.GROOM_TYPE);
     navigate("/portal/groom/type-select", { replace: true });
   };
 

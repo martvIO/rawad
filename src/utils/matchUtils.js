@@ -8,6 +8,9 @@
 //   - Name and address use fuzzy similarity to tolerate spelling variation
 //     across Arabic / Hebrew / English transliterations.
 
+import { MATCHING } from "../config/index.js";
+import { MATCH_STATUS } from "../constants/matchStatuses.js";
+
 // ── Phone ───────────────────────────────────────────────────────────────────
 
 // Strip everything except digits, then peel known country prefixes and a
@@ -124,9 +127,10 @@ export function addressSimilarity(a, b) {
 // ── Thresholds ──────────────────────────────────────────────────────────────
 // Tuned for short Arabic/Hebrew names where one-letter spelling variants
 // are common. 0.55 accepts "Muhammad" ≈ "Mohammed"; 0.40 accepts a partial
-// city match (one of two words present).
-export const NAME_SIMILAR_THRESHOLD = 0.55;
-export const ADDRESS_SIMILAR_THRESHOLD = 0.40;
+// city match (one of two words present). Values live in src/config so the
+// tuning is in one place if the matching feature is revisited.
+export const NAME_SIMILAR_THRESHOLD = MATCHING.NAME_THRESHOLD;
+export const ADDRESS_SIMILAR_THRESHOLD = MATCHING.ADDRESS_THRESHOLD;
 
 // ── Classification ─────────────────────────────────────────────────────────
 
@@ -150,9 +154,9 @@ export function composeConfirmationAddress(conf) {
 //   C) phone exists but name or address differs            → red
 //   D) phone not in any guest of this groom                → unknown
 export function classifyConfirmation(conf, guestList) {
-  if (!conf) return { status: "unknown", guest: null, reasons: [] };
+  if (!conf) return { status: MATCH_STATUS.UNKNOWN, guest: null, reasons: [] };
   const wanted = normalizePhoneForMatching(conf.submittedPhone);
-  if (!wanted) return { status: "unknown", guest: null, reasons: [] };
+  if (!wanted) return { status: MATCH_STATUS.UNKNOWN, guest: null, reasons: [] };
 
   // Find guest by phone within the same groom. Falls back to all if the
   // caller passed a flat list (admin view); guard with groomUid match.
@@ -161,7 +165,7 @@ export function classifyConfirmation(conf, guestList) {
     normalizePhoneForMatching(g.phone) === wanted,
   ) || null;
 
-  if (!guest) return { status: "unknown", guest: null, reasons: [] };
+  if (!guest) return { status: MATCH_STATUS.UNKNOWN, guest: null, reasons: [] };
 
   const nameSim = nameSimilarity(conf.submittedName, guest.name);
   const guestHasAddress = !!(guest.area && String(guest.area).trim());
@@ -181,15 +185,15 @@ export function classifyConfirmation(conf, guestList) {
   if (!addrOk) reasons.push("address_differs");
 
   // Case A: everything aligns.
-  if (nameOk && addrOk) return { status: "green", guest, reasons: [] };
+  if (nameOk && addrOk) return { status: MATCH_STATUS.GREEN, guest, reasons: [] };
 
   // Case B: name matches; groom has no address; guest filled one in.
   if (nameOk && !guestHasAddress && confHasAddress) {
-    return { status: "green", guest, reasons: [] };
+    return { status: MATCH_STATUS.GREEN, guest, reasons: [] };
   }
 
   // Case C: anything else with a phone match is a red mismatch.
-  return { status: "red", guest, reasons };
+  return { status: MATCH_STATUS.RED, guest, reasons };
 }
 
 // Build a map of confirmation.id → classification result. Computed once per

@@ -9,11 +9,12 @@
 
 import { api } from "../utils/apiClient.js";
 import { createPoller } from "../utils/poller.js";
+import { POLL_MS } from "../config/index.js";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 /** Aggressive interval — invite pages need to detect "used" quickly. */
-const INVITE_TOKEN_POLL_INTERVAL_MS = 3 * 1000;
+const INVITE_TOKEN_POLL_INTERVAL_MS = POLL_MS.INVITES;
 
 // ─── Token mint / submit ──────────────────────────────────────────────────────
 

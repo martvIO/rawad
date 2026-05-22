@@ -38,6 +38,8 @@ import {
   requireAuth,
   requireAdmin,
 } from "../middleware/auth";
+import { MAX_BYTES, MAX_LEN } from "../../constants/limits";
+import { MEDIA_DOWNLOAD_URL_TTL_MS } from "../../constants/time";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -50,11 +52,11 @@ const STORAGE_MEDIA_PREFIX = "digitalMedia";
 const STORAGE_PHOTOG_PREFIX = "photographerFiles";
 const STORAGE_DESIGN_PREFIX = "designMockups";
 
-const MAX_GUEST_NAME_LEN = 120;
-const MAX_GUEST_PHONE_LEN = 30;
-const MAX_GUEST_RANK_LEN = 60;
-const MAX_GUEST_NOTE_LEN = 500;
-const MAX_BRIDE_NAME_LEN = 120;
+const MAX_GUEST_NAME_LEN = MAX_LEN.NAME;
+const MAX_GUEST_PHONE_LEN = MAX_LEN.PHONE;
+const MAX_GUEST_RANK_LEN = MAX_LEN.GUEST_RANK;
+const MAX_GUEST_NOTE_LEN = MAX_LEN.NOTE;
+const MAX_BRIDE_NAME_LEN = MAX_LEN.NAME;
 const MAX_RANK_ITEMS = 32;
 const MAX_GUEST_STATUSES = new Set(["pending", "attending", "absent"]);
 const ALLOWED_DESIGN_STATUSES = new Set([
@@ -65,14 +67,14 @@ const ALLOWED_DESIGN_STATUSES = new Set([
   "approved",
 ]);
 
-const MAX_INVITE_MEDIA_BYTES = 50 * 1024 * 1024;
-const MAX_PHOTOG_BYTES = 200 * 1024 * 1024;
-const MAX_MOCKUP_BYTES = 50 * 1024 * 1024;
+const MAX_INVITE_MEDIA_BYTES = MAX_BYTES.INVITE_MEDIA;
+const MAX_PHOTOG_BYTES = MAX_BYTES.PHOTOGRAPHER;
+const MAX_MOCKUP_BYTES = MAX_BYTES.MOCKUP;
 
 const ALLOWED_MEDIA_PREFIX = ["image/", "video/"];
 const ALLOWED_MOCKUP_PREFIX = ["image/"];
 
-const DOWNLOAD_URL_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const DOWNLOAD_URL_TTL_MS = MEDIA_DOWNLOAD_URL_TTL_MS;
 const SAFE_NAME_RE = /[^\w.\-]/g;
 
 export const digitalRouter = Router();

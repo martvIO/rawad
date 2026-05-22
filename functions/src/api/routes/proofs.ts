@@ -26,23 +26,25 @@ import {
   requireAuth,
   requireAnyRole,
 } from "../middleware/auth";
+import { MAX_BYTES, MAX_LEN } from "../../constants/limits";
+import { PROOF_DOWNLOAD_URL_TTL_MS } from "../../constants/time";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 /** Match storage.rules `/proofs/{groomUid}/{guestId}` size cap (6 MB). */
-const MAX_PROOF_BYTES = 6 * 1024 * 1024;
+const MAX_PROOF_BYTES = MAX_BYTES.PROOF;
 
 /** Mirrors storage.rules contentType matcher `image/.*`. */
 const ALLOWED_CONTENT_TYPE_PREFIX = "image/";
 
 /** Signed-URL lifetime when generating a read URL. */
-const DOWNLOAD_URL_TTL_MS = 60 * 60 * 1000;
+const DOWNLOAD_URL_TTL_MS = PROOF_DOWNLOAD_URL_TTL_MS;
 
 /** Acceptable proof-path shape: proofs/{groomUid}/{guestId}/{filename}.{ext} */
 const PROOF_PATH_RE = /^proofs\/[^/]+\/[^/]+\/[^/]+$/;
 
 /** Max length of an arbitrary storage path the URL endpoint will accept. */
-const MAX_PATH_LEN = 240;
+const MAX_PATH_LEN = MAX_LEN.PATH;
 
 export const proofsRouter = Router();
 

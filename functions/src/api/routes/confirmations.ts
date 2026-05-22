@@ -28,14 +28,17 @@ import {
   normalisePhoneForMatching,
   isFiniteInRange,
 } from "../../helpers";
+import { MAX_LEN } from "../../constants/limits";
+import { HOUR_MS } from "../../constants/time";
+import { RATE } from "../../constants/rateLimits";
 
 // ─── Schema constants (mirror database.rules.json /confirmations) ─────────────
 
-const MAX_NAME_LEN = 120;
-const MAX_PHONE_LEN = 30;
-const MAX_CITY_LEN = 80;
-const MAX_STREET_LEN = 120;
-const MAX_HOUSE_LEN = 20;
+const MAX_NAME_LEN = MAX_LEN.NAME;
+const MAX_PHONE_LEN = MAX_LEN.PHONE;
+const MAX_CITY_LEN = MAX_LEN.CITY;
+const MAX_STREET_LEN = MAX_LEN.STREET;
+const MAX_HOUSE_LEN = MAX_LEN.HOUSE;
 const MAX_ATTACHED_GUEST_ID_LEN = 64;
 
 const MIN_LAT = -90;
@@ -45,9 +48,8 @@ const MAX_LNG = 180;
 const MIN_ACCURACY_M = 0;
 const MAX_ACCURACY_M = 100_000;
 
-const HOUR_MS = 60 * 60 * 1000;
-const SUBMIT_MAX_PER_HOUR = 5;
-const ATTACH_MAX_PER_HOUR = 30;
+const SUBMIT_MAX_PER_HOUR = RATE.CONFIRM_PER_IP.limit;
+const ATTACH_MAX_PER_HOUR = RATE.ATTACH_LOC_PER_ADMIN.limit;
 
 const MIN_NAME_WORDS = 2;
 

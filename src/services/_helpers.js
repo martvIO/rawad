@@ -17,11 +17,12 @@
 
 import { api } from "../utils/apiClient.js";
 import { createPoller } from "../utils/poller.js";
+import { POLL_MS } from "../config/index.js";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 /** Default poll interval matches the legacy onValue cadence for list views. */
-const DEFAULT_LIST_INTERVAL_MS = 15 * 1000;
+const DEFAULT_LIST_INTERVAL_MS = POLL_MS.DEFAULT;
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 

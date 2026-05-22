@@ -8,10 +8,11 @@
 
 import { api } from "../utils/apiClient.js";
 import { subscribeList } from "./_helpers.js";
+import { POLL_MS } from "../config/index.js";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const CONFIRMATIONS_POLL_INTERVAL_MS = 15 * 1000;
+const CONFIRMATIONS_POLL_INTERVAL_MS = POLL_MS.CONFIRMATIONS;
 
 // ─── Subscriptions ────────────────────────────────────────────────────────────
 

@@ -3,13 +3,14 @@
 import { useNavigate } from "react-router-dom";
 import { usePortal } from "../../../context/PortalContext.jsx";
 import { C } from "../../../styles/theme.js";
+import { STORAGE_KEYS } from "../../../constants/storageKeys.js";
 
 export function GroomTypeSelect() {
   const { lang, onBack } = usePortal();
   const navigate = useNavigate();
 
   const pick = (type) => {
-    localStorage.setItem("dawa_groom_type", type);
+    localStorage.setItem(STORAGE_KEYS.GROOM_TYPE, type);
     navigate(
       type === "handwritten"
         ? "/portal/groom/handwritten/dashboard"

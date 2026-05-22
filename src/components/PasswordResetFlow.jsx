@@ -18,11 +18,9 @@ import { isStrongPassword } from "../utils/password.js";
 import { logErr } from "../utils/logger.js";
 import { makeT } from "../i18n/index.js";
 import { C } from "../styles/theme.js";
+import { RECAPTCHA_SITE_KEY } from "../config/index.js";
 
 // ─── reCAPTCHA constants ──────────────────────────────────────────────────────
-
-/** Public reCAPTCHA v2 site key configured at build time. */
-const RECAPTCHA_SITE_KEY = import.meta.env?.VITE_RECAPTCHA_V2_SITE_KEY ?? "";
 
 /** Google's hosted reCAPTCHA script. Loaded once on demand. */
 const RECAPTCHA_SCRIPT_SRC = "https://www.google.com/recaptcha/api.js";

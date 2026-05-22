@@ -15,17 +15,10 @@ import { randomBytes } from "crypto";
 import { allow } from "./rateLimit";
 import { writeAudit } from "./audit";
 import { getClaims, isFiniteInRange, normalisePhone } from "./helpers";
-
-const TOKEN_TTL_MS = 90 * 24 * 60 * 60 * 1000;
-
-const MAX_LEN = {
-  submittedName:   120,
-  submittedPhone:  30,
-  submittedCity:   80,
-  submittedStreet: 120,
-  submittedHouse:  20,
-  deliveryNote:    240,
-};
+import { MAX_LEN } from "./constants/limits";
+import { RATE } from "./constants/rateLimits";
+import { TOKEN_BYTES, TOKEN_HEX_RE, TOKEN_TTL_MS } from "./constants/tokens";
+import { ADDRESS_JOINER } from "./constants/format";
 
 function clampStr(v: unknown, max: number): string {
   return (typeof v === "string" ? v.trim() : "").slice(0, max);
@@ -43,8 +36,12 @@ export const createGuestInvite = onCall(
       throw new HttpsError("permission-denied", "Groom or admin only.");
     }
 
-    // Per-caller rate limit — 60 invite creations per hour.
-    if (!allow(`createInvite:${callerUid}`, 60, 60 * 60 * 1000)) {
+    // Per-caller rate limit — see RATE.CREATE_INVITE_PER_USER.
+    if (!allow(
+      `createInvite:${callerUid}`,
+      RATE.CREATE_INVITE_PER_USER.limit,
+      RATE.CREATE_INVITE_PER_USER.windowMs,
+    )) {
       throw new HttpsError("resource-exhausted", "Too many invites; please slow down.");
     }
 
@@ -79,15 +76,15 @@ export const createGuestInvite = onCall(
     }
 
     const now = Date.now();
-    const token = randomBytes(16).toString("hex"); // 32 hex chars, 128 bits
+    const token = randomBytes(TOKEN_BYTES).toString("hex"); // 32 hex chars, 128 bits
     const expiresAt = now + TOKEN_TTL_MS;
 
     await db.ref(`inviteTokens/${token}`).set({
       groomUid,
       groomUsername,
       guestId,
-      guestName:  (guest?.name  ?? "").toString().slice(0, 120),
-      guestPhone: (guest?.phone ?? "").toString().slice(0, 30),
+      guestName:  (guest?.name  ?? "").toString().slice(0, MAX_LEN.NAME),
+      guestPhone: (guest?.phone ?? "").toString().slice(0, MAX_LEN.PHONE),
       createdAt: now,
       expiresAt,
     });
@@ -108,13 +105,13 @@ export const submitGuestInvite = onCall(
   { enforceAppCheck: false },
   async (req) => {
     const ip = (req.rawRequest?.ip ?? "unknown").toString();
-    if (!allow(`invite:${ip}`, 5, 60 * 60 * 1000)) {
+    if (!allow(`invite:${ip}`, RATE.SUBMIT_INVITE_PER_IP.limit, RATE.SUBMIT_INVITE_PER_IP.windowMs)) {
       throw new HttpsError("resource-exhausted", "Too many submissions; please try again later.");
     }
 
     const data = req.data ?? {};
     const token = (data.token ?? "").toString();
-    if (!/^[a-f0-9]{32}$/.test(token)) {
+    if (!TOKEN_HEX_RE.test(token)) {
       throw new HttpsError("invalid-argument", "Invalid token.");
     }
 
@@ -131,12 +128,12 @@ export const submitGuestInvite = onCall(
       throw new HttpsError("deadline-exceeded", "Invite link expired.");
     }
 
-    const submittedName   = clampStr(data.submittedName,   MAX_LEN.submittedName);
-    const submittedPhone  = clampStr(data.submittedPhone,  MAX_LEN.submittedPhone);
-    const submittedCity   = clampStr(data.submittedCity,   MAX_LEN.submittedCity);
-    const submittedStreet = clampStr(data.submittedStreet, MAX_LEN.submittedStreet);
-    const submittedHouse  = clampStr(data.submittedHouse,  MAX_LEN.submittedHouse);
-    const deliveryNote    = clampStr(data.deliveryNote,    MAX_LEN.deliveryNote);
+    const submittedName   = clampStr(data.submittedName,   MAX_LEN.NAME);
+    const submittedPhone  = clampStr(data.submittedPhone,  MAX_LEN.PHONE);
+    const submittedCity   = clampStr(data.submittedCity,   MAX_LEN.CITY);
+    const submittedStreet = clampStr(data.submittedStreet, MAX_LEN.STREET);
+    const submittedHouse  = clampStr(data.submittedHouse,  MAX_LEN.HOUSE);
+    const deliveryNote    = clampStr(data.deliveryNote,    MAX_LEN.AREA);
 
     if (!submittedName || !submittedPhone || !submittedCity) {
       throw new HttpsError("invalid-argument", "Name, phone and city are required.");
@@ -159,7 +156,7 @@ export const submitGuestInvite = onCall(
     // rest of the app's joined-address conventions (see useConfirmationData).
     const area = [submittedCity, submittedStreet, submittedHouse]
       .filter(Boolean)
-      .join("، ");
+      .join(ADDRESS_JOINER);
 
     const guestRef = db.ref(`guestsByGroom/${tk.groomUid}/${tk.guestId}`);
     const guestSnap = await guestRef.get();

@@ -15,8 +15,10 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import {
   publishMyFix, clearMyLocation, subscribeDriversForGroom,
 } from "../services/liveLocations.js";
+import { GEO } from "../config/index.js";
+import { ROLES } from "../constants/roles.js";
 
-const STALE_MS = 30 * 1000; // drivers older than 30s are treated as offline
+const { STALE_MS, MAX_AGE_MS, TIMEOUT_MS, PUBLISH_INTERVAL_MS } = GEO;
 
 export function useGeolocation({
   userType,
@@ -51,7 +53,7 @@ export function useGeolocation({
   // no new snapshot has arrived.
   const [nowTick, setNowTick] = useState(0);
   useEffect(() => {
-    const id = setInterval(() => setNowTick((n) => n + 1), 1000);
+    const id = setInterval(() => setNowTick((n) => n + 1), PUBLISH_INTERVAL_MS);
     return () => clearInterval(id);
   }, []);
 
@@ -88,7 +90,7 @@ export function useGeolocation({
         }
         setDriverIsSharing(false);
       },
-      { enableHighAccuracy: true, maximumAge: 1000, timeout: 12000 },
+      { enableHighAccuracy: true, maximumAge: MAX_AGE_MS, timeout: TIMEOUT_MS },
     );
   };
 
@@ -114,14 +116,14 @@ export function useGeolocation({
 
   // While broadcasting, push the latest fix to RTDB every second.
   useEffect(() => {
-    if (userType !== "driver" || !driverIsSharing || !currentUid) return;
+    if (userType !== ROLES.DRIVER || !driverIsSharing || !currentUid) return;
     const tick = () => {
       const fix = driverCoordsRef.current;
       if (!fix) return;
       publishMyFix(currentUid, currentUsername, fix, usernamesToUids(liveShareWith)).catch(() => {});
     };
     tick();
-    const id = setInterval(tick, 1000);
+    const id = setInterval(tick, PUBLISH_INTERVAL_MS);
     return () => clearInterval(id);
   }, [userType, driverIsSharing, currentUid, liveShareWith]);
 
@@ -161,21 +163,21 @@ export function useGeolocation({
           groomWatchIdRef.current = null;
         }
       },
-      { enableHighAccuracy: true, maximumAge: 1000, timeout: 12000 },
+      { enableHighAccuracy: true, maximumAge: MAX_AGE_MS, timeout: TIMEOUT_MS },
     );
   };
 
   // ── Groom: subscribe to the drivers currently sharing with them ───────────
   const [driversSnapshot, setDriversSnapshot] = useState({}); // { [driverUid]: { lat, lng, accuracy, timeISO } }
   useEffect(() => {
-    if (userType !== "groom" || !activeGroomUid) { setDriversSnapshot({}); return; }
+    if (userType !== ROLES.GROOM || !activeGroomUid) { setDriversSnapshot({}); return; }
     return subscribeDriversForGroom(activeGroomUid, setDriversSnapshot);
   }, [userType, activeGroomUid]);
 
   // Match the original consumer shape: array of objects with .driver, .lat,
   // .lng, .accuracy, .time. (Fixes the latent bug from the localStorage era.)
   const driversSharingWithMe = useMemo(() => {
-    if (userType !== "groom") return [];
+    if (userType !== ROLES.GROOM) return [];
     const now = Date.now();
     const out = [];
     for (const [driverUid, info] of Object.entries(driversSnapshot || {})) {

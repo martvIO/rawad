@@ -6,10 +6,11 @@
 
 import { api } from "../utils/apiClient.js";
 import { createPoller } from "../utils/poller.js";
+import { POLL_MS } from "../config/index.js";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const ASSIGNMENTS_POLL_INTERVAL_MS = 30 * 1000;
+const ASSIGNMENTS_POLL_INTERVAL_MS = POLL_MS.ASSIGNMENTS;
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 

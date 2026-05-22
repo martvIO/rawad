@@ -14,6 +14,7 @@ import { getDatabase } from "firebase-admin/database";
 import { getFirestore } from "firebase-admin/firestore";
 import * as fs from "fs";
 import * as path from "path";
+import { TOKEN_HEX_RE } from "./constants/tokens";
 
 const OG_BLOCK_RE = /<!--OG_TAGS-->[\s\S]*?<!--\/OG_TAGS-->/;
 
@@ -87,7 +88,7 @@ export const digitalInvitePreview = onRequest(
     let inputs: OgInputs = { guestName: "", url: fullUrl };
 
     try {
-      if (token && /^[a-f0-9]{32}$/.test(token)) {
+      if (token && TOKEN_HEX_RE.test(token)) {
         const db = getDatabase();
         const snap = await db.ref(`inviteTokens/${token}`).get();
         if (snap.exists()) {

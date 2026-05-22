@@ -13,6 +13,8 @@ import {
   assertAdmin, isE164, isRole, isUsername,
   phoneIndexKey, syntheticEmail,
 } from "./helpers";
+import { MAX_LEN } from "./constants/limits";
+import { RATE } from "./constants/rateLimits";
 
 interface UpdateInput {
   uid: string;
@@ -28,7 +30,11 @@ export const updatePortalUser = onCall(
   { enforceAppCheck: false },
   async (req) => {
     const callerUid = assertAdmin(req);
-    if (!allow(`updateUser:${callerUid}`, 60, 60 * 60 * 1000)) {
+    if (!allow(
+      `updateUser:${callerUid}`,
+      RATE.UPDATE_USER_PER_ADMIN.limit,
+      RATE.UPDATE_USER_PER_ADMIN.windowMs,
+    )) {
       throw new HttpsError("resource-exhausted", "Too many user updates.");
     }
 
@@ -63,7 +69,7 @@ export const updatePortalUser = onCall(
     if (
       input.displayName !== undefined &&
       input.displayName !== null &&
-      (typeof input.displayName !== "string" || input.displayName.length > 120)
+      (typeof input.displayName !== "string" || input.displayName.length > MAX_LEN.NAME)
     ) {
       throw new HttpsError("invalid-argument", "Invalid displayName.");
     }
@@ -103,7 +109,7 @@ export const updatePortalUser = onCall(
       authPatch.phoneNumber = newPhone;
     }
     if (newDisplayName !== undefined) {
-      authPatch.displayName = (newDisplayName ?? "").slice(0, 120) || null;
+      authPatch.displayName = (newDisplayName ?? "").slice(0, MAX_LEN.NAME) || null;
     }
     if (Object.keys(authPatch).length > 0) {
       await getAuth().updateUser(uid, authPatch);

@@ -17,16 +17,17 @@
 import { Router, Response } from "express";
 import { getDatabase } from "firebase-admin/database";
 import { AuthRequest, requireAuth } from "../middleware/auth";
+import { MAX_LEN } from "../../constants/limits";
 
 // ─── Schema constants (mirror database.rules.json) ────────────────────────────
 
-const MAX_NAME_LEN = 120;
-const MAX_PHONE_LEN = 30;
-const MAX_AREA_LEN = 240;
-const MAX_GROOM_USERNAME_LEN = 60;
-const MAX_PROOF_PATH_LEN = 240;
+const MAX_NAME_LEN = MAX_LEN.NAME;
+const MAX_PHONE_LEN = MAX_LEN.PHONE;
+const MAX_AREA_LEN = MAX_LEN.AREA;
+const MAX_GROOM_USERNAME_LEN = MAX_LEN.GROOM_USERNAME;
+const MAX_PROOF_PATH_LEN = MAX_LEN.PATH;
 const MAX_INVITE_TOKEN_LEN = 64;
-const MAX_DELIVERED_BY_LEN = 120;
+const MAX_DELIVERED_BY_LEN = MAX_LEN.NAME;
 
 const ALLOWED_STATUS = new Set(["pending", "enroute", "delivered"]);
 const ALLOWED_INVITE_TYPE = new Set(["premium", "vip"]);

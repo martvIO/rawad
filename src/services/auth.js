@@ -20,11 +20,12 @@ import {
   getStoredUid,
 } from "../utils/tokenManager.js";
 import { logWarn } from "../utils/logger.js";
+import { POLL_MS } from "../config/index.js";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 /** Frequency at which /auth/me is polled to refresh role/claims. */
-const ME_POLL_INTERVAL_MS = 30 * 1000;
+const ME_POLL_INTERVAL_MS = POLL_MS.ME;
 
 // ─── Login / logout ───────────────────────────────────────────────────────────
 

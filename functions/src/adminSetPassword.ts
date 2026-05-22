@@ -8,6 +8,7 @@ import { getAuth }    from "firebase-admin/auth";
 import { writeAudit } from "./audit";
 import { allow }      from "./rateLimit";
 import { assertAdmin, isStrongPassword } from "./helpers";
+import { RATE } from "./constants/rateLimits";
 
 // App Check is OFF — admin-only callable already gated by assertAdmin +
 // rate limit + audit log. See users.ts for the policy rationale.
@@ -15,7 +16,11 @@ export const adminSetPassword = onCall(
   { enforceAppCheck: false },
   async (req) => {
     const callerUid = assertAdmin(req);
-    if (!allow(`adminSetPassword:${callerUid}`, 30, 60 * 60 * 1000)) {
+    if (!allow(
+      `adminSetPassword:${callerUid}`,
+      RATE.SET_PASSWORD_PER_ADMIN.limit,
+      RATE.SET_PASSWORD_PER_ADMIN.windowMs,
+    )) {
       throw new HttpsError("resource-exhausted", "Too many password resets.");
     }
 

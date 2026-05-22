@@ -17,9 +17,9 @@ import { randomBytes } from "crypto";
 import { allow } from "./rateLimit";
 import { writeAudit } from "./audit";
 import { getClaims } from "./helpers";
-
-const TOKEN_TTL_MS = 90 * 24 * 60 * 60 * 1000;
-const MAX_NOTE_LEN = 500;
+import { MAX_LEN } from "./constants/limits";
+import { RATE } from "./constants/rateLimits";
+import { TOKEN_BYTES, TOKEN_HEX_RE, TOKEN_TTL_MS } from "./constants/tokens";
 
 function clampStr(v: unknown, max: number): string {
   return (typeof v === "string" ? v.trim() : "").slice(0, max);
@@ -35,7 +35,11 @@ export const createDigitalGuestInvite = onCall(
       throw new HttpsError("permission-denied", "Groom or admin only.");
     }
 
-    if (!allow(`createDigitalInvite:${callerUid}`, 60, 60 * 60 * 1000)) {
+    if (!allow(
+      `createDigitalInvite:${callerUid}`,
+      RATE.CREATE_DIGITAL_INVITE_PER_USER.limit,
+      RATE.CREATE_DIGITAL_INVITE_PER_USER.windowMs,
+    )) {
       throw new HttpsError("resource-exhausted", "Too many invites; please slow down.");
     }
 
@@ -66,15 +70,15 @@ export const createDigitalGuestInvite = onCall(
     }
 
     const now = Date.now();
-    const token = randomBytes(16).toString("hex");
+    const token = randomBytes(TOKEN_BYTES).toString("hex");
     const expiresAt = now + TOKEN_TTL_MS;
 
     await db.ref(`inviteTokens/${token}`).set({
       groomUid,
       groomUsername,
       guestId,
-      guestName:  (guest?.name  ?? "").toString().slice(0, 120),
-      guestPhone: (guest?.phone ?? "").toString().slice(0, 30),
+      guestName:  (guest?.name  ?? "").toString().slice(0, MAX_LEN.NAME),
+      guestPhone: (guest?.phone ?? "").toString().slice(0, MAX_LEN.PHONE),
       guestType: "digital",
       createdAt: now,
       expiresAt,
@@ -94,13 +98,17 @@ export const submitDigitalGuestInvite = onCall(
   { enforceAppCheck: false },
   async (req) => {
     const ip = (req.rawRequest?.ip ?? "unknown").toString();
-    if (!allow(`digitalInvite:${ip}`, 10, 60 * 60 * 1000)) {
+    if (!allow(
+      `digitalInvite:${ip}`,
+      RATE.SUBMIT_DIGITAL_INVITE_PER_IP.limit,
+      RATE.SUBMIT_DIGITAL_INVITE_PER_IP.windowMs,
+    )) {
       throw new HttpsError("resource-exhausted", "Too many submissions; please try again later.");
     }
 
     const data = req.data ?? {};
     const token = (data.token ?? "").toString();
-    if (!/^[a-f0-9]{32}$/.test(token)) {
+    if (!TOKEN_HEX_RE.test(token)) {
       throw new HttpsError("invalid-argument", "Invalid token.");
     }
 
@@ -109,7 +117,7 @@ export const submitDigitalGuestInvite = onCall(
       throw new HttpsError("invalid-argument", "rsvp must be 'attending' or 'absent'.");
     }
     const rsvp: "attending" | "absent" = rsvpRaw;
-    const note = clampStr(data.note, MAX_NOTE_LEN);
+    const note = clampStr(data.note, MAX_LEN.NOTE);
 
     const db = getDatabase();
     const tokenSnap = await db.ref(`inviteTokens/${token}`).get();

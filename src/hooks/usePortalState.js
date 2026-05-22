@@ -6,10 +6,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { load, save, removeKey } from "../utils/storage.js";
-import { toIntlPhone, validatePhone } from "../utils/phone.js";
+import { buildWaLink, toIntlPhone, validatePhone } from "../utils/phone.js";
 import { validateName } from "../utils/validation.js";
 import { isStrongPassword } from "../utils/password.js";
+import { formatAddress } from "../utils/geo.js";
 import { logErr } from "../utils/logger.js";
+import { INVITE_BASE_URL, TIMING } from "../config/index.js";
+import { ROLES } from "../constants/roles.js";
+import { STORAGE_KEYS } from "../constants/storageKeys.js";
+import { MATCH_STATUS } from "../constants/matchStatuses.js";
 
 import { subscribeAuth, signIn, signOutNow, forceRefreshToken } from "../services/auth.js";
 import { setAuthChangeCallback } from "../utils/apiClient.js";
@@ -75,7 +80,7 @@ export function usePortalState({ onBack, t, lang, setLang }) {
   const userType = authUser?.role ?? null;
   const currentUsername = authUser?.username ?? null;
   const currentUid = authUser?.uid ?? null;
-  const isAdmin = authUser?.claims?.role === "admin";
+  const isAdmin = authUser?.claims?.role === ROLES.ADMIN;
 
   // ── Login form (transient) ──────────────────────────────────────────────────
   const [loginUser, setLoginUser]   = useState("");
@@ -84,7 +89,7 @@ export function usePortalState({ onBack, t, lang, setLang }) {
 
   // ── Toast ───────────────────────────────────────────────────────────────────
   const [toast, setToast] = useState(null);
-  const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(null), 3200); };
+  const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(null), TIMING.TOAST_MS); };
 
   // Logout confirmation modal
   const [logoutAsking, setLogoutAsking] = useState(false);
@@ -92,9 +97,9 @@ export function usePortalState({ onBack, t, lang, setLang }) {
   // ── Driver: active groom they're delivering for ─────────────────────────────
   // Persisted as { uid, username } because the username isn't world-readable.
   const [driverServingGroom, setDriverServingGroomState] = useState(
-    () => load("dawa_driver_serving_groom", null),
+    () => load(STORAGE_KEYS.DRIVER_SERVING_GROOM, null),
   );
-  useEffect(() => { save("dawa_driver_serving_groom", driverServingGroom); }, [driverServingGroom]);
+  useEffect(() => { save(STORAGE_KEYS.DRIVER_SERVING_GROOM, driverServingGroom); }, [driverServingGroom]);
   const driverServingGroomUid      = driverServingGroom?.uid      ?? null;
   const driverServingGroomUsername = driverServingGroom?.username ?? null;
 
@@ -231,12 +236,12 @@ export function usePortalState({ onBack, t, lang, setLang }) {
       const ghosts   = optimisticUsers.filter(o => !liveUids.has(o.uid));
       return [...adminUsers, ...ghosts];
     }
-    if (userType === "driver" && driverServingGroom) {
+    if (userType === ROLES.DRIVER && driverServingGroom) {
       return [{
         uid: driverServingGroom.uid,
         id:  driverServingGroom.uid,
         username: driverServingGroom.username,
-        role: "groom",
+        role: ROLES.GROOM,
       }];
     }
     return [];
@@ -267,9 +272,9 @@ export function usePortalState({ onBack, t, lang, setLang }) {
   useEffect(() => {
     if (!authed) { setGuests([]); return; }
     if (isAdmin)                                 return subscribeAllGuests(setGuests);
-    if (userType === "driver" && driverServingGroomUid)
+    if (userType === ROLES.DRIVER && driverServingGroomUid)
       return subscribeGuestsForGroom(driverServingGroomUid, setGuests);
-    if (userType === "groom"  && currentUid)
+    if (userType === ROLES.GROOM && currentUid)
       return subscribeGuestsForGroom(currentUid, setGuests);
     setGuests([]);
   }, [authed, isAdmin, userType, currentUid, driverServingGroomUid]);
@@ -277,7 +282,7 @@ export function usePortalState({ onBack, t, lang, setLang }) {
   // ── قائمة الـ UIDs المُسنَدة للمرسل (من JWT claim assignedGrooms) ────────────
   // تُستخدم في البلدات المشتركة لمعرفة أي عرسان يمكنه قراءة معازيمهم.
   const driverAssignedGroomUids = useMemo(() => {
-    if (userType !== "driver") return [];
+    if (userType !== ROLES.DRIVER) return [];
     const ag = authUser?.claims?.assignedGrooms;
     if (!ag || typeof ag !== "object") return [];
     return Object.keys(ag).filter(uid => ag[uid] === true);
@@ -294,7 +299,7 @@ export function usePortalState({ onBack, t, lang, setLang }) {
   // أي عريس غير مُسنَد تُعيد اشتراكه فارغاً بصمت.
   const [sharedGuests, setSharedGuests] = useState([]);
   useEffect(() => {
-    if (userType !== "driver" || driverAssignedGroomUids.length === 0) {
+    if (userType !== ROLES.DRIVER || driverAssignedGroomUids.length === 0) {
       setSharedGuests([]);
       return;
     }
@@ -313,11 +318,11 @@ export function usePortalState({ onBack, t, lang, setLang }) {
   }, [userType, _assignedKey]);
 
   // Active groom context: groom uses their own uid; driver uses the assigned one.
-  const activeGroomUid      = userType === "groom"  ? currentUid
-                            : userType === "driver" ? driverServingGroomUid
+  const activeGroomUid      = userType === ROLES.GROOM  ? currentUid
+                            : userType === ROLES.DRIVER ? driverServingGroomUid
                             : null;
-  const activeGroomUsername = userType === "groom"  ? currentUsername
-                            : userType === "driver" ? driverServingGroomUsername
+  const activeGroomUsername = userType === ROLES.GROOM  ? currentUsername
+                            : userType === ROLES.DRIVER ? driverServingGroomUsername
                             : null;
 
   // For non-admin sessions the subscription already filtered to one groom, so
@@ -386,7 +391,7 @@ export function usePortalState({ onBack, t, lang, setLang }) {
     setSharedStep("pickGrooms");
     setSharedSelectedGrooms([]); setSharedSelectedCity(null);
     setDriverServingGroomState(null);
-    removeKey("dawa_driver_serving_groom");
+    removeKey(STORAGE_KEYS.DRIVER_SERVING_GROOM);
   };
 
   // ── Driver picks a groom (server-side: assignDriverToGroom Function) ────────
@@ -409,14 +414,8 @@ export function usePortalState({ onBack, t, lang, setLang }) {
   );
 
   // ── WhatsApp link helpers ───────────────────────────────────────────────────
-  const waLinkFor = (phone) => {
-    const intl = toIntlPhone(phone);
-    if (!intl) return "";
-    const body = (adminMessageBody || "").trim();
-    const link = (adminFormLink    || "").trim();
-    const text = [body, link].filter(Boolean).join("\n\n");
-    return `https://wa.me/${intl}?text=${encodeURIComponent(text)}`;
-  };
+  const waLinkFor = (phone) =>
+    buildWaLink(phone, (adminMessageBody || "").trim(), (adminFormLink || "").trim()) || "";
   const sendWaToOne = (phone) => {
     const url = waLinkFor(phone);
     if (!url) { showToast(t("share_invalid")); return; }
@@ -430,7 +429,7 @@ export function usePortalState({ onBack, t, lang, setLang }) {
     showToast(t("admin_bulk_warn"));
     groomGuests.forEach((g, i) => {
       const url = waLinkFor(g.phone);
-      if (url) setTimeout(() => window.open(url, "_blank", "noopener"), i * 300);
+      if (url) setTimeout(() => window.open(url, "_blank", "noopener"), i * TIMING.WA_STAGGER_MS);
     });
   };
 
@@ -442,8 +441,7 @@ export function usePortalState({ onBack, t, lang, setLang }) {
   //               can personalise the displayed guest name.
   const sendInviteLink = async (guest) => {
     if (!guest?.groomUid || !guest?.id) { showToast(t("share_invalid")); return; }
-    const intl = toIntlPhone(guest.phone);
-    if (!intl) { showToast(t("share_invalid")); return; }
+    if (!toIntlPhone(guest.phone)) { showToast(t("share_invalid")); return; }
     try {
       if (adminMode === "digital") {
         const { token } = await createDigitalGuestInvite({
@@ -455,12 +453,8 @@ export function usePortalState({ onBack, t, lang, setLang }) {
                   || `${window.location.origin}/d`;
         const groomUsername = guest.groomUsername || "";
         const url  = groomUsername ? `${base}/${groomUsername}/${token}` : `${base}/${token}`;
-        const body = (adminDigitalMessage || "").trim();
-        const text = [body, url].filter(Boolean).join("\n\n");
-        window.open(
-          `https://wa.me/${intl}?text=${encodeURIComponent(text)}`,
-          "_blank", "noopener",
-        );
+        const waUrl = buildWaLink(guest.phone, (adminDigitalMessage || "").trim(), url);
+        if (waUrl) window.open(waUrl, "_blank", "noopener");
         return;
       }
 
@@ -470,15 +464,11 @@ export function usePortalState({ onBack, t, lang, setLang }) {
         guestId:  guest.id,
       });
       if (!token) { showToast(t("share_invalid")); return; }
-      const baseUrl = (import.meta.env.VITE_INVITE_BASE_URL || "").replace(/\/+$/, "")
+      const baseUrl = (INVITE_BASE_URL || "").replace(/\/+$/, "")
                    || window.location.origin;
-      const url  = `${baseUrl}/invite/${token}`;
-      const body = (adminMessageBody || "").trim();
-      const text = [body, url].filter(Boolean).join("\n\n");
-      window.open(
-        `https://wa.me/${intl}?text=${encodeURIComponent(text)}`,
-        "_blank", "noopener",
-      );
+      const url = `${baseUrl}/invite/${token}`;
+      const waUrl = buildWaLink(guest.phone, (adminMessageBody || "").trim(), url);
+      if (waUrl) window.open(waUrl, "_blank", "noopener");
     } catch (e) {
       logErr("sendInviteLink", e);
       showToast(e?.message || t("share_invalid"));
@@ -490,23 +480,18 @@ export function usePortalState({ onBack, t, lang, setLang }) {
   // Only the admin's Send tab calls this — grooms can no longer self-send.
   const sendDigitalInviteLink = async (guest, groomUid) => {
     if (!groomUid || !guest?.id) { showToast(t("share_invalid")); return; }
-    const intl = toIntlPhone(guest.phone);
-    if (!intl) { showToast(t("share_invalid")); return; }
+    if (!toIntlPhone(guest.phone)) { showToast(t("share_invalid")); return; }
     try {
       const { token } = await createDigitalGuestInvite({
         groomUid,
         guestId: guest.id,
       });
       if (!token) { showToast(t("share_invalid")); return; }
-      const baseUrl = (import.meta.env.VITE_INVITE_BASE_URL || "").replace(/\/+$/, "")
+      const baseUrl = (INVITE_BASE_URL || "").replace(/\/+$/, "")
                    || window.location.origin;
-      const url  = `${baseUrl}/invite/digital/${token}`;
-      const body = (adminMessageBody || "").trim();
-      const text = [body, url].filter(Boolean).join("\n\n");
-      window.open(
-        `https://wa.me/${intl}?text=${encodeURIComponent(text)}`,
-        "_blank", "noopener",
-      );
+      const url = `${baseUrl}/invite/digital/${token}`;
+      const waUrl = buildWaLink(guest.phone, (adminMessageBody || "").trim(), url);
+      if (waUrl) window.open(waUrl, "_blank", "noopener");
     } catch (e) {
       logErr("sendDigitalInviteLink", e);
       showToast(e?.message || t("share_invalid"));
@@ -528,7 +513,7 @@ export function usePortalState({ onBack, t, lang, setLang }) {
   // matchColor returns "green" | "red" | "unknown" (note: was previously
   // "red" for unknowns; UI now branches on three states for the Unknown section).
   const matchColor = (conf) =>
-    classificationMap.get(conf?.id)?.status ?? "unknown";
+    classificationMap.get(conf?.id)?.status ?? MATCH_STATUS.UNKNOWN;
 
   // Translate machine reason codes into the existing i18n strings so
   // AdminConfirmationsTab can display them as badges.
@@ -546,7 +531,7 @@ export function usePortalState({ onBack, t, lang, setLang }) {
   const useConfirmationData = async (conf) => {
     const guest = matchedGuestFor(conf);
     if (!guest) return;
-    const fullAddr = [conf.submittedCity, conf.submittedStreet, conf.submittedHouse].filter(Boolean).join("، ");
+    const fullAddr = formatAddress(conf.submittedCity, conf.submittedStreet, conf.submittedHouse);
     try {
       await updateGuestSrv(guest.groomUid, guest.id, {
         name:  conf.submittedName  || guest.name,
@@ -613,7 +598,7 @@ export function usePortalState({ onBack, t, lang, setLang }) {
     );
     if (!conf) return null;
     const cls = classificationMap.get(conf.id);
-    if (!cls || cls.status === "green") return { status: "matched", conf };
+    if (!cls || cls.status === MATCH_STATUS.GREEN) return { status: "matched", conf };
     return { status: "mismatch", reasons: reasonsLabel(cls.reasons), conf };
   };
 
@@ -703,7 +688,7 @@ export function usePortalState({ onBack, t, lang, setLang }) {
         setOptimisticUsers(prev => [...prev, newRow]);
         // إذا كان دور الحساب الجديد "عريس" نكتب سجله في /groomProfiles مباشرةً
         // من الكلايَنت حتى يظهر فوراً في القوائم (بدون انتظار نشر Cloud Function).
-        if (role === "groom") {
+        if (role === ROLES.GROOM) {
           upsertGroomProfile(uid, { username }).catch(() => {});
         }
       }
@@ -827,9 +812,9 @@ export function usePortalState({ onBack, t, lang, setLang }) {
       const finalDN       = localPatch.displayName !== undefined
                               ? localPatch.displayName
                               : (orig.displayName ?? undefined);
-      if (finalRole === "groom") {
+      if (finalRole === ROLES.GROOM) {
         upsertGroomProfile(uid, { username: finalUsername, displayName: finalDN }).catch(() => {});
-      } else if (orig.role === "groom" && finalRole && finalRole !== "groom") {
+      } else if (orig.role === ROLES.GROOM && finalRole && finalRole !== ROLES.GROOM) {
         removeGroomProfile(uid).catch(() => {});
       }
 

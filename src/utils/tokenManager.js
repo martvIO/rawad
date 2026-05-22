@@ -20,6 +20,7 @@
 //     `/api/auth/refresh` over HTTPS.
 
 import { logErr, log } from "./logger.js";
+import { API_BASE_URL, TOKEN_MGR } from "../config/index.js";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -31,22 +32,7 @@ const STORAGE_KEY_REFRESH_TOKEN = `${STORAGE_PREFIX}refreshToken`;
 const STORAGE_KEY_EXPIRES_AT = `${STORAGE_PREFIX}expiresAt`;
 const STORAGE_KEY_UID = `${STORAGE_PREFIX}uid`;
 
-/** Refresh proactively this many ms before the recorded expiry. */
-const REFRESH_LEAD_MS = 5 * 60 * 1000;
-
-/** Minimum delay before scheduling — guards against negative timers. */
-const MIN_REFRESH_DELAY_MS = 1000;
-
-/** Default ID-token lifetime (1 hour) when the server doesn't return expiresIn. */
-const DEFAULT_EXPIRES_IN_SECONDS = 3600;
-
-/**
- * Base URL of the REST API. Configured at build time via the Vite env var
- * `VITE_API_BASE_URL` (e.g. `https://us-central1-dawa-aa793.cloudfunctions.net/api`).
- * Falls back to a same-origin `/api` for prod Firebase Hosting deployments
- * where the `/api/**` rewrite is in place.
- */
-const API_BASE_URL = (import.meta.env?.VITE_API_BASE_URL ?? "/api").replace(/\/$/, "");
+const { REFRESH_LEAD_MS, MIN_REFRESH_DELAY_MS, DEFAULT_EXPIRES_IN_SECONDS } = TOKEN_MGR;
 
 // ─── Module state ─────────────────────────────────────────────────────────────
 

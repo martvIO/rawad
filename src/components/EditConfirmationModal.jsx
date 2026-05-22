@@ -6,6 +6,7 @@
 import { useEffect, useState } from "react";
 import { usePortal } from "../context/PortalContext.jsx";
 import { C } from "../styles/theme.js";
+import { formatAddress } from "../utils/geo.js";
 
 export function EditConfirmationModal() {
   const {
@@ -25,8 +26,7 @@ export function EditConfirmationModal() {
       setName (editingConf.submittedName  || "");
       setPhone(editingConf.submittedPhone || "");
       // Show city + street + house joined; admin can edit as one address field.
-      setCity ([editingConf.submittedCity, editingConf.submittedStreet, editingConf.submittedHouse]
-        .filter(Boolean).join("، "));
+      setCity(formatAddress(editingConf.submittedCity, editingConf.submittedStreet, editingConf.submittedHouse));
       setPickGuestId("");
     }
   }, [editingConf]);

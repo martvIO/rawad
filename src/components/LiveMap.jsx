@@ -8,24 +8,16 @@
 import { useRef, useEffect, useState } from "react";
 import { useLeaflet } from "../hooks/useLeaflet.js";
 import { C } from "../styles/theme.js";
+import { MAP_TILES } from "../config/index.js";
 
+// Local map of tile-key → leaflet config. We spread the shared MAP_TILES
+// definitions so the URLs/attributions stay centralised in src/config, but
+// keep the per-provider `subdomains` here since Leaflet treats it specially.
 const TILE_LAYERS = {
-  osm: {
-    url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-    attribution: "© OpenStreetMap", maxZoom: 19, subdomains: "abc",
-  },
-  satellite: {
-    url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-    attribution: "© Esri", maxZoom: 19,
-  },
-  light: {
-    url: "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",
-    attribution: "© OpenStreetMap, © CARTO", maxZoom: 19, subdomains: "abcd",
-  },
-  dark: {
-    url: "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png",
-    attribution: "© OpenStreetMap, © CARTO", maxZoom: 19, subdomains: "abcd",
-  },
+  osm:       { ...MAP_TILES.OSM,           subdomains: "abc"  },
+  satellite: { ...MAP_TILES.ARCGIS_IMAGERY                    },
+  light:     { ...MAP_TILES.CARTO_LIGHT,   subdomains: "abcd" },
+  dark:      { ...MAP_TILES.CARTO_DARK,    subdomains: "abcd" },
 };
 
 // One palette entry per marker kind. Keeps the visual contract central so

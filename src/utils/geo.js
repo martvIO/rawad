@@ -1,5 +1,14 @@
 // Geo/location helpers — coordinate parsing, map-embed URLs, and navigation links.
 
+import { ADDRESS_JOINER, GEO } from "../config/index.js";
+
+// Join a set of address parts (city / street / house, …) into a single
+// human-readable string. Empty / nullish parts are dropped. The joiner is
+// the Arabic comma + space pulled from src/config so it can be tweaked
+// once if the formatting convention changes.
+export const formatAddress = (...parts) =>
+  parts.filter(Boolean).join(ADDRESS_JOINER);
+
 // Extract [lat, lng] from any Google Maps URL or a raw "lat,lng" string.
 // Returns null when no valid coordinates are found.
 export const extractCoords = (raw) => {
@@ -91,7 +100,7 @@ export const getCurrentFix = (t) =>
           : (err.message || (t ? t("geo_denied") : "Location unavailable."));
         reject(new Error(msg));
       },
-      { enableHighAccuracy: true, maximumAge: 0, timeout: 12000 },
+      { enableHighAccuracy: true, maximumAge: 0, timeout: GEO.TIMEOUT_MS },
     );
   });
 

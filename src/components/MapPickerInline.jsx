@@ -6,13 +6,9 @@
 import { useEffect, useRef } from "react";
 import { useLeaflet } from "../hooks/useLeaflet.js";
 import { C } from "../styles/theme.js";
+import { MAP_TILES } from "../config/index.js";
 
-const OSM_TILE = {
-  url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-  attribution: "© OpenStreetMap",
-  maxZoom: 19,
-  subdomains: "abc",
-};
+const OSM_TILE = { ...MAP_TILES.OSM, subdomains: "abc" };
 
 // Israel-centred fallback (matches LiveMap.jsx).
 const DEFAULT_CENTER = [32.79, 35.0];

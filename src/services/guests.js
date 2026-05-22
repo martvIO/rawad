@@ -10,11 +10,12 @@
 import { api } from "../utils/apiClient.js";
 import { createPoller } from "../utils/poller.js";
 import { subscribeList } from "./_helpers.js";
+import { POLL_MS } from "../config/index.js";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 /** Poll interval for guest-list subscriptions (matches the old onValue feel). */
-const GUEST_POLL_INTERVAL_MS = 15 * 1000;
+const GUEST_POLL_INTERVAL_MS = POLL_MS.GUESTS;
 
 // ─── Subscriptions ────────────────────────────────────────────────────────────
 
