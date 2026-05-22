@@ -9,10 +9,8 @@ export function LogoutPage() {
   const navigate = useNavigate();
   const { t, doLogout } = usePortal();
 
-  const onConfirm = async () => {
-    await doLogout();
-    navigate("/", { replace: true });
-  };
+  // doLogout() clears the session and returns the user to the landing page.
+  const onConfirm = async () => { await doLogout(); };
   const onCancel = () => navigate(-1);
 
   return (

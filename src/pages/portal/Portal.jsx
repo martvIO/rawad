@@ -43,16 +43,29 @@ function PortalRouter() {
   // While the auth subscription resolves the session, show a branded
   // splash — avoids a blank screen and a login-flash for active sessions.
   if (!authReady) return <AuthLoadingScreen />;
-  if (!authed) return <LoginScreen />;
 
   const defaultPath =
     userType === "admin"  ? "/portal/admin/users"
   : userType === "driver" ? "/portal/driver/pending"
   :                        "/portal/groom";
 
+  // Signed out — /portal/login is the only reachable route; every other
+  // /portal/* URL redirects to it so the address bar matches the screen.
+  if (!authed) {
+    return (
+      <Routes>
+        <Route path="login" element={<LoginScreen />} />
+        <Route path="*"     element={<Navigate to="/portal/login" replace />} />
+      </Routes>
+    );
+  }
+
+  // Signed in — role-based routing. The index, the now-stale login route,
+  // and any unknown path redirect to the user's role dashboard.
   return (
     <Routes>
-      <Route index element={<Navigate to={defaultPath} replace />} />
+      <Route index           element={<Navigate to={defaultPath} replace />} />
+      <Route path="login"    element={<Navigate to={defaultPath} replace />} />
       <Route path="logout"   element={<LogoutPage />} />
       <Route path="admin/*"  element={<RoleGuard roles={["admin"]}  fallback={<Navigate to={defaultPath} replace />}><AdminPortal />     </RoleGuard>} />
       <Route path="driver/*" element={<RoleGuard roles={["driver"]} fallback={<Navigate to={defaultPath} replace />}><DriverPortal />    </RoleGuard>} />

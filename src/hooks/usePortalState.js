@@ -409,11 +409,12 @@ export function usePortalState({ onBack, t, lang, setLang }) {
     setSharedSelectedGrooms([]); setSharedSelectedCity(null);
     setDriverServingGroomState(null);
     removeKey(STORAGE_KEYS.DRIVER_SERVING_GROOM);
-    // Drop the local session so PortalRouter falls back to LoginScreen, and
-    // restart the subscription (it now fires cb(null) since tokens are gone).
+    // Drop the local session and restart the subscription (it now fires
+    // cb(null) since tokens are gone), then return to the landing page.
     setAuthUser(null);
     setAuthReady(true);
     setAuthKey((k) => k + 1);
+    navigate("/", { replace: true });
   };
 
   // ── Driver picks a groom (server-side: assignDriverToGroom Function) ────────
