@@ -56,6 +56,9 @@ export function usePortalState({ onBack, t, lang, setLang }) {
   // claim visible to the UI without forcing a sign-out / sign-in.
   const [authUser, setAuthUser] = useState(null);
   const [authReady, setAuthReady] = useState(false);
+  // Bumped after login/logout to re-run the subscription effect so it
+  // re-evaluates with the freshly stored (or cleared) tokens.
+  const [authKey, setAuthKey] = useState(0);
   useEffect(() => {
     // REST polling auth — subscribeAuth handles both the initial state and
     // every periodic /auth/me refresh (replaces SDK onAuthStateChanged +
@@ -74,7 +77,7 @@ export function usePortalState({ onBack, t, lang, setLang }) {
       unsubAuth();
       setAuthChangeCallback(null);
     };
-  }, []);
+  }, [authKey]);
 
   const authed = !!authUser;
   const userType = authUser?.role ?? null;
@@ -86,6 +89,7 @@ export function usePortalState({ onBack, t, lang, setLang }) {
   const [loginUser, setLoginUser]   = useState("");
   const [loginPass, setLoginPass]   = useState("");
   const [loginError, setLoginError] = useState("");
+  const [loginLoading, setLoginLoading] = useState(false);
 
   // ── Toast ───────────────────────────────────────────────────────────────────
   const [toast, setToast] = useState(null);
@@ -375,12 +379,25 @@ export function usePortalState({ onBack, t, lang, setLang }) {
     const u = loginUser.trim();
     const p = loginPass;
     if (!u || !p) { setLoginError(t("login_error")); return; }
+    setLoginLoading(true);
     try {
-      await signIn(u, p);
+      const user = await signIn(u, p);
+      // Apply the session immediately so PortalRouter flips to the authed
+      // tree without waiting for the first /auth/me poll. Bumping authKey
+      // restarts the subscription so it picks up the freshly stored tokens.
+      setAuthUser(user);
+      setAuthReady(true);
+      setAuthKey((k) => k + 1);
       setLoginError("");
-      // Post-login routing is handled by PortalRouter's role-based redirect.
+      const path =
+        user.role === ROLES.ADMIN  ? "/portal/admin/users"
+      : user.role === ROLES.DRIVER ? "/portal/driver/pending"
+      :                              "/portal/groom";
+      navigate(path, { replace: true });
     } catch {
       setLoginError(t("login_error"));
+    } finally {
+      setLoginLoading(false);
     }
   };
 
@@ -392,6 +409,11 @@ export function usePortalState({ onBack, t, lang, setLang }) {
     setSharedSelectedGrooms([]); setSharedSelectedCity(null);
     setDriverServingGroomState(null);
     removeKey(STORAGE_KEYS.DRIVER_SERVING_GROOM);
+    // Drop the local session so PortalRouter falls back to LoginScreen, and
+    // restart the subscription (it now fires cb(null) since tokens are gone).
+    setAuthUser(null);
+    setAuthReady(true);
+    setAuthKey((k) => k + 1);
   };
 
   // ── Driver picks a groom (server-side: assignDriverToGroom Function) ────────
@@ -913,7 +935,7 @@ export function usePortalState({ onBack, t, lang, setLang }) {
     driverServingGroom: driverServingGroomUsername,
     setDriverServingGroom,
     loginUser, setLoginUser, loginPass, setLoginPass,
-    loginError, setLoginError,
+    loginError, setLoginError, loginLoading,
     handleLogin, doLogout,
     logoutAsking, setLogoutAsking,
     driverGroomInput, setDriverGroomInput,

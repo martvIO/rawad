@@ -11,7 +11,7 @@ export function LoginScreen() {
   const {
     onBack, t, lang, setLang,
     loginUser, setLoginUser, loginPass, setLoginPass,
-    loginError, handleLogin,
+    loginError, setLoginError, handleLogin, loginLoading,
   } = usePortal();
   return (
     <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
@@ -37,11 +37,12 @@ export function LoginScreen() {
           <div style={{ marginBottom: 10, fontSize: 13, color: C.goldDim }}>{t("login_pass")}</div>
           <input className="input-field" type="password" placeholder="••••••"
                  value={loginPass} onChange={e => { setLoginPass(e.target.value); setLoginError(""); }}
-                 onKeyDown={e => e.key === "Enter" && handleLogin()}
+                 onKeyDown={e => e.key === "Enter" && !loginLoading && handleLogin()}
                  style={{ marginBottom: 12 }}/>
           {loginError && <div style={{ color: C.red, fontSize: 12, marginBottom: 12 }}>{loginError}</div>}
-          <button className="gold-btn" style={{ width: "100%" }} onClick={handleLogin}>
-            {t("login_submit")}
+          <button className="gold-btn" style={{ width: "100%" }}
+                  onClick={handleLogin} disabled={loginLoading}>
+            {loginLoading ? <span className="spinner" /> : t("login_submit")}
           </button>
           <div style={{ marginTop: 18, padding: "12px 14px", borderRadius: 10,
             background: "rgba(255,255,255,.03)", border: "1px solid rgba(255,255,255,.06)",

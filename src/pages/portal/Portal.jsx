@@ -10,18 +10,39 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import { PortalProvider, usePortal } from "../../context/PortalContext.jsx";
 import { RoleGuard } from "../../components/RoleGuard.jsx";
+import { BrandLogo } from "../../components/BrandLogo.jsx";
 import { LoginScreen } from "./LoginScreen.jsx";
 import { LogoutPage } from "./LogoutPage.jsx";
 import { AdminPortal } from "./admin/AdminPortal.jsx";
 import { DriverPortal } from "./driver/DriverPortal.jsx";
 import { GroomPortalView } from "./groom/GroomPortalView.jsx";
 
+// Branded splash shown while the auth subscription resolves the session.
+// Replaces a blank screen — and prevents a login-flash for active sessions.
+function AuthLoadingScreen() {
+  return (
+    <div style={{
+      minHeight: "100vh", display: "flex", flexDirection: "column",
+      alignItems: "center", justifyContent: "center", gap: 22,
+    }}>
+      <BrandLogo size={56} />
+      <div style={{
+        width: 30, height: 30,
+        border: "3px solid rgba(201,168,76,.18)",
+        borderTopColor: "#c9a84c",
+        borderRadius: "50%",
+        animation: "spin .7s linear infinite",
+      }} />
+    </div>
+  );
+}
+
 // Picks which view to render — must run inside <PortalProvider>.
 function PortalRouter() {
   const { authed, authReady, userType } = usePortal();
-  // While Firebase Auth is still resolving, render nothing — avoids a
-  // login-flash for users with an active session.
-  if (!authReady) return null;
+  // While the auth subscription resolves the session, show a branded
+  // splash — avoids a blank screen and a login-flash for active sessions.
+  if (!authReady) return <AuthLoadingScreen />;
   if (!authed) return <LoginScreen />;
 
   const defaultPath =
