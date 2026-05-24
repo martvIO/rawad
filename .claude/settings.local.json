@@ -42,5 +42,10 @@
       "PowerShell(try { $j = Get-Content \"c:\\\\Users\\\\user1\\\\Documents\\\\rawad\\\\database.rules.json\" -Raw | ConvertFrom-Json; Write-Output \"rules JSON valid\" } catch { Write-Output \"JSON INVALID: $_\" })",
       "PowerShell(npx firebase deploy --only hosting --project dawa-aa793 --non-interactive)"
     ]
+  },
+  "mcpServers": {
+    "playwright": {
+      "url": "http://localhost:8931/mcp"
+    }
   }
 }

@@ -1,285 +1,519 @@
-# Dawa (دعوة) — Codebase Reference
+# دعوة (Dawa)
 
-> **Note (2026-05-22):** the Firebase client SDK was fully removed in
-> commits `fed9d38…6ad2ae5`. All client/server traffic now goes through a
-> REST API. See [docs/USER-FLOWS.md](docs/USER-FLOWS.md) for the
-> interaction map and [docs/AUDIT-2026-05-22.md](docs/AUDIT-2026-05-22.md)
-> for the audit that drove this rewrite of the doc.
+Wedding-invitation management and distribution platform for the Arab/Israeli market.
 
-## 1. What This Project Is
-
-**Dawa** ("Invitation" in Arabic) is a wedding-invitation management and
-distribution platform for the Arab/Israeli market. There are three roles:
-
-- **Admin** — manages users, monitors confirmations, edits guests, sends WhatsApp messages, controls settings.
-- **Groom** — manages their own guest list, monitors delivery + live driver locations, sends per-guest digital invite links.
-- **Driver** — picks a groom's delivery route, marks guests delivered, uploads proof photos, shares GPS.
-
-The app supports both **handwritten** (physical delivery by driver, with
-photo proof + GPS) and **digital** (WhatsApp invite link with RSVP form)
-invitations.
+Grooms manage a guest list. Drivers deliver physical invitations and upload proof photos. An admin oversees all users and operations. Guests can also receive personalized digital invitation links via WhatsApp.
 
 ---
 
-## 2. Tech Stack
+## Roles
 
-| Layer | Tech |
+| Role | Primary tasks |
 |---|---|
-| Frontend | React 18, Vite, react-router-dom v7 |
-| Frontend state | One central hook ([src/hooks/usePortalState.js](src/hooks/usePortalState.js)) exposed via [PortalContext](src/context/PortalContext.jsx) |
-| Frontend ↔ backend | REST over `fetch`. Bearer-token auth. No Firebase client SDK. |
-| REST client | [src/utils/apiClient.js](src/utils/apiClient.js) + [tokenManager.js](src/utils/tokenManager.js) + [poller.js](src/utils/poller.js) |
-| Backend | Express app mounted as the `api` Cloud Function ([functions/src/api/](functions/src/api/)), Node 20 |
-| Backend ↔ Firebase | `firebase-admin` SDK (RTDB + Firestore + Storage + Auth) — server-side only |
-| Auth | Synthetic email `username@dawa.local` + password proxied to Firebase Identity Toolkit (REST) |
-| Password reset | Phone SMS OTP via Firebase Phone Auth REST + `/api/auth/reset-password` |
-| Map library | Leaflet 1.9.4 (lazily injected from CDN by [useLeaflet](src/hooks/useLeaflet.js)) |
-| Styling | 100% inline styles + design tokens in [src/styles/theme.js](src/styles/theme.js) |
-| Testing | Vitest — 404 unit tests pass (`npm run test:unit`); integration tests via Firebase Database emulator |
-| Deployment | Firebase Hosting (frontend) + Cloud Functions (`api`, `digitalInvitePreview`) |
+| **Admin** | Manage all users, monitor confirmations, send WhatsApp bulk messages, edit settings |
+| **Groom** | Manage guest list, track delivery proofs, send per-guest invite links |
+| **Driver** | Receive delivery route, upload proof photos, share live GPS |
 
 ---
 
-## 3. High-Level Request Flow
+## Run locally
 
-```
-Browser  ── fetch ──▶  Firebase Hosting  ── /api/** rewrite ──▶  Cloud Function `api`
-                                                                       │
-                                                                       ▼
-                                                                  Express app
-                                                                  ([functions/src/api/index.ts](functions/src/api/index.ts))
-                                                                       │
-                                                                       ├─ /auth/*           → Firebase Identity Toolkit REST
-                                                                       ├─ /users/*          → firebase-admin (Auth + RTDB)
-                                                                       ├─ /guests/*         → firebase-admin (RTDB)
-                                                                       ├─ /confirmations/*  → firebase-admin (RTDB)
-                                                                       ├─ /digital/*        → firebase-admin (Firestore + Storage)
-                                                                       ├─ /invites/*        → firebase-admin (RTDB)
-                                                                       ├─ /assignments/*    → firebase-admin (RTDB + custom claims)
-                                                                       ├─ /proofs/*         → firebase-admin (Storage signed URLs)
-                                                                       ├─ /live-locations/* → firebase-admin (RTDB) + SSE
-                                                                       └─ /settings         → firebase-admin (RTDB)
-```
+### Prerequisites
 
-The frontend never speaks to Firebase directly. Browser → Hosting →
-Express → `firebase-admin`. The Firebase client SDK is no longer installed
-or imported. [src/firebase.js](src/firebase.js) is an empty shell kept only
-so any lingering imports don't crash module load.
+- Node.js 20+
+- Java 21 (required for Firebase emulators)
+- Firebase CLI (`npm install -g firebase-tools`)
 
----
-
-## 4. Project Structure (top-level)
-
-```
-rawad/
-├── src/
-│   ├── main.jsx                        — Entry point; mounts React in BrowserRouter
-│   ├── App.jsx                         — Top-level routes; language state
-│   ├── firebase.js                     — EMPTY SHELL (kept for back-compat)
-│   ├── config/index.js                 — All env vars + tuning constants
-│   ├── constants/                      — Frozen string/number maps (roles, status, storage keys)
-│   ├── i18n/                           — Arabic + Hebrew string maps + makeT factory
-│   ├── data/                           — Static seed data (cities, status, invite templates)
-│   ├── assets/                         — Inline SVG strings
-│   ├── styles/                         — theme.js tokens + GlobalStyle.jsx
-│   ├── hooks/
-│   │   ├── usePortalState.js           — Central portal state + handlers (≈1000 LOC)
-│   │   ├── useGeolocation.js           — GPS watch + REST publish/subscribe (driver share + groom map)
-│   │   └── useLeaflet.js               — Lazy CDN-load Leaflet
-│   ├── context/PortalContext.jsx       — One context exposing usePortalState
-│   ├── utils/
-│   │   ├── apiClient.js                — fetch wrapper: auth + 401-refresh-retry + timeout
-│   │   ├── tokenManager.js             — idToken + refreshToken lifecycle (localStorage)
-│   │   ├── poller.js                   — createPoller — fires fetchFn every N ms (subscription substitute)
-│   │   ├── logger.js                   — Tagged [dawa] console wrapper (silent in prod)
-│   │   ├── matchUtils.js               — Confirmation phone/name/address fuzzy matching
-│   │   ├── phone.js, validation.js, password.js, geo.js, storage.js
-│   ├── services/                       — One file per resource. Each file = REST calls + subscriptions.
-│   │   ├── _helpers.js                 — subscribeList(endpoint, cb) = createPoller(api.get(endpoint), cb)
-│   │   ├── auth.js                     — signIn, signOutNow, subscribeAuth (polls /auth/me), OTP flow
-│   │   ├── guests.js                   — guests RTDB endpoints
-│   │   ├── users.js                    — admin user CRUD endpoints
-│   │   ├── confirmations.js            — public submit + admin list/edit
-│   │   ├── adminSettings.js            — /settings subscribe + save
-│   │   ├── assignments.js              — driver↔groom claim management
-│   │   ├── invites.js                  — per-guest token mint/redeem
-│   │   ├── liveLocations.js            — REST publish + SSE subscribe for driver GPS
-│   │   ├── proofs.js                   — delivery photo upload (multipart)
-│   │   ├── digitalInvitation.js        — Firestore-backed digital guests + media + photographer
-│   │   └── designRequests.js           — design workflow
-│   ├── pages/
-│   │   ├── LandingPage.jsx, ConfirmationForm.jsx, InviteForm.jsx,
-│   │   ├── DigitalInviteForm.jsx, DigitalInvitationPage.jsx
-│   │   └── portal/
-│   │       ├── Portal.jsx                — Auth gate + role-based route tree
-│   │       ├── LoginScreen.jsx, LogoutPage.jsx
-│   │       ├── admin/  — AdminPortal + tabs (Users, Send, Confirmations, Designs, Settings)
-│   │       ├── driver/ — DriverPortal + tabs (PickGroom, DeliveryList, Map, ShareLocation, SharedCities)
-│   │       └── groom/  — GroomPortalView + handwritten + digital/ subtrees
-│   └── components/                     — Modals, inputs, map, brand widgets (see folder)
-│
-├── functions/
-│   ├── src/
-│   │   ├── index.ts                    — `api` and `digitalInvitePreview` Cloud Function entry
-│   │   ├── api/
-│   │   │   ├── index.ts                — Express app factory + CORS + stripApiPrefix middleware
-│   │   │   ├── middleware/auth.ts      — requireAuth (verifies Bearer), requireAdmin
-│   │   │   ├── middleware/rateLimit.ts — Express adapter over rateLimit.ts
-│   │   │   └── routes/                 — auth, users, guests, confirmations, settings, invites,
-│   │   │                                  assignments, proofs, liveLocations, digital (10 routers)
-│   │   ├── helpers.ts                  — assertAdmin shim, isE164, syntheticEmail, phoneIndexKey, isStrongPassword
-│   │   ├── audit.ts                    — writeAudit helper (/audit/{id})
-│   │   └── rateLimit.ts                — Sliding-window in-memory limiter
-│   ├── lib/                            — tsc output (gitignored)
-│   └── .env                            — WEB_API_KEY (server-only; do not expose to client)
-│
-├── database.rules.json                 — RTDB rules (auth.token.role === 'admin', ownership, schema)
-├── storage.rules                       — Storage rules (assignedGrooms claim for proof photos)
-├── firestore.rules                     — Firestore rules (digital invitation data)
-├── firebase.json                       — Hosting rewrites, CSP headers, emulator ports
-├── netlify.toml                        — SPA fallback config (for Netlify mirror deploys)
-├── .env                                — VITE_* + VITE_API_BASE_URL=/api
-├── docs/
-│   ├── USER-FLOWS.md                   — Interaction map for every user flow
-│   ├── AUDIT-2026-05-22.md             — Audit findings + fixes shipped 2026-05-22
-│   └── SMOKE_TEST.md                   — Manual smoke-test checklist
-└── tests/                              — Integration tests against the emulator
-```
-
----
-
-## 5. The Three Critical Frontend Modules
-
-These three files run every network round trip. If you touch them, run
-[src/__tests__/utils/apiClient.test.js](src/__tests__/utils/apiClient.test.js)
-and the poller + tokenManager tests.
-
-### 5.1 [src/utils/apiClient.js](src/utils/apiClient.js)
-- `api.get / post / patch / put / delete` — JSON bodies, always returns parsed body or throws `ApiError`.
-- `api.upload(path, FormData, opts?)` — multipart; optional `opts.signal` for caller-supplied AbortSignal.
-- Both forms auto-attach `Authorization: Bearer <idToken>` via `tokenManager.getIdToken()`.
-- On 401 (non-public): one-shot `refreshIdToken()` then retry. Second 401 → clear tokens + fire `authChangeCb(null)`.
-- Every request is wrapped in `fetchWithTimeout` (default 30s, uploads 2 min). A stalled request becomes `Error("request_timeout")`, not an infinite spinner.
-
-### 5.2 [src/utils/tokenManager.js](src/utils/tokenManager.js)
-- `storeTokens` — writes `idToken`, `refreshToken`, `expiresAt`, `uid` to localStorage and memory cache.
-- `getIdToken` — proactively refreshes when within `REFRESH_LEAD_MS` of expiry.
-- `refreshIdToken` — calls `POST /auth/refresh`; deduplicates concurrent refreshes via `inflightRefresh`.
-- `clearTokens` — wipes both layers + cancels pending refresh timer; fires registered `onAuthClearedCb` so apiClient can route to login.
-
-### 5.3 [src/utils/poller.js](src/utils/poller.js)
-- `createPoller(fetchFn, callback, { intervalMs })` — replaces Firebase `onValue`/`onSnapshot`.
-- Fires once immediately, then every `intervalMs`. Returns `unsubscribe()`.
-- On `ApiError` 401 → callback `(null)` and stop polling (lets the hook layer route to login).
-- Other errors are logged and the next tick retries.
-
----
-
-## 6. Auth + Routing in 10 Lines
-
-1. User submits LoginScreen → `handleLogin` in [usePortalState.js:378](src/hooks/usePortalState.js#L378).
-2. `signIn(u, p)` posts `/api/auth/login`, gets `{idToken, refreshToken, uid, role, username, ...}`, stores them.
-3. `handleLogin` applies the session locally (`setAuthUser`, `setAuthReady`, bump `authKey`) and `navigate("/portal/{role}/…")`.
-4. `PortalRouter` ([Portal.jsx](src/pages/portal/Portal.jsx)) sees `authed = true` and matches the role route.
-5. `RoleGuard` checks `userType` matches the route's role; mismatch → redirect to defaultPath.
-6. The `authKey` bump re-runs the `subscribeAuth` effect, which starts a new poller hitting `/auth/me` every 30s.
-7. `/auth/me` returns the current claims; role/assignment changes propagate without a re-login.
-8. On logout, `doLogout` calls `signOutNow` (which POSTs `/auth/logout` + clears tokens) and bumps `authKey` again → poller stops, `authUser = null`.
-9. Any 401 from any request fires `authChangeCb(null)` via tokenManager, dropping the user to login.
-10. The `AuthLoadingScreen` covers the brief window between mount and the first `subscribeAuth` callback so the user doesn't see a login flash on reload.
-
----
-
-## 7. Security Model (unchanged)
-
-Three layers, all enforced server-side:
-
-| Layer | Where | Mechanism |
-|---|---|---|
-| Express middleware | [functions/src/api/middleware/auth.ts](functions/src/api/middleware/auth.ts) | `requireAuth` verifies the Bearer token; `requireAdmin` checks `claims.role === "admin"` |
-| RTDB rules | [database.rules.json](database.rules.json) | `auth.token.role === 'admin'`, ownership, schema validators |
-| Storage rules | [storage.rules](storage.rules) | Proof photos require `assignedGrooms[groomUid] === true` claim |
-
-JWT custom claims: `{ role, username }` on every user. Drivers also carry
-`assignedGrooms: { [groomUid]: true }`. The `/api/assignments/*` route is
-the only place that mutates `assignedGrooms`.
-
-Rate limiting: in-memory per-IP / per-admin sliding window in
-[functions/src/rateLimit.ts](functions/src/rateLimit.ts). Login is 10/hr per
-IP; admin mutations 30/hr per admin; OTP send 5/hr per IP.
-
----
-
-## 8. RTDB / Firestore / Storage Layout
-
-```
-RTDB:
-  /users/{uid}                            — portal user profile
-  /usernameIndex/{username}               — uid
-  /phoneIndex/{normalizedPhone}           — uid
-  /groomProfiles/{uid}                    — { username, displayName }
-  /guestsByGroom/{groomUid}/{guestId}     — handwritten guest records
-  /confirmations/{confId}                 — confirmation submissions
-  /inviteTokens/{token}                   — per-guest invite tokens
-  /liveLocationsByGroom/{groomUid}/{driverUid} — live GPS
-  /driverAssignments/{driverUid}          — { [groomUid]: true }
-  /adminSettings                          — { messageBody, formLink, mode, digitalBaseUrl, digitalMessage }
-  /audit/{eventId}                        — admin action audit log
-
-Firestore (digital invitations):
-  digitalInvitations/{groomUid}                              — invitation doc (media[], settings)
-  digitalInvitations/{groomUid}/guests/{guestId}             — RSVP list
-  digitalInvitations/{groomUid}/photographerFiles/{fileId}   — photo metadata
-  digitalInvitations/{groomUid}/designRequests/{reqId}       — design workflow
-
-Storage:
-  proofs/{groomUid}/{guestId}/{ts}.jpg     — delivery proof photos
-  digitalMedia/{groomUid}/m_{ts}.{ext}     — invite background media
-  photographerFiles/{groomUid}/{ts}.{ext}  — wedding photos for guests
-  designMockups/{groomUid}/{reqId}/...     — admin mockups
-```
-
----
-
-## 9. Running the Project
+### Install
 
 ```bash
-# Frontend dev server pointing at the deployed /api function
-npm run dev
+npm install
+cd functions && npm install && cd ..
+```
 
-# Frontend dev server + local emulators (Auth/DB/Firestore/Storage/Functions)
+### Start with emulators (recommended)
+
+```bash
+# Build functions + start all emulators + start Vite dev server in one command:
 npm run dev:full
 
+# Or start them separately:
+npm run emulators:build   # build functions + start emulators
+npm run dev:emulator      # start Vite pointed at emulator API
+```
+
+### Start without emulators (uses production Firebase)
+
+```bash
+npm run dev
+```
+
+### Seed emulator data
+
+```bash
+npm run emulators:seed
+```
+
+---
+
+## Build & Deploy
+
+```bash
 # Build frontend
 npm run build
 
 # Build Cloud Functions
 cd functions && npm run build
 
-# Unit tests (no emulator needed)
-npm run test:unit
-
-# Integration tests (requires Java 21 for the emulator)
-npm test
-
 # Deploy everything
 firebase deploy --project dawa-aa793
 
-# Deploy only the API + frontend (most common after a fix)
-firebase deploy --only functions:api,hosting --project dawa-aa793
+# Deploy individual targets
+firebase deploy --only hosting --project dawa-aa793
+firebase deploy --only functions --project dawa-aa793
+firebase deploy --only database,storage,firestore --project dawa-aa793
 ```
-
-Required env vars: see [.env](.env) (client) and [functions/.env](functions/.env) (server).
-`WEB_API_KEY` is the only server-only secret; it must be set in the
-deployed function or `/api/auth/*` returns `500 server_misconfigured`.
 
 ---
 
-## 10. Common gotchas
+## Tests
 
-- **Polling intervals**: defined in [src/config/index.js](src/config/index.js) under `POLL_MS`. Bumping these reduces load but increases UI lag.
-- **/auth/me does not block login**: `handleLogin` applies the session locally and only later does the poller confirm it. So if `/auth/me` returns stale claims for one poll cycle, the UI is still consistent because login wrote them directly.
-- **`role: null` after login**: the backend returns `null` if the RTDB `/users/{uid}` profile is missing. The frontend treats `null` as groom (the default `defaultPath`), then `RoleGuard` rejects → redirect loop. Fix: seed the profile via `POST /api/users` (admin only).
-- **CSP** ([firebase.json](firebase.json)): `connect-src` must include `*.cloudfunctions.net`. Adding new external HTTPS dependencies requires updating the CSP header.
-- **Cold start**: the `api` function can take up to ~5s on the first request after idle. apiClient times out at 30s, so cold starts succeed.
-- **`firebase deploy` predeploy hook**: [scripts/build-functions.cjs](scripts/build-functions.cjs) wipes `functions/lib/` + `functions/tsconfig.tsbuildinfo` on every run to avoid stale-export prompts.
+```bash
+# Unit tests (no emulators needed)
+npm run test:unit
+
+# Integration tests (Firebase Database emulator required)
+npm test
+
+# Unit tests in watch mode
+npm run test:unit:watch
+
+# Coverage report
+npm run test:coverage
+```
+
+---
+
+## Git Workflow — Commit Every Step
+
+Commit early and often. Each meaningful unit of work (feature, fix, config change) should be its own commit so history stays readable and rollbacks are surgical.
+
+### Initial setup
+
+```bash
+git init                          # if not already a git repo
+git remote add origin <repo-url>  # link to GitHub
+git branch -M main
+```
+
+### Recommended commit cadence
+
+```bash
+# 1. Stage only what belongs in this commit
+git add <file-or-folder>
+
+# 2. Write a short, imperative subject line (≤72 chars)
+git commit -m "feat: add driver GPS live-share endpoint"
+
+# 3. Push to the remote branch
+git push origin main              # or your feature branch
+```
+
+### Suggested commit message prefixes
+
+| Prefix | When to use |
+|---|---|
+| `feat:` | New feature or page |
+| `fix:` | Bug fix |
+| `chore:` | Dependency updates, tooling, config |
+| `refactor:` | Code restructure without behavior change |
+| `test:` | Adding or updating tests |
+| `docs:` | README or comment changes |
+| `deploy:` | Firebase config, rules, or deploy-only changes |
+
+### Typical step-by-step example
+
+```bash
+# After installing deps
+git add package.json package-lock.json
+git commit -m "chore: install project dependencies"
+
+# After writing a new service
+git add src/services/inviteService.js
+git commit -m "feat: add inviteService with CRUD methods"
+
+# After updating Firestore rules
+git add firestore.rules
+git commit -m "deploy: tighten Firestore rules for driver role"
+
+# After all tests pass
+git add .
+git commit -m "test: add unit tests for matchUtils fuzzy matching"
+
+git push origin main
+```
+
+### Branching strategy (recommended)
+
+```bash
+git checkout -b feature/<short-name>   # work on a branch
+# ... commits ...
+git push origin feature/<short-name>
+# open a Pull Request on GitHub, review, then merge to main
+```
+
+---
+
+## Deploy to Firebase & Smoke-Test
+
+### 1. Authenticate and select project
+
+```bash
+firebase login
+firebase use dawa-aa793
+```
+
+### 2. Build everything
+
+```bash
+npm run build
+cd functions && npm run build && cd ..
+```
+
+### 3. Run pre-deploy tests
+
+```bash
+npm run test:unit          # fast — no emulators needed
+npm test                   # integration tests against emulator
+```
+
+Only proceed to deploy if all tests pass.
+
+### 4. Deploy
+
+```bash
+# Full deploy (hosting + functions + rules)
+firebase deploy --project dawa-aa793
+
+# Or deploy targets individually to limit blast radius
+firebase deploy --only hosting   --project dawa-aa793
+firebase deploy --only functions --project dawa-aa793
+firebase deploy --only firestore,database,storage --project dawa-aa793
+```
+
+### 5. Commit the deploy
+
+```bash
+git add .
+git commit -m "deploy: release vX.Y.Z to production"
+git push origin main
+```
+
+### 6. Smoke-test after deploy
+
+Open the hosted URL and run through the critical paths manually (or via Playwright — see next section):
+
+| Path | What to verify |
+|---|---|
+| `/` | Landing page loads, RTL layout correct |
+| `/portal/login` | Login with each role (admin / groom / driver) |
+| `/portal/admin/*` | User list loads, bulk-WhatsApp button visible |
+| `/portal/groom/*` | Guest list loads, invite link generation works |
+| `/portal/driver/*` | Route list loads, photo-upload flow works |
+| `/confirm/:groomUsername` | Public confirmation form renders |
+| `/invite/:token` | Invite form renders with correct guest data |
+
+### 7. Monitor logs
+
+```bash
+firebase functions:log --project dawa-aa793
+```
+
+Check for unhandled errors or unexpected `permission-denied` exceptions right after deploy.
+
+---
+
+## End-to-End Testing with Playwright
+
+### Install Playwright
+
+```bash
+npm install --save-dev @playwright/test
+npx playwright install          # download browsers (Chromium, Firefox, WebKit)
+```
+
+### Configuration
+
+Create `playwright.config.ts` at the project root:
+
+```typescript
+import { defineConfig, devices } from '@playwright/test';
+
+export default defineConfig({
+  testDir: './e2e',
+  timeout: 30_000,
+  retries: process.env.CI ? 2 : 0,
+  use: {
+    baseURL: process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:5173',
+    trace: 'on-first-retry',
+    video: 'on-first-retry',
+  },
+  projects: [
+    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+    { name: 'mobile-safari', use: { ...devices['iPhone 14'] } },
+  ],
+});
+```
+
+Add scripts to `package.json`:
+
+```json
+{
+  "scripts": {
+    "test:e2e":        "playwright test",
+    "test:e2e:ui":     "playwright test --ui",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:report": "playwright show-report"
+  }
+}
+```
+
+### Writing tests
+
+Place test files in `e2e/`. Convention: one file per role or feature area.
+
+**`e2e/landing.spec.ts` — public pages**
+
+```typescript
+import { test, expect } from '@playwright/test';
+
+test('landing page loads and shows correct title', async ({ page }) => {
+  await page.goto('/');
+  await expect(page).toHaveTitle(/دعوة|Dawa/i);
+});
+
+test('confirmation form renders for valid groom username', async ({ page }) => {
+  await page.goto('/confirm/test-groom');
+  await expect(page.getByRole('form')).toBeVisible();
+});
+```
+
+**`e2e/auth.spec.ts` — login flow**
+
+```typescript
+import { test, expect } from '@playwright/test';
+
+test('admin can log in and reach admin portal', async ({ page }) => {
+  await page.goto('/portal/login');
+  await page.getByLabel(/username|phone/i).fill(process.env.TEST_ADMIN_USER!);
+  await page.getByLabel(/password/i).fill(process.env.TEST_ADMIN_PASS!);
+  await page.getByRole('button', { name: /login|sign in/i }).click();
+  await expect(page).toHaveURL(/\/portal\/admin/);
+});
+
+test('wrong password shows error message', async ({ page }) => {
+  await page.goto('/portal/login');
+  await page.getByLabel(/username|phone/i).fill('nobody');
+  await page.getByLabel(/password/i).fill('wrong');
+  await page.getByRole('button', { name: /login|sign in/i }).click();
+  await expect(page.getByRole('alert')).toBeVisible();
+});
+```
+
+**`e2e/groom.spec.ts` — groom portal**
+
+```typescript
+import { test, expect } from '@playwright/test';
+import { loginAs } from './helpers';
+
+test('groom can view guest list', async ({ page }) => {
+  await loginAs(page, 'groom');
+  await expect(page.getByTestId('guest-list')).toBeVisible();
+});
+
+test('groom can generate invite link for a guest', async ({ page }) => {
+  await loginAs(page, 'groom');
+  await page.getByTestId('guest-row').first().getByRole('button', { name: /invite/i }).click();
+  await expect(page.getByTestId('invite-link')).toContainText('/invite/');
+});
+```
+
+**`e2e/helpers.ts` — shared utilities**
+
+```typescript
+import { Page } from '@playwright/test';
+
+export async function loginAs(page: Page, role: 'admin' | 'groom' | 'driver') {
+  const creds = {
+    admin:  { user: process.env.TEST_ADMIN_USER!,  pass: process.env.TEST_ADMIN_PASS!  },
+    groom:  { user: process.env.TEST_GROOM_USER!,  pass: process.env.TEST_GROOM_PASS!  },
+    driver: { user: process.env.TEST_DRIVER_USER!, pass: process.env.TEST_DRIVER_PASS! },
+  };
+  await page.goto('/portal/login');
+  await page.getByLabel(/username|phone/i).fill(creds[role].user);
+  await page.getByLabel(/password/i).fill(creds[role].pass);
+  await page.getByRole('button', { name: /login|sign in/i }).click();
+}
+```
+
+Store test credentials in a `.env.test` file (never commit this file):
+
+```bash
+TEST_ADMIN_USER=admin-test
+TEST_ADMIN_PASS=...
+TEST_GROOM_USER=groom-test
+TEST_GROOM_PASS=...
+TEST_DRIVER_USER=driver-test
+TEST_DRIVER_PASS=...
+```
+
+### Running tests
+
+```bash
+# Against local dev server (start it first with npm run dev:emulator)
+npm run test:e2e
+
+# Against the deployed production URL
+PLAYWRIGHT_BASE_URL=https://dawa-aa793.web.app npm run test:e2e
+
+# Open the interactive UI runner
+npm run test:e2e:ui
+
+# View the last HTML report
+npm run test:e2e:report
+```
+
+### CI integration (GitHub Actions example)
+
+```yaml
+# .github/workflows/e2e.yml
+name: E2E Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  playwright:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - run: npx playwright install --with-deps
+      - run: npm run test:e2e
+        env:
+          PLAYWRIGHT_BASE_URL: ${{ secrets.STAGING_URL }}
+          TEST_ADMIN_USER: ${{ secrets.TEST_ADMIN_USER }}
+          TEST_ADMIN_PASS: ${{ secrets.TEST_ADMIN_PASS }}
+          TEST_GROOM_USER: ${{ secrets.TEST_GROOM_USER }}
+          TEST_GROOM_PASS: ${{ secrets.TEST_GROOM_PASS }}
+          TEST_DRIVER_USER: ${{ secrets.TEST_DRIVER_USER }}
+          TEST_DRIVER_PASS: ${{ secrets.TEST_DRIVER_PASS }}
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: playwright-report/
+```
+
+---
+
+## Environment variables
+
+| Variable | Required | Description |
+|---|---|---|
+| `VITE_API_BASE_URL` | Dev only | REST API base URL. In prod, same-origin `/api` via Firebase Hosting rewrite. |
+| `VITE_INVITE_BASE_URL` | Optional | Base URL for per-guest invite links. |
+| `VITE_RECAPTCHA_V2_SITE_KEY` | For OTP | reCAPTCHA v2 site key for phone-OTP password reset. |
+| `VITE_USE_EMULATORS` | Dev | Set `1` to connect Firebase SDK to emulators. |
+| `WEB_API_KEY` | Cloud Functions | Firebase Web API key. Set in Functions environment, never in `VITE_*`. |
+| `ALLOWED_ORIGINS` | Cloud Functions | Comma-separated CORS allowed origins. Empty = allow all (dev-friendly). |
+
+Set `VITE_*` vars in `.env` (local) or `.env.production` (prod build). Set `WEB_API_KEY` via `firebase functions:config:set` or Google Cloud Secret Manager.
+
+---
+
+## Project structure
+
+```
+src/
+  config/           Centralized env vars and constants (POLL_MS, TIMING, GEO, etc.)
+  constants/        Role constants, storage key constants, match status constants
+  utils/
+    tokenManager.js Token lifecycle (localStorage-backed, no Firebase SDK)
+    apiClient.js    fetch() wrapper with Bearer auth + 401-retry
+    poller.js       Polling helper replacing RTDB onValue subscriptions
+    matchUtils.js   Fuzzy phone/name/address matching for admin confirmations
+    geo.js          Coordinate parsing, Waze/Maps deep links
+    phone.js        E.164 formatting, validation
+    validation.js   Name validation
+    password.js     Password strength rules
+    storage.js      localStorage wrappers
+    logger.js       Tagged console wrapper (silent in prod)
+  services/         One file per resource — all use apiClient.js
+  hooks/
+    usePortalState.js   Single source of truth for portal state + auth
+    useGeolocation.js   GPS watch + publish/subscribe
+    useLeaflet.js       Lazy Leaflet CDN injection
+  context/
+    PortalContext.jsx   Single hook run once; exposes state to all portal views
+  pages/
+    LandingPage.jsx
+    ConfirmationForm.jsx
+    InviteForm.jsx
+    DigitalInviteForm.jsx
+    DigitalInvitationPage.jsx   Public digital invitation page
+    portal/                     Auth-gated portal (login + role views)
+  components/         Reusable UI: modals, maps, address fields, Toast, Skeleton, …
+  styles/             theme.js (palette tokens C/ROLE/S) + GlobalStyle.jsx
+  i18n/               Arabic + Hebrew strings + makeT() factory
+  data/               status.js, cities.js, inviteContent.js
+
+functions/src/
+  api/               Express app — 10 REST resource routers
+  index.ts           Cloud Function exports (api + legacy callables)
+  helpers.ts         assertAdmin, validators, phone utils
+  *.ts               Legacy callable Cloud Functions (users, invites, confirmations, …)
+
+e2e/                  Playwright end-to-end tests
+  helpers.ts          Shared login utilities
+  landing.spec.ts     Public page tests
+  auth.spec.ts        Login / auth-guard tests
+  groom.spec.ts       Groom portal tests
+  driver.spec.ts      Driver portal tests
+  admin.spec.ts       Admin portal tests
+```
+
+---
+
+## Routes
+
+| Path | Component | Auth |
+|---|---|---|
+| `/` | LandingPage | Public |
+| `/confirm/:groomUsername` | ConfirmationForm | Public |
+| `/invite/:token` | InviteForm | Public |
+| `/invite/digital/:token` | DigitalInviteForm | Public |
+| `/d/:groomUsername/:token/*` | DigitalInvitationPage | Public |
+| `/portal/login` | LoginScreen | Public |
+| `/portal/logout` | LogoutPage | Authenticated |
+| `/portal/admin/*` | AdminPortal | Admin only |
+| `/portal/driver/*` | DriverPortal | Driver only |
+| `/portal/groom/*` | GroomPortalView | Groom only |
+
+---
+
+## Security model
+
+Three enforced layers:
+
+1. **Cloud Functions** — `assertAdmin()` in `helpers.ts` throws `permission-denied` before any privileged logic
+2. **RTDB rules** — `database.rules.json` checks `auth.token.role === 'admin'`, ownership, schema `.validate`
+3. **Storage rules** — `storage.rules` gates proof photos on `assignedGrooms[groomUid] === true` claim
+4. **Client UI** — `RoleGuard` prevents wrong-role rendering (convenience only — not authoritative)
+
+JWT custom claims: `{ role: "admin"|"driver"|"groom", username }`. Drivers also carry `assignedGrooms: { [groomUid]: true }`.
