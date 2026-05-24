@@ -34,6 +34,39 @@ _Track open bugs here. Mark resolved bugs with the fix date. Never delete entrie
 
 ## Resolved Bugs
 
+### BUG-R006 — CSP blocks API calls → endless loading on return visit (Resolved 2026-05)
+
+**Files:** `firebase.json`, `src/utils/poller.js`, `src/services/auth.js`
+**Severity:** Critical — returning users see infinite spinner, no error message
+**Symptom:** Console showed:
+```
+Refused to connect to https://api-je74slt7ra-uc.a.run.app … Content Security Policy
+[dawa] apiClient.fetch GET /auth/me TypeError: Failed to fetch
+[dawa] poller.tick Error network_error
+```
+**Root cause:** `VITE_API_BASE_URL` points to Cloud Run domain `api-je74slt7ra-uc.a.run.app`,
+which was not in `connect-src`. `poller.tick` swallowed network errors without calling its
+callback, so `authReady` was never set to `true` and `AuthLoadingScreen` hung forever.
+**Fix:** Added `https://api-je74slt7ra-uc.a.run.app` to `connect-src` in `firebase.json`.
+Added `onError` option to `createPoller`; `subscribeAuth` passes `onError: () => cb(null)`
+so the first network failure resolves to the login screen instead of hanging.
+**Deploy required:** `firebase deploy --only hosting --project dawa-aa793`
+
+---
+
+### BUG-R007 — Groom proof photos not visible (Resolved 2026-05)
+
+**Files:** `src/hooks/usePortalState.js` (proof URL resolution), `firebase.json` (CSP)
+**Severity:** High — groom cannot verify driver deliveries
+**Symptom:** Groom portal shows emoji placeholder instead of proof images.
+**Root cause:** `proofDownloadUrl()` called `api.get("/proofs/url?path=…")` through the same
+CSP-blocked domain. The error was caught silently and stored as `null` in `proofUrlCache`,
+preventing retries. `GroomProofs.jsx` only renders `<img>` for `https://` URLs.
+**Fix:** CSP fix (BUG-R006) allows the `/proofs/url` call to succeed. Catch block now logs
+the error via `logErr` and skips caching `null`, so failed fetches retry on next render.
+
+---
+
 ### BUG-R001 — tsc incremental cache causing stale exports (Resolved 2026-05)
 
 **Fix:** `scripts/build-functions.cjs` now wipes both `functions/lib/` and `functions/tsconfig.tsbuildinfo` before every tsc run.

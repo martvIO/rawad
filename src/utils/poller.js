@@ -47,6 +47,7 @@ const MIN_INTERVAL_MS = 1000;
  * @param {(value: any) => void} callback  receives each successful result
  * @param {Object} [opts]
  * @param {number} [opts.intervalMs=15000]  poll interval in milliseconds
+ * @param {(err: Error) => void} [opts.onError]  called on non-401 network errors
  * @returns {() => void}  unsubscribe handle
  */
 export function createPoller(fetchFn, callback, opts) {
@@ -57,6 +58,7 @@ export function createPoller(fetchFn, callback, opts) {
     throw new Error("createPoller: callback must be a function");
   }
   const intervalMs = Math.max(MIN_INTERVAL_MS, opts?.intervalMs ?? DEFAULT_INTERVAL_MS);
+  const onError = opts?.onError ?? null;
 
   let stopped = false;
   let timer = null;
@@ -74,6 +76,7 @@ export function createPoller(fetchFn, callback, opts) {
         return;
       }
       logErr("poller.tick", err);
+      if (onError && !stopped) onError(err);
       // Other errors: swallow and let the next tick retry.
     } finally {
       if (!stopped) {

@@ -142,7 +142,7 @@ export function subscribeAuth(cb) {
         claims: value.claims ?? {},
       });
     },
-    { intervalMs: ME_POLL_INTERVAL_MS },
+    { intervalMs: ME_POLL_INTERVAL_MS, onError: () => cb(null) },
   );
 }
 

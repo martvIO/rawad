@@ -908,7 +908,7 @@ export function usePortalState({ onBack, t, lang, setLang }) {
       const adds = {};
       for (const g of need) {
         try { adds[g.id] = await proofDownloadUrl(g.proofPhotoPath); }
-        catch { adds[g.id] = null; }
+        catch (err) { logErr("proof.url", err); }
       }
       if (!cancelled) setProofUrlCache((prev) => ({ ...prev, ...adds }));
     })();
