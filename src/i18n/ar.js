@@ -69,6 +69,7 @@ export const ar = {
   price_vip_body: "تجربة دعوة عصرية راقية — لكل مدعو لمسة شخصية لا تُنسى.",
   price_pkg1_label: "الباقة الأولى: التصميم الاحترافي",
   price_pkg1_price: "2,500 ₪",
+  price_pkg1_discount_badge: "خصم 50%",
   price_pkg1_sub: "الدعوة الرقمية الراقية — كل التفاصيل الأساسية بأسلوب يليق بمناسبتك.",
   price_pkg1_bullets: [
     "تصميم مخصص وأنيق لكل مدعو",

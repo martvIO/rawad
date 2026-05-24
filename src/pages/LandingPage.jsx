@@ -893,20 +893,54 @@ function PricingSection({ t, onEnterPortal }) {
         >
           <div style={{ fontSize: 44, marginBottom: 16 }}>✦</div>
           <div style={{ fontSize: 11, color: "#f0c84c", letterSpacing: 3, textTransform: "uppercase", fontWeight: 800, marginBottom: 10 }}>PREMIUM</div>
-          <h3 style={{ fontFamily: "'Amiri',serif", color: "#fff3c0", fontWeight: 900, fontSize: 26, marginBottom: 22, lineHeight: 1.4 }}>{t("price_premium_title")}</h3>
-          <div style={{ marginBottom: 26 }}>
-            <div style={{
-              fontFamily: "'Amiri',serif", fontWeight: 900,
-              fontSize: 44, lineHeight: 1.25,
-              background: "linear-gradient(135deg,#fff3c0,#f0c84c,#c9a84c)",
-              WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
-              paddingBlock: 4,
-            }}>{t("price_premium_discount")}</div>
-            <div style={{ color: "#d8c9a6", fontSize: 13, marginTop: 6 }}>{t("price_premium_vs")}</div>
+          <h3 style={{ fontFamily: "'Amiri',serif", color: "#fff3c0", fontWeight: 900, fontSize: 26, marginBottom: 18, lineHeight: 1.4 }}>{t("price_pkg1_label")}</h3>
+          {(() => {
+            const priceStr = t("price_pkg1_price") || "";
+            const priceNum = parseInt(priceStr.replace(/[^\d]/g, ""), 10) || 0;
+            const originalNum = priceNum * 2;
+            const currency = priceStr.replace(/[\d,٬\s]/g, "").trim();
+            const originalStr = originalNum > 0
+              ? `${originalNum.toLocaleString("en-US")} ${currency}`.trim()
+              : "";
+            return (
+              <div style={{ marginBottom: 18 }}>
+                {originalStr && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 6 }}>
+                    <span style={{
+                      color: "#8a7a55", fontSize: 20, textDecoration: "line-through",
+                      fontFamily: "'Amiri',serif", fontWeight: 700, opacity: 0.85,
+                    }}>{originalStr}</span>
+                    <span style={{
+                      background: "linear-gradient(135deg, #c9a84c, #f0c84c)",
+                      color: "#1a1408", padding: "4px 12px", borderRadius: 999,
+                      fontSize: 11, fontWeight: 900, letterSpacing: 1.2,
+                      boxShadow: "0 4px 14px rgba(201,168,76,.35)",
+                    }}>{t("price_pkg1_discount_badge")}</span>
+                  </div>
+                )}
+                <div style={{
+                  fontFamily: "'Amiri',serif", fontWeight: 900,
+                  fontSize: 44, lineHeight: 1.25,
+                  background: "linear-gradient(135deg,#fff3c0,#f0c84c,#c9a84c)",
+                  WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+                  paddingBlock: 4,
+                }}>{priceStr}</div>
+              </div>
+            );
+          })()}
+          <div style={{ color: "#d8c9a6", fontSize: 14, lineHeight: 1.85, marginBottom: 20 }}>
+            {t("price_pkg1_sub")}
           </div>
-          <div style={{ color: "#d8c9a6", fontSize: 14, lineHeight: 1.85, marginBottom: 26 }}>
-            {t("price_premium_body")}
-          </div>
+          <ul style={{
+            listStyle: "none", padding: 0, margin: "0 0 26px",
+            color: "#d8c9a6", fontSize: 13, lineHeight: 1.95,
+          }}>
+            {(t("price_pkg1_bullets") || []).map((b, bi) => (
+              <li key={bi} style={{ marginBottom: 6 }}>
+                <span style={{ color: "#c9a84c", marginInlineEnd: 6 }}>✓</span>{b}
+              </li>
+            ))}
+          </ul>
           <button className="ghost-btn" style={{ width: "100%" }} onClick={onEnterPortal}>{t("price_contact")}</button>
         </div>
 
@@ -933,40 +967,32 @@ function PricingSection({ t, onEnterPortal }) {
           <div style={{ color: "#d8c9a6", fontSize: 14, lineHeight: 1.85, marginBottom: 22 }}>
             {t("price_vip_body")}
           </div>
-          {[
-            { label: t("price_pkg1_label"), price: t("price_pkg1_price"), sub: t("price_pkg1_sub"), bullets: t("price_pkg1_bullets") || [] },
-            { label: t("price_pkg2_label"), price: t("price_pkg2_price"), sub: t("price_pkg2_sub"), bullets: t("price_pkg2_bullets") || [] },
-          ].map((pkg, pi) => (
-            <div key={pi} style={{
-              marginBottom: 18, paddingBlock: 16,
-              borderTop: "1px solid rgba(192,132,252,.25)",
-            }}>
-              <div style={{
-                fontSize: 11.5, color: "#c084fc", fontWeight: 800,
-                letterSpacing: 1.8, marginBottom: 8,
-              }}>{pkg.label}</div>
-              <div style={{
-                fontFamily: "'Amiri',serif", fontWeight: 900,
-                fontSize: 36, lineHeight: 1.2,
-                background: "linear-gradient(135deg,#fff,#c084fc,#9b4bd4)",
-                WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
-                paddingBlock: 2,
-              }}>{pkg.price}</div>
-              <div style={{ color: "#d8c9a6", fontSize: 12.5, lineHeight: 1.7, marginTop: 8, marginBottom: 12 }}>
-                {pkg.sub}
-              </div>
-              <ul style={{
-                listStyle: "none", padding: 0, margin: 0,
-                color: "#d8c9a6", fontSize: 12.5, lineHeight: 1.85,
-              }}>
-                {pkg.bullets.map((b, bi) => (
-                  <li key={bi} style={{ marginBottom: 5 }}>
-                    <span style={{ color: "#c084fc", marginInlineEnd: 6 }}>✓</span>{b}
-                  </li>
-                ))}
-              </ul>
+          <div style={{ marginBottom: 18, paddingTop: 16, borderTop: "1px solid rgba(192,132,252,.25)" }}>
+            <div style={{
+              fontSize: 11.5, color: "#c084fc", fontWeight: 800,
+              letterSpacing: 1.8, marginBottom: 8,
+            }}>{t("price_pkg2_label")}</div>
+            <div style={{
+              fontFamily: "'Amiri',serif", fontWeight: 900,
+              fontSize: 44, lineHeight: 1.2,
+              background: "linear-gradient(135deg,#fff,#c084fc,#9b4bd4)",
+              WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+              paddingBlock: 2,
+            }}>{t("price_pkg2_price")}</div>
+            <div style={{ color: "#d8c9a6", fontSize: 13, lineHeight: 1.75, marginTop: 8, marginBottom: 14 }}>
+              {t("price_pkg2_sub")}
             </div>
-          ))}
+            <ul style={{
+              listStyle: "none", padding: 0, margin: 0,
+              color: "#d8c9a6", fontSize: 13, lineHeight: 1.9,
+            }}>
+              {(t("price_pkg2_bullets") || []).map((b, bi) => (
+                <li key={bi} style={{ marginBottom: 6 }}>
+                  <span style={{ color: "#c084fc", marginInlineEnd: 6 }}>✓</span>{b}
+                </li>
+              ))}
+            </ul>
+          </div>
           <button className="gold-btn" style={{ width: "100%", marginTop: 8 }} onClick={onEnterPortal}>{t("price_contact")}</button>
         </div>
       </div>
