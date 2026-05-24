@@ -145,6 +145,9 @@ export function LandingPage({ onEnterPortal, t, lang, setLang }) {
       <AboutSection      t={t} lang={lang} />
       <Divider />
       <FeaturesSection   t={t} />
+      <PersonalizationSection t={t} onEnterPortal={onEnterPortal} />
+      <Divider />
+      <ServicesSection   t={t} onEnterPortal={onEnterPortal} />
       <StatsSection      t={t} lang={lang} />
       <ProcessSection    t={t} />
       <ShowcaseSection   t={t} onEnterPortal={onEnterPortal} />
@@ -393,10 +396,10 @@ function AboutSection({ t, lang }) {
 function FeaturesSection({ t }) {
   const [hover, setHover] = useState(null);
   const items = [
-    { icon: "⏳", title: t("feat1_title"), body: t("feat1_body") },
-    { icon: "✉",  title: t("feat2_title"), body: t("feat2_body") },
-    { icon: "📍", title: t("feat3_title"), body: t("feat3_body") },
-    { icon: "👔", title: t("feat4_title"), body: t("feat4_body") },
+    { icon: "✉",  title: t("feat1_title"), body: t("feat1_body"), bullets: t("feat1_bullets") || [] },
+    { icon: "📱", title: t("feat2_title"), body: t("feat2_body"), bullets: t("feat2_bullets") || [] },
+    { icon: "⏳", title: t("feat3_title"), body: t("feat3_body"), bullets: [] },
+    { icon: "💎", title: t("feat4_title"), body: t("feat4_body"), bullets: [] },
   ];
   return (
     <section style={{ padding: "120px 24px", maxWidth: 1100, margin: "0 auto" }}>
@@ -433,9 +436,136 @@ function FeaturesSection({ t }) {
             <p style={{
               fontSize: 14, color: "#d8c9a6", lineHeight: 1.95, maxWidth: "36ch",
             }}>{f.body}</p>
+            {f.bullets.length > 0 && (
+              <ul style={{
+                marginTop: 14, paddingInlineStart: 18,
+                color: "#d8c9a6", fontSize: 13, lineHeight: 1.9,
+                listStyle: "disc", maxWidth: "36ch",
+              }}>
+                {f.bullets.map((b, bi) => (
+                  <li key={bi} style={{ marginBottom: 6 }}>{b}</li>
+                ))}
+              </ul>
+            )}
           </div>
         ))}
       </div>
+    </section>
+  );
+}
+
+// ── PERSONALIZATION — "think with me for a minute" narrative section ───────
+function PersonalizationSection({ t, onEnterPortal }) {
+  const lines = t("pers_body_full") || [];
+  return (
+    <section style={{ padding: "120px 24px", maxWidth: 820, margin: "0 auto", textAlign: "center" }}>
+      <div className="dawa-reveal" style={{ textAlign: "center", marginBottom: 48 }}>
+        <h2 style={{
+          fontFamily: "'Amiri',serif", fontWeight: 900,
+          fontSize: "clamp(34px,5vw,56px)", lineHeight: 1.3,
+          background: "linear-gradient(135deg,#fff3c0,#f0c84c,#c9a84c)",
+          WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+          marginBottom: 18, letterSpacing: 0, paddingBlock: 6,
+        }}>{t("pers_title")}</h2>
+      </div>
+      <div className="dawa-reveal" style={{ color: "#d8c9a6", fontSize: 15, lineHeight: 2.1, marginBottom: 48 }}>
+        {lines.map((line, i) => {
+          const isBullet = typeof line === "string" && line.startsWith("•");
+          const isLast = i === lines.length - 1;
+          return (
+            <p key={i} style={{
+              marginBottom: isBullet ? 6 : 18,
+              textAlign: isBullet ? "start" : "center",
+              fontWeight: isLast ? 700 : 400,
+              color: isLast ? "#fff3c0" : "#d8c9a6",
+              maxWidth: isBullet ? "60ch" : "none",
+              marginInline: isBullet ? "auto" : 0,
+            }}>{line}</p>
+          );
+        })}
+      </div>
+      <div className="dawa-reveal" style={{ textAlign: "center" }}>
+        <button className="gold-btn" onClick={onEnterPortal}>{t("pers_cta")}</button>
+      </div>
+    </section>
+  );
+}
+
+// ── SERVICES — two-tab invitation type showcase ────────────────────────────
+function ServicesSection({ t, onEnterPortal }) {
+  const [tab, setTab] = useState(0);
+  const tab1Label = t("services_tab1_label");
+  const tab2Label = t("services_tab2_label");
+  const tab2Bullets = t("services_tab2_bullets") || [];
+  const tab1Lines = t("delivery_body_lines") || [];
+  return (
+    <section style={{ padding: "120px 24px", maxWidth: 1000, margin: "0 auto" }}>
+      <SectionHead
+        eyebrow={t("services_label")}
+        title={t("services_title")}
+        sub={t("services_subtitle")}
+      />
+      <div className="dawa-reveal" style={{
+        display: "flex", gap: 12, marginBottom: 48, justifyContent: "center", flexWrap: "wrap",
+      }}>
+        {[tab1Label, tab2Label].map((label, i) => (
+          <button key={i}
+            className={i === tab ? "gold-btn" : "ghost-btn"}
+            style={{ minWidth: 160 }}
+            onClick={() => setTab(i)}>{label}</button>
+        ))}
+      </div>
+      {tab === 0 && (
+        <div className="dawa-reveal" style={{
+          padding: "40px 32px", borderRadius: 24,
+          background: "linear-gradient(180deg, rgba(201,168,76,.06), rgba(201,168,76,.01))",
+          border: "1px solid rgba(201,168,76,.30)",
+          backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)",
+          maxWidth: 720, margin: "0 auto",
+        }}>
+          <div style={{ fontSize: 11, color: "#f0c84c", letterSpacing: 3, textTransform: "uppercase", fontWeight: 800, marginBottom: 10 }}>
+            {t("delivery_subtitle")}
+          </div>
+          <h3 style={{
+            fontFamily: "'Amiri',serif", color: "#fff3c0", fontWeight: 900,
+            fontSize: 26, marginBottom: 22, lineHeight: 1.4,
+          }}>{t("delivery_title")}</h3>
+          <ul style={{ color: "#d8c9a6", fontSize: 14.5, lineHeight: 2, listStyle: "none", padding: 0, margin: 0 }}>
+            {tab1Lines.map((l, i) => (
+              <li key={i} style={{ marginBottom: 8, paddingInlineStart: 4 }}>
+                <span style={{ color: "#c9a84c", marginInlineEnd: 8 }}>✓</span>{l}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {tab === 1 && (
+        <div className="dawa-reveal" style={{
+          padding: "40px 32px", borderRadius: 24,
+          background: "linear-gradient(180deg, rgba(155,75,212,.10), rgba(155,75,212,.02))",
+          border: "1px solid rgba(155,75,212,.40)",
+          backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)",
+          maxWidth: 720, margin: "0 auto",
+        }}>
+          <div style={{ fontSize: 11, color: "#c084fc", letterSpacing: 3, textTransform: "uppercase", fontWeight: 800, marginBottom: 10 }}>
+            DIGITAL
+          </div>
+          <h3 style={{
+            fontFamily: "'Amiri',serif", color: "#fff3c0", fontWeight: 900,
+            fontSize: 26, marginBottom: 18, lineHeight: 1.4,
+          }}>{t("services_tab2_title")}</h3>
+          <p style={{ color: "#d8c9a6", fontSize: 15, lineHeight: 1.95, marginBottom: 24 }}>
+            {t("services_tab2_body")}
+          </p>
+          <ul style={{ color: "#d8c9a6", fontSize: 14.5, lineHeight: 2, listStyle: "none", padding: 0, margin: 0 }}>
+            {tab2Bullets.map((b, i) => (
+              <li key={i} style={{ marginBottom: 8, paddingInlineStart: 4 }}>
+                <span style={{ color: "#c084fc", marginInlineEnd: 8 }}>✓</span>{b}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </section>
   );
 }
@@ -799,21 +929,45 @@ function PricingSection({ t, onEnterPortal }) {
           }}>{t("price_vip_badge")}</div>
           <div style={{ fontSize: 44, marginBottom: 16 }}>♛</div>
           <div style={{ fontSize: 11, color: "#c084fc", letterSpacing: 3, textTransform: "uppercase", fontWeight: 800, marginBottom: 10 }}>VIP ROYAL</div>
-          <h3 style={{ fontFamily: "'Amiri',serif", color: "#fff3c0", fontWeight: 900, fontSize: 26, marginBottom: 22, lineHeight: 1.4 }}>{t("price_vip_title")}</h3>
-          <div style={{ marginBottom: 26 }}>
-            <div style={{
-              fontFamily: "'Amiri',serif", fontWeight: 900,
-              fontSize: 44, lineHeight: 1.25,
-              background: "linear-gradient(135deg,#fff,#c084fc,#9b4bd4)",
-              WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
-              paddingBlock: 4,
-            }}>{t("price_vip_normal")}</div>
-            <div style={{ color: "#d8c9a6", fontSize: 13, marginTop: 6 }}>{t("price_vip_pitch")}</div>
-          </div>
-          <div style={{ color: "#d8c9a6", fontSize: 14, lineHeight: 1.85, marginBottom: 26 }}>
+          <h3 style={{ fontFamily: "'Amiri',serif", color: "#fff3c0", fontWeight: 900, fontSize: 26, marginBottom: 14, lineHeight: 1.4 }}>{t("price_vip_title")}</h3>
+          <div style={{ color: "#d8c9a6", fontSize: 14, lineHeight: 1.85, marginBottom: 22 }}>
             {t("price_vip_body")}
           </div>
-          <button className="gold-btn" style={{ width: "100%" }} onClick={onEnterPortal}>{t("price_contact")}</button>
+          {[
+            { label: t("price_pkg1_label"), price: t("price_pkg1_price"), sub: t("price_pkg1_sub"), bullets: t("price_pkg1_bullets") || [] },
+            { label: t("price_pkg2_label"), price: t("price_pkg2_price"), sub: t("price_pkg2_sub"), bullets: t("price_pkg2_bullets") || [] },
+          ].map((pkg, pi) => (
+            <div key={pi} style={{
+              marginBottom: 18, paddingBlock: 16,
+              borderTop: "1px solid rgba(192,132,252,.25)",
+            }}>
+              <div style={{
+                fontSize: 11.5, color: "#c084fc", fontWeight: 800,
+                letterSpacing: 1.8, marginBottom: 8,
+              }}>{pkg.label}</div>
+              <div style={{
+                fontFamily: "'Amiri',serif", fontWeight: 900,
+                fontSize: 36, lineHeight: 1.2,
+                background: "linear-gradient(135deg,#fff,#c084fc,#9b4bd4)",
+                WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+                paddingBlock: 2,
+              }}>{pkg.price}</div>
+              <div style={{ color: "#d8c9a6", fontSize: 12.5, lineHeight: 1.7, marginTop: 8, marginBottom: 12 }}>
+                {pkg.sub}
+              </div>
+              <ul style={{
+                listStyle: "none", padding: 0, margin: 0,
+                color: "#d8c9a6", fontSize: 12.5, lineHeight: 1.85,
+              }}>
+                {pkg.bullets.map((b, bi) => (
+                  <li key={bi} style={{ marginBottom: 5 }}>
+                    <span style={{ color: "#c084fc", marginInlineEnd: 6 }}>✓</span>{b}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+          <button className="gold-btn" style={{ width: "100%", marginTop: 8 }} onClick={onEnterPortal}>{t("price_contact")}</button>
         </div>
       </div>
     </section>

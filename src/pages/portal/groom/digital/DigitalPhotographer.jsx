@@ -4,7 +4,7 @@ import { usePortal } from "../../../../context/PortalContext.jsx";
 import {
   subscribePhotographerFiles, uploadPhotographerFile, removePhotographerFile,
   renamePhotographerFile,
-  listPhotographerFilesFromStorage, healPhotographerFiles,
+  healPhotographerFiles,
   subscribeDigitalMedia, setPhotographerPublished,
 } from "../../../../services/digitalInvitation.js";
 import { logErr } from "../../../../utils/logger.js";
@@ -63,24 +63,11 @@ export function DigitalPhotographer() {
     return () => { u1(); u2(); };
   }, [currentUid]);
 
-  // Storage-first listing — fires once per uid. Ensures the page shows files
-  // even when the Firestore metadata layer is empty or temporarily errored.
-  // Result is cached to localStorage so the next mount has data on first paint.
+  // Files come exclusively from the Firestore subscription; Storage listing
+  // is a no-op stub. Flip loadingStorage off immediately so the skeleton
+  // loader resolves on the first subscription result rather than hanging.
   useEffect(() => {
-    if (!currentUid) return;
-    let cancelled = false;
-    const cached = load(cacheKey(currentUid), []);
-    if (cached.length) setStorageFiles(cached);
-    setLoadingStorage(true);
-    (async () => {
-      const list = await listPhotographerFilesFromStorage(currentUid);
-      if (cancelled) return;
-      setStorageFiles(list);
-      if (list.length) save(cacheKey(currentUid), list);
-      else             removeKey(cacheKey(currentUid));
-      setLoadingStorage(false);
-    })();
-    return () => { cancelled = true; };
+    setLoadingStorage(false);
   }, [currentUid]);
 
   // Auto-heal — once both Firestore and Storage have reported in, create
@@ -149,50 +136,44 @@ export function DigitalPhotographer() {
 
     setUploading(true);
     setInProgress(arr.map(f => f.name));
-
     const controller = new AbortController();
     uploadAbortRef.current = controller;
-    const results = await Promise.allSettled(
-      arr.map(f => uploadPhotographerFile(uid, f, { signal: controller.signal })),
-    );
-    uploadAbortRef.current = null;
+    try {
+      const results = await Promise.allSettled(
+        arr.map(f => uploadPhotographerFile(uid, f, { signal: controller.signal })),
+      );
 
-    // Always revoke + clear every preview so pending state can't strand.
-    // The Storage-listing refresh below repopulates the gallery from the server.
-    previews.forEach(p => URL.revokeObjectURL(p.url));
-    const previewIds = new Set(previews.map(p => p.id));
-    setPendingFiles(prev => prev.filter(p => !previewIds.has(p.id)));
+      // Always revoke + clear every preview so pending state can't strand.
+      previews.forEach(p => URL.revokeObjectURL(p.url));
+      const previewIds = new Set(previews.map(p => p.id));
+      setPendingFiles(prev => prev.filter(p => !previewIds.has(p.id)));
 
-    const failedResults = results.filter(r => r.status === "rejected");
-    if (failedResults.length === 0) {
-      showToast(lang === "he"
-        ? `✓ הועלו ${arr.length} קבצים`
-        : `✓ تم رفع ${arr.length.toLocaleString("en")} ملف`);
-      // Refresh Storage-list + cache so successful uploads show even if Firestore is silent
-      listPhotographerFilesFromStorage(currentUid).then(list => {
-        setStorageFiles(list);
-        if (list.length) save(cacheKey(currentUid), list);
-        else             removeKey(cacheKey(currentUid));
-      }).catch(() => {});
-    } else {
-      const reason = failedResults[0].reason;
-      logErr("uploadPhotographerFiles", reason);
-      const isTimeout = reason?.message === "request_timeout";
-      const isAbort = reason?.name === "AbortError";
-      if (!isAbort) {
-        showToast(
-          isTimeout
-            ? (lang === "he" ? "פג זמן ההעלאה — נסה שוב" : "انتهت مهلة الرفع — حاول مرة أخرى")
-            : (lang === "he"
-                ? `נכשלה העלאה של ${failedResults.length} קבצים`
-                : `فشل رفع ${failedResults.length} ملف`),
-        );
+      const failedResults = results.filter(r => r.status === "rejected");
+      if (failedResults.length === 0) {
+        showToast(lang === "he"
+          ? `✓ הועלו ${arr.length} קבצים`
+          : `✓ تم رفع ${arr.length.toLocaleString("en")} ملف`);
+      } else {
+        const reason = failedResults[0].reason;
+        logErr("uploadPhotographerFiles", reason);
+        const isTimeout = reason?.message === "request_timeout";
+        const isAbort = reason?.name === "AbortError";
+        if (!isAbort) {
+          showToast(
+            isTimeout
+              ? (lang === "he" ? "פג זמן ההעלאה — נסה שוב" : "انتهت مهلة الرفع — حاول مرة أخرى")
+              : (lang === "he"
+                  ? `נכשלה העלאה של ${failedResults.length} קבצים`
+                  : `فشل رفع ${failedResults.length} ملف`),
+          );
+        }
       }
+    } finally {
+      uploadAbortRef.current = null;
+      setUploading(false);
+      setInProgress([]);
+      if (inputRef.current) inputRef.current.value = "";
     }
-
-    setUploading(false);
-    setInProgress([]);
-    if (inputRef.current) inputRef.current.value = "";
   };
 
   const confirmDelete = async (item) => {

@@ -6,33 +6,70 @@ _Track open bugs here. Mark resolved bugs with the fix date. Never delete entrie
 
 ## Open Bugs
 
-### BUG-001 — DigitalAddGuest form submission hangs
+### BUG-O002 — `POST /api/digital/{uid}/media/upload` returns 400 `api_invalid_multipart`
 
-**File:** `src/pages/portal/groom/digital/DigitalAddGuest.jsx`
-**Severity:** High — feature is broken
-**Symptom:** Submit button spins forever. No data is saved to Firestore. No visible error.
-**Suspected cause:** Unknown. Could be a Firestore write permission issue after login, a service call returning a rejected promise that isn't caught, or a state update on an unmounted component.
-**To investigate:**
-1. Open browser DevTools → Network tab → filter for Firestore requests
-2. Check for console errors from the `[dawa]` logger
-3. Inspect `src/services/digitalInvitation.js` → `addDigitalGuest` for unhandled rejections
-4. Check Firestore rules for `digitalGuests/{uid}/guests` write permission
+**Severity:** High — groom cannot upload invitation media (images/video) via the digital dashboard
+**Symptom:** Console logs:
+```
+POST https://dawa-aa793.web.app/api/digital/MkijWMawYOc4RcPooW5mgcIpLYX2/media/upload 400 (Bad Request)
+[dawa] apiClient POST /digital/.../media/upload  api_invalid_multipart api_invalid_multipart
+[dawa] addInvitationMedia ApiError api_invalid_multipart
+```
+**Root cause:** Unknown — `parseMultipart(req, MAX_INVITE_MEDIA_BYTES)` in `functions/src/api/routes/digital.ts` throws / rejects, causing the handler to return `{ error: "api_invalid_multipart" }`. Possible causes: missing or incorrect `Content-Type: multipart/form-data` boundary sent by the client, file size exceeding `MAX_INVITE_MEDIA_BYTES`, or a busboy parsing regression.
+**Call site:** `DigitalDashboard.jsx` → `handleAddMedia` → `addInvitationMedia` (`src/services/digital.js`) → `api.upload('/digital/{uid}/media/upload', formData, opts)`
+**Next steps:** Check `firebase functions:log --project dawa-aa793` for the stack trace on the `/api/digital/:uid/media/upload` handler. Verify the FormData object contains the file field name expected by `parseMultipart`. Check `MAX_INVITE_MEDIA_BYTES` against actual file sizes used in testing.
 
 ---
 
-### BUG-002 — Photo upload state stuck on "uploading..." after success
+### BUG-O001 — `GET /api/proofs/url` returns 500 → proof photos fail to load
 
-**Files:** `src/pages/portal/groom/digital/DigitalDashboard.jsx`, `src/pages/portal/groom/digital/DigitalPhotographer.jsx`
-**Severity:** Medium — misleading UI
-**Symptom:** After a file uploads successfully to Firebase Storage, the UI continues showing an "uploading..." state and never clears.
-**Suspected cause:** The upload completion callback updates state correctly, but a component re-render or re-subscription resets the state before the user sees the success.
-**To investigate:**
-1. Add console logs at the start and end of the upload handler
-2. Check if the Firestore `onSnapshot` listener fires immediately after upload and overwrites local state
+**Severity:** High — groom/admin cannot view proof photos uploaded by drivers
+**Symptom:** Console logs:
+```
+[dawa] apiClient GET /proofs/url?path=proofs%2F… api_url_failed api_url_failed
+[dawa] proof.url ApiError api_url_failed
+GET https://dawa-aa793.web.app/api/proofs/url?path=proofs%2F… 500 (Internal Server Error)
+```
+The poller retries the call on every tick, flooding the console repeatedly.
+**Root cause:** Unknown — the `/proofs/url` Cloud Function endpoint throws a 500. Possible causes:
+Storage admin SDK permissions, missing `WEB_API_KEY` / Secret Manager config, or a regression
+in the `proofs` router after a recent deploy.
+**Related:** Similar symptom to BUG-R007 (which was a CSP block), but this is a 500 from the
+server rather than a client-side network block, so the CSP fix is not the cause.
+**Next steps:** Check `firebase functions:log --project dawa-aa793` for the stack trace on the
+`/api/proofs/url` handler. Verify `WEB_API_KEY` is set in the Functions environment and that
+the Storage service account has `storage.objects.get` permission.
 
 ---
 
 ## Resolved Bugs
+
+### BUG-R008 — DigitalAddGuest submit button hangs for 30 seconds (Resolved 2026-05)
+
+**File:** `src/pages/portal/groom/digital/DigitalAddGuest.jsx`
+**Severity:** High — form appeared broken; CSP masked the actual API error
+**Root cause:** Same CSP block as BUG-R006. `POST /api/digital/{uid}/guests` was blocked by
+the production CSP, causing `api.post` to timeout after 30 s (`API_TIMEOUT_MS.DEFAULT`). The
+button showed a spinner for the full timeout duration before the error toast appeared.
+**Fix:** CSP fix (BUG-R006) — the `POST` now routes same-origin without CSP violation.
+
+---
+
+### BUG-R009 — Photographer upload gallery clears after every successful upload (Resolved 2026-05)
+
+**File:** `src/pages/portal/groom/digital/DigitalPhotographer.jsx`
+**Severity:** Medium — gallery briefly showed empty after upload until Firestore polled
+**Root cause:** After each upload, the code called `listPhotographerFilesFromStorage()` which
+is a no-op stub always returning `[]`. This set `storageFiles = []` and deleted the localStorage
+cache. The display merged Firestore + Storage, so newly uploaded files vanished until the next
+Firestore poll (up to `POLL_MS.DIGITAL` ms). Also: no `try/finally` around the upload block
+meant an unexpected throw could permanently strand the "uploading…" spinner.
+**Fix:** Removed the `listPhotographerFilesFromStorage` call from the upload success path.
+Simplified the Storage-listing `useEffect` to just flip `loadingStorage = false` immediately
+(no more cache clearing). Wrapped the upload block in `try/finally` so `setUploading(false)`
+always runs.
+
+---
 
 ### BUG-R006 — CSP blocks API calls → endless loading on return visit (Resolved 2026-05)
 
