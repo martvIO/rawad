@@ -126,11 +126,11 @@ export function subscribeDigitalMedia(groomUid, cb, onErrCb) {
  * Upload a new background media item. Returns the newly created media[]
  * entry shape `{ url, kind, storagePath, order }`.
  */
-export async function addInvitationMedia(groomUid, file) {
+export async function addInvitationMedia(groomUid, file, opts) {
   const uid = resolveUid(groomUid);
   const formData = new FormData();
   formData.append("file", file, file.name);
-  return api.upload(`/digital/${uid}/media/upload`, formData);
+  return api.upload(`/digital/${uid}/media/upload`, formData, opts);
 }
 
 /**
@@ -214,11 +214,11 @@ export async function fetchPublishedPhotographerFiles(groomUid) {
   }
 }
 
-export async function uploadPhotographerFile(groomUid, file) {
+export async function uploadPhotographerFile(groomUid, file, opts) {
   const uid = resolveUid(groomUid);
   const formData = new FormData();
   formData.append("file", file, file.name);
-  const data = await api.upload(`/digital/${uid}/photographer/upload`, formData);
+  const data = await api.upload(`/digital/${uid}/photographer/upload`, formData, opts);
   return { url: data?.url ?? null, key: data?.id ?? null };
 }
 

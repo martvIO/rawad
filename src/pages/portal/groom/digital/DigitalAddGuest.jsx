@@ -1,6 +1,6 @@
 // Digital invitation — Add guest form.
 // Validation: name must be 2+ words, phone must be exactly 10 digits.
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { usePortal } from "../../../../context/PortalContext.jsx";
 import { addDigitalGuest, subscribeDigitalMedia } from "../../../../services/digitalInvitation.js";
@@ -15,6 +15,11 @@ export function DigitalAddGuest() {
   const [rank,   setRank]   = useState("");
   const [ranks,  setRanks]  = useState([]);
   const [saving, setSaving] = useState(false);
+  // Tracks unmount so we don't call setSaving on a dead component after the
+  // optimistic navigate has fired. Avoids React's "state on unmounted" warning
+  // and prevents the spinner state from being reset to stale on a fast remount.
+  const mountedRef = useRef(true);
+  useEffect(() => () => { mountedRef.current = false; }, []);
 
   // Load the groom's custom ranks from the parent invitation doc.
   useEffect(() => {
@@ -26,7 +31,10 @@ export function DigitalAddGuest() {
   const phoneDigits = phone.replace(/\D/g, "");
   const nameOk   = nameWords.length >= 2;
   const phoneOk  = phoneDigits.length === 10;
-  const canSubmit = nameOk && phoneOk && !saving;
+  // Block submit until auth resolves — otherwise addDigitalGuest 401s,
+  // apiClient retries once, then throws "session_expired" — which we'd show
+  // as a generic toast and confuse the user.
+  const canSubmit = nameOk && phoneOk && !saving && !!currentUid;
 
   // Show inline errors only once the user has typed something
   const nameErr  = name.trim()  && !nameOk
@@ -39,6 +47,10 @@ export function DigitalAddGuest() {
   const submit = async () => {
     if (!nameOk)  { showToast(nameErr  || (lang === "he" ? "שם לא תקין" : "الاسم غير صحيح"));  return; }
     if (!phoneOk) { showToast(phoneErr || (lang === "he" ? "טלפון לא תקין" : "الهاتف غير صحيح")); return; }
+    if (!currentUid) {
+      showToast(lang === "he" ? "אנא התחבר מחדש" : "يرجى إعادة تسجيل الدخول");
+      return;
+    }
     if (saving) return;
     setSaving(true);
     try {
@@ -50,7 +62,7 @@ export function DigitalAddGuest() {
       showToast(lang === "he" ? "✓ המוזמן נוסף" : "✓ تم إضافة المدعو");
       setName(""); setPhone(""); setRank("");
       // Pass the new guest via navigation state so the list shows it immediately
-      // without waiting for the Firebase subscription to fire.
+      // without waiting for the next subscription tick.
       const optimistic = {
         id, name: trimName, phone: phoneDigits, status: "pending", createdAt: Date.now(),
       };
@@ -58,9 +70,17 @@ export function DigitalAddGuest() {
       navigate("/portal/groom/digital/guests", { state: { newGuest: optimistic } });
     } catch (err) {
       logErr("addDigitalGuest", err);
-      showToast(err?.message || "خطأ");
+      const isTimeout = err?.message === "request_timeout";
+      showToast(
+        isTimeout
+          ? (lang === "he" ? "פג זמן הבקשה — נסה שוב" : "انتهت مهلة الطلب — حاول مرة أخرى")
+          : err?.message || (lang === "he" ? "שגיאה" : "خطأ"),
+      );
     } finally {
-      setSaving(false);
+      // Only flip the local spinner off if we're still mounted. After a
+      // successful submit, the optimistic navigate unmounts this view; React
+      // would warn on setState-on-unmounted otherwise.
+      if (mountedRef.current) setSaving(false);
     }
   };
 

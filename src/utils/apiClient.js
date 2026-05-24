@@ -23,7 +23,7 @@ import {
   setAuthClearedCallback,
 } from "./tokenManager.js";
 import { logErr, log } from "./logger.js";
-import { API_BASE_URL } from "../config/index.js";
+import { API_BASE_URL, API_TIMEOUT_MS } from "../config/index.js";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -120,6 +120,7 @@ export function buildApiUrl(path) {
 async function request(method, path, body, opts) {
   const url = buildApiUrl(path);
   const skipAuth = !!opts?.skipAuth;
+  const timeoutMs = opts?.timeoutMs ?? API_TIMEOUT_MS.DEFAULT;
   const headers = { Accept: JSON_MIME };
   if (body !== undefined) headers[HEADER_CONTENT_TYPE] = JSON_MIME;
 
@@ -128,20 +129,14 @@ async function request(method, path, body, opts) {
     if (tok) headers[HEADER_AUTH] = `${BEARER_PREFIX}${tok}`;
   }
 
-  let res;
-  try {
-    res = await fetch(url, {
-      method,
-      headers,
-      body: body === undefined ? undefined : JSON.stringify(body),
-    });
-  } catch (err) {
-    logErr(`apiClient.fetch ${method} ${path}`, err);
-    throw new Error("network_error");
-  }
+  const res = await fetchWithTimeout(url, {
+    method,
+    headers,
+    body: body === undefined ? undefined : JSON.stringify(body),
+  }, timeoutMs, `${method} ${path}`);
 
   if (res.status === HTTP_UNAUTHORIZED && !skipAuth) {
-    return handleUnauthorized(method, url, headers, body, path);
+    return handleUnauthorized(method, url, headers, body, path, timeoutMs);
   }
   return parseResponse(res, method, path);
 }
@@ -150,7 +145,7 @@ async function request(method, path, body, opts) {
  * On a 401: attempt one refresh + retry. If the retry still fails, fire the
  * auth-change callback so the UI can route to login.
  */
-async function handleUnauthorized(method, url, headers, body, path) {
+async function handleUnauthorized(method, url, headers, body, path, timeoutMs) {
   log(`apiClient: 401 on ${method} ${path}; attempting refresh`);
   try {
     const fresh = await refreshIdToken();
@@ -162,17 +157,11 @@ async function handleUnauthorized(method, url, headers, body, path) {
     throw new ApiError(HTTP_UNAUTHORIZED, null, "session_expired");
   }
 
-  let retryRes;
-  try {
-    retryRes = await fetch(url, {
-      method,
-      headers,
-      body: body === undefined ? undefined : JSON.stringify(body),
-    });
-  } catch (err) {
-    logErr(`apiClient.retry ${method} ${path}`, err);
-    throw new Error("network_error");
-  }
+  const retryRes = await fetchWithTimeout(url, {
+    method,
+    headers,
+    body: body === undefined ? undefined : JSON.stringify(body),
+  }, timeoutMs ?? API_TIMEOUT_MS.DEFAULT, `${method} ${path} (retry)`);
   if (retryRes.status === HTTP_UNAUTHORIZED) {
     clearTokens();
     if (authChangeCb) authChangeCb(null);
@@ -184,6 +173,10 @@ async function handleUnauthorized(method, url, headers, body, path) {
 /**
  * Multipart upload. `Content-Type` is NOT set — the browser fills it in
  * with the proper boundary. We still attach Authorization unless skipped.
+ *
+ * Honors `opts.signal` (caller-supplied AbortSignal) so a component can
+ * abort the upload on unmount. The internal timeout uses a separate signal
+ * combined with the caller's via AbortSignal.any() when available.
  */
 async function upload(path, formData, opts) {
   if (!(formData instanceof FormData)) {
@@ -191,19 +184,18 @@ async function upload(path, formData, opts) {
   }
   const url = buildApiUrl(path);
   const skipAuth = !!opts?.skipAuth;
+  const timeoutMs = opts?.timeoutMs ?? API_TIMEOUT_MS.UPLOAD;
   const headers = { Accept: JSON_MIME };
   if (!skipAuth) {
     const tok = await getIdToken().catch(() => null);
     if (tok) headers[HEADER_AUTH] = `${BEARER_PREFIX}${tok}`;
   }
 
-  let res;
-  try {
-    res = await fetch(url, { method: "POST", headers, body: formData });
-  } catch (err) {
-    logErr(`apiClient.upload ${path}`, err);
-    throw new Error("network_error");
-  }
+  let res = await fetchWithTimeout(url, {
+    method: "POST",
+    headers,
+    body: formData,
+  }, timeoutMs, `upload ${path}`, opts?.signal);
   if (res.status === HTTP_UNAUTHORIZED && !skipAuth) {
     try {
       const fresh = await refreshIdToken();
@@ -213,7 +205,11 @@ async function upload(path, formData, opts) {
       if (authChangeCb) authChangeCb(null);
       throw new ApiError(HTTP_UNAUTHORIZED, null, "session_expired");
     }
-    res = await fetch(url, { method: "POST", headers, body: formData });
+    res = await fetchWithTimeout(url, {
+      method: "POST",
+      headers,
+      body: formData,
+    }, timeoutMs, `upload ${path} (retry)`, opts?.signal);
     if (res.status === HTTP_UNAUTHORIZED) {
       clearTokens();
       if (authChangeCb) authChangeCb(null);
@@ -221,6 +217,48 @@ async function upload(path, formData, opts) {
     }
   }
   return parseResponse(res, "POST", path);
+}
+
+// ─── Fetch with timeout ──────────────────────────────────────────────────────
+
+/**
+ * Wraps `fetch` so a stalled request rejects after `timeoutMs` instead of
+ * hanging the spinner forever. Combines an internal AbortController with an
+ * optional caller-supplied signal so components can also cancel on unmount.
+ *
+ * Errors:
+ *   - timeout    → throws `Error("request_timeout")`
+ *   - user abort → throws the original AbortError (callers can re-throw it)
+ *   - other      → rethrown as `Error("network_error")` with original logged
+ */
+async function fetchWithTimeout(url, init, timeoutMs, label, userSignal) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(new Error("timeout")), timeoutMs);
+  const onUserAbort = () => controller.abort(userSignal.reason);
+  if (userSignal) {
+    if (userSignal.aborted) {
+      clearTimeout(timer);
+      throw userSignal.reason ?? new DOMException("Aborted", "AbortError");
+    }
+    userSignal.addEventListener("abort", onUserAbort);
+  }
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } catch (err) {
+    if (controller.signal.aborted) {
+      // Distinguish timeout from user abort by checking the reason we set.
+      if (userSignal?.aborted) {
+        throw userSignal.reason ?? new DOMException("Aborted", "AbortError");
+      }
+      logErr(`apiClient.timeout ${label}`, `after ${timeoutMs}ms`);
+      throw new Error("request_timeout");
+    }
+    logErr(`apiClient.fetch ${label}`, err);
+    throw new Error("network_error");
+  } finally {
+    clearTimeout(timer);
+    if (userSignal) userSignal.removeEventListener("abort", onUserAbort);
+  }
 }
 
 // ─── Response parsing ─────────────────────────────────────────────────────────

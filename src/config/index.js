@@ -90,6 +90,19 @@ export const TOKEN_MGR = {
   DEFAULT_EXPIRES_IN_SECONDS: 3600,
 };
 
+// ─── REST client timeouts ────────────────────────────────────────────────────
+//
+// Without these, a stalled network or a Cloud Functions cold-start that never
+// resolves leaves spinners spinning forever (Cloud Functions can take up to
+// 60s to cold-start). The frontend caps every request so a hang surfaces as
+// a regular error and the user can retry.
+export const API_TIMEOUT_MS = {
+  /** JSON GET/POST/PATCH/PUT/DELETE — covers login, /auth/me, lists, mutations. */
+  DEFAULT: 30 * 1000,
+  /** Multipart upload — longer because large files legitimately take time. */
+  UPLOAD: 2 * 60 * 1000,
+};
+
 // ─── Confirmation-match fuzzy thresholds ─────────────────────────────────────
 
 export const MATCHING = {

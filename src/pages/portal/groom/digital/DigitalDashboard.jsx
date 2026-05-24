@@ -34,6 +34,9 @@ export function DigitalDashboard() {
   const [pendingMedia, setPendingMedia] = useState([]); // [{ id, url, kind, pending: true }]
   const [newRank, setNewRank] = useState("");
   const inputRef = useRef(null);
+  // Abort controller for in-flight uploads. Aborted on unmount so a pending
+  // upload can't leave the spinner stranded if the user navigates away.
+  const uploadAbortRef = useRef(null);
 
   useEffect(() => {
     if (!currentUid) return;
@@ -42,6 +45,12 @@ export function DigitalDashboard() {
     const u2 = subscribeDigitalMedia(currentUid, setDoc, onErr);
     return () => { u1(); u2(); };
   }, [currentUid]);
+
+  // Abort any uploads in flight when the component unmounts so revoked blob
+  // URLs are reclaimed and pending state isn't applied to a dead component.
+  useEffect(() => () => {
+    if (uploadAbortRef.current) uploadAbortRef.current.abort();
+  }, []);
 
   const stats = useMemo(() => {
     const total     = guests.length;
@@ -77,26 +86,34 @@ export function DigitalDashboard() {
     }
 
     setBusy(true);
-    const results = await Promise.allSettled(files.map(f => addInvitationMedia(uid, f)));
+    const controller = new AbortController();
+    uploadAbortRef.current = controller;
+    const results = await Promise.allSettled(
+      files.map(f => addInvitationMedia(uid, f, { signal: controller.signal })),
+    );
+    uploadAbortRef.current = null;
     setBusy(false);
 
-    const succeededIds = previews
-      .filter((_, i) => results[i].status === "fulfilled")
-      .map(p => p.id);
-    const failedIds = previews
-      .filter((_, i) => results[i].status === "rejected")
-      .map(p => p.id);
+    // Always clear pending previews so the spinner can't strand if a request
+    // hangs and is later resolved by the abort path. Revoke every blob URL
+    // because none of them are still in use — the media[] poll repopulates
+    // the gallery with server-hosted URLs.
+    previews.forEach(p => URL.revokeObjectURL(p.url));
+    setPendingMedia(prev => prev.filter(p => !previews.some(pp => pp.id === p.id)));
 
-    // Revoke blob URLs of completed uploads (Firestore subscription will fill in).
-    previews.forEach(p => {
-      if (succeededIds.includes(p.id) || failedIds.includes(p.id)) URL.revokeObjectURL(p.url);
-    });
-    setPendingMedia(prev => prev.filter(p => !succeededIds.includes(p.id) && !failedIds.includes(p.id)));
-
-    if (failedIds.length) {
-      const reason = results.find(r => r.status === "rejected")?.reason;
+    const failedResults = results.filter(r => r.status === "rejected");
+    if (failedResults.length) {
+      const reason = failedResults[0].reason;
       logErr("addInvitationMedia", reason);
-      showToast(reason?.message || tt(lang, "فشل الرفع", "ההעלאה נכשלה"));
+      const isTimeout = reason?.message === "request_timeout";
+      const isAbort = reason?.name === "AbortError";
+      if (!isAbort) {
+        showToast(
+          isTimeout
+            ? tt(lang, "انتهت مهلة الرفع — حاول مرة أخرى", "פג זמן ההעלאה — נסה שוב")
+            : reason?.message || tt(lang, "فشل الرفع", "ההעלאה נכשלה"),
+        );
+      }
     } else {
       showToast(tt(lang, "✓ تم الرفع", "✓ הועלה"));
     }

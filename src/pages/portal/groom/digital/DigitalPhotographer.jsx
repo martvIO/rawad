@@ -51,6 +51,9 @@ export function DigitalPhotographer() {
   const [pendingFiles, setPendingFiles] = useState([]); // [{ id, name, type, url, blobUrl }]
   const inputRef = useRef(null);
   const healedRef = useRef(false);
+  // Abort in-flight uploads on unmount so pending state can't strand.
+  const uploadAbortRef = useRef(null);
+  useEffect(() => () => { if (uploadAbortRef.current) uploadAbortRef.current.abort(); }, []);
 
   useEffect(() => {
     if (!currentUid) return;
@@ -147,21 +150,21 @@ export function DigitalPhotographer() {
     setUploading(true);
     setInProgress(arr.map(f => f.name));
 
-    const results = await Promise.allSettled(arr.map(f => uploadPhotographerFile(uid, f)));
-    const failedIdx = results
-      .map((r, i) => r.status === "rejected" ? i : -1)
-      .filter(i => i !== -1);
-    const succeededPreviews = previews.filter((_, i) => !failedIdx.includes(i));
-    const failedPreviews    = previews.filter((_, i) =>  failedIdx.includes(i));
+    const controller = new AbortController();
+    uploadAbortRef.current = controller;
+    const results = await Promise.allSettled(
+      arr.map(f => uploadPhotographerFile(uid, f, { signal: controller.signal })),
+    );
+    uploadAbortRef.current = null;
 
-    // ── Immediate cleanup of successful uploads — don't wait for onSnapshot ──
-    if (succeededPreviews.length > 0) {
-      succeededPreviews.forEach(p => URL.revokeObjectURL(p.url));
-      const succeededIds = new Set(succeededPreviews.map(p => p.id));
-      setPendingFiles(prev => prev.filter(p => !succeededIds.has(p.id)));
-    }
+    // Always revoke + clear every preview so pending state can't strand.
+    // The Storage-listing refresh below repopulates the gallery from the server.
+    previews.forEach(p => URL.revokeObjectURL(p.url));
+    const previewIds = new Set(previews.map(p => p.id));
+    setPendingFiles(prev => prev.filter(p => !previewIds.has(p.id)));
 
-    if (failedIdx.length === 0) {
+    const failedResults = results.filter(r => r.status === "rejected");
+    if (failedResults.length === 0) {
       showToast(lang === "he"
         ? `✓ הועלו ${arr.length} קבצים`
         : `✓ تم رفع ${arr.length.toLocaleString("en")} ملف`);
@@ -172,14 +175,19 @@ export function DigitalPhotographer() {
         else             removeKey(cacheKey(currentUid));
       }).catch(() => {});
     } else {
-      logErr("uploadPhotographerFiles", results[failedIdx[0]].reason);
-      showToast(lang === "he"
-        ? `נכשלה העלאה של ${failedIdx.length} קבצים`
-        : `فشل رفع ${failedIdx.length} ملف`);
-      // Clean up blobs for failed files only
-      failedPreviews.forEach(p => URL.revokeObjectURL(p.url));
-      const failedIds = new Set(failedPreviews.map(p => p.id));
-      setPendingFiles(prev => prev.filter(p => !failedIds.has(p.id)));
+      const reason = failedResults[0].reason;
+      logErr("uploadPhotographerFiles", reason);
+      const isTimeout = reason?.message === "request_timeout";
+      const isAbort = reason?.name === "AbortError";
+      if (!isAbort) {
+        showToast(
+          isTimeout
+            ? (lang === "he" ? "פג זמן ההעלאה — נסה שוב" : "انتهت مهلة الرفع — حاول مرة أخرى")
+            : (lang === "he"
+                ? `נכשלה העלאה של ${failedResults.length} קבצים`
+                : `فشل رفع ${failedResults.length} ملف`),
+        );
+      }
     }
 
     setUploading(false);
