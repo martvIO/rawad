@@ -907,6 +907,9 @@ function PricingSection({ t, onEnterPortal }) {
                 {originalStr && (
                   <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 6 }}>
                     <span style={{
+                      color: "#8a7a55", fontSize: 13, fontWeight: 700, opacity: 0.85,
+                    }}>{t("price_pkg1_original_label")}</span>
+                    <span style={{
                       color: "#8a7a55", fontSize: 20, textDecoration: "line-through",
                       fontFamily: "'Amiri',serif", fontWeight: 700, opacity: 0.85,
                     }}>{originalStr}</span>
@@ -918,13 +921,18 @@ function PricingSection({ t, onEnterPortal }) {
                     }}>{t("price_pkg1_discount_badge")}</span>
                   </div>
                 )}
-                <div style={{
-                  fontFamily: "'Amiri',serif", fontWeight: 900,
-                  fontSize: 44, lineHeight: 1.25,
-                  background: "linear-gradient(135deg,#fff3c0,#f0c84c,#c9a84c)",
-                  WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
-                  paddingBlock: 4,
-                }}>{priceStr}</div>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
+                  <span style={{
+                    color: "#8a7a55", fontSize: 13, fontWeight: 700, opacity: 0.85,
+                  }}>{t("price_pkg1_new_label")}</span>
+                  <div style={{
+                    fontFamily: "'Amiri',serif", fontWeight: 900,
+                    fontSize: 44, lineHeight: 1.25,
+                    background: "linear-gradient(135deg,#fff3c0,#f0c84c,#c9a84c)",
+                    WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+                    paddingBlock: 4,
+                  }}>{priceStr}</div>
+                </div>
               </div>
             );
           })()}

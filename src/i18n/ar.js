@@ -70,6 +70,8 @@ export const ar = {
   price_pkg1_label: "الباقة الأولى: التصميم الاحترافي",
   price_pkg1_price: "2,500 ₪",
   price_pkg1_discount_badge: "خصم 50%",
+  price_pkg1_original_label: "السعر الأصلي",
+  price_pkg1_new_label: "السعر الجديد",
   price_pkg1_sub: "الدعوة الرقمية الراقية — كل التفاصيل الأساسية بأسلوب يليق بمناسبتك.",
   price_pkg1_bullets: [
     "تصميم مخصص وأنيق لكل مدعو",

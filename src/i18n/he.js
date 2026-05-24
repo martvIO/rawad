@@ -70,6 +70,8 @@ export const he = {
   price_pkg1_label: "החבילה הראשונה: העיצוב המקצועי",
   price_pkg1_price: "2,500 ₪",
   price_pkg1_discount_badge: "הנחה 50%",
+  price_pkg1_original_label: "המחיר המקורי",
+  price_pkg1_new_label: "המחיר החדש",
   price_pkg1_sub: "ההזמנה הדיגיטלית היוקרתית — כל הפרטים החיוניים בסגנון הראוי לאירועך.",
   price_pkg1_bullets: [
     "עיצוב מותאם ואלגנטי לכל מוזמן",

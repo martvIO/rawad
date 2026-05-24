@@ -19,7 +19,7 @@
 //     deletion in routes/users.ts.
 
 import { Router, Request, Response } from "express";
-import { getStorage } from "firebase-admin/storage";
+import { getStorage, getDownloadURL } from "firebase-admin/storage";
 import busboy from "busboy";
 import {
   AuthRequest,
@@ -27,7 +27,6 @@ import {
   requireAnyRole,
 } from "../middleware/auth";
 import { MAX_BYTES, MAX_LEN } from "../../constants/limits";
-import { PROOF_DOWNLOAD_URL_TTL_MS } from "../../constants/time";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -36,9 +35,6 @@ const MAX_PROOF_BYTES = MAX_BYTES.PROOF;
 
 /** Mirrors storage.rules contentType matcher `image/.*`. */
 const ALLOWED_CONTENT_TYPE_PREFIX = "image/";
-
-/** Signed-URL lifetime when generating a read URL. */
-const DOWNLOAD_URL_TTL_MS = PROOF_DOWNLOAD_URL_TTL_MS;
 
 /** Acceptable proof-path shape: proofs/{groomUid}/{guestId}/{filename}.{ext} */
 const PROOF_PATH_RE = /^proofs\/[^/]+\/[^/]+\/[^/]+$/;
@@ -118,10 +114,15 @@ proofsRouter.post(
 // ─── GET /proofs/url ──────────────────────────────────────────────────────────
 
 /**
- * Mint a short-lived (1h) signed download URL for a proof photo. The
- * client uses this to render thumbnails / lightboxes without granting
- * direct Storage SDK access. The frontend `<img src>` then fetches the
- * URL anonymously over HTTPS.
+ * Mint a download URL for a proof photo. The client uses this to render
+ * thumbnails / lightboxes without granting direct Storage SDK access.
+ *
+ * Uses Firebase's `getDownloadURL`, which embeds a Firebase download
+ * token in the URL. Unlike `bucket.file().getSignedUrl()`, this does NOT
+ * require the function's service account to hold the `Service Account
+ * Token Creator` IAM role — the default Firebase deploy has no such
+ * grant, and `getSignedUrl` was failing 500 in production for that
+ * reason.
  *
  * Authorization (mirror of `storage.rules` /proofs read clause):
  *   - admin: any path
@@ -149,12 +150,8 @@ proofsRouter.get(
     }
 
     try {
-      const expires = Date.now() + DOWNLOAD_URL_TTL_MS;
-      const [url] = await getStorage()
-        .bucket()
-        .file(path)
-        .getSignedUrl({ action: "read", expires });
-      res.json({ url, expires });
+      const url = await getDownloadURL(getStorage().bucket().file(path));
+      res.json({ url });
     } catch (err) {
       res.status(500).json({ error: "url_failed", detail: errorMessage(err) });
     }
@@ -220,9 +217,12 @@ interface ParsedUpload {
  * `MAX_PROOF_BYTES`. Resolves with `parsed.file.truncated === true` when
  * the cap is exceeded so the handler can return 413.
  *
- * Returns once busboy emits `finish` AND any in-progress file stream has
- * fully drained; both events are awaited to avoid resolving before the
- * full file is buffered.
+ * Firebase Functions v2 onRequest pre-consumes the request stream and
+ * exposes the raw bytes as `req.rawBody`. Piping `req` directly would feed
+ * busboy zero bytes and produce an "Unexpected end of form" error. When
+ * rawBody is present we hand the buffer to busboy via `bb.end(rawBody)`;
+ * otherwise (tests, local dev with a non-buffered transport) we fall back
+ * to piping the request stream.
  */
 function parseMultipart(req: Request): Promise<ParsedUpload> {
   return new Promise((resolve, reject) => {
@@ -258,7 +258,13 @@ function parseMultipart(req: Request): Promise<ParsedUpload> {
 
     bb.on("error", reject);
     bb.on("finish", () => resolve(result));
-    req.pipe(bb);
+
+    const rawBody = (req as Request & { rawBody?: Buffer }).rawBody;
+    if (rawBody) {
+      bb.end(rawBody);
+    } else {
+      req.pipe(bb);
+    }
   });
 }
 

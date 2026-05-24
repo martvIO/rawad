@@ -6,43 +6,49 @@ _Track open bugs here. Mark resolved bugs with the fix date. Never delete entrie
 
 ## Open Bugs
 
-### BUG-O002 — `POST /api/digital/{uid}/media/upload` returns 400 `api_invalid_multipart`
-
-**Severity:** High — groom cannot upload invitation media (images/video) via the digital dashboard
-**Symptom:** Console logs:
-```
-POST https://dawa-aa793.web.app/api/digital/MkijWMawYOc4RcPooW5mgcIpLYX2/media/upload 400 (Bad Request)
-[dawa] apiClient POST /digital/.../media/upload  api_invalid_multipart api_invalid_multipart
-[dawa] addInvitationMedia ApiError api_invalid_multipart
-```
-**Root cause:** Unknown — `parseMultipart(req, MAX_INVITE_MEDIA_BYTES)` in `functions/src/api/routes/digital.ts` throws / rejects, causing the handler to return `{ error: "api_invalid_multipart" }`. Possible causes: missing or incorrect `Content-Type: multipart/form-data` boundary sent by the client, file size exceeding `MAX_INVITE_MEDIA_BYTES`, or a busboy parsing regression.
-**Call site:** `DigitalDashboard.jsx` → `handleAddMedia` → `addInvitationMedia` (`src/services/digital.js`) → `api.upload('/digital/{uid}/media/upload', formData, opts)`
-**Next steps:** Check `firebase functions:log --project dawa-aa793` for the stack trace on the `/api/digital/:uid/media/upload` handler. Verify the FormData object contains the file field name expected by `parseMultipart`. Check `MAX_INVITE_MEDIA_BYTES` against actual file sizes used in testing.
-
----
-
-### BUG-O001 — `GET /api/proofs/url` returns 500 → proof photos fail to load
-
-**Severity:** High — groom/admin cannot view proof photos uploaded by drivers
-**Symptom:** Console logs:
-```
-[dawa] apiClient GET /proofs/url?path=proofs%2F… api_url_failed api_url_failed
-[dawa] proof.url ApiError api_url_failed
-GET https://dawa-aa793.web.app/api/proofs/url?path=proofs%2F… 500 (Internal Server Error)
-```
-The poller retries the call on every tick, flooding the console repeatedly.
-**Root cause:** Unknown — the `/proofs/url` Cloud Function endpoint throws a 500. Possible causes:
-Storage admin SDK permissions, missing `WEB_API_KEY` / Secret Manager config, or a regression
-in the `proofs` router after a recent deploy.
-**Related:** Similar symptom to BUG-R007 (which was a CSP block), but this is a 500 from the
-server rather than a client-side network block, so the CSP fix is not the cause.
-**Next steps:** Check `firebase functions:log --project dawa-aa793` for the stack trace on the
-`/api/proofs/url` handler. Verify `WEB_API_KEY` is set in the Functions environment and that
-the Storage service account has `storage.objects.get` permission.
+_None._
 
 ---
 
 ## Resolved Bugs
+
+### BUG-R011 — `POST /api/.../upload` returns 400 `api_invalid_multipart` (Resolved 2026-05-25)
+
+**Files:** `functions/src/api/routes/digital.ts`, `functions/src/api/routes/proofs.ts`
+**Severity:** High — every multipart endpoint (digital media, photographer files, design
+mockups, delivery proofs) was broken; affected groom uploads of invitation backgrounds,
+photographer files, and driver proof photos.
+**Root cause:** Firebase Functions v2 `onRequest` pre-consumes the request body and exposes
+the raw bytes via `req.rawBody`. The `parseMultipart` helpers in both files did
+`req.pipe(bb)`, which had nothing to pipe — busboy emitted an "Unexpected end of form"
+error that the handler surfaced as `{ error: "invalid_multipart" }`.
+**Fix:** Updated both `parseMultipart` implementations to feed busboy from `req.rawBody`
+when present (`bb.end(rawBody)`) and fall back to `req.pipe(bb)` only when the buffered
+body is absent (tests / local dev with a non-buffered transport).
+
+---
+
+### BUG-R010 — `GET /api/proofs/url` returns 500 → proof photos fail to load (Resolved 2026-05-25)
+
+**Files:** `functions/src/api/routes/proofs.ts`, `functions/src/api/routes/digital.ts`,
+`functions/src/constants/time.ts`
+**Severity:** High — groom/admin could not view proof photos; poller retried on every
+tick, flooding the console.
+**Root cause:** `bucket.file(path).getSignedUrl({ action: "read", ... })` requires the
+function's service account to hold the **Service Account Token Creator** IAM role on
+itself so it can self-sign URLs. The default Firebase deploy does not grant that role,
+so `getSignedUrl` threw, and the handler returned `{ error: "url_failed" }` as a 500.
+The same call inside `digital.ts/uploadAndGetUrl` had the same latent failure mode —
+it was masked by BUG-R011 because uploads never reached the signing step.
+**Fix:** Switched both routes to `getDownloadURL(file)` from `firebase-admin/storage`.
+That helper embeds a Firebase download token in the URL and uses Firebase's internal
+APIs (no `signBlob` permission required), so it works on a default deploy. As a bonus,
+`getDownloadURL` URLs do not expire on a timer like signed URLs did — fixes the latent
+issue where stored 30-day `MEDIA_DOWNLOAD_URL_TTL_MS` URLs in Firestore would have
+broken after expiry. Removed the now-unused `PROOF_DOWNLOAD_URL_TTL_MS` and
+`MEDIA_DOWNLOAD_URL_TTL_MS` constants.
+
+---
 
 ### BUG-R008 — DigitalAddGuest submit button hangs for 30 seconds (Resolved 2026-05)
 
