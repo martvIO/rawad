@@ -39,9 +39,13 @@ const USERS = [
   { username: "driver", password: "Driver1234", role: "driver", displayName: "Test Driver", phone: "+972500000003" },
 ];
 
+// Field names match what the app reads (src/pages/portal/groom/GroomGuests.jsx
+// and DriverDeliveryList.jsx): name / phone / area / status / inviteType.
+// groomUsername must be set so AdminSendTab's filter (`g.groomUsername === …`)
+// picks them up.
 const GUESTS = [
-  { name: "Ahmad Test", phoneE164: "+972501111111", city: "Haifa", street: "Main St", house: "12" },
-  { name: "Fatima Test", phoneE164: "+972502222222", city: "Nazareth", street: "Hill Rd", house: "5" },
+  { name: "Ahmad Test",  phone: "+972501111111", area: "Haifa, Main St, 12",  status: "pending", inviteType: "premium" },
+  { name: "Fatima Test", phone: "+972502222222", area: "Nazareth, Hill Rd, 5", status: "pending", inviteType: "premium" },
 ];
 
 async function ensureUser({ username, password, role, displayName, phone }) {
@@ -49,7 +53,11 @@ async function ensureUser({ username, password, role, displayName, phone }) {
   let user;
   try {
     user = await auth.getUserByEmail(email);
-    console.log(`[seed] exists: ${username} (${user.uid})`);
+    // Force-sync the password so reseeding never strands tests on a stale
+    // credential set. phoneNumber/displayName updates are safe-no-op if
+    // unchanged.
+    await auth.updateUser(user.uid, { password, displayName, phoneNumber: phone });
+    console.log(`[seed] exists: ${username} (${user.uid}) — password resynced`);
   } catch {
     user = await auth.createUser({ email, password, displayName, phoneNumber: phone });
     console.log(`[seed] created: ${username} (${user.uid})`);
@@ -66,9 +74,17 @@ async function seedGroomProfile(uid, username, displayName) {
   await rtdb.ref(`groomProfiles/${uid}`).set({ username, displayName });
 }
 
-async function seedGuests(groomUid) {
+async function seedGuests(groomUid, groomUsername) {
+  // Clear any prior seeded guests so reseeding is idempotent (avoids
+  // accumulating duplicates across emulator restarts).
+  await rtdb.ref(`guestsByGroom/${groomUid}`).remove();
   for (const g of GUESTS) {
-    const ref = await rtdb.ref(`guestsByGroom/${groomUid}`).push({ ...g, createdAt: Date.now() });
+    const ref = await rtdb.ref(`guestsByGroom/${groomUid}`).push({
+      ...g,
+      groomUid,
+      groomUsername,
+      createdAt: Date.now(),
+    });
     console.log(`[seed] guest: ${g.name} -> ${ref.key}`);
   }
 }
@@ -98,7 +114,7 @@ async function seedAdminSettings() {
     const uids = {};
     for (const u of USERS) uids[u.username] = await ensureUser(u);
     await seedGroomProfile(uids.groom, "groom", "Test Groom");
-    await seedGuests(uids.groom);
+    await seedGuests(uids.groom, "groom");
     await assignDriver(uids.driver, uids.groom);
     await seedAdminSettings();
     console.log("[seed] done.");

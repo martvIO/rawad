@@ -59,6 +59,8 @@ Do NOT rely solely on memory. Verify current code state before acting.
 - Run `npm run test:unit` for pure logic; `npm test` for security rules
 - Fix failures — never suppress or skip them
 - When tests fail: inspect stack trace → isolate root cause → fix → rerun → document
+- For UI changes: use the **Playwright MCP** (`http://localhost:8931/mcp`) to verify the feature in a live browser before closing the task — do not rely on code review alone
+- Never claim a UI fix works without actually navigating to it with the Playwright MCP and taking a screenshot
 
 ---
 

@@ -76,7 +76,7 @@ export function ConfirmationForm({ t, lang, setLang }) {
       <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
         <div style={{ maxWidth: 460, width: "100%", textAlign: "center" }}>
           <div style={{ fontSize: 64, marginBottom: 16 }}>🎉</div>
-          <h1 style={{ fontFamily: "'Amiri',serif", color: "#4cc97a", fontSize: 28, marginBottom: 12 }}>
+          <h1 data-testid="conf-thanks-title" style={{ fontFamily: "'Amiri',serif", color: "#4cc97a", fontSize: 28, marginBottom: 12 }}>
             {t("conf_form_thanks_title")}
           </h1>
           <p style={{ color: "rgba(245,230,184,.8)", fontSize: 14, lineHeight: 1.9 }}>
@@ -108,7 +108,7 @@ export function ConfirmationForm({ t, lang, setLang }) {
 
         <div className="gold-card">
           <div style={{ marginBottom: 6, fontSize: 12, color: C.goldDim }}>{t("conf_form_full_name")} *</div>
-          <input className="input-field" type="text" placeholder={t("example_name")}
+          <input data-testid="field-conf-name" className="input-field" type="text" placeholder={t("example_name")}
                  value={name} onChange={e => setName(e.target.value)}
                  style={{ marginBottom: 14 }}/>
 
@@ -160,20 +160,20 @@ export function ConfirmationForm({ t, lang, setLang }) {
           </div>
 
           <div style={{ marginBottom: 6, fontSize: 12, color: C.goldDim }}>{t("conf_form_street")}</div>
-          <input className="input-field" type="text"
+          <input data-testid="field-conf-street" className="input-field" type="text"
                  value={street} onChange={e => setStreet(e.target.value)}
                  style={{ marginBottom: 14 }}/>
 
           <div style={{ marginBottom: 6, fontSize: 12, color: C.goldDim }}>{t("conf_form_house_number")}</div>
-          <input className="input-field" type="text" placeholder="86"
+          <input data-testid="field-conf-house" className="input-field" type="text" placeholder="86"
                  value={house} onChange={e => setHouse(e.target.value)}
                  style={{ marginBottom: 14, direction: "ltr", textAlign: "right" }}/>
 
           {error && (
-            <div style={{ color: C.red, fontSize: 12, marginBottom: 12, textAlign: "center" }}>{error}</div>
+            <div data-testid="alert-conf-error" style={{ color: C.red, fontSize: 12, marginBottom: 12, textAlign: "center" }}>{error}</div>
           )}
 
-          <button className="gold-btn" style={{ width: "100%" }} onClick={submit}
+          <button data-testid="btn-conf-submit" className="gold-btn" style={{ width: "100%" }} onClick={submit}
                   disabled={busy || !name.trim() || !phone.trim() || !city.trim()}>
             {t("conf_form_submit")}
           </button>

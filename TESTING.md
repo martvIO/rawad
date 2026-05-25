@@ -75,13 +75,20 @@ All in `src/__tests__/` and `tests/functions/`:
 
 ---
 
+## Browser / E2E Testing — Playwright MCP
+
+For UI verification and end-to-end flows, use the **Playwright MCP** rather than writing `.spec.ts` files. The MCP server runs at `http://localhost:8931/mcp` (configured in `.claude/settings.local.json`).
+
+Start the dev server, then ask Claude to navigate, click, and assert in the live browser. Screenshots can be taken at any step. See the "Browser Testing with Playwright MCP" section in `CLAUDE.md` for example prompts.
+
+---
+
 ## What Is NOT Tested (gaps)
 
 - REST API route handlers (`functions/src/api/routes/`) — no automated tests exist
 - Firestore security rules — no rule tests for `digitalGuests`, `digitalMedia`, `photographerFiles`
 - Storage security rules — no automated rule tests
 - React component rendering — no component tests
-- End-to-end flows — manual only (see `docs/SMOKE_TEST.md`)
 
 ---
 

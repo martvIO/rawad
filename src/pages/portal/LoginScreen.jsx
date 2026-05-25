@@ -17,7 +17,7 @@ export function LoginScreen() {
     <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
       <div style={{ width: "100%", maxWidth: 400, animation: "fadeUp .4s ease" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-          <button onClick={onBack} style={{ background: "none", border: "none", color: C.dim, cursor: "pointer", fontSize: 13 }}>
+          <button data-testid="btn-login-back" onClick={onBack} style={{ background: "none", border: "none", color: C.dim, cursor: "pointer", fontSize: 13 }}>
             {t("login_back")}
           </button>
           <LangSwitcher lang={lang} setLang={setLang} />
@@ -31,16 +31,16 @@ export function LoginScreen() {
         </div>
         <div className="gold-card" style={{ padding: 28 }}>
           <div style={{ marginBottom: 10, fontSize: 13, color: C.goldDim }}>{t("login_user")}</div>
-          <input className="input-field" type="text" placeholder={t("login_user")}
+          <input data-testid="field-login-user" className="input-field" type="text" placeholder={t("login_user")}
                  value={loginUser} onChange={e => { setLoginUser(e.target.value); setLoginError(""); }}
                  style={{ marginBottom: 14 }}/>
           <div style={{ marginBottom: 10, fontSize: 13, color: C.goldDim }}>{t("login_pass")}</div>
-          <input className="input-field" type="password" placeholder="••••••"
+          <input data-testid="field-login-pass" className="input-field" type="password" placeholder="••••••"
                  value={loginPass} onChange={e => { setLoginPass(e.target.value); setLoginError(""); }}
                  onKeyDown={e => e.key === "Enter" && !loginLoading && handleLogin()}
                  style={{ marginBottom: 12 }}/>
-          {loginError && <div style={{ color: C.red, fontSize: 12, marginBottom: 12 }}>{loginError}</div>}
-          <button className="gold-btn" style={{ width: "100%" }}
+          {loginError && <div data-testid="alert-login-error" style={{ color: C.red, fontSize: 12, marginBottom: 12 }}>{loginError}</div>}
+          <button data-testid="btn-login-submit" className="gold-btn" style={{ width: "100%" }}
                   onClick={handleLogin} disabled={loginLoading}>
             {loginLoading ? <span className="spinner" /> : t("login_submit")}
           </button>

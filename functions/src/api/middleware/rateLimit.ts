@@ -36,8 +36,13 @@ const ANON_UID_KEY = "anon";
  * @param maxPerHour maximum allowed requests in the window
  * @param windowMs   sliding-window duration in milliseconds
  */
+/** True when running inside the Firebase local emulator suite. */
+const IN_EMULATOR = process.env.FUNCTIONS_EMULATOR === "true";
+
 export function ipRateLimit(prefix: string, maxPerHour: number, windowMs: number) {
   return function ipGate(req: Request, res: Response, next: NextFunction): void {
+    // Skip rate limiting in emulator mode so e2e tests can login freely.
+    if (IN_EMULATOR) { next(); return; }
     const ip = resolveClientIp(req);
     const key = `${prefix}:${ip}`;
     if (!allow(key, maxPerHour, windowMs)) {
@@ -57,6 +62,7 @@ export function ipRateLimit(prefix: string, maxPerHour: number, windowMs: number
  */
 export function uidRateLimit(prefix: string, maxPerHour: number, windowMs: number) {
   return function uidGate(req: AuthRequest, res: Response, next: NextFunction): void {
+    if (IN_EMULATOR) { next(); return; }
     const uid = req.caller?.uid ?? ANON_UID_KEY;
     const key = `${prefix}:${uid}`;
     if (!allow(key, maxPerHour, windowMs)) {

@@ -55,11 +55,11 @@ export function GroomHandwrittenShell() {
             </span>
           </div>
           <div style={{ display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center" }}>
-            <NavLink to="/portal/groom/handwritten/dashboard" className={navClass} style={navStyle}>{t("tab_dashboard")}</NavLink>
-            <NavLink to="/portal/groom/handwritten/guests"    className={navClass} style={navStyle}>{t("tab_guests")}</NavLink>
-            <NavLink to="/portal/groom/handwritten/add"       className={navClass} style={navStyle}>{t("tab_add")}</NavLink>
-            <NavLink to="/portal/groom/handwritten/proofs"    className={navClass} style={navStyle}>{t("tab_proofs")}</NavLink>
-            <NavLink to="/portal/groom/handwritten/map"       className={navClass} style={navStyle}>{t("tab_guest_map")}</NavLink>
+            <NavLink data-testid="nav-groom-dashboard" to="/portal/groom/handwritten/dashboard" className={navClass} style={navStyle}>{t("tab_dashboard")}</NavLink>
+            <NavLink data-testid="nav-groom-guests"    to="/portal/groom/handwritten/guests"    className={navClass} style={navStyle}>{t("tab_guests")}</NavLink>
+            <NavLink data-testid="nav-groom-add"       to="/portal/groom/handwritten/add"       className={navClass} style={navStyle}>{t("tab_add")}</NavLink>
+            <NavLink data-testid="nav-groom-proofs"    to="/portal/groom/handwritten/proofs"    className={navClass} style={navStyle}>{t("tab_proofs")}</NavLink>
+            <NavLink data-testid="nav-groom-map"       to="/portal/groom/handwritten/map"       className={navClass} style={navStyle}>{t("tab_guest_map")}</NavLink>
             <button
               onClick={changeType}
               title={lang === "he" ? "החלף סוג הזמנה" : "تغيير نوع المكتوب"}
@@ -70,7 +70,7 @@ export function GroomHandwrittenShell() {
               }}
             >⇄</button>
             <LangSwitcher lang={lang} setLang={setLang} />
-            <button onClick={() => setLogoutAsking(true)} title={t("logout")} style={{
+            <button data-testid="btn-logout" onClick={() => setLogoutAsking(true)} title={t("logout")} style={{
               background: "rgba(212,80,58,.08)", border: "1px solid rgba(212,80,58,.3)",
               color: C.red, padding: "5px 10px", borderRadius: 8,
               fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", marginInlineStart: 4,

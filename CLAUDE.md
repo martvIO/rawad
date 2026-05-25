@@ -211,7 +211,7 @@ git push origin main
 
 ### 6. Smoke-test after deploy
 
-Open the hosted URL and run through the critical paths manually (or via Playwright — see next section):
+Use the Playwright MCP to verify critical paths (the MCP server is configured in `.claude/settings.local.json`). Ask Claude to navigate to the hosted URL and walk through:
 
 | Path | What to verify |
 |---|---|
@@ -233,192 +233,48 @@ Check for unhandled errors or unexpected `permission-denied` exceptions right af
 
 ---
 
-## End-to-End Testing with Playwright
+## Browser Testing with Playwright MCP
 
-### Install Playwright
+The Playwright MCP server is configured in `.claude/settings.local.json` and runs at `http://localhost:8931/mcp`. Claude uses it directly to control a browser — no test files or `playwright test` CLI needed.
 
-```bash
-npm install --save-dev @playwright/test
-npx playwright install          # download browsers (Chromium, Firefox, WebKit)
+### How to use
+
+Start the dev server first (`npm run dev:emulator` or `npm run dev`), then ask Claude to verify a flow. Claude will use MCP browser tools to navigate, click, fill forms, and take screenshots in real time.
+
+### Critical paths to verify
+
+| Path | What to verify |
+|---|---|
+| `/` | Landing page loads, RTL layout correct |
+| `/portal/login` | Login with each role (admin / groom / driver) |
+| `/portal/admin/*` | User list loads, bulk-WhatsApp button visible |
+| `/portal/groom/*` | Guest list loads, invite link generation works |
+| `/portal/driver/*` | Route list loads, photo-upload flow works |
+| `/confirm/:groomUsername` | Public confirmation form renders |
+| `/invite/:token` | Invite form renders with correct guest data |
+
+### Example prompts for Claude
+
+```
+# Verify login works
+"Use the Playwright MCP to navigate to http://localhost:5173/portal/login, log in as admin, and confirm we land on /portal/admin"
+
+# Smoke-test after deploy
+"Use the Playwright MCP to smoke-test https://dawa-aa793.web.app — check the landing page, login page, and confirm RTL layout is correct"
+
+# Verify a specific fix
+"Use the Playwright MCP to verify the proof photo upload flow works for a driver in the emulator environment"
 ```
 
-### Configuration
+### When to use
 
-Create `playwright.config.ts` at the project root:
+- After any UI change — verify the feature works in the real browser before closing the task
+- Post-deploy smoke tests — navigate the hosted URL and check critical paths
+- Debugging visual or layout issues — take a screenshot to see what the browser actually renders
 
-```typescript
-import { defineConfig, devices } from '@playwright/test';
+### MCP server setup
 
-export default defineConfig({
-  testDir: './e2e',
-  timeout: 30_000,
-  retries: process.env.CI ? 2 : 0,
-  use: {
-    baseURL: process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:5173',
-    trace: 'on-first-retry',
-    video: 'on-first-retry',
-  },
-  projects: [
-    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
-    { name: 'mobile-safari', use: { ...devices['iPhone 14'] } },
-  ],
-});
-```
-
-Add scripts to `package.json`:
-
-```json
-{
-  "scripts": {
-    "test:e2e":        "playwright test",
-    "test:e2e:ui":     "playwright test --ui",
-    "test:e2e:headed": "playwright test --headed",
-    "test:e2e:report": "playwright show-report"
-  }
-}
-```
-
-### Writing tests
-
-Place test files in `e2e/`. Convention: one file per role or feature area.
-
-**`e2e/landing.spec.ts` — public pages**
-
-```typescript
-import { test, expect } from '@playwright/test';
-
-test('landing page loads and shows correct title', async ({ page }) => {
-  await page.goto('/');
-  await expect(page).toHaveTitle(/دعوة|Dawa/i);
-});
-
-test('confirmation form renders for valid groom username', async ({ page }) => {
-  await page.goto('/confirm/test-groom');
-  await expect(page.getByRole('form')).toBeVisible();
-});
-```
-
-**`e2e/auth.spec.ts` — login flow**
-
-```typescript
-import { test, expect } from '@playwright/test';
-
-test('admin can log in and reach admin portal', async ({ page }) => {
-  await page.goto('/portal/login');
-  await page.getByLabel(/username|phone/i).fill(process.env.TEST_ADMIN_USER!);
-  await page.getByLabel(/password/i).fill(process.env.TEST_ADMIN_PASS!);
-  await page.getByRole('button', { name: /login|sign in/i }).click();
-  await expect(page).toHaveURL(/\/portal\/admin/);
-});
-
-test('wrong password shows error message', async ({ page }) => {
-  await page.goto('/portal/login');
-  await page.getByLabel(/username|phone/i).fill('nobody');
-  await page.getByLabel(/password/i).fill('wrong');
-  await page.getByRole('button', { name: /login|sign in/i }).click();
-  await expect(page.getByRole('alert')).toBeVisible();
-});
-```
-
-**`e2e/groom.spec.ts` — groom portal**
-
-```typescript
-import { test, expect } from '@playwright/test';
-import { loginAs } from './helpers';
-
-test('groom can view guest list', async ({ page }) => {
-  await loginAs(page, 'groom');
-  await expect(page.getByTestId('guest-list')).toBeVisible();
-});
-
-test('groom can generate invite link for a guest', async ({ page }) => {
-  await loginAs(page, 'groom');
-  await page.getByTestId('guest-row').first().getByRole('button', { name: /invite/i }).click();
-  await expect(page.getByTestId('invite-link')).toContainText('/invite/');
-});
-```
-
-**`e2e/helpers.ts` — shared utilities**
-
-```typescript
-import { Page } from '@playwright/test';
-
-export async function loginAs(page: Page, role: 'admin' | 'groom' | 'driver') {
-  const creds = {
-    admin:  { user: process.env.TEST_ADMIN_USER!,  pass: process.env.TEST_ADMIN_PASS!  },
-    groom:  { user: process.env.TEST_GROOM_USER!,  pass: process.env.TEST_GROOM_PASS!  },
-    driver: { user: process.env.TEST_DRIVER_USER!, pass: process.env.TEST_DRIVER_PASS! },
-  };
-  await page.goto('/portal/login');
-  await page.getByLabel(/username|phone/i).fill(creds[role].user);
-  await page.getByLabel(/password/i).fill(creds[role].pass);
-  await page.getByRole('button', { name: /login|sign in/i }).click();
-}
-```
-
-Store test credentials in a `.env.test` file (never commit this file):
-
-```bash
-TEST_ADMIN_USER=admin-test
-TEST_ADMIN_PASS=...
-TEST_GROOM_USER=groom-test
-TEST_GROOM_PASS=...
-TEST_DRIVER_USER=driver-test
-TEST_DRIVER_PASS=...
-```
-
-### Running tests
-
-```bash
-# Against local dev server (start it first with npm run dev:emulator)
-npm run test:e2e
-
-# Against the deployed production URL
-PLAYWRIGHT_BASE_URL=https://dawa-aa793.web.app npm run test:e2e
-
-# Open the interactive UI runner
-npm run test:e2e:ui
-
-# View the last HTML report
-npm run test:e2e:report
-```
-
-### CI integration (GitHub Actions example)
-
-```yaml
-# .github/workflows/e2e.yml
-name: E2E Tests
-
-on:
-  push:
-    branches: [main]
-  pull_request:
-
-jobs:
-  playwright:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-      - run: npm ci
-      - run: npx playwright install --with-deps
-      - run: npm run test:e2e
-        env:
-          PLAYWRIGHT_BASE_URL: ${{ secrets.STAGING_URL }}
-          TEST_ADMIN_USER: ${{ secrets.TEST_ADMIN_USER }}
-          TEST_ADMIN_PASS: ${{ secrets.TEST_ADMIN_PASS }}
-          TEST_GROOM_USER: ${{ secrets.TEST_GROOM_USER }}
-          TEST_GROOM_PASS: ${{ secrets.TEST_GROOM_PASS }}
-          TEST_DRIVER_USER: ${{ secrets.TEST_DRIVER_USER }}
-          TEST_DRIVER_PASS: ${{ secrets.TEST_DRIVER_PASS }}
-      - uses: actions/upload-artifact@v4
-        if: failure()
-        with:
-          name: playwright-report
-          path: playwright-report/
-```
+The server is pre-configured. If it is not running, start it separately before asking Claude to use it. The MCP URL is `http://localhost:8931/mcp`.
 
 ---
 
@@ -479,13 +335,7 @@ functions/src/
   helpers.ts         assertAdmin, validators, phone utils
   *.ts               Legacy callable Cloud Functions (users, invites, confirmations, …)
 
-e2e/                  Playwright end-to-end tests
-  helpers.ts          Shared login utilities
-  landing.spec.ts     Public page tests
-  auth.spec.ts        Login / auth-guard tests
-  groom.spec.ts       Groom portal tests
-  driver.spec.ts      Driver portal tests
-  admin.spec.ts       Admin portal tests
+e2e/                  (optional) Playwright spec files for CI — primary browser testing via Playwright MCP
 ```
 
 ---
