@@ -31,7 +31,7 @@ import {
   DocumentReference,
   Firestore,
 } from "firebase-admin/firestore";
-import { getStorage } from "firebase-admin/storage";
+import { getStorage, getDownloadURL } from "firebase-admin/storage";
 import busboy from "busboy";
 import {
   AuthRequest,
@@ -39,7 +39,6 @@ import {
   requireAdmin,
 } from "../middleware/auth";
 import { MAX_BYTES, MAX_LEN } from "../../constants/limits";
-import { MEDIA_DOWNLOAD_URL_TTL_MS } from "../../constants/time";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -74,7 +73,6 @@ const MAX_MOCKUP_BYTES = MAX_BYTES.MOCKUP;
 const ALLOWED_MEDIA_PREFIX = ["image/", "video/"];
 const ALLOWED_MOCKUP_PREFIX = ["image/"];
 
-const DOWNLOAD_URL_TTL_MS = MEDIA_DOWNLOAD_URL_TTL_MS;
 const SAFE_NAME_RE = /[^\w.\-]/g;
 
 export const digitalRouter = Router();
@@ -727,22 +725,24 @@ function designCol(uid: string): CollectionReference {
 }
 
 /**
- * Save a buffer to Storage and return a long-lived signed download URL.
- * The download URL is ~30 days; the storage path itself is stable for
- * the lifetime of the object.
+ * Save a buffer to Storage and return a Firebase download URL. The URL
+ * uses a Firebase download token embedded in the link, which stays valid
+ * until the token is rotated/revoked — strictly better than the prior
+ * 30-day signed URL that expired even while still referenced in
+ * Firestore.
+ *
+ * `getDownloadURL` (firebase-admin/storage ≥ v11.4) does NOT require the
+ * `Service Account Token Creator` IAM role that `bucket.file().getSignedUrl()`
+ * needs, so it works out of the box on a default Firebase Functions deploy.
  */
 async function uploadAndGetUrl(
   path: string,
   buffer: Buffer,
   contentType: string
 ): Promise<string> {
-  const bucket = getStorage().bucket();
-  await bucket.file(path).save(buffer, { contentType, resumable: false });
-  const expires = Date.now() + DOWNLOAD_URL_TTL_MS;
-  const [url] = await bucket
-    .file(path)
-    .getSignedUrl({ action: "read", expires });
-  return url;
+  const file = getStorage().bucket().file(path);
+  await file.save(buffer, { contentType, resumable: false });
+  return getDownloadURL(file);
 }
 
 /**
@@ -1137,6 +1137,13 @@ interface ParsedMultipart {
  * Parse a multipart upload buffered in memory, capped at `maxBytes`.
  * Promise resolves once busboy emits `finish` AND any file stream's `end`
  * has fired (busboy emits `finish` only after all parts are complete).
+ *
+ * Firebase Functions v2 onRequest consumes the request body up front and
+ * exposes the raw bytes as `req.rawBody`. Piping `req` directly would
+ * feed busboy zero bytes and produce an "Unexpected end of form" error
+ * (surfaced to the client as `invalid_multipart`). When rawBody is
+ * present we hand it to busboy via `bb.end(rawBody)`; otherwise (tests,
+ * local dev) we fall back to piping the request stream.
  */
 function parseMultipart(
   req: Request,
@@ -1173,7 +1180,13 @@ function parseMultipart(
 
     bb.on("error", reject);
     bb.on("finish", () => resolve(result));
-    req.pipe(bb);
+
+    const rawBody = (req as Request & { rawBody?: Buffer }).rawBody;
+    if (rawBody) {
+      bb.end(rawBody);
+    } else {
+      req.pipe(bb);
+    }
   });
 }
 
