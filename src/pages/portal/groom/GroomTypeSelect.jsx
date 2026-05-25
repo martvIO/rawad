@@ -50,7 +50,7 @@ export function GroomTypeSelect() {
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
 
             {/* Handwritten */}
-            <button
+            <button data-testid="btn-type-handwritten"
               onClick={() => pick("handwritten")}
               style={{
                 padding: "28px 24px", borderRadius: 18, textAlign: "right", fontFamily: "inherit",
@@ -70,7 +70,7 @@ export function GroomTypeSelect() {
             </button>
 
             {/* Digital */}
-            <button
+            <button data-testid="btn-type-digital"
               onClick={() => pick("digital")}
               style={{
                 padding: "28px 24px", borderRadius: 18, textAlign: "right", fontFamily: "inherit",

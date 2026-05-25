@@ -17,7 +17,7 @@ export function CityField({ value, onChange, lang, t }) {
 
   return (
     <div style={{ position: "relative" }}>
-      <input className="input-field" type="text" placeholder={t("addr_city_placeholder")}
+      <input data-testid="field-city" className="input-field" type="text" placeholder={t("addr_city_placeholder")}
              value={value}
              onChange={e => { onChange(e.target.value); setOpen(true); }}
              onFocus={() => setOpen(true)}

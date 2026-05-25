@@ -248,7 +248,7 @@ function UserManagerInner() {
             const m = ROLE_META[val];
             const active = newUserRole === val;
             return (
-              <button key={val} onClick={() => setNewUserRole(val)} style={{
+              <button key={val} data-testid={`btn-new-role-${val}`} onClick={() => setNewUserRole(val)} style={{
                 flex: 1, padding: "10px 0", borderRadius: 10, cursor: "pointer",
                 background: active ? `${m.fg}22` : "rgba(255,255,255,.04)",
                 border: `1.5px solid ${active ? m.fg : "rgba(255,255,255,.08)"}`,
@@ -263,7 +263,7 @@ function UserManagerInner() {
         <div style={{ fontSize: 12, color: C.goldDim, marginBottom: 6 }}>
           {t("login_user")} <span style={{ color: C.red }}>*</span>
         </div>
-        <input className="input-field" type="text" placeholder={t("login_user")}
+        <input data-testid="field-new-user" className="input-field" type="text" placeholder={t("login_user")}
                value={newUserName} onChange={e => setNewUserName(e.target.value)}
                style={{ marginBottom: 14, direction: "ltr", textAlign: "right" }} />
 
@@ -271,7 +271,7 @@ function UserManagerInner() {
         <div style={{ fontSize: 12, color: C.goldDim, marginBottom: 6 }}>
           {t("login_pass")} <span style={{ color: C.red }}>*</span>
         </div>
-        <input className="input-field" type="password" placeholder="••••••••"
+        <input data-testid="field-new-pass" className="input-field" type="password" placeholder="••••••••"
                value={newUserPass} onChange={e => setNewUserPass(e.target.value)}
                style={{ marginBottom: 10, direction: "ltr", textAlign: "right" }} />
         <div style={{ marginBottom: 14 }}>
@@ -289,7 +289,7 @@ function UserManagerInner() {
           <PhoneInput value={newUserPhone} onChange={setNewUserPhone} t={t} lang={lang} />
         </div>
 
-        <button className="gold-btn" style={{ width: "100%" }}
+        <button data-testid="btn-create-user" className="gold-btn" style={{ width: "100%" }}
                 onClick={handleCreate}
                 disabled={!newUserName.trim() || !isStrongPassword(newUserPass)}>
           ➕ {t("admin_create")}
@@ -299,7 +299,7 @@ function UserManagerInner() {
       {/* ── تبويبات التصفية ───────────────────────────────────────── */}
       <div style={{ display: "flex", gap: 6, marginBottom: 14, flexWrap: "wrap" }}>
         {TABS.map(({ val, label }) => (
-          <button key={val} onClick={() => setFilter(val)} style={{
+          <button key={val} data-testid={`btn-filter-${val === "all" ? "all" : val + "s"}`} onClick={() => setFilter(val)} style={{
             flex: "1 1 80px", padding: "8px 0", borderRadius: 10, cursor: "pointer",
             background: filter === val ? "rgba(201,168,76,.18)" : "rgba(255,255,255,.04)",
             border: `1px solid ${filter === val ? "rgba(201,168,76,.4)" : "rgba(255,255,255,.08)"}`,
@@ -383,7 +383,7 @@ function UserManagerInner() {
 
                 {isConfirm ? (
                   <>
-                    <button
+                    <button data-testid="btn-delete-user-confirm"
                       onClick={() => { deleteUser(uid); setConfirmDelete(null); }}
                       style={{
                         background: "rgba(212,80,58,.2)", border: "1px solid rgba(212,80,58,.5)",
@@ -401,7 +401,7 @@ function UserManagerInner() {
                     >×</button>
                   </>
                 ) : (
-                  <button
+                  <button data-testid="btn-delete-user"
                     onClick={() => setConfirmDelete(uid)}
                     style={{
                       background: "rgba(212,122,75,.12)", border: "1px solid rgba(212,122,75,.3)",

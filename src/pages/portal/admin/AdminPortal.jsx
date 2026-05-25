@@ -49,7 +49,7 @@ export function AdminPortal() {
           </div>
           <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
             <LangSwitcher lang={lang} setLang={setLang} />
-            <button onClick={() => setLogoutAsking(true)} title={t("logout")} style={{
+            <button data-testid="btn-logout" onClick={() => setLogoutAsking(true)} title={t("logout")} style={{
               background: "rgba(212,80,58,.08)", border: "1px solid rgba(212,80,58,.3)",
               color: C.red, padding: "5px 10px", borderRadius: 8,
               fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
@@ -60,18 +60,18 @@ export function AdminPortal() {
       {logoutAsking && <LogoutConfirm t={t} onConfirm={doLogout} onCancel={() => setLogoutAsking(false)}/>}
 
       <div style={{ maxWidth: 720, margin: "0 auto", padding: "20px 16px 80px" }}>
-        <div className="gold-card" style={{ marginBottom: 18, padding: "14px 18px",
+        <div data-testid="alert-admin-warning" className="gold-card" style={{ marginBottom: 18, padding: "14px 18px",
           background: "rgba(255,180,80,.06)", border: "1px solid rgba(255,180,80,.2)" }}>
           <div style={{ fontSize: 12, color: "#f0c84c", fontWeight: 700 }}>⚠ {t("admin_warning")}</div>
         </div>
 
         {/* Admin sub-tabs */}
         <div style={{ display: "flex", gap: 6, marginBottom: 18, flexWrap: "wrap" }}>
-          <NavLink to="/portal/admin/users"         style={tabStyle}>👥 {t("admin_tab_users")}</NavLink>
-          <NavLink to="/portal/admin/send"          style={tabStyle}>📨 {t("admin_tab_send")}</NavLink>
-          <NavLink to="/portal/admin/confirmations" style={tabStyle}>✓ {t("admin_tab_confirmations")}{confirmations.length ? ` (${confirmations.length})` : ""}</NavLink>
-          <NavLink to="/portal/admin/designs"       style={tabStyle}>🎨 {lang === "he" ? "עיצובים" : "التصاميم"}</NavLink>
-          <NavLink to="/portal/admin/settings"      style={tabStyle}>⚙ {t("admin_tab_settings")}</NavLink>
+          <NavLink data-testid="nav-admin-users"         to="/portal/admin/users"         style={tabStyle}>👥 {t("admin_tab_users")}</NavLink>
+          <NavLink data-testid="nav-admin-send"          to="/portal/admin/send"          style={tabStyle}>📨 {t("admin_tab_send")}</NavLink>
+          <NavLink data-testid="nav-admin-confirmations" to="/portal/admin/confirmations" style={tabStyle}>✓ {t("admin_tab_confirmations")}{confirmations.length ? ` (${confirmations.length})` : ""}</NavLink>
+          <NavLink data-testid="nav-admin-designs"       to="/portal/admin/designs"       style={tabStyle}>🎨 {lang === "he" ? "עיצובים" : "التصاميم"}</NavLink>
+          <NavLink data-testid="nav-admin-settings"      to="/portal/admin/settings"      style={tabStyle}>⚙ {t("admin_tab_settings")}</NavLink>
         </div>
 
         <Routes>

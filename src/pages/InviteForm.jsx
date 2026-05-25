@@ -108,7 +108,7 @@ export function InviteForm({ t, lang, setLang }) {
     return (
       <CenteredMessage>
         <div style={{ fontSize: 56, marginBottom: 12 }}>⚠️</div>
-        <h1 style={{ fontFamily: "'Amiri',serif", color: C.red, fontSize: 24, marginBottom: 8 }}>
+        <h1 data-testid="conf-invalid-title" style={{ fontFamily: "'Amiri',serif", color: C.red, fontSize: 24, marginBottom: 8 }}>
           {t("invite_invalid")}
         </h1>
       </CenteredMessage>
@@ -118,7 +118,7 @@ export function InviteForm({ t, lang, setLang }) {
     return (
       <CenteredMessage>
         <div style={{ fontSize: 56, marginBottom: 12 }}>⏰</div>
-        <h1 style={{ fontFamily: "'Amiri',serif", color: C.red, fontSize: 24, marginBottom: 8 }}>
+        <h1 data-testid="conf-expired-title" style={{ fontFamily: "'Amiri',serif", color: C.red, fontSize: 24, marginBottom: 8 }}>
           {t("invite_expired")}
         </h1>
       </CenteredMessage>
@@ -128,7 +128,7 @@ export function InviteForm({ t, lang, setLang }) {
     return (
       <CenteredMessage>
         <div style={{ fontSize: 56, marginBottom: 12 }}>✅</div>
-        <h1 style={{ fontFamily: "'Amiri',serif", color: "#4cc97a", fontSize: 24, marginBottom: 8 }}>
+        <h1 data-testid="conf-used-title" style={{ fontFamily: "'Amiri',serif", color: "#4cc97a", fontSize: 24, marginBottom: 8 }}>
           {t("invite_used")}
         </h1>
       </CenteredMessage>
@@ -138,7 +138,7 @@ export function InviteForm({ t, lang, setLang }) {
     return (
       <CenteredMessage>
         <div style={{ fontSize: 64, marginBottom: 16 }}>🎉</div>
-        <h1 style={{ fontFamily: "'Amiri',serif", color: "#4cc97a", fontSize: 28, marginBottom: 12 }}>
+        <h1 data-testid="conf-thanks-title" style={{ fontFamily: "'Amiri',serif", color: "#4cc97a", fontSize: 28, marginBottom: 12 }}>
           {t("invite_done_title")}
         </h1>
         <p style={{ color: "rgba(245,230,184,.8)", fontSize: 14, lineHeight: 1.9 }}>
@@ -170,7 +170,7 @@ export function InviteForm({ t, lang, setLang }) {
 
         <div className="gold-card">
           <div style={{ marginBottom: 6, fontSize: 12, color: C.goldDim }}>{t("conf_form_full_name")} *</div>
-          <input className="input-field" type="text" placeholder={t("example_name")}
+          <input data-testid="field-conf-name" className="input-field" type="text" placeholder={t("example_name")}
                  value={name} onChange={e => setName(e.target.value)}
                  style={{ marginBottom: 14 }}/>
 
@@ -236,25 +236,25 @@ export function InviteForm({ t, lang, setLang }) {
           </div>
 
           <div style={{ marginBottom: 6, fontSize: 12, color: C.goldDim }}>{t("conf_form_street")}</div>
-          <input className="input-field" type="text"
+          <input data-testid="field-conf-street" className="input-field" type="text"
                  value={street} onChange={e => setStreet(e.target.value)}
                  style={{ marginBottom: 14 }}/>
 
           <div style={{ marginBottom: 6, fontSize: 12, color: C.goldDim }}>{t("conf_form_house_number")}</div>
-          <input className="input-field" type="text" placeholder="86"
+          <input data-testid="field-conf-house" className="input-field" type="text" placeholder="86"
                  value={house} onChange={e => setHouse(e.target.value)}
                  style={{ marginBottom: 14, direction: "ltr", textAlign: "right" }}/>
 
           <div style={{ marginBottom: 6, fontSize: 12, color: C.goldDim }}>{t("invite_delivery_note")}</div>
-          <textarea className="input-field" rows={3}
+          <textarea data-testid="field-conf-note" className="input-field" rows={3}
                  value={note} onChange={e => setNote(e.target.value.slice(0, 240))}
                  style={{ marginBottom: 14, resize: "vertical", minHeight: 64, fontFamily: "inherit" }}/>
 
           {error && (
-            <div style={{ color: C.red, fontSize: 12, marginBottom: 12, textAlign: "center" }}>{error}</div>
+            <div data-testid="alert-conf-error" style={{ color: C.red, fontSize: 12, marginBottom: 12, textAlign: "center" }}>{error}</div>
           )}
 
-          <button className="gold-btn" style={{ width: "100%" }} onClick={submit}
+          <button data-testid="btn-conf-submit" className="gold-btn" style={{ width: "100%" }} onClick={submit}
                   disabled={busy || !name.trim() || !phone.trim() || !city.trim()}>
             {busy ? "…" : t("invite_submit")}
           </button>

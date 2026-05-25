@@ -31,9 +31,35 @@ import { RATE } from "../../constants/rateLimits";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-/** Firebase Auth REST API base URLs. */
-const IDENTITY_TOOLKIT_BASE = "https://identitytoolkit.googleapis.com/v1/accounts";
-const SECURE_TOKEN_BASE = "https://securetoken.googleapis.com/v1/token";
+/**
+ * Firebase Auth REST API base URLs.
+ *
+ * When FIREBASE_AUTH_EMULATOR_HOST is set (emulator suite), redirect both
+ * endpoints to the local Auth emulator so usernames seeded against the
+ * emulator authenticate locally instead of being sent to live Google.
+ * Without this, e2e tests against the emulator silently fail with
+ * `invalid_credentials`.
+ */
+function identityToolkitBase(): string {
+  const emu = process.env.FIREBASE_AUTH_EMULATOR_HOST;
+  return emu
+    ? `http://${emu}/identitytoolkit.googleapis.com/v1/accounts`
+    : "https://identitytoolkit.googleapis.com/v1/accounts";
+}
+function secureTokenBase(): string {
+  const emu = process.env.FIREBASE_AUTH_EMULATOR_HOST;
+  return emu
+    ? `http://${emu}/securetoken.googleapis.com/v1/token`
+    : "https://securetoken.googleapis.com/v1/token";
+}
+const IDENTITY_TOOLKIT_BASE = identityToolkitBase();
+const SECURE_TOKEN_BASE = secureTokenBase();
+/** Emulator accepts any non-empty API key; fall back to a dummy value. */
+function effectiveApiKey(): string | null {
+  const k = process.env.WEB_API_KEY;
+  if (k) return k;
+  return process.env.FIREBASE_AUTH_EMULATOR_HOST ? "emulator-fake-api-key" : null;
+}
 
 /** Rate-limit windows. */
 const ONE_HOUR_MS = HOUR_MS;
@@ -80,7 +106,7 @@ authRouter.post(
       return;
     }
 
-    const apiKey = process.env.WEB_API_KEY;
+    const apiKey = effectiveApiKey();
     if (!apiKey) {
       res.status(500).json({ error: "server_misconfigured" });
       return;
@@ -158,7 +184,7 @@ authRouter.post(
       return;
     }
 
-    const apiKey = process.env.WEB_API_KEY;
+    const apiKey = effectiveApiKey();
     if (!apiKey) {
       res.status(500).json({ error: "server_misconfigured" });
       return;
@@ -230,7 +256,7 @@ authRouter.post(
       return;
     }
 
-    const apiKey = process.env.WEB_API_KEY;
+    const apiKey = effectiveApiKey();
     if (!apiKey) {
       res.status(500).json({ error: "server_misconfigured" });
       return;
@@ -276,7 +302,7 @@ authRouter.post(
       return;
     }
 
-    const apiKey = process.env.WEB_API_KEY;
+    const apiKey = effectiveApiKey();
     if (!apiKey) {
       res.status(500).json({ error: "server_misconfigured" });
       return;

@@ -56,7 +56,7 @@ export function DriverPortal() {
               </div>
             </div>
             <LangSwitcher lang={lang} setLang={setLang} />
-            <button onClick={() => setLogoutAsking(true)} title={t("logout")} style={{
+            <button data-testid="btn-logout" onClick={() => setLogoutAsking(true)} title={t("logout")} style={{
               background: "rgba(212,80,58,.08)", border: "1px solid rgba(212,80,58,.3)",
               color: C.red, padding: "5px 10px", borderRadius: 8,
               fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
@@ -64,10 +64,10 @@ export function DriverPortal() {
           </div>
           {/* Driver tabs */}
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-            <NavLink to="/portal/driver/pending"  style={tabStyle}>📋 {t("driver_subtitle")}</NavLink>
-            <NavLink to="/portal/driver/map"      style={tabStyle}>🗺 {t("tab_map")}</NavLink>
-            <NavLink to="/portal/driver/location" style={tabStyle}>📍 {lang === "he" ? "שיתוף מיקום" : "شارك موقعي"}</NavLink>
-            <NavLink to="/portal/driver/shared"   style={tabStyle}>🏘 {t("tab_shared")}</NavLink>
+            <NavLink data-testid="nav-driver-pending"  to="/portal/driver/pending"  style={tabStyle}>📋 {t("driver_subtitle")}</NavLink>
+            <NavLink data-testid="nav-driver-map"      to="/portal/driver/map"      style={tabStyle}>🗺 {t("tab_map")}</NavLink>
+            <NavLink data-testid="nav-driver-location" to="/portal/driver/location" style={tabStyle}>📍 {lang === "he" ? "שיתוף מיקום" : "شارك موقعي"}</NavLink>
+            <NavLink data-testid="nav-driver-shared"   to="/portal/driver/shared"   style={tabStyle}>🏘 {t("tab_shared")}</NavLink>
             <button onClick={() => setDriverServingGroom(null)} title={t("driver_pick_groom_change")} style={{
               padding: "8px 12px", borderRadius: 10, cursor: "pointer",
               background: "rgba(201,168,76,.08)", border: "1px solid rgba(201,168,76,.25)",

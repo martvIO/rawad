@@ -22,7 +22,7 @@ export function GroomAddGuest() {
 
             <div className="gold-card" style={{ padding: 24 }}>
               <div style={{ marginBottom: 6, fontSize: 12, color: C.goldDim }}>{t("field_name")}</div>
-              <input className="input-field" type="text" placeholder={t("example_name")}
+              <input data-testid="field-guest-name" className="input-field" type="text" placeholder={t("example_name")}
                      value={gName} onChange={e => setGName(e.target.value)}
                      style={{ marginBottom: 14 }}/>
 
@@ -34,7 +34,7 @@ export function GroomAddGuest() {
               <div style={{ marginBottom: 6, fontSize: 12, color: C.goldDim }}>
                 {t("field_address")} <span style={{ color: "#5a5040", fontWeight: 400 }}>{t("field_address_optional")}</span>
               </div>
-              <div style={{ marginBottom: 14 }}>
+              <div data-testid="field-guest-area" style={{ marginBottom: 14 }}>
                 <AddressInput value={gArea} onChange={setGArea}
                               placeholder={t("example_address")} lang={lang} t={t}/>
               </div>
@@ -45,7 +45,7 @@ export function GroomAddGuest() {
                   { val: "premium", lbl: t("type_premium"), color: C.gold },
                   { val: "vip",     lbl: t("type_vip"),     color: "#c084fc" },
                 ].map(opt => (
-                  <button key={opt.val} onClick={() => setGType(opt.val)} style={{
+                  <button key={opt.val} data-testid={`btn-guest-type-${opt.val}`} onClick={() => setGType(opt.val)} style={{
                     flex: 1, padding: "10px 0", borderRadius: 10, cursor: "pointer",
                     background: gType===opt.val ? `${opt.color}22` : "rgba(255,255,255,.04)",
                     border: `1.5px solid ${gType===opt.val ? opt.color : "rgba(255,255,255,.08)"}`,
@@ -55,7 +55,7 @@ export function GroomAddGuest() {
                 ))}
               </div>
 
-              <button className="gold-btn" style={{ width: "100%" }} onClick={addGuest}
+              <button data-testid="btn-add-guest" className="gold-btn" style={{ width: "100%" }} onClick={addGuest}
                       disabled={!gName.trim() || !gPhone.trim()}>
                 {t("add_submit")}
               </button>

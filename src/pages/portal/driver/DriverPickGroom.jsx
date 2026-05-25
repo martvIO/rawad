@@ -33,15 +33,15 @@ export function DriverPickGroom() {
             <div className="gold-card" style={{ padding: 24,
               background: "rgba(75,159,212,.06)", border: "1px solid rgba(75,159,212,.22)" }}>
               <div style={{ marginBottom: 10, fontSize: 13, color: C.goldDim }}>{t("driver_pick_groom_field")}</div>
-              <input className="input-field" type="text" placeholder="username"
+              <input data-testid="field-driver-pick-groom" className="input-field" type="text" placeholder="username"
                      value={driverGroomInput}
                      onChange={e => { setDriverGroomInput(e.target.value); setDriverGroomError(""); }}
                      onKeyDown={e => e.key === "Enter" && submitDriverGroom()}
                      style={{ marginBottom: 12, direction: "ltr", textAlign: "right" }}/>
               {driverGroomError && (
-                <div style={{ color: C.red, fontSize: 12, marginBottom: 12 }}>{driverGroomError}</div>
+                <div data-testid="alert-driver-pick-error" style={{ color: C.red, fontSize: 12, marginBottom: 12 }}>{driverGroomError}</div>
               )}
-              <button onClick={submitDriverGroom}
+              <button data-testid="btn-driver-pick-groom-submit" onClick={submitDriverGroom}
                       disabled={!driverGroomInput.trim()}
                       style={{
                         width: "100%", padding: 12, borderRadius: 10,
