@@ -3,6 +3,7 @@ import { NavLink, Routes, Route, Navigate, useNavigate } from "react-router-dom"
 import { LangSwitcher } from "../../../../components/LangSwitcher.jsx";
 import { LogoutConfirm } from "../../../../components/LogoutConfirm.jsx";
 import { Toast } from "../../../../components/Toast.jsx";
+import { TermsNotice } from "../../../../components/TermsNotice.jsx";
 import { usePortal } from "../../../../context/PortalContext.jsx";
 import { DigitalDashboard } from "./DigitalDashboard.jsx";
 import { DigitalGuests } from "./DigitalGuests.jsx";
@@ -85,6 +86,8 @@ export function DigitalPortal() {
       </div>
 
       {logoutAsking && <LogoutConfirm t={t} onConfirm={doLogout} onCancel={() => setLogoutAsking(false)}/>}
+
+      <TermsNotice t={t} />
 
       <div style={{ maxWidth: 900, margin: "0 auto", padding: "20px 16px 80px" }}>
         <Routes>

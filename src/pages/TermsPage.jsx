@@ -1,11 +1,58 @@
-// Public Terms & Conditions page — reads sections from i18n.
+// Public Terms & Conditions + Privacy page — reads sections from i18n.
 import { useNavigate } from "react-router-dom";
 import { C } from "../styles/theme.js";
 import { BrandLogo } from "../components/BrandLogo.jsx";
 
+function SectionCard({ title, body }) {
+  return (
+    <section style={{
+      padding: "28px 28px",
+      marginBottom: 18,
+      borderRadius: 16,
+      background: "linear-gradient(180deg, rgba(201,168,76,.04), rgba(201,168,76,.01))",
+      border: "1px solid rgba(201,168,76,.18)",
+    }}>
+      <h3 style={{
+        fontFamily: "'Amiri',serif", fontWeight: 800,
+        fontSize: 20, color: "#fff3c0",
+        marginTop: 0, marginBottom: 12, lineHeight: 1.4,
+      }}>{title}</h3>
+      <p style={{
+        color: "#d8c9a6", fontSize: 14.5, lineHeight: 1.95,
+        margin: 0,
+        whiteSpace: "pre-line",
+      }}>{body}</p>
+    </section>
+  );
+}
+
+function PageSubhead({ title, intro }) {
+  return (
+    <div style={{ margin: "56px 0 24px" }}>
+      <h2 style={{
+        fontFamily: "'Amiri',serif", fontWeight: 900,
+        fontSize: "clamp(24px, 3.4vw, 34px)", lineHeight: 1.3,
+        color: "#fff3c0",
+        marginTop: 0, marginBottom: 16,
+        paddingBottom: 14,
+        borderBottom: "1px solid rgba(201,168,76,.22)",
+      }}>{title}</h2>
+      {intro && (
+        <p style={{
+          color: "#d8c9a6", fontSize: 15, lineHeight: 1.9,
+          margin: 0,
+          paddingInlineStart: 16,
+          borderInlineStart: "2px solid rgba(201,168,76,.35)",
+        }}>{intro}</p>
+      )}
+    </div>
+  );
+}
+
 export function TermsPage({ t, lang }) {
   const navigate = useNavigate();
   const sections = t("terms_sections") || [];
+  const privacySections = t("terms_privacy_sections") || [];
 
   return (
     <div style={{
@@ -31,7 +78,7 @@ export function TermsPage({ t, lang }) {
           <BrandLogo size={48} />
           <h1 style={{
             fontFamily: "'Amiri',serif", fontWeight: 900,
-            fontSize: "clamp(32px, 4.5vw, 48px)", lineHeight: 1.2,
+            fontSize: "clamp(28px, 4.2vw, 44px)", lineHeight: 1.2,
             background: "linear-gradient(135deg,#fff3c0,#f0c84c,#c9a84c)",
             WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
             margin: 0, paddingBlock: 4,
@@ -46,25 +93,20 @@ export function TermsPage({ t, lang }) {
 
         <div>
           {sections.map((s, i) => (
-            <section key={i} style={{
-              padding: "28px 28px",
-              marginBottom: 18,
-              borderRadius: 16,
-              background: "linear-gradient(180deg, rgba(201,168,76,.04), rgba(201,168,76,.01))",
-              border: "1px solid rgba(201,168,76,.18)",
-            }}>
-              <h2 style={{
-                fontFamily: "'Amiri',serif", fontWeight: 800,
-                fontSize: 20, color: "#fff3c0",
-                marginTop: 0, marginBottom: 12, lineHeight: 1.4,
-              }}>{s.title}</h2>
-              <p style={{
-                color: "#d8c9a6", fontSize: 14.5, lineHeight: 1.9,
-                margin: 0,
-              }}>{s.body}</p>
-            </section>
+            <SectionCard key={i} title={s.title} body={s.body} />
           ))}
         </div>
+
+        {privacySections.length > 0 && (
+          <>
+            <PageSubhead title={t("terms_privacy_title")} intro={t("terms_privacy_intro")} />
+            <div>
+              {privacySections.map((s, i) => (
+                <SectionCard key={i} title={s.title} body={s.body} />
+              ))}
+            </div>
+          </>
+        )}
 
         <div style={{
           marginTop: 48, paddingTop: 24,
