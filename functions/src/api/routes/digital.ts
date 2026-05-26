@@ -99,7 +99,7 @@ digitalRouter.get(
         .get();
       res.json(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     } catch (err) {
-      res.status(500).json({ error: "read_failed", detail: errorMessage(err) });
+      res.status(500).json({ error: "read_failed", detail: safeDetail(err) });
     }
   }
 );
@@ -131,7 +131,7 @@ digitalRouter.post(
       const snap = await docRef.get();
       res.json({ id: docRef.id, ...snap.data() });
     } catch (err) {
-      res.status(500).json({ error: "write_failed", detail: errorMessage(err) });
+      res.status(500).json({ error: "write_failed", detail: safeDetail(err) });
     }
   }
 );
@@ -163,7 +163,7 @@ digitalRouter.patch(
         .update(sanitized.value as Record<string, unknown>);
       res.json({ ok: true });
     } catch (err) {
-      res.status(500).json({ error: "write_failed", detail: errorMessage(err) });
+      res.status(500).json({ error: "write_failed", detail: safeDetail(err) });
     }
   }
 );
@@ -180,7 +180,7 @@ digitalRouter.delete(
       await guestsCol(req.params.uid).doc(req.params.id).delete();
       res.json({ ok: true });
     } catch (err) {
-      res.status(500).json({ error: "delete_failed", detail: errorMessage(err) });
+      res.status(500).json({ error: "delete_failed", detail: safeDetail(err) });
     }
   }
 );
@@ -206,7 +206,7 @@ digitalRouter.get(
       const snap = await mediaDoc(req.params.uid).get();
       res.json(snap.exists ? projectMediaDoc(snap.data()) : null);
     } catch (err) {
-      res.status(500).json({ error: "read_failed", detail: errorMessage(err) });
+      res.status(500).json({ error: "read_failed", detail: safeDetail(err) });
     }
   }
 );
@@ -237,7 +237,7 @@ digitalRouter.patch(
       await mediaDoc(req.params.uid).set(sanitized.value, { merge: true });
       res.json({ ok: true });
     } catch (err) {
-      res.status(500).json({ error: "write_failed", detail: errorMessage(err) });
+      res.status(500).json({ error: "write_failed", detail: safeDetail(err) });
     }
   }
 );
@@ -260,7 +260,7 @@ digitalRouter.post(
     try {
       parsed = await parseMultipart(req, MAX_INVITE_MEDIA_BYTES);
     } catch (err) {
-      res.status(400).json({ error: "invalid_multipart", detail: errorMessage(err) });
+      res.status(400).json({ error: "invalid_multipart", detail: safeDetail(err) });
       return;
     }
     if (!parsed.file) {
@@ -310,7 +310,7 @@ digitalRouter.post(
       });
       res.json(item);
     } catch (err) {
-      res.status(500).json({ error: "upload_failed", detail: errorMessage(err) });
+      res.status(500).json({ error: "upload_failed", detail: safeDetail(err) });
     }
   }
 );
@@ -349,7 +349,7 @@ digitalRouter.post(
       await deleteStorageObjectSilently(storagePath);
       res.json({ ok: true });
     } catch (err) {
-      res.status(500).json({ error: "delete_failed", detail: errorMessage(err) });
+      res.status(500).json({ error: "delete_failed", detail: safeDetail(err) });
     }
   }
 );
@@ -371,7 +371,7 @@ digitalRouter.delete(
       await deleteStorageFolder(`${STORAGE_MEDIA_PREFIX}/${req.params.uid}/`);
       res.json({ ok: true });
     } catch (err) {
-      res.status(500).json({ error: "delete_failed", detail: errorMessage(err) });
+      res.status(500).json({ error: "delete_failed", detail: safeDetail(err) });
     }
   }
 );
@@ -399,7 +399,7 @@ digitalRouter.get(
         .get();
       res.json(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     } catch (err) {
-      res.status(500).json({ error: "read_failed", detail: errorMessage(err) });
+      res.status(500).json({ error: "read_failed", detail: safeDetail(err) });
     }
   }
 );
@@ -421,7 +421,7 @@ digitalRouter.post(
     try {
       parsed = await parseMultipart(req, MAX_PHOTOG_BYTES);
     } catch (err) {
-      res.status(400).json({ error: "invalid_multipart", detail: errorMessage(err) });
+      res.status(400).json({ error: "invalid_multipart", detail: safeDetail(err) });
       return;
     }
     if (!parsed.file) {
@@ -451,7 +451,7 @@ digitalRouter.post(
       });
       res.json({ id: docRef.id, url, storagePath: path });
     } catch (err) {
-      res.status(500).json({ error: "upload_failed", detail: errorMessage(err) });
+      res.status(500).json({ error: "upload_failed", detail: safeDetail(err) });
     }
   }
 );
@@ -479,7 +479,7 @@ digitalRouter.patch(
         .update({ name });
       res.json({ ok: true });
     } catch (err) {
-      res.status(500).json({ error: "write_failed", detail: errorMessage(err) });
+      res.status(500).json({ error: "write_failed", detail: safeDetail(err) });
     }
   }
 );
@@ -504,7 +504,7 @@ digitalRouter.delete(
       if (storagePath) await deleteStorageObjectSilently(storagePath);
       res.json({ ok: true });
     } catch (err) {
-      res.status(500).json({ error: "delete_failed", detail: errorMessage(err) });
+      res.status(500).json({ error: "delete_failed", detail: safeDetail(err) });
     }
   }
 );
@@ -530,7 +530,7 @@ digitalRouter.get(
         .get();
       res.json(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     } catch (err) {
-      res.status(500).json({ error: "read_failed", detail: errorMessage(err) });
+      res.status(500).json({ error: "read_failed", detail: safeDetail(err) });
     }
   }
 );
@@ -553,7 +553,7 @@ digitalRouter.get(
         .get();
       res.json(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     } catch (err) {
-      res.status(500).json({ error: "read_failed", detail: errorMessage(err) });
+      res.status(500).json({ error: "read_failed", detail: safeDetail(err) });
     }
   }
 );
@@ -591,7 +591,7 @@ digitalRouter.post(
       });
       res.json({ id: docRef.id });
     } catch (err) {
-      res.status(500).json({ error: "write_failed", detail: errorMessage(err) });
+      res.status(500).json({ error: "write_failed", detail: safeDetail(err) });
     }
   }
 );
@@ -628,7 +628,7 @@ digitalRouter.patch(
         .update({ ...sanitized.value, updatedAt: Date.now() });
       res.json({ ok: true });
     } catch (err) {
-      res.status(500).json({ error: "write_failed", detail: errorMessage(err) });
+      res.status(500).json({ error: "write_failed", detail: safeDetail(err) });
     }
   }
 );
@@ -647,7 +647,7 @@ digitalRouter.post(
     try {
       parsed = await parseMultipart(req, MAX_MOCKUP_BYTES);
     } catch (err) {
-      res.status(400).json({ error: "invalid_multipart", detail: errorMessage(err) });
+      res.status(400).json({ error: "invalid_multipart", detail: safeDetail(err) });
       return;
     }
     if (!parsed.file) {
@@ -702,7 +702,7 @@ digitalRouter.post(
       }
       res.json(mockup);
     } catch (err) {
-      res.status(500).json({ error: "upload_failed", detail: errorMessage(err) });
+      res.status(500).json({ error: "upload_failed", detail: safeDetail(err) });
     }
   }
 );
@@ -722,7 +722,7 @@ digitalRouter.get("/:uid/public", async (req: Request, res: Response) => {
     const snap = await mediaDoc(req.params.uid).get();
     res.json(snap.exists ? projectMediaDoc(snap.data()) : null);
   } catch (err) {
-    res.status(500).json({ error: "read_failed", detail: errorMessage(err) });
+    res.status(500).json({ error: "read_failed", detail: safeDetail(err) });
   }
 });
 
@@ -1238,4 +1238,13 @@ function errorMessage(err: unknown): string {
   if (err instanceof Error) return err.message;
   if (typeof err === "string") return err;
   return "unknown";
+}
+
+// In production we never echo raw error messages back to the client — Firebase
+// Admin errors can include Firestore document paths, GCS bucket names, and
+// internal function identifiers. Dev/emulator builds keep the detail so
+// engineers can debug failed uploads without trawling Cloud Logging.
+function safeDetail(err: unknown): string | undefined {
+  if (process.env.NODE_ENV === "production") return undefined;
+  return errorMessage(err);
 }

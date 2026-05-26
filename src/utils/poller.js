@@ -18,8 +18,13 @@
 //   - It does not deduplicate identical results — callers should bail
 //     out in their callback if nothing changed. The poller fires on
 //     every successful fetch.
-//   - It does not back off after errors. Network errors continue at the
-//     same interval; the next successful fetch resumes normal behavior.
+//
+// What this file DOES do on errors:
+//   - Exponential backoff. The first failure retries at the normal
+//     interval; each consecutive failure doubles the next delay up to
+//     MAX_BACKOFF_MS. A successful fetch resets the counter. This keeps
+//     a broken endpoint from hammering Cloud Run / draining mobile data
+//     while the user has the tab open during a network outage.
 
 import { ApiError } from "./apiClient.js";
 import { logErr } from "./logger.js";
@@ -31,6 +36,12 @@ const DEFAULT_INTERVAL_MS = 15 * 1000;
 
 /** Min interval guard — anything below this hammers the API for little gain. */
 const MIN_INTERVAL_MS = 1000;
+
+/** Ceiling for the exponential backoff after consecutive failures. */
+const MAX_BACKOFF_MS = 60 * 1000;
+
+/** Cap on the doubling exponent so `1 << n` cannot blow up to NaN/Infinity. */
+const MAX_BACKOFF_EXP = 10;
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
@@ -62,11 +73,13 @@ export function createPoller(fetchFn, callback, opts) {
 
   let stopped = false;
   let timer = null;
+  let consecutiveErrors = 0;
 
   const tick = async () => {
     if (stopped) return;
     try {
       const value = await fetchFn();
+      consecutiveErrors = 0;
       if (!stopped) callback(value);
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
@@ -75,12 +88,20 @@ export function createPoller(fetchFn, callback, opts) {
         stopped = true;
         return;
       }
+      consecutiveErrors++;
       logErr("poller.tick", err);
       if (onError && !stopped) onError(err);
-      // Other errors: swallow and let the next tick retry.
+      // Other errors: swallow and let the next tick retry, with backoff.
     } finally {
       if (!stopped) {
-        timer = setTimeout(tick, intervalMs);
+        // First error retries at the normal interval — single transient
+        // failures shouldn't cause perceptible UI lag. Backoff only kicks in
+        // on the SECOND consecutive failure: 2×, 4×, 8× … capped at MAX.
+        const exp = Math.min(Math.max(0, consecutiveErrors - 1), MAX_BACKOFF_EXP);
+        const delay = consecutiveErrors === 0
+          ? intervalMs
+          : Math.min(intervalMs * (1 << exp), MAX_BACKOFF_MS);
+        timer = setTimeout(tick, delay);
       }
     }
   };

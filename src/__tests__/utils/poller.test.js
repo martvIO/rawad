@@ -131,4 +131,49 @@ describe("error handling", () => {
     await vi.advanceTimersByTimeAsync(1000);
     expect(cb).toHaveBeenCalledWith("ok");
   });
+
+  it("exponential backoff: 2nd consecutive error doubles next delay; 3rd doubles again", async () => {
+    const fetchFn = vi.fn()
+      .mockRejectedValueOnce(new Error("e1"))
+      .mockRejectedValueOnce(new Error("e2"))
+      .mockRejectedValueOnce(new Error("e3"))
+      .mockResolvedValue("ok");
+    const cb = vi.fn();
+    createPoller(fetchFn, cb, { intervalMs: 1000 });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+    // First error retries at the normal interval (no backoff yet).
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+    // Second error → next delay is 2× = 2000 ms; not fired at 1000 ms.
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(fetchFn).toHaveBeenCalledTimes(3);
+    // Third error → next delay is 4× = 4000 ms.
+    await vi.advanceTimersByTimeAsync(3999);
+    expect(fetchFn).toHaveBeenCalledTimes(3);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(fetchFn).toHaveBeenCalledTimes(4);
+    expect(cb).toHaveBeenCalledWith("ok");
+  });
+
+  it("backoff resets after a successful poll", async () => {
+    const fetchFn = vi.fn()
+      .mockRejectedValueOnce(new Error("e1"))
+      .mockRejectedValueOnce(new Error("e2"))
+      .mockResolvedValueOnce("recovered")
+      .mockRejectedValueOnce(new Error("e3"))
+      .mockResolvedValue("ok");
+    const cb = vi.fn();
+    createPoller(fetchFn, cb, { intervalMs: 1000 });
+    await vi.advanceTimersByTimeAsync(0);   // initial e1
+    await vi.advanceTimersByTimeAsync(1000); // 1× → e2
+    await vi.advanceTimersByTimeAsync(2000); // 2× → recovered (counter reset)
+    expect(cb).toHaveBeenCalledWith("recovered");
+    // After reset, first new error retries at the normal interval again.
+    await vi.advanceTimersByTimeAsync(1000); // 1× → e3
+    await vi.advanceTimersByTimeAsync(1000); // 1× → ok
+    expect(cb).toHaveBeenCalledWith("ok");
+  });
 });

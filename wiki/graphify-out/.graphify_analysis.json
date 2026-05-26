@@ -1,0 +1,214 @@
+{
+  "communities": {
+    "0": [
+      "concept_assert_admin",
+      "concept_assigned_grooms_claim",
+      "concept_data_storage_model",
+      "concept_jwt_claims",
+      "concept_rate_limit_ts",
+      "concept_require_auth",
+      "concept_role_guard",
+      "concept_rtdb_rules",
+      "concept_storage_rules",
+      "security_model_doc",
+      "user_roles_doc"
+    ],
+    "1": [
+      "code_digital_invitation_page",
+      "concept_firestore",
+      "concept_known_bugs",
+      "concept_optimistic_ui_pattern",
+      "concept_polling_and_realtime",
+      "concept_tasks_backlog",
+      "concept_user_roles",
+      "dawa_dawa",
+      "digital_invitations_digital_invitations",
+      "index_wiki_index"
+    ],
+    "2": [
+      "architecture_decisions_architecture_decisions",
+      "concept_firebase_rtdb",
+      "concept_firebase_storage",
+      "concept_jwt_custom_claims",
+      "concept_rate_limiting",
+      "concept_rtdb_sharding",
+      "concept_security_model",
+      "data_storage_model_data_storage_model"
+    ],
+    "3": [
+      "api_contracts_api_contracts",
+      "authentication_authentication",
+      "code_apiclient_js",
+      "code_tokenmanger_js",
+      "concept_phone_otp_reset",
+      "concept_rest_api_architecture",
+      "concept_synthetic_email_auth"
+    ],
+    "4": [
+      "ai_engineering_rules_ai_engineering_rules",
+      "code_ar_js",
+      "code_he_js",
+      "code_theme_js",
+      "concept_inline_styling_convention"
+    ],
+    "5": [
+      "concept_ai_engineering_rules",
+      "concept_globalstyle_jsx",
+      "concept_inline_styling",
+      "concept_theme_js",
+      "inline_styling_convention_doc"
+    ],
+    "6": [
+      "concept_api_client_js",
+      "concept_authentication",
+      "concept_rest_api",
+      "concept_token_manager_js",
+      "rest_api_architecture_doc"
+    ],
+    "7": [
+      "concept_digital_invitations",
+      "concept_digitaldashboard_jsx",
+      "concept_optimistic_ui",
+      "concept_runtransaction",
+      "optimistic_ui_pattern_doc"
+    ],
+    "8": [
+      "concept_api_contracts",
+      "concept_dawa",
+      "concept_useportalstate_js",
+      "known_bugs_doc",
+      "tasks_backlog_doc"
+    ],
+    "9": [
+      "concept_live_locations_js",
+      "concept_poller_js",
+      "concept_sse",
+      "polling_and_realtime_doc"
+    ]
+  },
+  "cohesion": {
+    "0": 0.3090909090909091,
+    "1": 0.4,
+    "2": 0.39285714285714285,
+    "3": 0.42857142857142855,
+    "4": 0.5,
+    "5": 0.4,
+    "6": 0.6,
+    "7": 0.6,
+    "8": 0.5,
+    "9": 0.6666666666666666
+  },
+  "gods": [
+    {
+      "id": "index_wiki_index",
+      "label": "Wiki Index",
+      "degree": 15
+    },
+    {
+      "id": "dawa_dawa",
+      "label": "Dawa (\u062f\u0639\u0648\u0629)",
+      "degree": 13
+    },
+    {
+      "id": "authentication_authentication",
+      "label": "Authentication",
+      "degree": 13
+    },
+    {
+      "id": "security_model_doc",
+      "label": "Security Model",
+      "degree": 13
+    },
+    {
+      "id": "data_storage_model_data_storage_model",
+      "label": "Data Storage Model",
+      "degree": 12
+    },
+    {
+      "id": "concept_security_model",
+      "label": "Security Model",
+      "degree": 12
+    },
+    {
+      "id": "known_bugs_doc",
+      "label": "Known Bugs",
+      "degree": 11
+    },
+    {
+      "id": "architecture_decisions_architecture_decisions",
+      "label": "Architecture Decisions",
+      "degree": 10
+    },
+    {
+      "id": "digital_invitations_digital_invitations",
+      "label": "Digital Invitations",
+      "degree": 10
+    },
+    {
+      "id": "concept_polling_and_realtime",
+      "label": "Polling and Realtime",
+      "degree": 10
+    }
+  ],
+  "surprises": [
+    {
+      "source": "RoleGuard",
+      "target": "User Roles",
+      "source_files": [
+        "Security-Model.md",
+        "Dawa.md"
+      ],
+      "confidence": "INFERRED",
+      "relation": "conceptually_related_to",
+      "why": "inferred connection - not explicitly stated in source; connects across different repos/directories; bridges separate communities; peripheral node `RoleGuard` unexpectedly reaches hub `User Roles`"
+    },
+    {
+      "source": "Data Storage Model",
+      "target": "Dawa (\u062f\u0639\u0648\u0629)",
+      "source_files": [
+        "Data-Storage-Model.md",
+        "Dawa.md"
+      ],
+      "confidence": "INFERRED",
+      "relation": "references",
+      "why": "inferred connection - not explicitly stated in source; connects across different repos/directories; bridges separate communities"
+    },
+    {
+      "source": "Synthetic Email Auth",
+      "target": "REST API Architecture",
+      "source_files": [
+        "Authentication.md",
+        "Dawa.md"
+      ],
+      "confidence": "INFERRED",
+      "relation": "conceptually_related_to",
+      "why": "inferred connection - not explicitly stated in source; connects across different repos/directories; peripheral node `Synthetic Email Auth` unexpectedly reaches hub `REST API Architecture`"
+    },
+    {
+      "source": "utils/poller.js",
+      "target": "Optimistic UI Pattern",
+      "source_files": [
+        "Polling-and-Realtime.md",
+        "Known-Bugs.md"
+      ],
+      "confidence": "INFERRED",
+      "relation": "conceptually_related_to",
+      "why": "inferred connection - not explicitly stated in source; connects across different repos/directories; bridges separate communities"
+    },
+    {
+      "source": "Authentication",
+      "target": "Dawa (\u062f\u0639\u0648\u0629)",
+      "source_files": [
+        "Authentication.md",
+        "Dawa.md"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "references",
+      "why": "connects across different repos/directories; bridges separate communities"
+    }
+  ],
+  "tokens": {
+    "input": 8288,
+    "output": 18348
+  }
+}

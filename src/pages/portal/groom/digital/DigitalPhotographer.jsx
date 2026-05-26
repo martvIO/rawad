@@ -15,6 +15,10 @@ import { SkeletonList } from "../../../../components/Skeleton.jsx";
 
 const cacheKey = (uid) => `dawa_photographer_${uid}`;
 
+// Mirror of MAX_PHOTOG_BYTES on the server (functions/src/constants/limits.ts).
+// 200 MB ceiling matches the multipart parser limit.
+const MAX_PHOTOG_BYTES = 200 * 1024 * 1024;
+
 const iconFor = (type = "") => {
   if (type.startsWith("image")) return "🖼";
   if (type.startsWith("video")) return "🎥";
@@ -131,8 +135,21 @@ export function DigitalPhotographer() {
   }, [files]);
 
   const handleFiles = async (fileList) => {
-    const arr = Array.from(fileList);
+    let arr = Array.from(fileList);
     if (!arr.length) return;
+
+    // Client-side size guard. The server enforces the same cap, but rejecting
+    // locally avoids a 200 MB POST that ends in 413 — particularly painful on
+    // a mobile connection.
+    const oversized = arr.filter(f => f.size > MAX_PHOTOG_BYTES);
+    if (oversized.length) {
+      const names = oversized.map(f => f.name).join("، ");
+      showToast(lang === "he"
+        ? `קבצים חורגים מ-200MB: ${names}`
+        : `ملفات تتجاوز 200 MB: ${names}`);
+      arr = arr.filter(f => f.size <= MAX_PHOTOG_BYTES);
+      if (!arr.length) return;
+    }
 
     // ── Immediate local previews — no auth needed ──
     const previews = arr.map(f => ({

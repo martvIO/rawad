@@ -6,7 +6,13 @@ _Track open bugs here. Mark resolved bugs with the fix date. Never delete entrie
 
 ## Open Bugs
 
-_(none)_
+### BUG-O004 — Both invitation links untested and likely broken
+
+**Files:** `src/pages/InviteForm.jsx`, `src/pages/DigitalInviteForm.jsx` (routes `/invite/:token`, `/invite/digital/:token`)
+**Severity:** Unknown — neither link has been tested end-to-end; assumed broken until verified
+**Symptom:** Unconfirmed — invitation links sent to guests via WhatsApp have not been exercised in any test run.
+**Root cause:** Not yet investigated.
+**Status:** Needs a Playwright smoke-test covering the full flow: generate link → open in browser → confirm guest details render correctly → submit form.
 
 ---
 
@@ -23,19 +29,25 @@ _(none)_
 - `POST /api/digital/:uid/media/delete-item`
 - `POST /api/digital/:uid/design-requests/:reqId/mockup`
 
+**Verified:** Playwright drove the deployed `dawa-aa793.web.app` site, uploaded 3 PNGs simultaneously, then read `/api/digital/:uid/media` directly: all 3 storage paths persisted (timestamps within 89 ms of each other — exactly the window that previously caused clobbers). UI count moved 10→13 and stayed there across reloads.
+
 ---
 
 ### BUG-O002 — Uploaded files never appear in the gallery despite successful upload toast (Resolved 2026-05-26)
 
-**Files:** `src/services/digitalInvitation.js`, `src/pages/portal/groom/digital/DigitalDashboard.jsx`, `src/pages/portal/groom/digital/DigitalPhotographer.jsx`
+**Files:** `src/hooks/usePortalState.js`, `src/services/digitalInvitation.js`, `src/pages/portal/groom/digital/DigitalDashboard.jsx`, `src/pages/portal/groom/digital/DigitalPhotographer.jsx`
 **Severity:** High — uploads showed a success toast but the file would vanish from the gallery on the next poll tick and never come back without a hard refresh
 **Symptom:** User uploaded a file, saw the success toast, the file showed briefly in the gallery, and then disappeared. Refreshing sometimes brought it back, sometimes didn't.
-**Root cause:** The 15-second poller (`subscribeDigitalMedia` / `subscribePhotographerFiles`) called `setDoc(serverResult)` unconditionally — blindly replacing local state. When a poll's GET was already in flight at the moment the upload completed and the optimistic merge ran, the poll's stale response (snapshot of the doc from before the upload committed) would land *after* the merge and wipe the freshly uploaded file out of local state. The next poll tick (up to 15 s later) would re-fetch and reveal the now-committed file, but in the gap between merges the file was effectively invisible. On the photographer page the symptom was identical because the same pattern lived in `subscribePhotographerFiles`.
+**Root cause:** TWO compounding bugs surfaced together:
+1. **Primary (subscription never started).** `usePortalState.js` declared `currentUid` on line 85 but never included it in its return object. The dashboard / photographer pages destructured it via `const { currentUid } = usePortal()`, got `undefined`, and the `useEffect` that subscribes to `subscribeDigitalMedia` / `subscribePhotographerFiles` early-bailed every render via `if (!currentUid) return`. The poll never ran, so `setDoc(serverResult)` never fired and the page rendered an empty doc on every fresh load. Uploads themselves still worked because `handleAddMedia` has a `currentUid || getStoredUid()` fallback — the optimistic `setDoc(prev => ...)` populated the UI for the session, but a reload showed zero items because nothing was reading the server. This was a latent issue that BUG-R012's optimistic update partially masked.
+2. **Secondary (poll vs optimistic race).** Even once the subscription works, the 15-second poller called `setDoc(serverResult)` unconditionally — blindly replacing local state. A poll already in flight when the upload commits will land its stale (pre-upload) snapshot AFTER the optimistic merge and wipe the freshly uploaded entry. Up to one more poll cycle later it self-heals, but in the gap the file appears to vanish.
 **Fix:**
-1. Both subscriptions now accept an optional `transform(serverResult) => result` callback that runs against every poll result before the consumer sees it.
-2. The dashboard and photographer page track recently-confirmed uploads in a `pendingPathsRef` / `pendingFilesRef` map (keyed by `storagePath` / file `id`). The `transform` callback splices any entries the poll result is missing back into the result, and removes entries the server has now echoed.
-3. Optimistic deletes also clear from the pending map so a poll mid-delete can't resurrect a just-deleted entry via the same merge path.
-4. The photographer upload service now returns the full record (`{ id, url, storagePath, name, type, uploadedAt, key }`) instead of just `{ url, key }`, so the page can register a complete pending entry without a second round trip.
+1. `usePortalState.js` now includes `currentUid` in its return object next to `currentUsername` — the foundational fix without which the rest of the optimistic logic is invisible.
+2. Both subscriptions accept an optional `transform(serverResult) => result` callback that runs against every poll result before the consumer sees it.
+3. The dashboard and photographer page track recently-confirmed uploads in a `pendingPathsRef` / `pendingFilesRef` map (keyed by `storagePath` / file `id`). The `transform` callback splices any entries the poll result is missing back into the result, and removes entries the server has now echoed.
+4. Optimistic deletes also clear from the pending map so a poll mid-delete can't resurrect a just-deleted entry via the same merge path.
+5. The photographer upload service now returns the full record (`{ id, url, storagePath, name, type, uploadedAt, key }`) instead of just `{ url, key }`, so the page can register a complete pending entry without a second round trip.
+**Verified:** Playwright drove the deployed `dawa-aa793.web.app` site: gallery rendered the existing 10 media items + the seven-rank-plus-wedding-date settings (was 0 before the `currentUid` fix); a 3-file parallel upload landed all 3 in Firestore (10→13, was losing all but one with the read-modify-write race); a single upload survived 35s / multiple poll cycles without vanishing. Photographer page tested with a 2-file parallel upload (8→10, stable).
 
 ---
 

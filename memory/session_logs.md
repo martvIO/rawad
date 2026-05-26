@@ -4,6 +4,45 @@ _Append-only. Never overwrite history. Most recent session at the top._
 
 ---
 
+## DATE: 2026-05-26
+
+**GOAL:** Resolve the two open bugs in [KNOWN_BUGS.md](../KNOWN_BUGS.md) — BUG-O002 (uploaded files never appear in gallery despite success toast) and BUG-O003 (only a subset of parallel uploads visible).
+
+**FILES CHANGED:**
+- `functions/src/api/routes/digital.ts` — wrapped media upload, media delete-item, and mockup-upload handlers in `fs().runTransaction(...)` to make their read-modify-write atomic.
+- `src/services/digitalInvitation.js` — `subscribeDigitalMedia` and `subscribePhotographerFiles` (via `pollList`) now accept an optional `transform(serverResult) => result` callback that runs on every poll result; `uploadPhotographerFile` returns the full record (`{ id, url, storagePath, name, type, uploadedAt, key }`) so callers can register an optimistic entry without a second round trip.
+- `src/pages/portal/groom/digital/DigitalDashboard.jsx` + `DigitalPhotographer.jsx` — added `pendingPathsRef` / `pendingFilesRef` Maps that track recently-confirmed uploads. The poll transform splices missing entries back in until the server echoes them; deletes also clear from the map so a poll mid-delete can't resurrect just-deleted entries.
+- `src/hooks/usePortalState.js` — added `currentUid` to the return object (was declared on line 85 but never exported).
+- `src/__tests__/services/services.test.js` — updated the photographer upload test to match the widened return shape.
+- `KNOWN_BUGS.md` — moved BUG-O002 and BUG-O003 to Resolved with full root-cause writeups and verification notes.
+- `memory/gotchas.md` — new file capturing 3 reusable lessons from this session.
+
+**TESTS:**
+- `cd functions && npm run build` — clean.
+- `npm run test:unit` — 402/404 passing. The 2 remaining failures are pre-existing `buildApiUrl` tests (verified by stashing the diff and re-running) unrelated to this work.
+- Playwright drove the deployed `dawa-aa793.web.app` site: dashboard rendered the existing 10 media items (was rendering 0 due to BUG-O002's primary cause); 3-file parallel upload landed all 3 (10 → 13, server-confirmed); single upload survived 35 s / multiple poll cycles without vanishing (14 stable); photographer page tested with 2-file parallel upload (8 → 10, stable).
+
+**PROBLEMS FOUND:**
+1. **BUG-O003 root cause** — `digital.ts` upload handler did `get()` → splice → `set({ media: [...] })` as 3 separate steps. Parallel uploads from `Promise.allSettled` each read the same `existing` and wrote `[existing, file_i]`; later writes clobbered earlier ones, leaving only the last upload in Firestore.
+2. **BUG-O002 secondary cause** — the 15s poller blindly replaced local state via `setDoc(serverResult)`. A poll already in flight when an upload commits lands its pre-upload snapshot after the optimistic merge and wipes the just-uploaded entry.
+3. **BUG-O002 primary cause (uncovered during Playwright verification)** — `usePortalState.js` declared `const currentUid = authUser?.uid ?? null` on line 85 but never included it in the return block on line 930. The dashboard / photographer subscriptions early-bailed on `if (!currentUid) return` and never polled. Uploads still worked via `getStoredUid()` fallback, but a reload left an empty gallery because no subscription was reading the server. Caught by walking the React fiber from a Playwright `browser_evaluate` and reading the `doc` useState directly.
+
+**FIXES:** All three above. See FILES CHANGED.
+
+**ARCHITECTURE DECISIONS:**
+- Picked Firestore transactions over `FieldValue.arrayUnion()` because the upload handler also needs to migrate legacy `backgroundUrl` docs into `media[]`, which `arrayUnion` can't express. Transaction also handles the delete and mockup-upload paths uniformly.
+- Picked "track pending paths + merge in poller" over "pause poller during uploads" because pausing pauses all refreshes (e.g. other-tab changes); the merge preserves optimistic items only and lets other state continue refreshing on schedule.
+
+**QUESTIONS:** None outstanding from this session.
+
+**NEXT TASKS:**
+- Commit + push the diff (held back pending user approval at end of session).
+- Consider auditing other `usePortal()` destructuring sites for fields that aren't in the return block — see [memory/gotchas.md](gotchas.md).
+
+**COMMITS:** None yet — diff staged, awaiting approval.
+
+---
+
 ## DATE: 2026-05-24
 
 **GOAL:** Run autonomous engineering startup sequence — inspect codebase and create all missing project documentation files from actual code.

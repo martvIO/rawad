@@ -43,6 +43,12 @@ import { getStoredUid } from "../../../../utils/tokenManager.js";
 
 const tt = (lang, ar, he) => (lang === "he" ? he : ar);
 
+// Mirror of MAX_INVITE_MEDIA_BYTES on the server (functions/src/constants/limits.ts).
+// Kept in sync manually — keeping a single number out of @dawa/shared isn't worth
+// the build wiring.
+const MAX_MEDIA_BYTES = 50 * 1024 * 1024;
+const ALLOWED_MEDIA_PREFIX = /^(image|video)\//;
+
 // Convert epoch ms ⇄ <input type="datetime-local"> value (in user's local zone).
 function epochToInputValue(epoch) {
   if (!epoch) return "";
@@ -118,9 +124,28 @@ export function DigitalDashboard() {
 
   // ── Media upload ─────────────────────────────────────────────────────────────
   const handleAddMedia = async (e) => {
-    const files = Array.from(e.target.files || []);
+    let files = Array.from(e.target.files || []);
     if (!files.length) return;
     if (inputRef.current) inputRef.current.value = "";
+
+    // Client-side validation — reject before allocating blob URLs / hitting
+    // the network. The server enforces the same limits, but rejecting locally
+    // saves the user a 50 MB POST that ends in 413.
+    const rejected = files.filter(
+      f => f.size > MAX_MEDIA_BYTES || !ALLOWED_MEDIA_PREFIX.test(f.type),
+    );
+    if (rejected.length) {
+      const names = rejected.map(f => f.name).join("، ");
+      showToast(tt(
+        lang,
+        `ملفات غير مقبولة (الحجم أو النوع): ${names}`,
+        `קבצים לא תקינים (גודל/סוג): ${names}`,
+      ));
+      files = files.filter(
+        f => f.size <= MAX_MEDIA_BYTES && ALLOWED_MEDIA_PREFIX.test(f.type),
+      );
+      if (!files.length) return;
+    }
 
     // Build immediate previews so the gallery shows the upload progress.
     const previews = files.map(f => ({

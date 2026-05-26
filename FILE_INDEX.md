@@ -161,6 +161,7 @@ _Generated from codebase inspection on 2026-05-24. Update whenever files are add
 ### `src/components/`
 | File | Purpose |
 |---|---|
+| `ErrorBoundary.jsx` | Top-level React error boundary; bilingual fallback with reload button |
 | `RoleGuard.jsx` | Client-side role gate (convenience only) |
 | `Toast.jsx` | Fixed-position top notification |
 | `Skeleton.jsx` | Loading skeleton placeholder |
