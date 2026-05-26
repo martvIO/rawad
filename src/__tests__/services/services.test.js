@@ -686,7 +686,7 @@ describe("digitalInvitation — media", () => {
 
 describe("digitalInvitation — photographer", () => {
   it("uploadPhotographerFile uploads multipart", async () => {
-    api.upload.mockResolvedValueOnce({ url: "u", id: "pf1" });
+    api.upload.mockResolvedValueOnce({ url: "u", id: "pf1", storagePath: "p/pf1" });
     const file = new File(["x"], "p.jpg", { type: "image/jpeg" });
     const out = await digital.uploadPhotographerFile("g1", file);
     expect(api.upload).toHaveBeenCalledWith(
@@ -694,7 +694,15 @@ describe("digitalInvitation — photographer", () => {
       expect.any(FormData),
       undefined,
     );
-    expect(out).toEqual({ url: "u", key: "pf1" });
+    expect(out).toMatchObject({
+      id: "pf1",
+      url: "u",
+      storagePath: "p/pf1",
+      key: "pf1",
+      name: "p.jpg",
+      type: "image/jpeg",
+    });
+    expect(typeof out.uploadedAt).toBe("number");
   });
 
   it("uploadPhotographerFile forwards an abort signal", async () => {

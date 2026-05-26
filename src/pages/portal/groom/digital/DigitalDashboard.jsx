@@ -16,8 +16,17 @@
 //     // DO NOT update local state on failure — the input should snap back.
 //   }
 //
-// Edge cases this prevents (see known_bugs.md BUG-001/003/004):
+// ── Poll-vs-optimistic race ──────────────────────────────────────────────────
+// BUG-O002 — the poller's GET races against in-flight uploads. If a poll
+// starts before an upload but resolves after the optimistic merge, it
+// overwrites local state with the pre-upload snapshot and the just-uploaded
+// file appears to vanish until the next poll. We defend against this by
+// tracking storagePaths/ids of recently-confirmed uploads in pendingPathsRef
+// and splicing them back into poll results that don't include them yet.
+//
+// Edge cases this prevents (see known_bugs.md BUG-001/002/003/004):
 //   • New photos vanishing for 15s after upload before the poller refreshes.
+//   • New photos vanishing because a mid-flight poll stomped optimistic state.
 //   • Wedding date input appearing to "reject" the user's selection.
 //   • Newly-added guest ranks not showing up in the badge list.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -59,14 +68,37 @@ export function DigitalDashboard() {
   // Abort controller for in-flight uploads. Aborted on unmount so a pending
   // upload can't leave the spinner stranded if the user navigates away.
   const uploadAbortRef = useRef(null);
+  // BUG-O002 — storagePaths of media items we've optimistically merged but
+  // the poller hasn't echoed yet. Anything still in this set is spliced
+  // back into a poll result that omits it (i.e. the poll started before
+  // our upload committed). Cleared once the server echoes the path, or
+  // when an explicit delete removes the entry.
+  const pendingPathsRef = useRef(new Map()); // storagePath -> item
 
   useEffect(() => {
     if (!currentUid) return;
     const onErr = (err) => showToast(`✗ ${err?.code || err?.message || "read failed"}`);
     const u1 = subscribeDigitalGuests(currentUid, setGuests, onErr);
-    const u2 = subscribeDigitalMedia(currentUid, setDoc, onErr);
+    const u2 = subscribeDigitalMedia(currentUid, setDoc, onErr, mergePendingMedia);
     return () => { u1(); u2(); };
   }, [currentUid]);
+
+  // Splice any optimistic items the poll result doesn't yet contain.
+  // Items confirmed by the server (path appears in serverDoc.media) are
+  // dropped from the pending map — we no longer need to inject them.
+  function mergePendingMedia(serverDoc) {
+    const pending = pendingPathsRef.current;
+    if (pending.size === 0) return serverDoc;
+    const serverMedia = Array.isArray(serverDoc?.media) ? serverDoc.media : [];
+    const serverPaths = new Set(serverMedia.map(m => m?.storagePath).filter(Boolean));
+    const missing = [];
+    for (const [path, item] of pending) {
+      if (serverPaths.has(path)) pending.delete(path);
+      else missing.push(item);
+    }
+    if (missing.length === 0) return serverDoc;
+    return { ...(serverDoc || {}), media: [...serverMedia, ...missing] };
+  }
 
   // Abort any uploads in flight when the component unmounts so revoked blob
   // URLs are reclaimed and pending state isn't applied to a dead component.
@@ -135,6 +167,13 @@ export function DigitalDashboard() {
       );
 
     if (uploaded.length) {
+      // Register every fresh path as pending. Any poll that ran during the
+      // upload window and resolves AFTER this merge would otherwise wipe
+      // these items out — pendingPathsRef.current keeps them visible until
+      // the server actually echoes them back. (BUG-O002)
+      for (const item of uploaded) {
+        pendingPathsRef.current.set(item.storagePath, item);
+      }
       setDoc(prev => {
         const existing = Array.isArray(prev?.media) ? prev.media : [];
         const knownPaths = new Set(existing.map(m => m?.storagePath).filter(Boolean));
@@ -180,6 +219,9 @@ export function DigitalDashboard() {
     if (!item?.storagePath) return;
     try {
       await removeInvitationMedia(currentUid, item);
+      // Drop from pending-paths so a poll mid-delete doesn't resurrect it
+      // by spliceing the optimistic entry back in. (BUG-O002)
+      pendingPathsRef.current.delete(item.storagePath);
       setDoc(prev => {
         const existing = Array.isArray(prev?.media) ? prev.media : [];
         return {

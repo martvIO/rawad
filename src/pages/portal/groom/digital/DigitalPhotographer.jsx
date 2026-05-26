@@ -53,15 +53,36 @@ export function DigitalPhotographer() {
   const healedRef = useRef(false);
   // Abort in-flight uploads on unmount so pending state can't strand.
   const uploadAbortRef = useRef(null);
+  // BUG-O002 — ids of files we just uploaded whose Firestore doc the poller
+  // hasn't yet echoed back. Each pending entry is spliced into a poll
+  // result that omits its id and removed once the server confirms it. A
+  // poll that started before the upload but resolved after the optimistic
+  // merge would otherwise wipe out the just-uploaded file.
+  const pendingFilesRef = useRef(new Map()); // id -> file record
   useEffect(() => () => { if (uploadAbortRef.current) uploadAbortRef.current.abort(); }, []);
 
   useEffect(() => {
     if (!currentUid) return;
     const onErr = (err) => showToast(`✗ ${err?.code || err?.message || "read failed"}`);
-    const u1 = subscribePhotographerFiles(currentUid, setFiles, onErr);
+    const u1 = subscribePhotographerFiles(currentUid, setFiles, onErr, mergePendingFiles);
     const u2 = subscribeDigitalMedia(currentUid, (d) => setPublished(d?.photographerPublished === true), onErr);
     return () => { u1(); u2(); };
   }, [currentUid]);
+
+  // Splice any optimistic uploads the poll result is missing; drop entries
+  // the server has now echoed.
+  function mergePendingFiles(serverList) {
+    const pending = pendingFilesRef.current;
+    if (pending.size === 0) return serverList;
+    const serverIds = new Set(serverList.map(f => f.id).filter(Boolean));
+    const missing = [];
+    for (const [id, rec] of pending) {
+      if (serverIds.has(id)) pending.delete(id);
+      else missing.push(rec);
+    }
+    if (missing.length === 0) return serverList;
+    return [...missing, ...serverList];
+  }
 
   // Files come exclusively from the Firestore subscription; Storage listing
   // is a no-op stub. Flip loadingStorage off immediately so the skeleton
@@ -148,6 +169,26 @@ export function DigitalPhotographer() {
       const previewIds = new Set(previews.map(p => p.id));
       setPendingFiles(prev => prev.filter(p => !previewIds.has(p.id)));
 
+      // Optimistic merge — splice every successful upload into `files`
+      // right away so the gallery shows the new entries the moment the
+      // request resolves, instead of waiting up to 15s for the next poll.
+      // pendingFilesRef keeps these visible if a mid-flight poll resolves
+      // late and would otherwise overwrite them with stale data (BUG-O002).
+      const uploaded = results
+        .filter(r => r.status === "fulfilled")
+        .map(r => r.value)
+        .filter(rec => rec && rec.id);
+      if (uploaded.length) {
+        for (const rec of uploaded) {
+          pendingFilesRef.current.set(rec.id, rec);
+        }
+        setFiles(prev => {
+          const knownIds = new Set(prev.map(f => f.id).filter(Boolean));
+          const fresh = uploaded.filter(rec => !knownIds.has(rec.id));
+          return fresh.length === 0 ? prev : [...fresh, ...prev];
+        });
+      }
+
       const failedResults = results.filter(r => r.status === "rejected");
       if (failedResults.length === 0) {
         showToast(lang === "he"
@@ -179,6 +220,11 @@ export function DigitalPhotographer() {
   const confirmDelete = async (item) => {
     try {
       await removePhotographerFile(currentUid, item.id);
+      // Drop from pending-uploads so a poll mid-delete can't resurrect the
+      // entry via the optimistic merge. (BUG-O002)
+      pendingFilesRef.current.delete(item.id);
+      // Remove from local files immediately — don't wait for the next poll.
+      setFiles(prev => prev.filter(f => f.id !== item.id));
       // Refresh Storage list so the deleted entry disappears from the merge
       setStorageFiles(prev => {
         const next = prev.filter(s => s.storagePath !== (item.storagePath || item.id));

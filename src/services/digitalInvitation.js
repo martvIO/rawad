@@ -47,8 +47,13 @@ function resolveUid(groomUid) {
 /**
  * Build a poller that surfaces errors through the consumer-provided cb.
  * Mirrors the legacy onSnapshot signature `(cb, onErrCb)`.
+ *
+ * `transform` (optional) runs against every server result before delivery.
+ * Used by callers that need to merge optimistic state into the poll output
+ * — see subscribePhotographerFiles for the pending-uploads use case
+ * (BUG-O002 fix).
  */
-function pollList(endpoint, cb, onErrCb) {
+function pollList(endpoint, cb, onErrCb, transform) {
   return createPoller(
     async () => {
       try {
@@ -59,7 +64,10 @@ function pollList(endpoint, cb, onErrCb) {
         return [];
       }
     },
-    (value) => cb(Array.isArray(value) ? value : []),
+    (value) => {
+      const arr = Array.isArray(value) ? value : [];
+      cb(typeof transform === "function" ? transform(arr) : arr);
+    },
     { intervalMs: DIGITAL_POLL_INTERVAL_MS },
   );
 }
@@ -104,8 +112,15 @@ export async function fetchDigitalGuests() {
  * Subscribe to the parent invitation doc (background media + flags +
  * wedding date). Server returns the projected shape with the legacy
  * single-background field auto-folded into media[0].
+ *
+ * `transform(serverDoc) => doc` (optional) runs against each poll result
+ * before delivery. Used by the dashboard to splice optimistic media[]
+ * entries that the user just uploaded but Firestore hasn't echoed back yet
+ * — BUG-O002 fix. Without this, a poll that started before the upload but
+ * resolved after the optimistic merge would overwrite the local state with
+ * the pre-upload server snapshot, making the file appear to vanish.
  */
-export function subscribeDigitalMedia(groomUid, cb, onErrCb) {
+export function subscribeDigitalMedia(groomUid, cb, onErrCb, transform) {
   const uid = resolveUid(groomUid);
   return createPoller(
     async () => {
@@ -117,7 +132,10 @@ export function subscribeDigitalMedia(groomUid, cb, onErrCb) {
         return null;
       }
     },
-    (value) => cb(value ?? null),
+    (value) => {
+      const next = value ?? null;
+      cb(typeof transform === "function" ? transform(next) : next);
+    },
     { intervalMs: DIGITAL_POLL_INTERVAL_MS },
   );
 }
@@ -195,9 +213,14 @@ export async function removeDigitalMedia(groomUid) {
 
 // ─── Photographer Files ───────────────────────────────────────────────────────
 
-export function subscribePhotographerFiles(groomUid, cb, onErrCb) {
+/**
+ * Subscribe to the groom's photographer files list. Optional `transform`
+ * runs on each poll result; the photographer page uses it to preserve
+ * recently-uploaded items that haven't propagated yet (BUG-O002 fix).
+ */
+export function subscribePhotographerFiles(groomUid, cb, onErrCb, transform) {
   const uid = resolveUid(groomUid);
-  return pollList(`/digital/${uid}/photographer`, cb, onErrCb);
+  return pollList(`/digital/${uid}/photographer`, cb, onErrCb, transform);
 }
 
 /**
@@ -219,7 +242,17 @@ export async function uploadPhotographerFile(groomUid, file, opts) {
   const formData = new FormData();
   formData.append("file", file, file.name);
   const data = await api.upload(`/digital/${uid}/photographer/upload`, formData, opts);
-  return { url: data?.url ?? null, key: data?.id ?? null };
+  // Returns the full record so callers can register the upload as a
+  // pending optimistic entry. `key` kept for back-compat with old callers.
+  return {
+    id: data?.id ?? null,
+    url: data?.url ?? null,
+    storagePath: data?.storagePath ?? null,
+    key: data?.id ?? null,
+    name: file.name,
+    type: file.type,
+    uploadedAt: Date.now(),
+  };
 }
 
 export async function renamePhotographerFile(groomUid, fileId, newName) {

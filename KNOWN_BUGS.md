@@ -6,11 +6,38 @@ _Track open bugs here. Mark resolved bugs with the fix date. Never delete entrie
 
 ## Open Bugs
 
-_None._
+_(none)_
 
 ---
 
 ## Resolved Bugs
+
+### BUG-O003 — Not all uploaded files are visible in the gallery (Resolved 2026-05-26)
+
+**Files:** `functions/src/api/routes/digital.ts`
+**Severity:** Medium — partial gallery; users could not manage their full upload history
+**Symptom:** After uploading multiple files in one batch, only a subset (often just the last one) showed up in the gallery after the next poll refresh. No error indicator surfaced.
+**Root cause:** Classic read-modify-write race on the `media[]` array. The dashboard's `handleAddMedia` fans uploads out via `Promise.allSettled`, hitting `POST /api/digital/:uid/media/upload` in parallel. The handler did `docSnap = docRef.get()` → splice → `docRef.set({ media: [...] })` as three separate steps, so N concurrent requests each saw the same `existing` array and wrote `[existing, file_i]` back. Whichever write committed last won; every earlier file was silently overwritten in Firestore. The same race lived in the media-delete and mockup-upload handlers.
+**Fix:** Wrapped each read-modify-write in `fs().runTransaction(...)`. Firestore serializes the read+set per document, so concurrent uploads each see prior commits and append safely. Applied to:
+- `POST /api/digital/:uid/media/upload`
+- `POST /api/digital/:uid/media/delete-item`
+- `POST /api/digital/:uid/design-requests/:reqId/mockup`
+
+---
+
+### BUG-O002 — Uploaded files never appear in the gallery despite successful upload toast (Resolved 2026-05-26)
+
+**Files:** `src/services/digitalInvitation.js`, `src/pages/portal/groom/digital/DigitalDashboard.jsx`, `src/pages/portal/groom/digital/DigitalPhotographer.jsx`
+**Severity:** High — uploads showed a success toast but the file would vanish from the gallery on the next poll tick and never come back without a hard refresh
+**Symptom:** User uploaded a file, saw the success toast, the file showed briefly in the gallery, and then disappeared. Refreshing sometimes brought it back, sometimes didn't.
+**Root cause:** The 15-second poller (`subscribeDigitalMedia` / `subscribePhotographerFiles`) called `setDoc(serverResult)` unconditionally — blindly replacing local state. When a poll's GET was already in flight at the moment the upload completed and the optimistic merge ran, the poll's stale response (snapshot of the doc from before the upload committed) would land *after* the merge and wipe the freshly uploaded file out of local state. The next poll tick (up to 15 s later) would re-fetch and reveal the now-committed file, but in the gap between merges the file was effectively invisible. On the photographer page the symptom was identical because the same pattern lived in `subscribePhotographerFiles`.
+**Fix:**
+1. Both subscriptions now accept an optional `transform(serverResult) => result` callback that runs against every poll result before the consumer sees it.
+2. The dashboard and photographer page track recently-confirmed uploads in a `pendingPathsRef` / `pendingFilesRef` map (keyed by `storagePath` / file `id`). The `transform` callback splices any entries the poll result is missing back into the result, and removes entries the server has now echoed.
+3. Optimistic deletes also clear from the pending map so a poll mid-delete can't resurrect a just-deleted entry via the same merge path.
+4. The photographer upload service now returns the full record (`{ id, url, storagePath, name, type, uploadedAt, key }`) instead of just `{ url, key }`, so the page can register a complete pending entry without a second round trip.
+
+---
 
 ### BUG-R012 — Digital dashboard: stale UI after media upload, date change, and rank edits (Resolved 2026-05-26)
 

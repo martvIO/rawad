@@ -23,3 +23,4 @@ functions/node_modules/
 serviceAccountKey.json
 /functions/tsconfig.tsbuildinfo
 /postman
+/.playwright-mcp/*

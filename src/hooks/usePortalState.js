@@ -932,7 +932,7 @@ export function usePortalState({ onBack, t, lang, setLang }) {
     onBack, t, lang, setLang,
 
     // auth + session
-    authed, authReady, userType, currentUsername,
+    authed, authReady, userType, currentUid, currentUsername,
     driverServingGroom: driverServingGroomUsername,
     setDriverServingGroom,
     loginUser, setLoginUser, loginPass, setLoginPass,

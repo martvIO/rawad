@@ -293,11 +293,21 @@ digitalRouter.post(
         order: Date.now(),
       };
 
+      // BUG-O003 fix — atomic append via transaction.
+      // The previous code read media[], appended, and wrote back in three
+      // separate steps. Parallel uploads (Promise.allSettled on N files)
+      // all read the same `existing`, then each wrote `[existing, file_i]`,
+      // so later writes clobbered earlier ones and only the last upload
+      // survived. A transaction serializes the read-modify-write per doc
+      // so concurrent uploads each see the prior commits and append safely.
       const docRef = mediaDoc(uid);
-      const docSnap = await docRef.get();
-      const existing = (docSnap.exists ? docSnap.data()?.media : null) ?? [];
-      const migrated = migrateLegacyBackground(docSnap.exists ? docSnap.data() : null, existing);
-      await docRef.set({ media: [...migrated, item] }, { merge: true });
+      await fs().runTransaction(async (tx) => {
+        const docSnap = await tx.get(docRef);
+        const data = docSnap.exists ? docSnap.data() : null;
+        const existing = (data?.media ?? []) as unknown[];
+        const migrated = migrateLegacyBackground(data, existing);
+        tx.set(docRef, { media: [...migrated, item] }, { merge: true });
+      });
       res.json(item);
     } catch (err) {
       res.status(500).json({ error: "upload_failed", detail: errorMessage(err) });
@@ -323,13 +333,19 @@ digitalRouter.post(
       return;
     }
     try {
+      // BUG-O003 fix — same read-modify-write race as the upload path.
+      // A delete coming in mid-upload could read media[] before the upload's
+      // commit, then write back the pre-upload array — silently restoring a
+      // file that was just deleted, or vice versa. Transaction makes both
+      // operations linearizable against each other.
       const docRef = mediaDoc(req.params.uid);
-      const snap = await docRef.get();
-      if (snap.exists) {
+      await fs().runTransaction(async (tx) => {
+        const snap = await tx.get(docRef);
+        if (!snap.exists) return;
         const existing = (snap.data()?.media ?? []) as { storagePath?: string }[];
         const filtered = existing.filter((m) => m.storagePath !== storagePath);
-        await docRef.set({ media: filtered }, { merge: true });
-      }
+        tx.set(docRef, { media: filtered }, { merge: true });
+      });
       await deleteStorageObjectSilently(storagePath);
       res.json({ ok: true });
     } catch (err) {
@@ -663,19 +679,27 @@ digitalRouter.post(
         name: parsed.file.filename,
       };
 
+      // BUG-O003 fix — same race as media upload. Admins occasionally
+      // upload multiple revision mockups in parallel; without a transaction
+      // each request would read+write mockups[] independently and stomp
+      // siblings.
       const docRef = designCol(uid).doc(reqId);
-      const docSnap = await docRef.get();
-      if (!docSnap.exists) {
+      const committed = await fs().runTransaction(async (tx) => {
+        const docSnap = await tx.get(docRef);
+        if (!docSnap.exists) return false;
+        const existing = (docSnap.data()?.mockups ?? []) as unknown[];
+        tx.update(docRef, {
+          mockups: [...existing, mockup],
+          status: "review",
+          revisionNotes: null,
+          updatedAt: Date.now(),
+        });
+        return true;
+      });
+      if (!committed) {
         res.status(404).json({ error: "design_request_not_found" });
         return;
       }
-      const existing = (docSnap.data()?.mockups ?? []) as unknown[];
-      await docRef.update({
-        mockups: [...existing, mockup],
-        status: "review",
-        revisionNotes: null,
-        updatedAt: Date.now(),
-      });
       res.json(mockup);
     } catch (err) {
       res.status(500).json({ error: "upload_failed", detail: errorMessage(err) });
