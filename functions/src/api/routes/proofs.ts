@@ -100,9 +100,13 @@ proofsRouter.post(
     try {
       const path = buildProofPath(groomUid, guestId, parsed.file.contentType);
       const bucket = getStorage().bucket();
+      // BUG-002 fix — keep parity with uploadAndGetUrl() in digital.ts:
+      // resumable uploads let GCS retry individual chunks on flaky mobile
+      // networks (drivers upload from the field), which is a big reliability
+      // win for proof photos shot on cellular connections.
       await bucket.file(path).save(parsed.file.buffer, {
         contentType: parsed.file.contentType,
-        resumable: false,
+        resumable: true,
       });
       res.json({ path });
     } catch (err) {

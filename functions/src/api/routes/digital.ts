@@ -734,6 +734,14 @@ function designCol(uid: string): CollectionReference {
  * `getDownloadURL` (firebase-admin/storage ≥ v11.4) does NOT require the
  * `Service Account Token Creator` IAM role that `bucket.file().getSignedUrl()`
  * needs, so it works out of the box on a default Firebase Functions deploy.
+ *
+ * BUG-002 fix — `resumable: true` lets the GCS client chunk the upload
+ * and retry individual chunks on transient errors instead of restarting
+ * the entire file on any failure. For the larger uploads we support
+ * (photographer files up to 200 MB), this is the difference between a
+ * failed flaky network costing the whole upload vs. just a few seconds.
+ * For small files there's a tiny extra round trip to start the session,
+ * but it's well under a second and worth the reliability win.
  */
 async function uploadAndGetUrl(
   path: string,
@@ -741,7 +749,7 @@ async function uploadAndGetUrl(
   contentType: string
 ): Promise<string> {
   const file = getStorage().bucket().file(path);
-  await file.save(buffer, { contentType, resumable: false });
+  await file.save(buffer, { contentType, resumable: true });
   return getDownloadURL(file);
 }
 

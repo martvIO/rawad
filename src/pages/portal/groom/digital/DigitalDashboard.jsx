@@ -1,4 +1,26 @@
 // Digital invitation — Dashboard: stats + multi-media gallery + wedding date.
+//
+// ── Optimistic-mutation convention ───────────────────────────────────────────
+// `doc` state is fed by subscribeDigitalMedia(), which polls every 15s
+// (POLL_MS.DIGITAL). Any handler that mutates the doc on the server MUST
+// also reflect the change in local `doc` state immediately after the server
+// confirms the write, otherwise the UI appears broken for up to 15 seconds.
+//
+// Pattern:
+//   try {
+//     await someService(currentUid, nextValue);
+//     setDoc(prev => ({ ...(prev || {}), field: nextValue }));
+//   } catch (err) {
+//     logErr("someService", err);
+//     showToast(err?.message || tt(lang, "خطأ", "שגיאה"));
+//     // DO NOT update local state on failure — the input should snap back.
+//   }
+//
+// Edge cases this prevents (see known_bugs.md BUG-001/003/004):
+//   • New photos vanishing for 15s after upload before the poller refreshes.
+//   • Wedding date input appearing to "reject" the user's selection.
+//   • Newly-added guest ranks not showing up in the badge list.
+// ─────────────────────────────────────────────────────────────────────────────
 import { useState, useEffect, useMemo, useRef } from "react";
 import { usePortal } from "../../../../context/PortalContext.jsx";
 import {
@@ -94,10 +116,38 @@ export function DigitalDashboard() {
     uploadAbortRef.current = null;
     setBusy(false);
 
+    // BUG-001 fix — optimistic merge.
+    // The dashboard refreshes via a 15s poller, so without this step the
+    // freshly-uploaded items would visibly disappear (the pending tile is
+    // removed below) and only re-appear on the next poll tick. We splice the
+    // server's response into doc.media right away so the gallery stays in
+    // sync the moment the request resolves.
+    //
+    // Defensive checks here matter because:
+    //   • A malformed/empty response would crash the MediaTile render.
+    //   • If the poller fired mid-upload, the item may already be in media[]
+    //     under the same storagePath — we must dedupe.
+    const uploaded = results
+      .filter(r => r.status === "fulfilled")
+      .map(r => r.value)
+      .filter(item =>
+        item && typeof item.url === "string" && typeof item.storagePath === "string",
+      );
+
+    if (uploaded.length) {
+      setDoc(prev => {
+        const existing = Array.isArray(prev?.media) ? prev.media : [];
+        const knownPaths = new Set(existing.map(m => m?.storagePath).filter(Boolean));
+        const fresh = uploaded.filter(item => !knownPaths.has(item.storagePath));
+        if (fresh.length === 0) return prev;          // poller already had them
+        return { ...(prev || {}), media: [...existing, ...fresh] };
+      });
+    }
+
     // Always clear pending previews so the spinner can't strand if a request
     // hangs and is later resolved by the abort path. Revoke every blob URL
-    // because none of them are still in use — the media[] poll repopulates
-    // the gallery with server-hosted URLs.
+    // because none of them are still in use — the doc.media merge above (or
+    // the next poll tick on failure) is now the source of truth.
     previews.forEach(p => URL.revokeObjectURL(p.url));
     setPendingMedia(prev => prev.filter(p => !previews.some(pp => pp.id === p.id)));
 
@@ -108,20 +158,35 @@ export function DigitalDashboard() {
       const isTimeout = reason?.message === "request_timeout";
       const isAbort = reason?.name === "AbortError";
       if (!isAbort) {
-        showToast(
-          isTimeout
-            ? tt(lang, "انتهت مهلة الرفع — حاول مرة أخرى", "פג זמן ההעלאה — נסה שוב")
-            : reason?.message || tt(lang, "فشل الرفع", "ההעלאה נכשלה"),
-        );
+        // Surface a partial-success message when some files made it through
+        // so users aren't misled into thinking the whole batch failed.
+        const partial = uploaded.length > 0;
+        const msg = isTimeout
+          ? tt(lang, "انتهت مهلة الرفع — حاول مرة أخرى", "פג זמן ההעלאה — נסה שוב")
+          : reason?.message || tt(lang, "فشل الرفع", "ההעלאה נכשלה");
+        showToast(partial
+          ? `${msg} (${uploaded.length}/${files.length})`
+          : msg);
       }
-    } else {
+    } else if (uploaded.length) {
       showToast(tt(lang, "✓ تم الرفع", "✓ הועלה"));
     }
   };
 
   const handleRemoveMedia = async (item) => {
+    // Same optimistic-mutation pattern as upload: prune from local state once
+    // the server confirms the delete so the tile vanishes immediately instead
+    // of lingering for up to 15s until the poller refreshes.
+    if (!item?.storagePath) return;
     try {
       await removeInvitationMedia(currentUid, item);
+      setDoc(prev => {
+        const existing = Array.isArray(prev?.media) ? prev.media : [];
+        return {
+          ...(prev || {}),
+          media: existing.filter(m => m?.storagePath !== item.storagePath),
+        };
+      });
     } catch (err) {
       logErr("removeInvitationMedia", err);
       showToast(err?.message || tt(lang, "خطأ", "שגיאה"));
@@ -129,26 +194,59 @@ export function DigitalDashboard() {
   };
 
   // ── Guest ranks ──────────────────────────────────────────────────────────────
+  // BUG-004 fix — optimistic write.
+  // setGuestRanks PATCHes the server doc, but the displayed list reads from
+  // doc.guestRanks which is only refreshed by the 15s poller. We mirror the
+  // write into local state immediately so newly-added/removed ranks appear
+  // without delay. The server clamps to MAX_RANK_ITEMS and dedupes, so we
+  // replicate the same client-side trimming to avoid drift between optimistic
+  // state and what actually persists.
   const ranks = doc?.guestRanks || [];
+
+  // Mirror the server-side limits from functions/src/api/routes/digital.ts
+  // (MAX_RANK_ITEMS) and functions/src/constants/limits.ts (GUEST_RANK) so
+  // local state can't diverge from what would actually persist.
+  const MAX_RANK_ITEMS = 32;
+  const MAX_RANK_LEN = 60;
+
   const handleAddRank = async () => {
     const v = newRank.trim();
     if (!v) return;
+    if (v.length > MAX_RANK_LEN) {
+      showToast(tt(lang, "الاسم طويل جداً", "השם ארוך מדי"));
+      return;
+    }
     if (ranks.includes(v)) {
       showToast(tt(lang, "موجود مسبقاً", "כבר קיים"));
       setNewRank("");
       return;
     }
+    if (ranks.length >= MAX_RANK_ITEMS) {
+      showToast(tt(lang, "وصلت الحد الأقصى", "הגעת למקסימום"));
+      return;
+    }
+
+    const next = [...ranks, v];
     try {
-      await setGuestRanks(currentUid, [...ranks, v]);
+      await setGuestRanks(currentUid, next);
+      // Only update local state after the PATCH succeeds — otherwise a failed
+      // network call would leave the UI showing a rank that doesn't exist.
+      setDoc(prev => ({ ...(prev || {}), guestRanks: next }));
       setNewRank("");
     } catch (err) {
       logErr("setGuestRanks", err);
       showToast(err?.message || tt(lang, "خطأ", "שגיאה"));
     }
   };
+
   const handleRemoveRank = async (r) => {
+    // Guard against double-clicks or stale closure: only proceed if r is
+    // actually in the current list.
+    if (!ranks.includes(r)) return;
+    const next = ranks.filter(x => x !== r);
     try {
-      await setGuestRanks(currentUid, ranks.filter(x => x !== r));
+      await setGuestRanks(currentUid, next);
+      setDoc(prev => ({ ...(prev || {}), guestRanks: next }));
     } catch (err) {
       logErr("setGuestRanks", err);
       showToast(err?.message || tt(lang, "خطأ", "שגיאה"));
@@ -156,14 +254,34 @@ export function DigitalDashboard() {
   };
 
   // ── Wedding date ─────────────────────────────────────────────────────────────
+  // BUG-003 fix — optimistic write.
+  // The <input type="datetime-local"> is a controlled input bound to
+  // `doc?.weddingDate`. Without the local setDoc() below, the displayed
+  // value would snap back to the old date until the next 15s poll tick,
+  // making the picker feel broken. We update local state immediately AFTER
+  // the server confirms the write so a rejected/network-failed save never
+  // leaves the UI lying about persisted state.
   const handleDateChange = async (e) => {
-    const epoch = inputValueToEpoch(e.target.value);
+    const raw = e.target.value;
+    const epoch = inputValueToEpoch(raw);
+
+    // If the user clears the field we save `null` to clear the server value
+    // too. If the user types something the browser can't parse (rare with
+    // datetime-local but possible via paste), bail without hitting the API.
+    if (raw && epoch === null) {
+      showToast(tt(lang, "تاريخ غير صالح", "תאריך לא תקין"));
+      return;
+    }
+
     try {
       await setWeddingDate(currentUid, epoch);
+      setDoc(prev => ({ ...(prev || {}), weddingDate: epoch ?? null }));
       showToast(tt(lang, "✓ تم حفظ التاريخ", "✓ התאריך נשמר"));
     } catch (err) {
       logErr("setWeddingDate", err);
       showToast(err?.message || tt(lang, "خطأ", "שגיאה"));
+      // Intentionally do NOT update setDoc on failure — the input will fall
+      // back to the prior server value, which is the correct UX.
     }
   };
 

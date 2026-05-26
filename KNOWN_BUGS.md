@@ -12,6 +12,20 @@ _None._
 
 ## Resolved Bugs
 
+### BUG-R012 — Digital dashboard: stale UI after media upload, date change, and rank edits (Resolved 2026-05-26)
+
+**Files:** `src/pages/portal/groom/digital/DigitalDashboard.jsx`, `functions/src/api/routes/digital.ts`, `functions/src/api/routes/proofs.ts`
+**Severity:** High — three separate flows on the groom digital dashboard appeared broken because UI changes only surfaced after the next 15-second poller tick. Slow uploads compounded the misperception.
+**Symptom:** (1) Photo uploaded but didn't appear in the gallery for up to 15s; (2) wedding-date input snapped back to the prior value after the user picked a new date; (3) newly added/removed guest ranks didn't show up. Also: all uploads (including driver proof photos) lacked GCS resumable semantics and could fail in full on flaky networks.
+**Root cause:** The dashboard reads `doc` state exclusively from `subscribeDigitalMedia()` (a 15-second poller). Each mutation handler (`handleAddMedia`, `handleDateChange`, `handleAddRank`, `handleRemoveRank`, `handleRemoveMedia`) PATCHed the server doc but never updated local state, so users had to wait up to 15s before the change was visible — a classic "missing optimistic update" pattern. Separately, `uploadAndGetUrl()` and the proofs upload handler called `file.save(buffer, { resumable: false })`, which means any transient network failure restarted the entire upload from byte 0 instead of retrying just the failed chunk.
+**Fix:**
+1. Each dashboard handler now mirrors its server write into `setDoc(prev => ...)` *after* the API resolves successfully. On failure we deliberately skip the local update so the UI reflects the actual persisted state.
+2. A docblock at the top of `DigitalDashboard.jsx` codifies the optimistic-mutation convention so future contributors don't repeat this class of bug.
+3. `uploadAndGetUrl()` and the proofs upload both switch to `resumable: true`, giving the GCS client chunked uploads with per-chunk retry — a reliability win for the 200 MB photographer files and field-uploaded driver proofs.
+4. Bonus defensive checks: malformed/empty upload responses are filtered before merging into `media[]`; deduplication by `storagePath` prevents double-render if the poller fires mid-upload; client-side rank-length and rank-count limits mirror the server's so optimistic state can't diverge from what actually persists; partial-batch upload failures now surface a "(n/total)" suffix in the toast.
+
+---
+
 ### BUG-R011 — `POST /api/.../upload` returns 400 `api_invalid_multipart` (Resolved 2026-05-25)
 
 **Files:** `functions/src/api/routes/digital.ts`, `functions/src/api/routes/proofs.ts`
