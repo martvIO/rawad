@@ -79,11 +79,20 @@ export function subscribeDigitalGuests(groomUid, cb, onErrCb) {
   return pollList(`/digital/${uid}/guests`, cb, onErrCb);
 }
 
-export async function addDigitalGuest(groomUid, { name, phone, rank }) {
+/**
+ * Add a guest. `ranks` is an array of zero-or-more rank labels (the new
+ * multi-rank shape). Legacy single-string `rank` is also accepted and
+ * promoted to `[rank]` for backwards compatibility with any old caller.
+ */
+export async function addDigitalGuest(groomUid, { name, phone, ranks, rank }) {
   const uid = resolveUid(groomUid);
   const body = { name, phone };
-  const cleanRank = (rank || "").trim();
-  if (cleanRank) body.rank = cleanRank;
+  const cleaned = Array.isArray(ranks)
+    ? ranks.map((r) => String(r || "").trim()).filter(Boolean)
+    : rank
+      ? [String(rank).trim()].filter(Boolean)
+      : [];
+  if (cleaned.length > 0) body.ranks = cleaned;
   const result = await api.post(`/digital/${uid}/guests`, body);
   return result?.id ?? null;
 }
