@@ -86,6 +86,11 @@ export function GroomGuests() {
                         <div style={{ fontWeight: 800, color: C.goldLight, fontSize: 14, marginBottom: 2 }}>{g.name}</div>
                         <div style={{ fontSize: 11, color: "#5a5040", direction: "ltr", textAlign: "right" }}>{g.phone}</div>
                         {g.area && <div style={{ fontSize: 12, color: C.dim }}>📍 {g.area}</div>}
+                        {g.confirmedAt && Number(g.companions) > 0 && (
+                          <div data-testid="guest-companions" style={{ fontSize: 11, fontWeight: 800, color: C.gold, marginTop: 2 }}>
+                            +{g.companions} {lang === "he" ? "מלווים" : "مرافق"}
+                          </div>
+                        )}
                       </div>
                       <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
                         <span className="status-badge" style={{ background: st.bg, color: st.color }}>{t("stat_" + g.status)}</span>

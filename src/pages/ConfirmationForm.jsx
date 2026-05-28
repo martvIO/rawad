@@ -9,6 +9,7 @@ import { BrandLogo } from "../components/BrandLogo.jsx";
 import { LangSwitcher } from "../components/LangSwitcher.jsx";
 import { CityField } from "../components/CityField.jsx";
 import { PhoneInput } from "../components/PhoneInput.jsx";
+import { CompanionsStepper } from "../components/CompanionsStepper.jsx";
 import { submitConfirmation } from "../services/confirmations.js";
 import { getCurrentFix } from "../utils/geo.js";
 import { logErr } from "../utils/logger.js";
@@ -21,6 +22,7 @@ export function ConfirmationForm({ t, lang, setLang }) {
   const [city, setCity]     = useState("");
   const [street, setStreet] = useState("");
   const [house, setHouse]   = useState("");
+  const [companions, setCompanions] = useState(0); // people attending besides the invited guest
   const [coords, setCoords] = useState(null);   // { lat, lng, accuracy }
   const [locating, setLocating] = useState(false);
   const [locError, setLocError] = useState("");
@@ -55,6 +57,7 @@ export function ConfirmationForm({ t, lang, setLang }) {
         submittedCity:   city.trim(),
         submittedStreet: street.trim(),
         submittedHouse:  house.trim(),
+        companions,
       };
       if (coords) {
         payload.lat = coords.lat;
@@ -168,6 +171,9 @@ export function ConfirmationForm({ t, lang, setLang }) {
           <input data-testid="field-conf-house" className="input-field" type="text" placeholder="86"
                  value={house} onChange={e => setHouse(e.target.value)}
                  style={{ marginBottom: 14, direction: "ltr", textAlign: "right" }}/>
+
+          <div style={{ marginBottom: 6, fontSize: 12, color: C.goldDim }}>{t("conf_form_companions")}</div>
+          <CompanionsStepper value={companions} onChange={setCompanions} />
 
           {error && (
             <div data-testid="alert-conf-error" style={{ color: C.red, fontSize: 12, marginBottom: 12, textAlign: "center" }}>{error}</div>

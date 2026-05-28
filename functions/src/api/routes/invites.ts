@@ -62,6 +62,12 @@ const MAX_ACCURACY_M = 100_000;
 
 const ARABIC_ADDRESS_SEPARATOR = ADDRESS_JOINER;
 const RSVP_VALUES = new Set(["attending", "absent"]);
+// Extra RSVP fields the luxury digital invitation collects from the guest.
+// `companions` = people attending BESIDES the invited guest (0–20, default 0).
+const MAX_COMPANIONS = 20;
+const MAX_MEAL_PREF_LEN = 40;
+const MAX_SONG_REQUEST_LEN = 120;
+const MAX_WISH_LEN = 300;
 
 export const invitesRouter = Router();
 
@@ -301,14 +307,24 @@ invitesRouter.post(
       }
 
       // Snapshot the approved design at mint time so later groom edits
-      // never alter invitations already sent to guests.
+      // never alter invitations already sent to guests. Spread the whole doc
+      // so every design field (story timeline, details, hotels, captions,
+      // section toggles, …) is captured — operational-only flags are dropped.
+      const {
+        photographerPublished: _pp,
+        guestRanks: _gr,
+        designStatus: _ds,
+        designSubmittedAt: _dsa,
+        designApprovedAt: _daa,
+        designRejectedAt: _dra,
+        designRejectionNote: _drn,
+        ...designFields
+      } = invData as Record<string, unknown>;
       const designSnapshot = {
+        ...designFields,
         brideName: invData.brideName ?? "",
         groomDisplayName: invData.groomDisplayName ?? "",
         weddingDate: invData.weddingDate ?? null,
-        venue: invData.venue ?? "",
-        venueAddress: invData.venueAddress ?? "",
-        customMessage: invData.customMessage ?? "",
         themeColor: invData.themeColor ?? "gold",
         fontFamily: invData.fontFamily ?? "amiri",
         media: Array.isArray(invData.media) ? invData.media : [],
@@ -359,7 +375,8 @@ invitesRouter.post(
       res.status(400).json({ error: parsed.error, field: parsed.field });
       return;
     }
-    const { token, rsvp, note } = parsed.value;
+    const { token, rsvp, note, companions, mealPreference, songRequest, wish } =
+      parsed.value;
 
     try {
       const db = getDatabase();
@@ -398,6 +415,12 @@ invitesRouter.post(
         confirmedAt: now,
       };
       if (note) patch.note = note;
+      if (rsvp === "attending") {
+        if (companions !== null) patch.companions = companions;
+        if (mealPreference) patch.mealPreference = mealPreference;
+        if (songRequest) patch.songRequest = songRequest;
+      }
+      if (wish) patch.wish = wish;
       await guestRef.update(patch);
       await db.ref(`inviteTokens/${token}/usedAt`).set(now);
 
@@ -458,6 +481,7 @@ type ParsedPhysical = {
   submittedStreet: string;
   submittedHouse: string;
   deliveryNote: string;
+  companions: number | null;
   hasCoords: boolean;
   lat: number | null;
   lng: number | null;
@@ -489,6 +513,10 @@ function parsePhysicalSubmitBody(body: unknown): ParseResult<ParsedPhysical> {
   const submittedStreet = clampStr(data.submittedStreet, MAX_STREET_LEN);
   const submittedHouse = clampStr(data.submittedHouse, MAX_HOUSE_LEN);
   const deliveryNote = clampStr(data.deliveryNote, MAX_DELIVERY_NOTE_LEN);
+  const companions = parseCompanions(data.companions);
+  if (companions === false) {
+    return { ok: false, error: "invalid_companions", field: "companions" };
+  }
 
   if (!submittedName) {
     return { ok: false, error: "missing_required", field: "submittedName" };
@@ -533,6 +561,7 @@ function parsePhysicalSubmitBody(body: unknown): ParseResult<ParsedPhysical> {
       submittedStreet,
       submittedHouse,
       deliveryNote,
+      companions,
       hasCoords,
       lat,
       lng,
@@ -559,6 +588,7 @@ function buildPhysicalGuestPatch(
     confirmedAt: now,
   };
   if (s.deliveryNote) patch.deliveryNote = s.deliveryNote;
+  if (s.companions !== null) patch.companions = s.companions;
   if (s.hasCoords) {
     patch.lat = s.lat;
     patch.lng = s.lng;
@@ -593,6 +623,7 @@ function buildPhysicalConfirmationRecord(
     confirmedAt: now,
     attachedGuestId: tk.guestId,
   };
+  if (s.companions !== null) record.companions = s.companions;
   if (s.hasCoords) {
     record.lat = s.lat;
     record.lng = s.lng;
@@ -619,6 +650,10 @@ type ParsedDigital = {
   token: string;
   rsvp: "attending" | "absent";
   note: string;
+  companions: number | null;
+  mealPreference: string;
+  songRequest: string;
+  wish: string;
 };
 
 function parseDigitalSubmitBody(body: unknown): ParseResult<ParsedDigital> {
@@ -635,14 +670,39 @@ function parseDigitalSubmitBody(body: unknown): ParseResult<ParsedDigital> {
     return { ok: false, error: "invalid_rsvp", field: "rsvp" };
   }
   const note = clampStr(data.note, MAX_NOTE_LEN);
+
+  const companions = parseCompanions(data.companions);
+  if (companions === false) {
+    return { ok: false, error: "invalid_companions", field: "companions" };
+  }
+  const mealPreference = clampStr(data.mealPreference, MAX_MEAL_PREF_LEN);
+  const songRequest = clampStr(data.songRequest, MAX_SONG_REQUEST_LEN);
+  const wish = clampStr(data.wish, MAX_WISH_LEN);
+
   return {
     ok: true,
     value: {
       token,
       rsvp: rsvpRaw as "attending" | "absent",
       note,
+      companions,
+      mealPreference,
+      songRequest,
+      wish,
     },
   };
+}
+
+/**
+ * Parse the optional `companions` count (people attending besides the invited
+ * guest). Returns `null` when absent, the clamped integer (0–MAX_COMPANIONS)
+ * when valid, or `false` when present-but-invalid (negative / non-numeric).
+ */
+function parseCompanions(v: unknown): number | null | false {
+  if (v === undefined || v === null || v === "") return null;
+  const n = Number(v);
+  if (!Number.isFinite(n) || n < 0) return false;
+  return Math.min(MAX_COMPANIONS, Math.floor(n));
 }
 
 // ─── Utility ──────────────────────────────────────────────────────────────────

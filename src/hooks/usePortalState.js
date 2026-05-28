@@ -371,7 +371,15 @@ export function usePortalState({ onBack, t, lang, setLang }) {
     const delivered = myGuests.filter(g => g.status === "delivered").length;
     const enroute   = myGuests.filter(g => g.status === "enroute").length;
     const pending   = myGuests.filter(g => g.status === "pending").length;
-    return { total, delivered, enroute, pending, pct: total ? Math.round(delivered/total*100) : 0 };
+    // A physical guest "confirms" by submitting the form (stamps confirmedAt).
+    // Expected attendees = each confirmed guest + the companions they reported.
+    const confirmedGuests = myGuests.filter(g => g.confirmedAt);
+    const confirmed = confirmedGuests.length;
+    const expectedAttendees = confirmedGuests.reduce(
+      (sum, g) => sum + 1 + (Number(g.companions) > 0 ? Number(g.companions) : 0),
+      0,
+    );
+    return { total, delivered, enroute, pending, confirmed, expectedAttendees, pct: total ? Math.round(delivered/total*100) : 0 };
   }, [myGuests]);
 
   // ── Handlers: auth ──────────────────────────────────────────────────────────

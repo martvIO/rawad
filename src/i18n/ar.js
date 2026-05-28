@@ -316,6 +316,7 @@ export const ar = {
   conf_form_city: "البلدة",
   conf_form_street: "اسم الشارع",
   conf_form_house_number: "رقم المنزل",
+  conf_form_companions: "كم شخصاً سيحضر معك؟ (عدا المدعو)",
   conf_form_submit: "✓ تأكيد بياناتي",
   conf_form_thanks_title: "شكراً لك! ✓",
   conf_form_thanks_body: "تم استلام بياناتك. سيتم التواصل معكم قريباً لتوصيل المكتوب.",

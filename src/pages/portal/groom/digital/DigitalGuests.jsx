@@ -321,6 +321,11 @@ export function DigitalGuests() {
                         </div>
                       );
                     })()}
+                    {g.status === "attending" && Number(g.companions) > 0 && (
+                      <div data-testid="guest-companions" style={{ marginTop: 5, fontSize: 11, fontWeight: 800, color: C.gold }}>
+                        +{g.companions} {lang === "he" ? "מלווים" : "مرافق"}
+                      </div>
+                    )}
                   </div>
 
                   {/* Right side: status badge + edit + delete */}

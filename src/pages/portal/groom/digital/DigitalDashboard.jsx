@@ -114,10 +114,17 @@ export function DigitalDashboard() {
 
   const stats = useMemo(() => {
     const total     = guests.length;
-    const attending = guests.filter(g => g.status === "attending").length;
+    const attendingGuests = guests.filter(g => g.status === "attending");
+    const attending = attendingGuests.length;
     const absent    = guests.filter(g => g.status === "absent").length;
     const pending   = guests.filter(g => g.status === "pending").length;
-    return { total, attending, absent, pending };
+    // Expected attendees = each attending invitee + however many companions
+    // they said are coming with them.
+    const expectedAttendees = attendingGuests.reduce(
+      (sum, g) => sum + 1 + (Number(g.companions) > 0 ? Number(g.companions) : 0),
+      0,
+    );
+    return { total, attending, absent, pending, expectedAttendees };
   }, [guests]);
 
   const media = doc?.media || [];
@@ -498,6 +505,16 @@ export function DigitalDashboard() {
           </div>
         ))}
       </div>
+
+      {stats.expectedAttendees > 0 && (
+        <div className="gold-card" data-testid="digital-expected-attendees" style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
+          <div style={{ fontSize: 26 }}>👥</div>
+          <div>
+            <div style={{ fontSize: 26, fontWeight: 900, color: C.gold }}>{stats.expectedAttendees.toLocaleString("en")}</div>
+            <div style={{ fontSize: 11, color: C.dim }}>{tt(lang, "العدد المتوقع للحضور (مع المرافقين)", "צפי נוכחים (כולל מלווים)")}</div>
+          </div>
+        </div>
+      )}
 
       {stats.total > 0 && (
         <div className="gold-card">

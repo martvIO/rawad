@@ -58,7 +58,42 @@ const MAX_VENUE_LEN = 120;
 const MAX_VENUE_ADDR_LEN = 200;
 const MAX_CUSTOM_MSG_LEN = 500;
 const MAX_REJECT_NOTE_LEN = 500;
+const MAX_STORY_LEN = 1000;
+const MAX_EVENT_TITLE_LEN = 60;
+const MAX_EVENT_TIME_LEN = 40;
+const MAX_EVENT_VENUE_LEN = 120;
+const MAX_EVENT_ADDR_LEN = 200;
+const MAX_MAP_URL_LEN = 600;
+const MAX_GIFT_IBAN_LEN = 60;
+const MAX_GIFT_NOTE_LEN = 300;
+const MAX_MUSIC_URL_LEN = 600;
+const MAX_EVENT_ICON_LEN = 8;
+const MAX_EVENTS = 6;
 const MAX_RANK_ITEMS = 32;
+// New luxury-design fields.
+const MAX_EYEBROW_LEN = 60;
+const MAX_MONOGRAM_LEN = 12;
+const MAX_VENUE_CITY_LEN = 80;
+const MAX_ACCESS_NOTE_LEN = 200;
+const MAX_DRESS_CODE_LEN = 120;
+const MAX_STORY_WHEN_LEN = 40;
+const MAX_STORY_TITLE_LEN = 60;
+const MAX_STORY_BODY_LEN = 400;
+const MAX_STORY_ITEMS = 8;
+const MAX_DETAIL_META_LEN = 40;
+const MAX_DETAIL_TITLE_LEN = 80;
+const MAX_DETAIL_BODY_LEN = 300;
+const MAX_DETAIL_ITEMS = 8;
+const MAX_HOTEL_NAME_LEN = 80;
+const MAX_HOTEL_WALK_LEN = 40;
+const MAX_HOTEL_ITEMS = 6;
+const MAX_WISH_WHO_LEN = 60;
+const MAX_WISH_WHAT_LEN = 300;
+const MAX_WISH_ITEMS = 30;
+const MAX_MEAL_OPTION_LEN = 40;
+const MAX_MEAL_OPTIONS = 8;
+const MAX_CAPTION_LEN = 120;
+const MAX_CAPTION_ENTRIES = 60;
 const MAX_GUEST_STATUSES = new Set(["pending", "attending", "absent"]);
 
 const THEME_COLORS = new Set(["gold", "rose", "blue", "emerald", "white"]);
@@ -75,6 +110,37 @@ const DESIGN_FIELDS = new Set([
   "customMessage",
   "themeColor",
   "fontFamily",
+  "story",
+  "events",
+  "giftIban",
+  "giftNote",
+  "musicUrl",
+  "storyEnabled",
+  "eventsEnabled",
+  "countdownEnabled",
+  "galleryEnabled",
+  "giftEnabled",
+  "musicEnabled",
+  "footerDockEnabled",
+  // New luxury-design fields.
+  "eyebrow",
+  "monogram",
+  "venueCity",
+  "accessNote",
+  "dressCode",
+  "storyTimeline",
+  "details",
+  "hotels",
+  "wishes",
+  "mealOptions",
+  "mediaCaptions",
+  "detailsEnabled",
+  "venueEnabled",
+  "guestbookEnabled",
+  "envelopeEnabled",
+  "rsvpCompanionsEnabled",
+  "rsvpMealEnabled",
+  "rsvpSongEnabled",
 ]);
 
 const MAX_INVITE_MEDIA_BYTES = MAX_BYTES.INVITE_MEDIA;
@@ -590,6 +656,36 @@ digitalRouter.get(
           customMessage: data.customMessage ?? "",
           themeColor: data.themeColor ?? "gold",
           fontFamily: data.fontFamily ?? "amiri",
+          story: data.story ?? "",
+          events: Array.isArray(data.events) ? data.events : [],
+          giftIban: data.giftIban ?? "",
+          giftNote: data.giftNote ?? "",
+          musicUrl: data.musicUrl ?? "",
+          storyEnabled: data.storyEnabled ?? true,
+          eventsEnabled: data.eventsEnabled ?? true,
+          countdownEnabled: data.countdownEnabled ?? true,
+          galleryEnabled: data.galleryEnabled ?? true,
+          giftEnabled: data.giftEnabled ?? true,
+          musicEnabled: data.musicEnabled ?? true,
+          footerDockEnabled: data.footerDockEnabled ?? true,
+          eyebrow: data.eyebrow ?? "",
+          monogram: data.monogram ?? "",
+          venueCity: data.venueCity ?? "",
+          accessNote: data.accessNote ?? "",
+          dressCode: data.dressCode ?? "",
+          storyTimeline: Array.isArray(data.storyTimeline) ? data.storyTimeline : [],
+          details: Array.isArray(data.details) ? data.details : [],
+          hotels: Array.isArray(data.hotels) ? data.hotels : [],
+          wishes: Array.isArray(data.wishes) ? data.wishes : [],
+          mealOptions: Array.isArray(data.mealOptions) ? data.mealOptions : [],
+          mediaCaptions: data.mediaCaptions ?? {},
+          detailsEnabled: data.detailsEnabled ?? true,
+          venueEnabled: data.venueEnabled ?? true,
+          guestbookEnabled: data.guestbookEnabled ?? true,
+          envelopeEnabled: data.envelopeEnabled ?? true,
+          rsvpCompanionsEnabled: data.rsvpCompanionsEnabled ?? true,
+          rsvpMealEnabled: data.rsvpMealEnabled ?? true,
+          rsvpSongEnabled: data.rsvpSongEnabled ?? true,
           media: Array.isArray(data.media) ? data.media : [],
           designStatus: data.designStatus ?? "draft",
           designSubmittedAt: data.designSubmittedAt ?? null,
@@ -1056,6 +1152,39 @@ function sanitizeDigitalGuestPatch(
   return { ok: true, value: out };
 }
 
+interface EventItem {
+  icon: string;
+  title: string;
+  time: string;
+  venue: string;
+  address: string;
+  mapUrl: string;
+}
+
+interface StoryItem {
+  when: string;
+  icon: string;
+  title: string;
+  body: string;
+}
+
+interface DetailItem {
+  icon: string;
+  meta: string;
+  title: string;
+  body: string;
+}
+
+interface HotelItem {
+  name: string;
+  walk: string;
+}
+
+interface WishItem {
+  who: string;
+  what: string;
+}
+
 interface MediaSettings {
   weddingDate?: number | null;
   photographerPublished?: boolean;
@@ -1067,6 +1196,37 @@ interface MediaSettings {
   customMessage?: string;
   themeColor?: string;
   fontFamily?: string;
+  story?: string;
+  events?: EventItem[];
+  giftIban?: string;
+  giftNote?: string;
+  musicUrl?: string;
+  storyEnabled?: boolean;
+  eventsEnabled?: boolean;
+  countdownEnabled?: boolean;
+  galleryEnabled?: boolean;
+  giftEnabled?: boolean;
+  musicEnabled?: boolean;
+  footerDockEnabled?: boolean;
+  // New luxury-design fields.
+  eyebrow?: string;
+  monogram?: string;
+  venueCity?: string;
+  accessNote?: string;
+  dressCode?: string;
+  storyTimeline?: StoryItem[];
+  details?: DetailItem[];
+  hotels?: HotelItem[];
+  wishes?: WishItem[];
+  mealOptions?: string[];
+  mediaCaptions?: Record<string, string>;
+  detailsEnabled?: boolean;
+  venueEnabled?: boolean;
+  guestbookEnabled?: boolean;
+  envelopeEnabled?: boolean;
+  rsvpCompanionsEnabled?: boolean;
+  rsvpMealEnabled?: boolean;
+  rsvpSongEnabled?: boolean;
 }
 
 function sanitizeMediaSettings(body: unknown): Sanitized<MediaSettings> {
@@ -1164,7 +1324,225 @@ function sanitizeMediaSettings(body: unknown): Sanitized<MediaSettings> {
     }
     out.fontFamily = v;
   }
+  if (data.story !== undefined) {
+    const v = (data.story ?? "").toString();
+    if (v.length > MAX_STORY_LEN) {
+      return { ok: false, error: "story_too_long", field: "story" };
+    }
+    out.story = v;
+  }
+  if (data.events !== undefined) {
+    if (!Array.isArray(data.events)) {
+      return { ok: false, error: "invalid_events", field: "events" };
+    }
+    const cleaned: EventItem[] = [];
+    for (const raw of data.events) {
+      if (!raw || typeof raw !== "object" || Array.isArray(raw)) continue;
+      const e = raw as Record<string, unknown>;
+      const item: EventItem = {
+        icon: clampField(e.icon, MAX_EVENT_ICON_LEN),
+        title: clampField(e.title, MAX_EVENT_TITLE_LEN),
+        time: clampField(e.time, MAX_EVENT_TIME_LEN),
+        venue: clampField(e.venue, MAX_EVENT_VENUE_LEN),
+        address: clampField(e.address, MAX_EVENT_ADDR_LEN),
+        mapUrl: clampField(e.mapUrl, MAX_MAP_URL_LEN),
+      };
+      // Drop entirely-empty rows so the editor's blank template doesn't persist.
+      if (item.title || item.time || item.venue || item.address) {
+        cleaned.push(item);
+      }
+      if (cleaned.length >= MAX_EVENTS) break;
+    }
+    out.events = cleaned;
+  }
+  if (data.giftIban !== undefined) {
+    const v = (data.giftIban ?? "").toString().trim();
+    if (v.length > MAX_GIFT_IBAN_LEN) {
+      return { ok: false, error: "gift_iban_too_long", field: "giftIban" };
+    }
+    out.giftIban = v;
+  }
+  if (data.giftNote !== undefined) {
+    const v = (data.giftNote ?? "").toString();
+    if (v.length > MAX_GIFT_NOTE_LEN) {
+      return { ok: false, error: "gift_note_too_long", field: "giftNote" };
+    }
+    out.giftNote = v;
+  }
+  if (data.musicUrl !== undefined) {
+    const v = (data.musicUrl ?? "").toString().trim();
+    if (v.length > MAX_MUSIC_URL_LEN) {
+      return { ok: false, error: "music_url_too_long", field: "musicUrl" };
+    }
+    if (v.length > 0 && !/^https?:\/\//.test(v)) {
+      return { ok: false, error: "music_url_invalid", field: "musicUrl" };
+    }
+    out.musicUrl = v;
+  }
+  // ── New luxury-design scalar fields ──────────────────────────────────────
+  const scalarFields: [keyof MediaSettings, number, string][] = [
+    ["eyebrow", MAX_EYEBROW_LEN, "eyebrow_too_long"],
+    ["monogram", MAX_MONOGRAM_LEN, "monogram_too_long"],
+    ["venueCity", MAX_VENUE_CITY_LEN, "venue_city_too_long"],
+    ["accessNote", MAX_ACCESS_NOTE_LEN, "access_note_too_long"],
+    ["dressCode", MAX_DRESS_CODE_LEN, "dress_code_too_long"],
+  ];
+  for (const [key, max, err] of scalarFields) {
+    if (data[key] !== undefined) {
+      const v = (data[key] ?? "").toString().trim();
+      if (v.length > max) return { ok: false, error: err, field: key as string };
+      (out as Record<string, string>)[key as string] = v;
+    }
+  }
+
+  // ── Story timeline ───────────────────────────────────────────────────────
+  if (data.storyTimeline !== undefined) {
+    if (!Array.isArray(data.storyTimeline)) {
+      return { ok: false, error: "invalid_story_timeline", field: "storyTimeline" };
+    }
+    const cleaned: StoryItem[] = [];
+    for (const raw of data.storyTimeline) {
+      if (!raw || typeof raw !== "object" || Array.isArray(raw)) continue;
+      const e = raw as Record<string, unknown>;
+      const item: StoryItem = {
+        when: clampField(e.when, MAX_STORY_WHEN_LEN),
+        icon: clampField(e.icon, MAX_EVENT_ICON_LEN),
+        title: clampField(e.title, MAX_STORY_TITLE_LEN),
+        body: clampField(e.body, MAX_STORY_BODY_LEN),
+      };
+      if (item.when || item.title || item.body) cleaned.push(item);
+      if (cleaned.length >= MAX_STORY_ITEMS) break;
+    }
+    out.storyTimeline = cleaned;
+  }
+
+  // ── Detail cards ─────────────────────────────────────────────────────────
+  if (data.details !== undefined) {
+    if (!Array.isArray(data.details)) {
+      return { ok: false, error: "invalid_details", field: "details" };
+    }
+    const cleaned: DetailItem[] = [];
+    for (const raw of data.details) {
+      if (!raw || typeof raw !== "object" || Array.isArray(raw)) continue;
+      const e = raw as Record<string, unknown>;
+      const item: DetailItem = {
+        icon: clampField(e.icon, MAX_EVENT_ICON_LEN),
+        meta: clampField(e.meta, MAX_DETAIL_META_LEN),
+        title: clampField(e.title, MAX_DETAIL_TITLE_LEN),
+        body: clampField(e.body, MAX_DETAIL_BODY_LEN),
+      };
+      if (item.meta || item.title || item.body) cleaned.push(item);
+      if (cleaned.length >= MAX_DETAIL_ITEMS) break;
+    }
+    out.details = cleaned;
+  }
+
+  // ── Nearby hotels ────────────────────────────────────────────────────────
+  if (data.hotels !== undefined) {
+    if (!Array.isArray(data.hotels)) {
+      return { ok: false, error: "invalid_hotels", field: "hotels" };
+    }
+    const cleaned: HotelItem[] = [];
+    for (const raw of data.hotels) {
+      if (!raw || typeof raw !== "object" || Array.isArray(raw)) continue;
+      const e = raw as Record<string, unknown>;
+      const item: HotelItem = {
+        name: clampField(e.name, MAX_HOTEL_NAME_LEN),
+        walk: clampField(e.walk, MAX_HOTEL_WALK_LEN),
+      };
+      if (item.name) cleaned.push(item);
+      if (cleaned.length >= MAX_HOTEL_ITEMS) break;
+    }
+    out.hotels = cleaned;
+  }
+
+  // ── Guestbook wishes (groom-curated) ─────────────────────────────────────
+  if (data.wishes !== undefined) {
+    if (!Array.isArray(data.wishes)) {
+      return { ok: false, error: "invalid_wishes", field: "wishes" };
+    }
+    const cleaned: WishItem[] = [];
+    for (const raw of data.wishes) {
+      if (!raw || typeof raw !== "object" || Array.isArray(raw)) continue;
+      const e = raw as Record<string, unknown>;
+      const item: WishItem = {
+        who: clampField(e.who, MAX_WISH_WHO_LEN),
+        what: clampField(e.what, MAX_WISH_WHAT_LEN),
+      };
+      if (item.what) cleaned.push(item);
+      if (cleaned.length >= MAX_WISH_ITEMS) break;
+    }
+    out.wishes = cleaned;
+  }
+
+  // ── RSVP meal options ────────────────────────────────────────────────────
+  if (data.mealOptions !== undefined) {
+    if (!Array.isArray(data.mealOptions)) {
+      return { ok: false, error: "invalid_meal_options", field: "mealOptions" };
+    }
+    const cleaned: string[] = [];
+    for (const r of data.mealOptions) {
+      if (typeof r !== "string") continue;
+      const v = r.trim().slice(0, MAX_MEAL_OPTION_LEN);
+      if (!v || cleaned.includes(v)) continue;
+      cleaned.push(v);
+      if (cleaned.length >= MAX_MEAL_OPTIONS) break;
+    }
+    out.mealOptions = cleaned;
+  }
+
+  // ── Per-photo captions keyed by storagePath ──────────────────────────────
+  if (data.mediaCaptions !== undefined) {
+    if (
+      !data.mediaCaptions ||
+      typeof data.mediaCaptions !== "object" ||
+      Array.isArray(data.mediaCaptions)
+    ) {
+      return { ok: false, error: "invalid_media_captions", field: "mediaCaptions" };
+    }
+    const cleaned: Record<string, string> = {};
+    let count = 0;
+    for (const [k, val] of Object.entries(data.mediaCaptions as Record<string, unknown>)) {
+      if (count >= MAX_CAPTION_ENTRIES) break;
+      const cap = (typeof val === "string" ? val : "").trim().slice(0, MAX_CAPTION_LEN);
+      if (cap) {
+        cleaned[k.slice(0, 200)] = cap;
+        count++;
+      }
+    }
+    out.mediaCaptions = cleaned;
+  }
+
+  const boolKeys: (keyof MediaSettings)[] = [
+    "storyEnabled",
+    "eventsEnabled",
+    "countdownEnabled",
+    "galleryEnabled",
+    "giftEnabled",
+    "musicEnabled",
+    "footerDockEnabled",
+    "detailsEnabled",
+    "venueEnabled",
+    "guestbookEnabled",
+    "envelopeEnabled",
+    "rsvpCompanionsEnabled",
+    "rsvpMealEnabled",
+    "rsvpSongEnabled",
+  ];
+  for (const key of boolKeys) {
+    if (data[key] !== undefined) {
+      if (typeof data[key] !== "boolean") {
+        return { ok: false, error: "invalid_toggle", field: key as string };
+      }
+      (out as Record<string, unknown>)[key] = data[key];
+    }
+  }
   return { ok: true, value: out };
+}
+
+/** Trim a possibly-non-string field to a max length. */
+function clampField(v: unknown, max: number): string {
+  return (typeof v === "string" ? v.trim() : "").slice(0, max);
 }
 
 

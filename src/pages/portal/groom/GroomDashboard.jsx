@@ -48,6 +48,18 @@ export function GroomDashboard() {
               </div>
             </div>
 
+            {stats.expectedAttendees > 0 && (
+              <div className="gold-card" data-testid="groom-expected-attendees" style={{ marginBottom: 20, display: "flex", alignItems: "center", gap: 12 }}>
+                <div style={{ fontSize: 26 }}>👥</div>
+                <div>
+                  <div style={{ fontSize: 26, fontWeight: 900, color: C.gold }}>{stats.expectedAttendees.toLocaleString("en")}</div>
+                  <div style={{ fontSize: 11, color: C.dim }}>
+                    {lang === "he" ? "צפי נוכחים (כולל מלווים)" : "العدد المتوقع للحضور (مع المرافقين)"}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* ── Live map on the dashboard: groom's own location + every driver sharing ── */}
             <div style={{ marginBottom: 22 }}>
               <div style={{

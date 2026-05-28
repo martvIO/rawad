@@ -82,6 +82,11 @@ export function AdminConfirmationsTab() {
             <div style={{ fontSize: 11, color: C.dim, marginTop: 4 }}>
               📍 {fullAddress || t("admin_conf_no_address")}
             </div>
+            {Number(conf.companions) > 0 && (
+              <div style={{ fontSize: 11, color: C.gold, fontWeight: 800, marginTop: 4 }}>
+                👥 +{conf.companions} {lang === "he" ? "מלווים" : "مرافق"}
+              </div>
+            )}
           </div>
         </div>
 

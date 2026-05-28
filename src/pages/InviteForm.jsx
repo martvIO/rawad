@@ -15,6 +15,7 @@ import { LangSwitcher } from "../components/LangSwitcher.jsx";
 import { CityField } from "../components/CityField.jsx";
 import { PhoneInput } from "../components/PhoneInput.jsx";
 import { MapPickerInline } from "../components/MapPickerInline.jsx";
+import { CompanionsStepper } from "../components/CompanionsStepper.jsx";
 import { subscribeInviteToken, submitGuestInvite } from "../services/invites.js";
 import { getCurrentFix } from "../utils/geo.js";
 import { logErr } from "../utils/logger.js";
@@ -29,6 +30,7 @@ export function InviteForm({ t, lang, setLang }) {
   const [street, setStreet] = useState("");
   const [house,  setHouse]  = useState("");
   const [note,   setNote]   = useState("");
+  const [companions, setCompanions] = useState(0); // people attending besides the invited guest
   const [coords, setCoords] = useState(null); // { lat, lng, accuracy?, source }
   const [showMap, setShowMap] = useState(false);
   const [locating, setLocating] = useState(false);
@@ -76,6 +78,7 @@ export function InviteForm({ t, lang, setLang }) {
         submittedStreet: street.trim(),
         submittedHouse:  house.trim(),
         deliveryNote:    note.trim(),
+        companions,
       };
       if (coords) {
         payload.lat = coords.lat;
@@ -249,6 +252,9 @@ export function InviteForm({ t, lang, setLang }) {
           <textarea data-testid="field-conf-note" className="input-field" rows={3}
                  value={note} onChange={e => setNote(e.target.value.slice(0, 240))}
                  style={{ marginBottom: 14, resize: "vertical", minHeight: 64, fontFamily: "inherit" }}/>
+
+          <div style={{ marginBottom: 6, fontSize: 12, color: C.goldDim }}>{t("conf_form_companions")}</div>
+          <CompanionsStepper value={companions} onChange={setCompanions} />
 
           {error && (
             <div data-testid="alert-conf-error" style={{ color: C.red, fontSize: 12, marginBottom: 12, textAlign: "center" }}>{error}</div>

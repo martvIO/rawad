@@ -83,6 +83,7 @@
           "inviteLinkToken":  { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 64)" },
           "inviteLinkSentAt": { ".validate": "!newData.exists() || newData.isNumber()" },
           "confirmedAt":      { ".validate": "!newData.exists() || newData.isNumber()" },
+          "companions":       { ".validate": "!newData.exists() || (newData.isNumber() && newData.val() >= 0 && newData.val() <= 20)" },
           "$other":         { ".validate": false }
         }
       }
@@ -124,6 +125,7 @@
         "locationCapturedAt":{ ".validate": "!newData.exists() || newData.isNumber()" },
         "attachedGuestId":   { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 64)" },
         "confirmedAt":     { ".validate": "newData.isNumber()" },
+        "companions":      { ".validate": "!newData.exists() || (newData.isNumber() && newData.val() >= 0 && newData.val() <= 20)" },
         "$other":          { ".validate": false }
       }
     },

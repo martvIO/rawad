@@ -40,6 +40,8 @@ const MAX_CITY_LEN = MAX_LEN.CITY;
 const MAX_STREET_LEN = MAX_LEN.STREET;
 const MAX_HOUSE_LEN = MAX_LEN.HOUSE;
 const MAX_ATTACHED_GUEST_ID_LEN = 64;
+// `companions` = people attending besides the invited guest (0–20, default 0).
+const MAX_COMPANIONS = 20;
 
 const MIN_LAT = -90;
 const MAX_LAT = 90;
@@ -290,6 +292,7 @@ function buildConfirmationRecord(
     submittedHouse: s.submittedHouse,
     confirmedAt: now,
   };
+  if (s.companions !== null) record.companions = s.companions;
   if (s.hasCoords) {
     record.lat = s.lat;
     record.lng = s.lng;
@@ -336,6 +339,7 @@ async function tryAutoAttach(
     const guestVal = guestsSnap.child(guestId).val() as { lat?: unknown } | null;
     const now = Date.now();
     const guestPatch: Record<string, unknown> = { confirmedAt: now };
+    if (s.companions !== null) guestPatch.companions = s.companions;
     if (s.hasCoords && guestVal && typeof guestVal.lat !== "number") {
       guestPatch.lat = s.lat;
       guestPatch.lng = s.lng;
@@ -364,6 +368,7 @@ type ParsedSubmit = {
   submittedCity: string;
   submittedStreet: string;
   submittedHouse: string;
+  companions: number | null;
   hasCoords: boolean;
   lat: number | null;
   lng: number | null;
@@ -412,6 +417,11 @@ function parseSubmitBody(body: unknown): ParseResult {
     return { ok: false, error: "invalid_phone", field: "submittedPhone" };
   }
 
+  const companions = parseCompanions(data.companions);
+  if (companions === false) {
+    return { ok: false, error: "invalid_companions", field: "companions" };
+  }
+
   // GPS is all-or-nothing: both lat AND lng must be valid finite numbers in
   // range. Half-set coords (lat without lng) are silently dropped — matches
   // the legacy onCall behavior.
@@ -437,12 +447,25 @@ function parseSubmitBody(body: unknown): ParseResult {
       submittedCity,
       submittedStreet,
       submittedHouse,
+      companions,
       hasCoords,
       lat,
       lng,
       locationAccuracy,
     },
   };
+}
+
+/**
+ * Parse the optional `companions` count (people attending besides the invited
+ * guest). Returns `null` when absent, the clamped integer (0–MAX_COMPANIONS)
+ * when valid, or `false` when present-but-invalid.
+ */
+function parseCompanions(v: unknown): number | null | false {
+  if (v === undefined || v === null || v === "") return null;
+  const n = Number(v);
+  if (!Number.isFinite(n) || n < 0) return false;
+  return Math.min(MAX_COMPANIONS, Math.floor(n));
 }
 
 // ─── PATCH validation ─────────────────────────────────────────────────────────
