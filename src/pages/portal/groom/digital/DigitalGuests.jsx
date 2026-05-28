@@ -5,9 +5,20 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { usePortal } from "../../../../context/PortalContext.jsx";
 import {
   subscribeDigitalGuests, updateDigitalGuest, removeDigitalGuest,
+  subscribeDigitalMedia,
 } from "../../../../services/digitalInvitation.js";
 import { logErr } from "../../../../utils/logger.js";
 import { C } from "../../../../styles/theme.js";
+
+/**
+ * Normalize the rank shape: new guests carry `ranks: string[]`, legacy
+ * guests carry `rank: string`. The list view treats both uniformly.
+ */
+function getGuestRanks(g) {
+  if (Array.isArray(g?.ranks)) return g.ranks;
+  if (g?.rank) return [g.rank];
+  return [];
+}
 
 const STATUS_CFG = {
   pending:   { icon: "⌛", label_ar: "لم يرد",   label_he: "טרם ענה",   bg: "rgba(201,168,76,.15)", color: C.gold    },
@@ -20,11 +31,20 @@ export function DigitalGuests() {
   const { lang, currentUid, showToast } = usePortal();
   const navigate  = useNavigate();
   const location  = useLocation();
-  const [guests,     setGuests]     = useState([]);
-  const [editingId,  setEditingId]  = useState(null);
-  const [editName,   setEditName]   = useState("");
-  const [editPhone,  setEditPhone]  = useState("");
-  const [revealedId, setRevealedId] = useState(null); // guest pending delete confirm
+  const [guests,         setGuests]         = useState([]);
+  const [editingId,      setEditingId]      = useState(null);
+  const [editName,       setEditName]       = useState("");
+  const [editPhone,      setEditPhone]      = useState("");
+  const [editRanks,      setEditRanks]      = useState([]); // chip-picker state during inline edit
+  const [revealedId,     setRevealedId]     = useState(null); // guest pending delete confirm
+  const [availableRanks, setAvailableRanks] = useState([]);   // master list from parent invite doc
+
+  // Master rank list — needed for the chip picker shown in edit mode and
+  // for filtering out stale ranks before rendering chips on each guest.
+  useEffect(() => {
+    if (!currentUid) return;
+    return subscribeDigitalMedia(currentUid, (d) => setAvailableRanks(d?.guestRanks || []));
+  }, [currentUid]);
 
   // ── Optimistic insert from navigation state ──────────────────────────────────
   useEffect(() => {
@@ -59,7 +79,14 @@ export function DigitalGuests() {
     setEditingId(g.id);
     setEditName(g.name);
     setEditPhone(g.phone);
+    setEditRanks(getGuestRanks(g));
     setRevealedId(null);
+  };
+
+  const toggleEditRank = (r) => {
+    setEditRanks((prev) =>
+      prev.includes(r) ? prev.filter((x) => x !== r) : [...prev, r],
+    );
   };
 
   const saveEdit = async () => {
@@ -73,10 +100,17 @@ export function DigitalGuests() {
       showToast(lang === "he" ? "10 ספרות בדיוק" : "رقم الهاتف 10 أرقام بالضبط");
       return;
     }
+    // Drop ranks that no longer exist in the master list (guards a stale
+    // chip from being persisted if the groom removed it in another tab).
+    const cleanedRanks = editRanks.filter((r) => availableRanks.includes(r));
     try {
-      await updateDigitalGuest(currentUid, editingId, { name: trimName, phone: digits });
+      await updateDigitalGuest(currentUid, editingId, {
+        name: trimName, phone: digits, ranks: cleanedRanks,
+      });
       // Optimistic local update — no subscription needed
-      setGuests(prev => prev.map(g => g.id === editingId ? { ...g, name: trimName, phone: digits } : g));
+      setGuests(prev => prev.map(g => g.id === editingId
+        ? { ...g, name: trimName, phone: digits, ranks: cleanedRanks }
+        : g));
       setEditingId(null);
     } catch (err) {
       logErr("saveDigitalEdit", err);
@@ -196,6 +230,58 @@ export function DigitalGuests() {
                              style={{ fontSize: 12, direction: "ltr" }}/>
                     </div>
                   </div>
+
+                  {/* Rank chip picker — tap any chip to toggle on/off */}
+                  <div style={{
+                    fontSize: 10, color: C.goldDim, marginBottom: 6,
+                    display: "flex", justifyContent: "space-between", alignItems: "baseline",
+                  }}>
+                    <span>{lang === "he" ? "רמות (אפשר לבחור כמה)" : "الرتب (يمكن اختيار عدة)"}</span>
+                    {editRanks.length > 0 && (
+                      <span style={{ color: C.gold, fontWeight: 700 }}>
+                        {editRanks.length} {lang === "he" ? "נבחרו" : "محددة"}
+                      </span>
+                    )}
+                  </div>
+                  {availableRanks.length === 0 ? (
+                    <div style={{
+                      marginBottom: 8, padding: "6px 8px", borderRadius: 8,
+                      background: "rgba(255,255,255,.02)", border: "1px dashed rgba(255,255,255,.1)",
+                      fontSize: 10, color: C.dim, textAlign: "center",
+                    }}>
+                      {lang === "he" ? "אין רמות — הוסף ברשימה הראשית" : "لا توجد رتب — أضفها في الرئيسية"}
+                    </div>
+                  ) : (
+                    <div style={{
+                      display: "flex", flexWrap: "wrap", gap: 5,
+                      marginBottom: 8, padding: "6px",
+                      borderRadius: 8, background: "rgba(255,255,255,.02)",
+                      border: "1px solid rgba(255,255,255,.06)",
+                    }}>
+                      {availableRanks.map(r => {
+                        const on = editRanks.includes(r);
+                        return (
+                          <button
+                            key={r}
+                            type="button"
+                            onClick={() => toggleEditRank(r)}
+                            style={{
+                              padding: "4px 10px", borderRadius: 999,
+                              border: on ? `1px solid ${C.gold}` : "1px solid rgba(255,255,255,.12)",
+                              background: on ? "rgba(201,168,76,.18)" : "transparent",
+                              color: on ? C.gold : C.goldDim,
+                              fontWeight: on ? 800 : 600,
+                              fontSize: 11, fontFamily: "inherit", cursor: "pointer",
+                              transition: "all .15s",
+                            }}
+                          >
+                            {on ? "✓ " : ""}{r}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
                   <div style={{ display: "flex", gap: 8 }}>
                     <button className="gold-btn"  style={{ flex: 1, padding: "8px 0", fontSize: 12 }} onClick={saveEdit}>
                       {lang === "he" ? "💾 שמור" : "💾 حفظ"}
@@ -211,10 +297,30 @@ export function DigitalGuests() {
                   {/* Status icon */}
                   <div style={{ fontSize: 20 }}>{sc.icon}</div>
 
-                  {/* Name + phone */}
+                  {/* Name + phone + ranks */}
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 800, color: C.goldLight, fontSize: 14, marginBottom: 2 }}>{g.name}</div>
                     <div style={{ fontSize: 11, color: "#5a5040", direction: "ltr", textAlign: "right" }}>{g.phone}</div>
+                    {(() => {
+                      const gr = getGuestRanks(g);
+                      if (gr.length === 0) return null;
+                      return (
+                        <div style={{
+                          display: "flex", flexWrap: "wrap", gap: 4,
+                          marginTop: 5,
+                        }}>
+                          {gr.map((r) => (
+                            <span key={r} style={{
+                              fontSize: 10, fontWeight: 700,
+                              padding: "2px 7px", borderRadius: 999,
+                              background: "rgba(201,168,76,.12)",
+                              border: "1px solid rgba(201,168,76,.3)",
+                              color: C.gold,
+                            }}>{r}</span>
+                          ))}
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   {/* Right side: status badge + edit + delete */}

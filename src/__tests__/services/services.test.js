@@ -581,11 +581,19 @@ describe("digitalInvitation — guests", () => {
     expect(out).toBe("dg1");
   });
 
-  it("addDigitalGuest includes trimmed rank when present", async () => {
+  it("addDigitalGuest includes trimmed ranks array when present", async () => {
     api.post.mockResolvedValueOnce({ id: "dg2" });
+    await digital.addDigitalGuest("g1", { name: "n", phone: "+1", ranks: [" VIP ", "Friend"] });
+    expect(api.post).toHaveBeenCalledWith("/digital/g1/guests", {
+      name: "n", phone: "+1", ranks: ["VIP", "Friend"],
+    });
+  });
+
+  it("addDigitalGuest promotes legacy single rank string to ranks[]", async () => {
+    api.post.mockResolvedValueOnce({ id: "dg2b" });
     await digital.addDigitalGuest("g1", { name: "n", phone: "+1", rank: " VIP " });
     expect(api.post).toHaveBeenCalledWith("/digital/g1/guests", {
-      name: "n", phone: "+1", rank: "VIP",
+      name: "n", phone: "+1", ranks: ["VIP"],
     });
   });
 

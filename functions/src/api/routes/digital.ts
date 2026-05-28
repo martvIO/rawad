@@ -105,7 +105,11 @@ digitalRouter.get(
 );
 
 /**
- * Add a guest. Body: `{ name, phone, rank? }`. Always seeds status="pending"
+ * Add a guest. Body: `{ name, phone, ranks? }` where `ranks` is an array
+ * of zero-or-more rank strings (each must already exist in the parent
+ * doc's `guestRanks`; the server does not enforce that — it accepts any
+ * string ≤ MAX_GUEST_RANK_LEN and dedupes). Legacy single `rank: string`
+ * is still accepted and folded into `[rank]`. Always seeds status="pending"
  * and createdAt=now. Returns `{ id, ...record }` so the client can render
  * the row immediately without a round-trip.
  */
@@ -137,8 +141,10 @@ digitalRouter.post(
 );
 
 /**
- * Patch a guest. Allowed fields: name, phone, rank, status, note. Unknown
+ * Patch a guest. Allowed fields: name, phone, ranks, status, note. Unknown
  * keys are dropped. Status is restricted to the same 3 values the UI cycles.
+ * `ranks` always replaces (pass `[]` to clear). Legacy `rank: string` is
+ * also accepted and folded into `ranks: [rank]`.
  */
 digitalRouter.patch(
   "/:uid/guests/:id",
@@ -875,7 +881,39 @@ type Sanitized<T> =
 interface DigitalGuestCreate {
   name: string;
   phone: string;
-  rank?: string;
+  ranks?: string[];
+}
+
+/**
+ * Coerce a `ranks` payload — accepts either `ranks: string[]` (new shape)
+ * or legacy `rank: string` (a single-rank picker, kept so old clients in
+ * the field continue to work). Returns a deduped, trimmed array capped at
+ * MAX_RANK_ITEMS, or null if the input is malformed.
+ */
+function coerceRanks(data: Record<string, unknown>):
+  | { ok: true; value: string[] | undefined }
+  | { ok: false; error: string; field: string } {
+  let raw: unknown;
+  if (data.ranks !== undefined) raw = data.ranks;
+  else if (data.rank !== undefined) raw = [data.rank];
+  else return { ok: true, value: undefined };
+
+  if (raw === null) return { ok: true, value: [] };
+  if (!Array.isArray(raw)) {
+    return { ok: false, error: "invalid_ranks", field: "ranks" };
+  }
+  const cleaned: string[] = [];
+  for (const r of raw) {
+    if (typeof r !== "string") continue;
+    const v = r.trim();
+    if (!v) continue;
+    if (v.length > MAX_GUEST_RANK_LEN) {
+      return { ok: false, error: "rank_too_long", field: "ranks" };
+    }
+    if (!cleaned.includes(v)) cleaned.push(v);
+    if (cleaned.length >= MAX_RANK_ITEMS) break;
+  }
+  return { ok: true, value: cleaned };
 }
 
 function sanitizeDigitalGuestCreate(
@@ -893,13 +931,12 @@ function sanitizeDigitalGuestCreate(
   if (!phone || phone.length > MAX_GUEST_PHONE_LEN) {
     return { ok: false, error: "invalid_phone", field: "phone" };
   }
-  const rankRaw = (data.rank ?? "").toString().trim();
+  const ranksResult = coerceRanks(data);
+  if (!ranksResult.ok) return ranksResult;
+
   const out: DigitalGuestCreate = { name, phone };
-  if (rankRaw) {
-    if (rankRaw.length > MAX_GUEST_RANK_LEN) {
-      return { ok: false, error: "rank_too_long", field: "rank" };
-    }
-    out.rank = rankRaw;
+  if (ranksResult.value && ranksResult.value.length > 0) {
+    out.ranks = ranksResult.value;
   }
   return { ok: true, value: out };
 }
@@ -907,7 +944,7 @@ function sanitizeDigitalGuestCreate(
 interface DigitalGuestPatch {
   name?: string;
   phone?: string;
-  rank?: string;
+  ranks?: string[];
   status?: string;
   note?: string;
 }
@@ -935,12 +972,11 @@ function sanitizeDigitalGuestPatch(
     }
     out.phone = v;
   }
-  if (data.rank !== undefined) {
-    const v = (data.rank ?? "").toString().trim();
-    if (v.length > MAX_GUEST_RANK_LEN) {
-      return { ok: false, error: "rank_too_long", field: "rank" };
-    }
-    out.rank = v;
+  if (data.ranks !== undefined || data.rank !== undefined) {
+    const ranksResult = coerceRanks(data);
+    if (!ranksResult.ok) return ranksResult;
+    // PATCH semantics: `ranks` always replaces (empty array clears).
+    out.ranks = ranksResult.value ?? [];
   }
   if (data.status !== undefined) {
     const v = (data.status ?? "").toString();

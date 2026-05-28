@@ -10,11 +10,14 @@ import { C } from "../../../../styles/theme.js";
 export function DigitalAddGuest() {
   const { lang, currentUid, showToast } = usePortal();
   const navigate = useNavigate();
-  const [name,   setName]   = useState("");
-  const [phone,  setPhone]  = useState("");
-  const [rank,   setRank]   = useState("");
-  const [ranks,  setRanks]  = useState([]);
-  const [saving, setSaving] = useState(false);
+  const [name,           setName]           = useState("");
+  const [phone,          setPhone]          = useState("");
+  // `selectedRanks` is the multi-select state — an array of rank labels the
+  // user has toggled on. `availableRanks` is the master list from the parent
+  // invitation doc (managed in DigitalDashboard).
+  const [selectedRanks,  setSelectedRanks]  = useState([]);
+  const [availableRanks, setAvailableRanks] = useState([]);
+  const [saving,         setSaving]         = useState(false);
   // Tracks unmount so we don't call setSaving on a dead component after the
   // optimistic navigate has fired. Avoids React's "state on unmounted" warning
   // and prevents the spinner state from being reset to stale on a fast remount.
@@ -24,8 +27,14 @@ export function DigitalAddGuest() {
   // Load the groom's custom ranks from the parent invitation doc.
   useEffect(() => {
     if (!currentUid) return;
-    return subscribeDigitalMedia(currentUid, (d) => setRanks(d?.guestRanks || []));
+    return subscribeDigitalMedia(currentUid, (d) => setAvailableRanks(d?.guestRanks || []));
   }, [currentUid]);
+
+  const toggleRank = (r) => {
+    setSelectedRanks((prev) =>
+      prev.includes(r) ? prev.filter((x) => x !== r) : [...prev, r],
+    );
+  };
 
   const nameWords  = name.trim().split(/\s+/).filter(Boolean);
   const phoneDigits = phone.replace(/\D/g, "");
@@ -55,18 +64,21 @@ export function DigitalAddGuest() {
     setSaving(true);
     try {
       const trimName = name.trim();
-      const cleanRank = rank.trim();
+      // Keep only ranks the user actually picked AND that still exist in the
+      // master list — protects against a race where the groom removed a rank
+      // in another tab between selection and submit.
+      const cleanRanks = selectedRanks.filter((r) => availableRanks.includes(r));
       const id = await addDigitalGuest(currentUid, {
-        name: trimName, phone: phoneDigits, rank: cleanRank,
+        name: trimName, phone: phoneDigits, ranks: cleanRanks,
       });
       showToast(lang === "he" ? "✓ המוזמן נוסף" : "✓ تم إضافة المدعو");
-      setName(""); setPhone(""); setRank("");
+      setName(""); setPhone(""); setSelectedRanks([]);
       // Pass the new guest via navigation state so the list shows it immediately
       // without waiting for the next subscription tick.
       const optimistic = {
         id, name: trimName, phone: phoneDigits, status: "pending", createdAt: Date.now(),
       };
-      if (cleanRank) optimistic.rank = cleanRank;
+      if (cleanRanks.length > 0) optimistic.ranks = cleanRanks;
       navigate("/portal/groom/digital/guests", { state: { newGuest: optimistic } });
     } catch (err) {
       logErr("addDigitalGuest", err);
@@ -136,27 +148,54 @@ export function DigitalAddGuest() {
           {phoneDigits.length} / 10
         </div>
 
-        {/* Rank dropdown — dynamically loaded from the groom's saved ranks */}
-        <div style={{ marginBottom: 6, fontSize: 12, color: C.goldDim }}>
-          {lang === "he" ? "רמת המוזמן" : "رتبة المدعو"}
+        {/* Ranks chip picker — tap each chip to toggle. Multi-select. */}
+        <div style={{ marginBottom: 6, fontSize: 12, color: C.goldDim,
+                      display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+          <span>{lang === "he" ? "רמות המוזמן (אפשר לבחור כמה)" : "رتب المدعو (يمكن اختيار عدة)"}</span>
+          {selectedRanks.length > 0 && (
+            <span style={{ fontSize: 10, color: C.gold, fontWeight: 700 }}>
+              {selectedRanks.length} {lang === "he" ? "נבחרו" : "محددة"}
+            </span>
+          )}
         </div>
-        <select
-          className="input-field"
-          value={rank}
-          onChange={e => setRank(e.target.value)}
-          disabled={ranks.length === 0}
-          style={{ marginBottom: 6, fontFamily: "inherit",
-                   cursor: ranks.length === 0 ? "not-allowed" : "pointer" }}
-        >
-          <option value="">
-            {ranks.length === 0
-              ? (lang === "he" ? "אין רמות — הוסף ברשימה הראשית" : "لا توجد رتب — أضفها في الرئيسية")
-              : (lang === "he" ? "— ללא רמה —" : "— بدون رتبة —")}
-          </option>
-          {ranks.map(r => (
-            <option key={r} value={r}>{r}</option>
-          ))}
-        </select>
+        {availableRanks.length === 0 ? (
+          <div style={{
+            marginBottom: 16, padding: "10px 12px", borderRadius: 10,
+            background: "rgba(255,255,255,.03)", border: "1px dashed rgba(255,255,255,.12)",
+            fontSize: 12, color: C.dim, textAlign: "center",
+          }}>
+            {lang === "he" ? "אין רמות — הוסף ברשימה הראשית" : "لا توجد رتب — أضفها في الرئيسية"}
+          </div>
+        ) : (
+          <div style={{
+            display: "flex", flexWrap: "wrap", gap: 6,
+            marginBottom: 6, padding: "8px 6px",
+            borderRadius: 10, background: "rgba(255,255,255,.02)",
+            border: "1px solid rgba(255,255,255,.06)",
+          }}>
+            {availableRanks.map(r => {
+              const on = selectedRanks.includes(r);
+              return (
+                <button
+                  key={r}
+                  type="button"
+                  onClick={() => toggleRank(r)}
+                  style={{
+                    padding: "6px 12px", borderRadius: 999,
+                    border: on ? `1px solid ${C.gold}` : "1px solid rgba(255,255,255,.12)",
+                    background: on ? "rgba(201,168,76,.18)" : "transparent",
+                    color: on ? C.gold : C.goldDim,
+                    fontWeight: on ? 800 : 600,
+                    fontSize: 12, fontFamily: "inherit", cursor: "pointer",
+                    transition: "all .15s",
+                  }}
+                >
+                  {on ? "✓ " : ""}{r}
+                </button>
+              );
+            })}
+          </div>
+        )}
         <div style={{ fontSize: 10, color: C.dim, marginBottom: 20, lineHeight: 1.6 }}>
           {lang === "he"
             ? "ניתן לנהל את הרמות בעמוד הראשי"
