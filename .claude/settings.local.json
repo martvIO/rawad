@@ -43,7 +43,11 @@
       "PowerShell(npx firebase deploy --only hosting --project dawa-aa793 --non-interactive)",
       "Bash(python -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d.get\\('scripts',{}\\), indent=2\\)\\)\")",
       "Bash(curl -s http://127.0.0.1:5001/dawa-aa793/us-central1/api/auth/login -o /dev/null -w \"%{http_code}\")",
-      "Bash(npx @playwright/mcp@latest --version)"
+      "Bash(npx @playwright/mcp@latest --version)",
+      "Bash(chmod +x \"C:/Users/martv/.claude/skills/wiki-brain/hooks/session-start.sh\")",
+      "Bash(bash \"C:/Users/martv/.claude/skills/wiki-brain/hooks/session-start.sh\")",
+      "Bash(python3 -c \"import json; print\\(json.load\\(open\\('/c/Users/martv/.claude/skills/wiki-brain/config.json'\\)\\).get\\('vaultPath',''\\)\\)\")",
+      "Bash(python3 -c \"import json; print\\(json.load\\(open\\('C:/Users/martv/.claude/skills/wiki-brain/config.json'\\)\\).get\\('vaultPath',''\\)\\)\")"
     ]
   },
   "mcpServers": {

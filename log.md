@@ -16,3 +16,9 @@ Chronological, append-only record of everything that's happened in this wiki.
 
 ## [2026-05-26 17:35] ingest | Dawa project docs (initial wiki build)
 Touched: Dawa, User Roles, REST API Architecture, Authentication, Polling and Realtime, Data Storage Model, Security Model, Digital Invitations, Optimistic UI Pattern, Inline Styling Convention, API Contracts, Architecture Decisions, Known Bugs, Tasks Backlog, AI Engineering Rules
+
+## [2026-05-28] session | Full Playwright QA audit of live production app
+Touched: none (new report file qa-audit-2026-05-28.md written to repo root; project memory saved)
+
+## [2026-05-28 07:03] session | Add SessionStart hook for wiki-brain
+Touched: none (config/hook setup, not a wiki page change)
