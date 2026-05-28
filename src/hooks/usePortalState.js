@@ -512,7 +512,7 @@ export function usePortalState({ onBack, t, lang, setLang }) {
       if (!token) { showToast(t("share_invalid")); return; }
       const baseUrl = (INVITE_BASE_URL || "").replace(/\/+$/, "")
                    || window.location.origin;
-      const url = `${baseUrl}/invite/digital/${token}`;
+      const url = `${baseUrl}/d/${adminSelectedGroom}/${token}`;
       const waUrl = buildWaLink(guest.phone, (adminMessageBody || "").trim(), url);
       if (waUrl) window.open(waUrl, "_blank", "noopener");
     } catch (e) {
