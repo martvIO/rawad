@@ -14,7 +14,7 @@ import { AdminUserManager } from "./AdminUserManager.jsx";
 import { AdminSendTab } from "./AdminSendTab.jsx";
 import { AdminSettingsTab } from "./AdminSettingsTab.jsx";
 import { AdminConfirmationsTab } from "./AdminConfirmationsTab.jsx";
-import { AdminDesignRequests } from "./AdminDesignRequests.jsx";
+import { AdminDesigns } from "./AdminDesigns.jsx";
 import { C } from "../../../styles/theme.js";
 
 const tabStyle = ({ isActive }) => ({
@@ -79,7 +79,7 @@ export function AdminPortal() {
           <Route path="users"           element={<AdminUserManager />} />
           <Route path="send"            element={<AdminSendTab />} />
           <Route path="confirmations"   element={<AdminConfirmationsTab />} />
-          <Route path="designs"         element={<AdminDesignRequests />} />
+          <Route path="designs"         element={<AdminDesigns />} />
           <Route path="settings"        element={<AdminSettingsTab />} />
           <Route path="*"               element={<Navigate to="users" replace />} />
         </Routes>

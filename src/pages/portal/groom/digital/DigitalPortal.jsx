@@ -9,7 +9,7 @@ import { DigitalDashboard } from "./DigitalDashboard.jsx";
 import { DigitalGuests } from "./DigitalGuests.jsx";
 import { DigitalAddGuest } from "./DigitalAddGuest.jsx";
 import { DigitalPhotographer } from "./DigitalPhotographer.jsx";
-import { DigitalDesignRequest } from "./DigitalDesignRequest.jsx";
+import { DigitalDesignEditor } from "./DigitalDesignEditor.jsx";
 import { C } from "../../../../styles/theme.js";
 import { STORAGE_KEYS } from "../../../../constants/storageKeys.js";
 
@@ -96,7 +96,7 @@ export function DigitalPortal() {
           <Route path="guests"       element={<DigitalGuests />} />
           <Route path="add"          element={<DigitalAddGuest />} />
           <Route path="photographer" element={<DigitalPhotographer />} />
-          <Route path="design"       element={<DigitalDesignRequest />} />
+          <Route path="design"       element={<DigitalDesignEditor />} />
           <Route path="*"            element={<Navigate to="dashboard" replace />} />
         </Routes>
       </div>

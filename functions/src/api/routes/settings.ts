@@ -22,10 +22,19 @@ import { requireAuth, requireAdmin, AuthRequest } from "../middleware/auth";
 
 const MAX_MESSAGE_BODY_LEN = 4000;
 const MAX_FORM_LINK_LEN = 1000;
+const MAX_DIGITAL_MSG_LEN = 4000;
 const HTTPS_PREFIX = "https://";
 
+const VALID_MODES = new Set(["manual", "digital"]);
+
 /** Names of fields the PATCH endpoint is allowed to set. */
-const ALLOWED_KEYS = new Set(["messageBody", "formLink"]);
+const ALLOWED_KEYS = new Set([
+  "messageBody",
+  "formLink",
+  "mode",
+  "digitalBaseUrl",
+  "digitalMessage",
+]);
 
 export const settingsRouter = Router();
 
@@ -116,6 +125,20 @@ function validatePatch(patch: Record<string, unknown>): ValidationResult {
       if (value.length > 0 && !value.startsWith(HTTPS_PREFIX)) {
         return { ok: false, error: "must_be_https", field: key };
       }
+    }
+    if (key === "mode" && !VALID_MODES.has(value)) {
+      return { ok: false, error: "invalid_mode", field: key };
+    }
+    if (key === "digitalBaseUrl") {
+      if (value.length > MAX_FORM_LINK_LEN) {
+        return { ok: false, error: "too_long", field: key };
+      }
+      if (value.length > 0 && !value.startsWith(HTTPS_PREFIX)) {
+        return { ok: false, error: "must_be_https", field: key };
+      }
+    }
+    if (key === "digitalMessage" && value.length > MAX_DIGITAL_MSG_LEN) {
+      return { ok: false, error: "too_long", field: key };
     }
     sanitized[key] = value;
   }

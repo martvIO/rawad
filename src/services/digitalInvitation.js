@@ -11,10 +11,10 @@
 //   /digital/:uid/photographer                 — photographer files list
 //   /digital/:uid/photographer/upload          — multipart upload
 //   /digital/:uid/photographer/:fileId         — patch (rename) / delete
-//   /digital/:uid/design-requests              — design workflow (groom view)
-//   /digital/design-requests                   — design workflow (admin global)
-//   /digital/:uid/design-requests/:reqId       — patch
-//   /digital/:uid/design-requests/:reqId/mockup — admin mockup upload
+//   /digital/:uid/media/settings               — design fields PATCH (see patchDesignFields)
+//   /digital/:uid/design/submit|cancel         — groom design state transitions
+//   /digital/:uid/design/approve|reject        — admin design state transitions
+//   /digital/design-list                       — admin design review grid
 //   /digital/:uid/public                       — unauthenticated read
 
 import { api } from "../utils/apiClient.js";
@@ -191,6 +191,65 @@ export async function setGuestRanks(groomUid, ranks) {
   return api.patch(`/digital/${uid}/media/settings`, {
     guestRanks: Array.isArray(ranks) ? ranks : [],
   });
+}
+
+/**
+ * Patch any subset of the groom's design fields in one round trip. Used by
+ * the self-serve design editor. Server demotes designStatus back to draft
+ * if the design was approved and any design field changes.
+ */
+export async function patchDesignFields(groomUid, patch) {
+  const uid = resolveUid(groomUid);
+  return api.patch(`/digital/${uid}/media/settings`, patch || {});
+}
+
+// ─── Design approval state machine ────────────────────────────────────────────
+
+export async function submitDesignForApproval(groomUid) {
+  const uid = resolveUid(groomUid);
+  return api.post(`/digital/${uid}/design/submit`, {});
+}
+
+export async function cancelDesignSubmission(groomUid) {
+  const uid = resolveUid(groomUid);
+  return api.post(`/digital/${uid}/design/cancel`, {});
+}
+
+export async function approveDigitalDesign(groomUid) {
+  return api.post(`/digital/${groomUid}/design/approve`, {});
+}
+
+export async function rejectDigitalDesign(groomUid, note) {
+  return api.post(`/digital/${groomUid}/design/reject`, { note: note || "" });
+}
+
+export async function fetchDigitalDesignList() {
+  try {
+    return await api.get("/digital/design-list");
+  } catch (err) {
+    logErr("fetchDigitalDesignList", err);
+    return [];
+  }
+}
+
+/**
+ * Periodic poll of the admin design list. Mirrors subscribeDigitalGuests
+ * shape so the AdminDesigns screen can use the standard useEffect pattern.
+ */
+export function subscribeAdminDesignList(cb, onErrCb) {
+  return createPoller(
+    async () => {
+      try {
+        return await api.get("/digital/design-list");
+      } catch (err) {
+        logErr("subscribeAdminDesignList", err);
+        if (typeof onErrCb === "function") onErrCb(err);
+        return [];
+      }
+    },
+    (value) => cb(Array.isArray(value) ? value : []),
+    { intervalMs: DIGITAL_POLL_INTERVAL_MS },
+  );
 }
 
 /**

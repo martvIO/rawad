@@ -45,33 +45,42 @@ import { MAX_BYTES, MAX_LEN } from "../../constants/limits";
 const COLL_ROOT = "digitalInvitations";
 const COLL_GUESTS = "guests";
 const COLL_PHOTOG = "photographerFiles";
-const COLL_DESIGN = "designRequests";
 
 const STORAGE_MEDIA_PREFIX = "digitalMedia";
 const STORAGE_PHOTOG_PREFIX = "photographerFiles";
-const STORAGE_DESIGN_PREFIX = "designMockups";
 
 const MAX_GUEST_NAME_LEN = MAX_LEN.NAME;
 const MAX_GUEST_PHONE_LEN = MAX_LEN.PHONE;
 const MAX_GUEST_RANK_LEN = MAX_LEN.GUEST_RANK;
 const MAX_GUEST_NOTE_LEN = MAX_LEN.NOTE;
 const MAX_BRIDE_NAME_LEN = MAX_LEN.NAME;
+const MAX_VENUE_LEN = 120;
+const MAX_VENUE_ADDR_LEN = 200;
+const MAX_CUSTOM_MSG_LEN = 500;
+const MAX_REJECT_NOTE_LEN = 500;
 const MAX_RANK_ITEMS = 32;
 const MAX_GUEST_STATUSES = new Set(["pending", "attending", "absent"]);
-const ALLOWED_DESIGN_STATUSES = new Set([
-  "submitted",
-  "designing",
-  "review",
-  "revision_requested",
-  "approved",
+
+const THEME_COLORS = new Set(["gold", "rose", "blue", "emerald", "white"]);
+const FONT_FAMILIES = new Set(["amiri", "noto", "cairo"]);
+
+// Fields whose change demotes an approved design back to draft. Operational
+// flags (photographerPublished, guestRanks) are intentionally NOT design fields.
+const DESIGN_FIELDS = new Set([
+  "brideName",
+  "groomDisplayName",
+  "weddingDate",
+  "venue",
+  "venueAddress",
+  "customMessage",
+  "themeColor",
+  "fontFamily",
 ]);
 
 const MAX_INVITE_MEDIA_BYTES = MAX_BYTES.INVITE_MEDIA;
 const MAX_PHOTOG_BYTES = MAX_BYTES.PHOTOGRAPHER;
-const MAX_MOCKUP_BYTES = MAX_BYTES.MOCKUP;
 
 const ALLOWED_MEDIA_PREFIX = ["image/", "video/"];
-const ALLOWED_MOCKUP_PREFIX = ["image/"];
 
 const SAFE_NAME_RE = /[^\w.\-]/g;
 
@@ -240,7 +249,21 @@ digitalRouter.patch(
       return;
     }
     try {
-      await mediaDoc(req.params.uid).set(sanitized.value, { merge: true });
+      const patch: Record<string, unknown> = { ...sanitized.value };
+      const touchesDesign = Object.keys(sanitized.value).some((k) =>
+        DESIGN_FIELDS.has(k)
+      );
+      if (touchesDesign) {
+        // Edits to a design field while approved demote it back to draft —
+        // already-sent invite tokens are unaffected because they carry a
+        // designSnapshot embedded at mint time.
+        const snap = await mediaDoc(req.params.uid).get();
+        if (snap.exists && snap.data()?.designStatus === "approved") {
+          patch.designStatus = "draft";
+          patch.designApprovedAt = null;
+        }
+      }
+      await mediaDoc(req.params.uid).set(patch, { merge: true });
       res.json({ ok: true });
     } catch (err) {
       res.status(500).json({ error: "write_failed", detail: safeDetail(err) });
@@ -312,7 +335,12 @@ digitalRouter.post(
         const data = docSnap.exists ? docSnap.data() : null;
         const existing = (data?.media ?? []) as unknown[];
         const migrated = migrateLegacyBackground(data, existing);
-        tx.set(docRef, { media: [...migrated, item] }, { merge: true });
+        const update: Record<string, unknown> = { media: [...migrated, item] };
+        if (data?.designStatus === "approved") {
+          update.designStatus = "draft";
+          update.designApprovedAt = null;
+        }
+        tx.set(docRef, update, { merge: true });
       });
       res.json(item);
     } catch (err) {
@@ -348,9 +376,15 @@ digitalRouter.post(
       await fs().runTransaction(async (tx) => {
         const snap = await tx.get(docRef);
         if (!snap.exists) return;
-        const existing = (snap.data()?.media ?? []) as { storagePath?: string }[];
+        const data = snap.data();
+        const existing = (data?.media ?? []) as { storagePath?: string }[];
         const filtered = existing.filter((m) => m.storagePath !== storagePath);
-        tx.set(docRef, { media: filtered }, { merge: true });
+        const update: Record<string, unknown> = { media: filtered };
+        if (data?.designStatus === "approved") {
+          update.designStatus = "draft";
+          update.designApprovedAt = null;
+        }
+        tx.set(docRef, update, { merge: true });
       });
       await deleteStorageObjectSilently(storagePath);
       res.json({ ok: true });
@@ -516,25 +550,56 @@ digitalRouter.delete(
 );
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// DESIGN REQUESTS  —  digitalInvitations/{uid}/designRequests
+// DESIGN APPROVAL STATE MACHINE  —  fields on digitalInvitations/{uid}
 // ═══════════════════════════════════════════════════════════════════════════════
+//
+// designStatus transitions:
+//   draft | rejected      → POST /design/submit  → pending_approval
+//   pending_approval      → POST /design/cancel  → draft  (groom)
+//   pending_approval      → POST /design/approve → approved (admin)
+//   pending_approval      → POST /design/reject  → rejected (admin)
+//   approved              → any design-field edit → draft (handled in PATCH
+//                                                  /media/settings + media
+//                                                  upload + delete-item)
+//
+// Already-distributed invite tokens carry a designSnapshot embedded at mint
+// time, so demoting back to draft never alters the invitation that a guest
+// already opened.
 
 /**
- * Admin-only collectionGroup read across every groom's design requests.
- * Mounted BEFORE the /:uid/design-requests routes so the literal path
- * doesn't get captured as a groomUid.
+ * Admin-only: list every groom's invitation doc with their current design
+ * status + the fields the admin needs to render the review grid. Mounted
+ * BEFORE /:uid/* so the literal path isn't captured as a groomUid.
  */
 digitalRouter.get(
-  "/design-requests",
+  "/design-list",
   requireAuth,
   requireAdmin,
   async (_req: AuthRequest, res: Response) => {
     try {
-      const snap = await getFirestore()
-        .collectionGroup(COLL_DESIGN)
-        .orderBy("createdAt", "desc")
-        .get();
-      res.json(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+      const snap = await getFirestore().collection(COLL_ROOT).get();
+      const rows = snap.docs.map((d) => {
+        const data = d.data() || {};
+        return {
+          groomUid: d.id,
+          brideName: data.brideName ?? "",
+          groomDisplayName: data.groomDisplayName ?? "",
+          weddingDate: data.weddingDate ?? null,
+          venue: data.venue ?? "",
+          venueAddress: data.venueAddress ?? "",
+          customMessage: data.customMessage ?? "",
+          themeColor: data.themeColor ?? "gold",
+          fontFamily: data.fontFamily ?? "amiri",
+          media: Array.isArray(data.media) ? data.media : [],
+          designStatus: data.designStatus ?? "draft",
+          designSubmittedAt: data.designSubmittedAt ?? null,
+          designApprovedAt: data.designApprovedAt ?? null,
+          designRejectedAt: data.designRejectedAt ?? null,
+          designRejectionNote: data.designRejectionNote ?? null,
+          designVersion: data.designVersion ?? 1,
+        };
+      });
+      res.json(rows);
     } catch (err) {
       res.status(500).json({ error: "read_failed", detail: safeDetail(err) });
     }
@@ -542,60 +607,45 @@ digitalRouter.get(
 );
 
 /**
- * List one groom's design requests, sorted newest first. Admin or owning
- * groom only — mirrors `firestore.rules`.
- */
-digitalRouter.get(
-  "/:uid/design-requests",
-  requireAuth,
-  async (req: AuthRequest, res: Response) => {
-    if (!canActOnUid(req, req.params.uid)) {
-      res.status(403).json({ error: "forbidden" });
-      return;
-    }
-    try {
-      const snap = await designCol(req.params.uid)
-        .orderBy("createdAt", "desc")
-        .get();
-      res.json(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-    } catch (err) {
-      res.status(500).json({ error: "read_failed", detail: safeDetail(err) });
-    }
-  }
-);
-
-/**
- * Groom submits a new design template. Body: `{ groomUsername, templateData }`.
- * Always seeds status="submitted", empty mockups[], null revisionNotes/approvedAt.
+ * Groom submits design for admin approval. Allowed only from draft|rejected.
+ * Increments designVersion, clears any rejection note, stamps designSubmittedAt.
  */
 digitalRouter.post(
-  "/:uid/design-requests",
+  "/:uid/design/submit",
   requireAuth,
   async (req: AuthRequest, res: Response) => {
     if (!canActOnUid(req, req.params.uid)) {
       res.status(403).json({ error: "forbidden" });
       return;
     }
-    const groomUsername = (req.body?.groomUsername ?? "").toString().slice(0, 60);
-    const templateData = req.body?.templateData ?? {};
-    if (!templateData || typeof templateData !== "object" || Array.isArray(templateData)) {
-      res.status(400).json({ error: "invalid_template_data" });
-      return;
-    }
-    const now = Date.now();
     try {
-      const docRef = await designCol(req.params.uid).add({
-        groomUid: req.params.uid,
-        groomUsername,
-        status: "submitted",
-        templateData,
-        mockups: [],
-        revisionNotes: null,
-        createdAt: now,
-        updatedAt: now,
-        approvedAt: null,
+      const docRef = mediaDoc(req.params.uid);
+      const result = await fs().runTransaction(async (tx) => {
+        const snap = await tx.get(docRef);
+        const data = snap.exists ? snap.data() : null;
+        const status = (data?.designStatus ?? "draft") as string;
+        if (status !== "draft" && status !== "rejected") {
+          return { ok: false as const, error: "invalid_state", status };
+        }
+        const version = Number(data?.designVersion ?? 0) + 1;
+        const now = Date.now();
+        tx.set(
+          docRef,
+          {
+            designStatus: "pending_approval",
+            designSubmittedAt: now,
+            designRejectionNote: null,
+            designVersion: version,
+          },
+          { merge: true }
+        );
+        return { ok: true as const, version, submittedAt: now };
       });
-      res.json({ id: docRef.id });
+      if (!result.ok) {
+        res.status(409).json({ error: result.error, currentStatus: result.status });
+        return;
+      }
+      res.json({ ok: true, designVersion: result.version, designSubmittedAt: result.submittedAt });
     } catch (err) {
       res.status(500).json({ error: "write_failed", detail: safeDetail(err) });
     }
@@ -603,35 +653,33 @@ digitalRouter.post(
 );
 
 /**
- * Patch a design request. Accepts any of:
- *   - status: one of the 5 allowed values
- *   - mockups: array (set by mockup-upload endpoint typically)
- *   - revisionNotes: string|null
- *   - approvedAt: number|null
- * Server always stamps `updatedAt: now`. Admin can transition to any status;
- * groom can only transition to approved / revision_requested.
+ * Groom cancels a pending submission, dropping back to draft so they can
+ * keep editing without admin intervention.
  */
-digitalRouter.patch(
-  "/:uid/design-requests/:reqId",
+digitalRouter.post(
+  "/:uid/design/cancel",
   requireAuth,
   async (req: AuthRequest, res: Response) => {
     if (!canActOnUid(req, req.params.uid)) {
       res.status(403).json({ error: "forbidden" });
       return;
     }
-    const sanitized = sanitizeDesignPatch(req.body, req.caller!.claims.role === "admin");
-    if (!sanitized.ok) {
-      res.status(400).json({ error: sanitized.error, field: sanitized.field });
-      return;
-    }
-    if (Object.keys(sanitized.value).length === 0) {
-      res.status(400).json({ error: "empty_patch" });
-      return;
-    }
     try {
-      await designCol(req.params.uid)
-        .doc(req.params.reqId)
-        .update({ ...sanitized.value, updatedAt: Date.now() });
+      const docRef = mediaDoc(req.params.uid);
+      const result = await fs().runTransaction(async (tx) => {
+        const snap = await tx.get(docRef);
+        const data = snap.exists ? snap.data() : null;
+        const status = (data?.designStatus ?? "draft") as string;
+        if (status !== "pending_approval") {
+          return { ok: false as const, error: "invalid_state", status };
+        }
+        tx.set(docRef, { designStatus: "draft" }, { merge: true });
+        return { ok: true as const };
+      });
+      if (!result.ok) {
+        res.status(409).json({ error: result.error, currentStatus: result.status });
+        return;
+      }
       res.json({ ok: true });
     } catch (err) {
       res.status(500).json({ error: "write_failed", detail: safeDetail(err) });
@@ -640,75 +688,92 @@ digitalRouter.patch(
 );
 
 /**
- * Admin uploads a mockup image. Multipart `file`, max 50 MB, `image/*`.
- * Appends the new mockup metadata to the request's mockups[] and flips
- * status to "review", clearing any prior revisionNotes.
+ * Admin approves a pending design. Stamps designApprovedAt and clears the
+ * rejection note (in case the groom resubmitted after a prior rejection).
  */
 digitalRouter.post(
-  "/:uid/design-requests/:reqId/mockup",
+  "/:uid/design/approve",
   requireAuth,
   requireAdmin,
   async (req: AuthRequest, res: Response) => {
-    let parsed: ParsedMultipart;
     try {
-      parsed = await parseMultipart(req, MAX_MOCKUP_BYTES);
-    } catch (err) {
-      res.status(400).json({ error: "invalid_multipart", detail: safeDetail(err) });
-      return;
-    }
-    if (!parsed.file) {
-      res.status(400).json({ error: "missing_file" });
-      return;
-    }
-    if (parsed.file.truncated) {
-      res.status(413).json({ error: "file_too_large", maxBytes: MAX_MOCKUP_BYTES });
-      return;
-    }
-    if (!hasAllowedPrefix(parsed.file.contentType, ALLOWED_MOCKUP_PREFIX)) {
-      res.status(415).json({ error: "unsupported_content_type" });
-      return;
-    }
-
-    try {
-      const { uid, reqId } = req.params;
-      const safeName = parsed.file.filename.replace(SAFE_NAME_RE, "_");
-      const path = `${STORAGE_DESIGN_PREFIX}/${uid}/${reqId}/${Date.now()}_${safeName}`;
-      const url = await uploadAndGetUrl(
-        path,
-        parsed.file.buffer,
-        parsed.file.contentType
-      );
-      const mockup = {
-        url,
-        storagePath: path,
-        uploadedAt: Date.now(),
-        name: parsed.file.filename,
-      };
-
-      // BUG-O003 fix — same race as media upload. Admins occasionally
-      // upload multiple revision mockups in parallel; without a transaction
-      // each request would read+write mockups[] independently and stomp
-      // siblings.
-      const docRef = designCol(uid).doc(reqId);
-      const committed = await fs().runTransaction(async (tx) => {
-        const docSnap = await tx.get(docRef);
-        if (!docSnap.exists) return false;
-        const existing = (docSnap.data()?.mockups ?? []) as unknown[];
-        tx.update(docRef, {
-          mockups: [...existing, mockup],
-          status: "review",
-          revisionNotes: null,
-          updatedAt: Date.now(),
-        });
-        return true;
+      const docRef = mediaDoc(req.params.uid);
+      const result = await fs().runTransaction(async (tx) => {
+        const snap = await tx.get(docRef);
+        const data = snap.exists ? snap.data() : null;
+        const status = (data?.designStatus ?? "draft") as string;
+        if (status !== "pending_approval") {
+          return { ok: false as const, error: "invalid_state", status };
+        }
+        const now = Date.now();
+        tx.set(
+          docRef,
+          {
+            designStatus: "approved",
+            designApprovedAt: now,
+            designRejectionNote: null,
+          },
+          { merge: true }
+        );
+        return { ok: true as const, approvedAt: now };
       });
-      if (!committed) {
-        res.status(404).json({ error: "design_request_not_found" });
+      if (!result.ok) {
+        res.status(409).json({ error: result.error, currentStatus: result.status });
         return;
       }
-      res.json(mockup);
+      res.json({ ok: true, designApprovedAt: result.approvedAt });
     } catch (err) {
-      res.status(500).json({ error: "upload_failed", detail: safeDetail(err) });
+      res.status(500).json({ error: "write_failed", detail: safeDetail(err) });
+    }
+  }
+);
+
+/**
+ * Admin rejects a pending design with an explanatory note the groom will
+ * see in their Design tab. Body: `{ note: string }`.
+ */
+digitalRouter.post(
+  "/:uid/design/reject",
+  requireAuth,
+  requireAdmin,
+  async (req: AuthRequest, res: Response) => {
+    const note = (req.body?.note ?? "").toString().trim();
+    if (!note) {
+      res.status(400).json({ error: "missing_note", field: "note" });
+      return;
+    }
+    if (note.length > MAX_REJECT_NOTE_LEN) {
+      res.status(400).json({ error: "note_too_long", field: "note" });
+      return;
+    }
+    try {
+      const docRef = mediaDoc(req.params.uid);
+      const result = await fs().runTransaction(async (tx) => {
+        const snap = await tx.get(docRef);
+        const data = snap.exists ? snap.data() : null;
+        const status = (data?.designStatus ?? "draft") as string;
+        if (status !== "pending_approval") {
+          return { ok: false as const, error: "invalid_state", status };
+        }
+        const now = Date.now();
+        tx.set(
+          docRef,
+          {
+            designStatus: "rejected",
+            designRejectedAt: now,
+            designRejectionNote: note,
+          },
+          { merge: true }
+        );
+        return { ok: true as const, rejectedAt: now };
+      });
+      if (!result.ok) {
+        res.status(409).json({ error: result.error, currentStatus: result.status });
+        return;
+      }
+      res.json({ ok: true, designRejectedAt: result.rejectedAt });
+    } catch (err) {
+      res.status(500).json({ error: "write_failed", detail: safeDetail(err) });
     }
   }
 );
@@ -748,10 +813,6 @@ function guestsCol(uid: string): CollectionReference {
 
 function photographerCol(uid: string): CollectionReference {
   return fs().collection(`${COLL_ROOT}/${uid}/${COLL_PHOTOG}`);
-}
-
-function designCol(uid: string): CollectionReference {
-  return fs().collection(`${COLL_ROOT}/${uid}/${COLL_DESIGN}`);
 }
 
 /**
@@ -1001,6 +1062,11 @@ interface MediaSettings {
   guestRanks?: string[];
   brideName?: string;
   groomDisplayName?: string;
+  venue?: string;
+  venueAddress?: string;
+  customMessage?: string;
+  themeColor?: string;
+  fontFamily?: string;
 }
 
 function sanitizeMediaSettings(body: unknown): Sanitized<MediaSettings> {
@@ -1063,67 +1129,44 @@ function sanitizeMediaSettings(body: unknown): Sanitized<MediaSettings> {
     }
     out.groomDisplayName = v;
   }
-  return { ok: true, value: out };
-}
-
-interface DesignPatch {
-  status?: string;
-  mockups?: unknown[];
-  revisionNotes?: string | null;
-  approvedAt?: number | null;
-}
-
-const GROOM_ALLOWED_STATUSES = new Set(["approved", "revision_requested"]);
-
-function sanitizeDesignPatch(
-  body: unknown,
-  isAdmin: boolean
-): Sanitized<DesignPatch> {
-  if (!body || typeof body !== "object" || Array.isArray(body)) {
-    return { ok: false, error: "invalid_body" };
+  if (data.venue !== undefined) {
+    const v = (data.venue ?? "").toString().trim();
+    if (v.length > MAX_VENUE_LEN) {
+      return { ok: false, error: "venue_too_long", field: "venue" };
+    }
+    out.venue = v;
   }
-  const data = body as Record<string, unknown>;
-  const out: DesignPatch = {};
-
-  if (data.status !== undefined) {
-    const v = (data.status ?? "").toString();
-    if (!ALLOWED_DESIGN_STATUSES.has(v)) {
-      return { ok: false, error: "invalid_status", field: "status" };
+  if (data.venueAddress !== undefined) {
+    const v = (data.venueAddress ?? "").toString().trim();
+    if (v.length > MAX_VENUE_ADDR_LEN) {
+      return { ok: false, error: "venue_address_too_long", field: "venueAddress" };
     }
-    if (!isAdmin && !GROOM_ALLOWED_STATUSES.has(v)) {
-      return { ok: false, error: "groom_status_forbidden", field: "status" };
-    }
-    out.status = v;
+    out.venueAddress = v;
   }
-  if (data.mockups !== undefined) {
-    if (!Array.isArray(data.mockups)) {
-      return { ok: false, error: "invalid_mockups", field: "mockups" };
+  if (data.customMessage !== undefined) {
+    const v = (data.customMessage ?? "").toString();
+    if (v.length > MAX_CUSTOM_MSG_LEN) {
+      return { ok: false, error: "custom_message_too_long", field: "customMessage" };
     }
-    out.mockups = data.mockups;
+    out.customMessage = v;
   }
-  if (data.revisionNotes !== undefined) {
-    if (data.revisionNotes === null) {
-      out.revisionNotes = null;
-    } else if (typeof data.revisionNotes === "string") {
-      out.revisionNotes = data.revisionNotes.slice(0, MAX_GUEST_NOTE_LEN);
-    } else {
-      return { ok: false, error: "invalid_revision_notes", field: "revisionNotes" };
+  if (data.themeColor !== undefined) {
+    const v = (data.themeColor ?? "").toString();
+    if (!THEME_COLORS.has(v)) {
+      return { ok: false, error: "invalid_theme_color", field: "themeColor" };
     }
+    out.themeColor = v;
   }
-  if (data.approvedAt !== undefined) {
-    if (data.approvedAt === null) {
-      out.approvedAt = null;
-    } else if (
-      typeof data.approvedAt === "number" &&
-      Number.isFinite(data.approvedAt)
-    ) {
-      out.approvedAt = data.approvedAt;
-    } else {
-      return { ok: false, error: "invalid_approved_at", field: "approvedAt" };
+  if (data.fontFamily !== undefined) {
+    const v = (data.fontFamily ?? "").toString();
+    if (!FONT_FAMILIES.has(v)) {
+      return { ok: false, error: "invalid_font_family", field: "fontFamily" };
     }
+    out.fontFamily = v;
   }
   return { ok: true, value: out };
 }
+
 
 // ─── Media-doc projection (legacy compatibility) ──────────────────────────────
 

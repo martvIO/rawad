@@ -56,7 +56,6 @@ import * as invites from "../../services/invites.js";
 import * as liveLocations from "../../services/liveLocations.js";
 import * as proofs from "../../services/proofs.js";
 import * as digital from "../../services/digitalInvitation.js";
-import * as design from "../../services/designRequests.js";
 
 beforeEach(() => {
   Object.values(api).forEach((fn) => fn.mockReset());
@@ -758,78 +757,50 @@ describe("digitalInvitation — photographer", () => {
 });
 
 // ════════════════════════════════════════════════════════════════════════════
-// designRequests.js
+// digitalInvitation.js — design approval state machine
 // ════════════════════════════════════════════════════════════════════════════
 
-describe("designRequests", () => {
-  it("submitDesignTemplate POSTs /digital/:uid/design-requests", async () => {
-    api.post.mockResolvedValueOnce({ id: "dr1" });
-    const out = await design.submitDesignTemplate("g1", "groomname", { brideName: "B" });
-    expect(api.post).toHaveBeenCalledWith("/digital/g1/design-requests", {
-      groomUsername: "groomname",
-      templateData: { brideName: "B" },
-    });
-    expect(out).toBe("dr1");
-  });
-
-  it("approveDesign PATCHes status=approved", async () => {
+describe("digital design approval", () => {
+  it("patchDesignFields PATCHes /media/settings with the supplied subset", async () => {
     api.patch.mockResolvedValueOnce({ ok: true });
-    await design.approveDesign("g1", "r1");
-    const [path, body] = api.patch.mock.calls[0];
-    expect(path).toBe("/digital/g1/design-requests/r1");
-    expect(body.status).toBe("approved");
-    expect(body.approvedAt).toBeGreaterThan(0);
-  });
-
-  it("requestRevision PATCHes status=revision_requested with trimmed notes", async () => {
-    api.patch.mockResolvedValueOnce({ ok: true });
-    await design.requestRevision("g1", "r1", "  more polish  ");
-    expect(api.patch).toHaveBeenCalledWith("/digital/g1/design-requests/r1", {
-      status: "revision_requested",
-      revisionNotes: "more polish",
+    await digital.patchDesignFields("g1", { themeColor: "rose", venue: "Hall" });
+    expect(api.patch).toHaveBeenCalledWith("/digital/g1/media/settings", {
+      themeColor: "rose",
+      venue: "Hall",
     });
   });
 
-  it("requestRevision falls back to null for empty notes", async () => {
-    api.patch.mockResolvedValueOnce({ ok: true });
-    await design.requestRevision("g1", "r1", "   ");
-    expect(api.patch).toHaveBeenCalledWith("/digital/g1/design-requests/r1", {
-      status: "revision_requested",
-      revisionNotes: null,
+  it("submitDesignForApproval POSTs /design/submit", async () => {
+    api.post.mockResolvedValueOnce({ ok: true });
+    await digital.submitDesignForApproval("g1");
+    expect(api.post).toHaveBeenCalledWith("/digital/g1/design/submit", {});
+  });
+
+  it("cancelDesignSubmission POSTs /design/cancel", async () => {
+    api.post.mockResolvedValueOnce({ ok: true });
+    await digital.cancelDesignSubmission("g1");
+    expect(api.post).toHaveBeenCalledWith("/digital/g1/design/cancel", {});
+  });
+
+  it("approveDigitalDesign POSTs /design/approve", async () => {
+    api.post.mockResolvedValueOnce({ ok: true });
+    await digital.approveDigitalDesign("g1");
+    expect(api.post).toHaveBeenCalledWith("/digital/g1/design/approve", {});
+  });
+
+  it("rejectDigitalDesign POSTs /design/reject with the note", async () => {
+    api.post.mockResolvedValueOnce({ ok: true });
+    await digital.rejectDigitalDesign("g1", "fix the venue");
+    expect(api.post).toHaveBeenCalledWith("/digital/g1/design/reject", {
+      note: "fix the venue",
     });
   });
 
-  it("startDesigning PATCHes status=designing", async () => {
-    api.patch.mockResolvedValueOnce({ ok: true });
-    await design.startDesigning("g1", "r1");
-    expect(api.patch).toHaveBeenCalledWith("/digital/g1/design-requests/r1", {
-      status: "designing",
-    });
-  });
-
-  it("uploadMockup uploads multipart to mockup endpoint", async () => {
-    api.upload.mockResolvedValueOnce({ url: "u" });
-    const file = new File(["x"], "m.png", { type: "image/png" });
-    await design.uploadMockup("g1", "r1", file);
-    expect(api.upload).toHaveBeenCalledWith(
-      "/digital/g1/design-requests/r1/mockup",
-      expect.any(FormData),
-    );
-  });
-
-  it("subscribeAllDesignRequests polls /digital/design-requests (admin scope)", async () => {
+  it("subscribeAdminDesignList polls /digital/design-list", async () => {
     api.get.mockResolvedValue([]);
-    design.subscribeAllDesignRequests(vi.fn());
-    const fetchFn = createPoller.mock.calls[0][0];
+    digital.subscribeAdminDesignList(vi.fn());
+    const fetchFn = createPoller.mock.calls[createPoller.mock.calls.length - 1][0];
     await fetchFn();
-    expect(api.get).toHaveBeenCalledWith("/digital/design-requests");
-  });
-
-  it("subscribeDesignRequests polls per-groom endpoint", async () => {
-    api.get.mockResolvedValue([]);
-    design.subscribeDesignRequests("g1", vi.fn());
-    const fetchFn = createPoller.mock.calls[0][0];
-    await fetchFn();
-    expect(api.get).toHaveBeenCalledWith("/digital/g1/design-requests");
+    expect(api.get).toHaveBeenCalledWith("/digital/design-list");
   });
 });

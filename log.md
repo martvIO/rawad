@@ -22,3 +22,6 @@ Touched: none (new report file qa-audit-2026-05-28.md written to repo root; proj
 
 ## [2026-05-28 07:03] session | Add SessionStart hook for wiki-brain
 Touched: none (config/hook setup, not a wiki page change)
+
+## [2026-05-28 16:05] session | Self-serve digital design editor + approval gate
+Touched: Digital Invitations, API Contracts, Architecture Decisions, Tasks Backlog

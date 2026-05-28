@@ -274,9 +274,20 @@ invitesRouter.post(
       const fs = getFirestore();
       const db = getDatabase();
       const guestRef = fs.doc(`digitalInvitations/${groomUid}/guests/${guestId}`);
-      const guestSnap = await guestRef.get();
+      const invDocRef = fs.doc(`digitalInvitations/${groomUid}`);
+      const [guestSnap, invDocSnap] = await Promise.all([
+        guestRef.get(),
+        invDocRef.get(),
+      ]);
       if (!guestSnap.exists) {
         res.status(404).json({ error: "guest_not_found" });
+        return;
+      }
+      // Gate: minting requires an approved design. The admin's Send tab
+      // surfaces this as a localized toast.
+      const invData = invDocSnap.exists ? invDocSnap.data() ?? {} : {};
+      if (invData.designStatus !== "approved") {
+        res.status(403).json({ error: "design_not_approved" });
         return;
       }
       const guest = guestSnap.data() as
@@ -289,6 +300,21 @@ invitesRouter.post(
         return;
       }
 
+      // Snapshot the approved design at mint time so later groom edits
+      // never alter invitations already sent to guests.
+      const designSnapshot = {
+        brideName: invData.brideName ?? "",
+        groomDisplayName: invData.groomDisplayName ?? "",
+        weddingDate: invData.weddingDate ?? null,
+        venue: invData.venue ?? "",
+        venueAddress: invData.venueAddress ?? "",
+        customMessage: invData.customMessage ?? "",
+        themeColor: invData.themeColor ?? "gold",
+        fontFamily: invData.fontFamily ?? "amiri",
+        media: Array.isArray(invData.media) ? invData.media : [],
+        designVersion: invData.designVersion ?? 1,
+      };
+
       const { token, expiresAt, now } = mintToken();
       await db.ref(`inviteTokens/${token}`).set({
         groomUid,
@@ -299,6 +325,7 @@ invitesRouter.post(
         guestType: "digital",
         createdAt: now,
         expiresAt,
+        designSnapshot,
       });
       await guestRef.update({
         inviteLinkToken: token,

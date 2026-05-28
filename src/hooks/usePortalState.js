@@ -494,6 +494,13 @@ export function usePortalState({ onBack, t, lang, setLang }) {
       if (waUrl) window.open(waUrl, "_blank", "noopener");
     } catch (e) {
       logErr("sendInviteLink", e);
+      const apiError = e?.body?.error || "";
+      if (apiError === "design_not_approved" || /design_not_approved/.test(e?.message || "")) {
+        showToast(lang === "he"
+          ? "העיצוב טרם אושר"
+          : "لم يتم اعتماد تصميم الدعوة بعد");
+        return;
+      }
       showToast(e?.message || t("share_invalid"));
     }
   };
@@ -517,6 +524,16 @@ export function usePortalState({ onBack, t, lang, setLang }) {
       if (waUrl) window.open(waUrl, "_blank", "noopener");
     } catch (e) {
       logErr("sendDigitalInviteLink", e);
+      // The server returns { error: "design_not_approved" } when the groom
+      // hasn't gotten an admin to approve their design yet. ApiError carries
+      // the parsed body and stamps the message as `api_design_not_approved`.
+      const apiError = e?.body?.error || "";
+      if (apiError === "design_not_approved" || /design_not_approved/.test(e?.message || "")) {
+        showToast(lang === "he"
+          ? "העיצוב טרם אושר"
+          : "لم يتم اعتماد تصميم الدعوة بعد");
+        return;
+      }
       showToast(e?.message || t("share_invalid"));
     }
   };

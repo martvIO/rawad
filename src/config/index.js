@@ -25,9 +25,11 @@ export const API_BASE_URL = (import.meta.env?.VITE_API_BASE_URL ?? "/api").repla
 
 /**
  * Base URL used when constructing per-guest invite links (e.g. for WhatsApp
- * "send invite" messages). Empty string means same-origin.
+ * "send invite" messages). Defaults to the production invite domain; dev
+ * envs can override via VITE_INVITE_BASE_URL (e.g. point to localhost).
  */
-export const INVITE_BASE_URL = import.meta.env?.VITE_INVITE_BASE_URL ?? "";
+export const INVITE_BASE_URL =
+  import.meta.env?.VITE_INVITE_BASE_URL ?? "https://invite.dawa.to";
 
 /**
  * Site key for the Phone-Auth invisible reCAPTCHA challenge. Only required
@@ -50,7 +52,6 @@ export const POLL_MS = {
   GUESTS: 15 * 1000,
   CONFIRMATIONS: 15 * 1000,
   DIGITAL: 15 * 1000,
-  DESIGN_REQUESTS: 15 * 1000,
   SETTINGS: 30 * 1000,
   ASSIGNMENTS: 30 * 1000,
   /** Invite pages need to notice "used" within a few seconds. */
