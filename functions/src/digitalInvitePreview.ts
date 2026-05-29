@@ -18,10 +18,19 @@ import { TOKEN_HEX_RE } from "./constants/tokens";
 
 const OG_BLOCK_RE = /<!--OG_TAGS-->[\s\S]*?<!--\/OG_TAGS-->/;
 
-// Cached HTML template (read once per cold start).
-let cachedHtml: string | null = null;
-function loadIndexHtml(): string {
-  if (cachedHtml) return cachedHtml;
+// How long a live-fetched index.html stays fresh in module memory. Assets only
+// change on deploy, so a few minutes keeps crawler bursts cheap while still
+// picking up a new bundle hash shortly after a hosting deploy.
+const HTML_CACHE_TTL_MS = 5 * 60 * 1000;
+// Abort the live fetch quickly so a hosting hiccup never hangs WhatsApp's
+// crawler — we fall back to the bundled copy instead.
+const FETCH_TIMEOUT_MS = 2000;
+
+// Bundled-copy cache (read once per cold start). This is only the cold-start /
+// offline fallback now; the live fetch in loadIndexHtml() is the source of truth.
+let bundledHtml: string | null = null;
+function loadBundledHtml(): string {
+  if (bundledHtml) return bundledHtml;
   // build-functions.cjs copies dist/index.html → functions/lib/index.html
   // alongside the compiled JS, so __dirname/index.html is the canonical path.
   const candidates = [
@@ -33,11 +42,68 @@ function loadIndexHtml(): string {
   for (const c of candidates) {
     try {
       const txt = fs.readFileSync(c, "utf8");
-      cachedHtml = txt;
+      bundledHtml = txt;
       return txt;
     } catch { /* try next */ }
   }
   throw new Error("index.html template not found");
+}
+
+// Live-fetched index.html cache, keyed by the source URL so emulator + prod
+// never share a stale entry across (unlikely) co-located warm instances.
+let liveHtml: { key: string; html: string; fetchedAt: number } | null = null;
+
+// Serve the CURRENTLY-DEPLOYED index.html so the returned page always points at
+// asset hashes that actually exist in hosting — immune to deploy-order drift and
+// hosting-only deploys (the original cause of the stale-bundle MIME error).
+//
+// `/index.html` is a static hosting file: Hosting serves static files before
+// rewrites, and the `/d/**` rewrite only matches `/d/...`, so fetching it never
+// re-enters this function. On any failure we fall back to the bundled copy.
+async function loadIndexHtml(url: string): Promise<string> {
+  if (liveHtml && liveHtml.key === url && Date.now() - liveHtml.fetchedAt < HTML_CACHE_TTL_MS) {
+    return liveHtml.html;
+  }
+  if (url) {
+    const ac = new AbortController();
+    const timer = setTimeout(() => ac.abort(), FETCH_TIMEOUT_MS);
+    try {
+      const r = await fetch(url, { signal: ac.signal });
+      if (r.ok) {
+        const html = await r.text();
+        // Only trust a response that is actually the SPA shell (has the OG block
+        // to replace) — guards against an error page slipping through.
+        if (OG_BLOCK_RE.test(html)) {
+          liveHtml = { key: url, html, fetchedAt: Date.now() };
+          return html;
+        }
+      }
+      console.log(`[digitalInvitePreview] live index.html unusable (status ${r.status}) from ${url} — using bundled fallback`);
+    } catch (e) {
+      console.log(`[digitalInvitePreview] live index.html fetch failed (${(e as Error).message}) from ${url} — using bundled fallback`);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  return loadBundledHtml();
+}
+
+// Resolve the public hosting origin for the live index.html fetch. Behind the
+// Firebase Hosting → Functions proxy the `Host` header is the function's own
+// host, not the site — the original site host is in `x-forwarded-host`. Fall
+// back to the project's default *.web.app domain (always serves the current
+// deploy) so the fetch works even if neither header is trustworthy.
+function resolveIndexUrl(req: { get(name: string): string | undefined }): string {
+  // x-forwarded-* can be comma-joined across proxy hops — take the first hop.
+  const first = (v?: string) => (v ? v.split(",")[0].trim() : "");
+  const xfHost = first(req.get("x-forwarded-host"));
+  const hostHdr = req.get("host") || "";
+  const projectHost = process.env.GCLOUD_PROJECT ? `${process.env.GCLOUD_PROJECT}.web.app` : "";
+  const host = xfHost || hostHdr || projectHost;
+  if (!host) return "";
+  const isLocal = /^(localhost|127\.0\.0\.1|\[::1\])/i.test(host);
+  const proto = first(req.get("x-forwarded-proto")) || (isLocal ? "http" : "https");
+  return `${proto}://${host}/index.html`;
 }
 
 function escapeHtml(s: string): string {
@@ -119,7 +185,7 @@ export const digitalInvitePreview = onRequest(
 
     let html: string;
     try {
-      html = loadIndexHtml();
+      html = await loadIndexHtml(resolveIndexUrl(req));
     } catch {
       res.status(500).send("template not found");
       return;
