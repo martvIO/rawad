@@ -1,6 +1,7 @@
 ﻿// Groom → Proofs: delivery proof photos for each delivered guest.
 import { usePortal } from "../../../context/PortalContext.jsx";
 import { C } from "../../../styles/theme.js";
+import { Num } from "../../../components/Num.jsx";
 
 export function GroomProofs() {
   const { t, myGuests, setViewingPhoto } = usePortal();
@@ -59,7 +60,7 @@ export function GroomProofs() {
             })}
             {myGuests.filter(g => !g.proofImg).length > 0 && (
               <div style={{ marginTop: 20, textAlign: "center", color: "#5a5040", fontSize: 12 }}>
-                {myGuests.filter(g => !g.proofImg).length.toLocaleString("en")} {t("proofs_pending")}
+                <Num>{myGuests.filter(g => !g.proofImg).length.toLocaleString("en")}</Num> {t("proofs_pending")}
               </div>
             )}
           </div>

@@ -15,6 +15,7 @@ import { AdminSendTab } from "./AdminSendTab.jsx";
 import { AdminSettingsTab } from "./AdminSettingsTab.jsx";
 import { AdminConfirmationsTab } from "./AdminConfirmationsTab.jsx";
 import { AdminDesigns } from "./AdminDesigns.jsx";
+import { Num } from "../../../components/Num.jsx";
 import { C } from "../../../styles/theme.js";
 
 const tabStyle = ({ isActive }) => ({
@@ -69,7 +70,7 @@ export function AdminPortal() {
         <div style={{ display: "flex", gap: 6, marginBottom: 18, flexWrap: "wrap" }}>
           <NavLink data-testid="nav-admin-users"         to="/portal/admin/users"         style={tabStyle}>👥 {t("admin_tab_users")}</NavLink>
           <NavLink data-testid="nav-admin-send"          to="/portal/admin/send"          style={tabStyle}>📨 {t("admin_tab_send")}</NavLink>
-          <NavLink data-testid="nav-admin-confirmations" to="/portal/admin/confirmations" style={tabStyle}>✓ {t("admin_tab_confirmations")}{confirmations.length ? ` (${confirmations.length})` : ""}</NavLink>
+          <NavLink data-testid="nav-admin-confirmations" to="/portal/admin/confirmations" style={tabStyle}>✓ {t("admin_tab_confirmations")}{confirmations.length ? <> (<Num>{confirmations.length}</Num>)</> : ""}</NavLink>
           <NavLink data-testid="nav-admin-designs"       to="/portal/admin/designs"       style={tabStyle}>🎨 {lang === "he" ? "עיצובים" : "التصاميم"}</NavLink>
           <NavLink data-testid="nav-admin-settings"      to="/portal/admin/settings"      style={tabStyle}>⚙ {t("admin_tab_settings")}</NavLink>
         </div>

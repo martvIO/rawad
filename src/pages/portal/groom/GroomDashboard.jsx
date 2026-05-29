@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { LiveMap } from "../../../components/LiveMap.jsx";
 import { usePortal } from "../../../context/PortalContext.jsx";
 import { C } from "../../../styles/theme.js";
+import { Num } from "../../../components/Num.jsx";
 
 export function GroomDashboard() {
   const navigate = useNavigate();
@@ -27,7 +28,7 @@ export function GroomDashboard() {
                 <div key={s.label} className="card" style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   <div style={{ fontSize: 26 }}>{s.icon}</div>
                   <div>
-                    <div style={{ fontSize: 26, fontWeight: 900, color: s.color }}>{s.val.toLocaleString("en")}</div>
+                    <div style={{ fontSize: 26, fontWeight: 900, color: s.color }}><Num>{s.val.toLocaleString("en")}</Num></div>
                     <div style={{ fontSize: 11, color: C.dim }}>{s.label}</div>
                   </div>
                 </div>
@@ -37,7 +38,7 @@ export function GroomDashboard() {
             <div className="gold-card" style={{ marginBottom: 20 }}>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
                 <span style={{ fontSize: 14, color: C.goldDim, fontWeight: 700 }}>{t("progress_label")}</span>
-                <span style={{ fontSize: 20, fontWeight: 900, color: C.gold }}>{stats.pct}%</span>
+                <span style={{ fontSize: 20, fontWeight: 900, color: C.gold }}><Num>{stats.pct}%</Num></span>
               </div>
               <div style={{ height: 10, background: "rgba(255,255,255,.06)", borderRadius: 5, overflow: "hidden" }}>
                 <div style={{
@@ -52,7 +53,7 @@ export function GroomDashboard() {
               <div className="gold-card" data-testid="groom-expected-attendees" style={{ marginBottom: 20, display: "flex", alignItems: "center", gap: 12 }}>
                 <div style={{ fontSize: 26 }}>👥</div>
                 <div>
-                  <div style={{ fontSize: 26, fontWeight: 900, color: C.gold }}>{stats.expectedAttendees.toLocaleString("en")}</div>
+                  <div style={{ fontSize: 26, fontWeight: 900, color: C.gold }}><Num>{stats.expectedAttendees.toLocaleString("en")}</Num></div>
                   <div style={{ fontSize: 11, color: C.dim }}>
                     {lang === "he" ? "צפי נוכחים (כולל מלווים)" : "العدد المتوقع للحضور (مع المرافقين)"}
                   </div>
@@ -70,7 +71,7 @@ export function GroomDashboard() {
                   {t("map_legend")}
                   {driversSharingWithMe.length > 0 && (
                     <span style={{ color: "#4cc97a", marginInlineStart: 8 }}>
-                      · {driversSharingWithMe.length.toLocaleString("en")} {t("map_drivers_count")}
+                      · <Num>{driversSharingWithMe.length.toLocaleString("en")}</Num> {t("map_drivers_count")}
                     </span>
                   )}
                 </div>

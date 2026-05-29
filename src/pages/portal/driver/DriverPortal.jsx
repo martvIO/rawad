@@ -11,6 +11,7 @@ import { DriverDeliveryList } from "./DriverDeliveryList.jsx";
 import { DriverMap } from "./DriverMap.jsx";
 import { DriverShareLocation } from "./DriverShareLocation.jsx";
 import { SharedCities } from "./SharedCities.jsx";
+import { Num } from "../../../components/Num.jsx";
 import { C } from "../../../styles/theme.js";
 
 const tabStyle = ({ isActive }) => ({
@@ -75,7 +76,7 @@ export function DriverPortal() {
             }}>⇄</button>
           </div>
           <div style={{ marginTop: 8, fontSize: 11, color: "#4cc97a", textAlign: "left" }}>
-            {done.length.toLocaleString("en")}/{myGuests.length.toLocaleString("en")} {t("driver_completed")}
+            <Num>{done.length.toLocaleString("en")}</Num>/<Num>{myGuests.length.toLocaleString("en")}</Num> {t("driver_completed")}
           </div>
         </div>
       </div>

@@ -13,13 +13,17 @@ import {
   DEFAULT_EYEBROW,
   DEFAULT_MEAL_OPTIONS,
 } from "../../data/digitalInviteDefaults.js";
+import { localize, localizeItems, localizeList } from "../../utils/localize.js";
+import { Num } from "../Num.jsx";
 
 const ON_GOLD = "#2a0f00"; // dark ink for text sitting on the gold gradient
 
 export function DigitalInvitationView({
   design,
   guestName,
+  guestPhone = "",
   lang = "ar",
+  setLang,
   mode = "preview",
   onSubmitRsvp,
   showEnvelope = false,
@@ -32,38 +36,41 @@ export function DigitalInvitationView({
   const rootRef = useRef(null);
 
   // ── Field extraction with sensible fallbacks ────────────────────────────
-  const groomName = design?.groomDisplayName || "";
-  const brideName = design?.brideName || "";
-  const eyebrow = (design?.eyebrow || "").trim() || (lang === "he" ? DEFAULT_EYEBROW.he : DEFAULT_EYEBROW.ar);
-  const venue = design?.venue || "";
-  const venueCity = design?.venueCity || "";
-  const venueAddress = design?.venueAddress || "";
-  const accessNote = design?.accessNote || "";
+  // Every groom-authored text field may be a plain string (legacy / single-
+  // language) or a localized { ar, he } object — `localize` resolves the right
+  // language with a fallback to the other, so toggling never blanks a field.
+  const groomName = localize(design?.groomDisplayName, lang);
+  const brideName = localize(design?.brideName, lang);
+  const eyebrow = localize(design?.eyebrow, lang).trim() || (lang === "he" ? DEFAULT_EYEBROW.he : DEFAULT_EYEBROW.ar);
+  const venue = localize(design?.venue, lang);
+  const venueCity = localize(design?.venueCity, lang);
+  const venueAddress = localize(design?.venueAddress, lang);
+  const accessNote = localize(design?.accessNote, lang);
   const weddingDate = design?.weddingDate || null;
   const musicUrl = design?.musicUrl || "";
-  const giftIban = design?.giftIban || "";
-  const giftNote = design?.giftNote || "";
+  const giftIban = design?.giftIban || ""; // IBAN is latin-only; never localized
+  const giftNote = localize(design?.giftNote, lang);
 
   const monogram = useMemo(() => {
-    const explicit = (design?.monogram || "").trim();
+    const explicit = localize(design?.monogram, lang).trim();
     if (explicit) return explicit;
     const g = groomName.trim().charAt(0);
     const b = brideName.trim().charAt(0);
     return [g, b].filter(Boolean).join("&") || "د";
-  }, [design?.monogram, groomName, brideName]);
+  }, [design?.monogram, lang, groomName, brideName]);
 
   const captions = design?.mediaCaptions && typeof design.mediaCaptions === "object" ? design.mediaCaptions : {};
   const media = useMemo(() => {
     const arr = Array.isArray(design?.media) ? design.media : [];
-    return arr.map((m) => ({ ...m, cap: captions[m.storagePath] || m.cap || "" }));
-  }, [design?.media, captions]);
+    return arr.map((m) => ({ ...m, cap: localize(captions[m.storagePath], lang) || localize(m.cap, lang) || "" }));
+  }, [design?.media, captions, lang]);
 
-  const storyItems = Array.isArray(design?.storyTimeline) ? design.storyTimeline : [];
-  const detailItems = Array.isArray(design?.details) ? design.details : [];
-  const hotels = Array.isArray(design?.hotels) ? design.hotels : [];
-  const wishes = Array.isArray(design?.wishes) ? design.wishes : [];
+  const storyItems = localizeItems(design?.storyTimeline, ["when", "title", "body"], lang);
+  const detailItems = localizeItems(design?.details, ["meta", "title", "body"], lang);
+  const hotels = localizeItems(design?.hotels, ["name", "walk"], lang);
+  const wishes = localizeItems(design?.wishes, ["who", "what"], lang);
   const mealOptions = Array.isArray(design?.mealOptions) && design.mealOptions.length
-    ? design.mealOptions
+    ? localizeList(design.mealOptions, lang)
     : (lang === "he" ? DEFAULT_MEAL_OPTIONS.he : DEFAULT_MEAL_OPTIONS.ar);
 
   // Section flags default to ON; arrays still auto-hide when empty so guests
@@ -137,6 +144,10 @@ export function DigitalInvitationView({
     >
       <ViewStyles theme={theme} font={font} fixed={isPublic} />
 
+      {isPublic && typeof setLang === "function" && (
+        <LangToggle lang={lang} setLang={setLang} theme={theme} font={font} />
+      )}
+
       {showEnvelopeNow && <EnvelopeIntro guestName={guestName} font={font} lang={lang} />}
       <Ambience theme={theme} fixed={isPublic} />
 
@@ -176,6 +187,7 @@ export function DigitalInvitationView({
         lang={lang}
         opts={rsvpOpts}
         mealOptions={mealOptions}
+        guestPhone={guestPhone}
         onSubmitRsvp={onSubmitRsvp}
         disabled={!isPublic}
         alreadyAnswered={alreadyAnswered}
@@ -341,7 +353,7 @@ function Hero({ guestName, groomName, brideName, monogram, eyebrow, dateText, ve
           className="dawa-inv-dateline"
           style={{ background: theme.chipBg, border: `1px solid ${theme.chipBorder}`, color: theme.text, fontFamily: font.family }}
         >
-          {dateText && <strong style={{ color: theme.accent, fontWeight: 700 }}>{dateText}</strong>}
+          {dateText && <strong style={{ color: theme.accent, fontWeight: 700 }}><Num dir="auto">{dateText}</Num></strong>}
           {dateText && venueLine && <span className="dawa-inv-dot" style={{ background: theme.accent }} />}
           {venueLine && <span>{venueLine}</span>}
         </div>
@@ -349,7 +361,16 @@ function Hero({ guestName, groomName, brideName, monogram, eyebrow, dateText, ve
 
       <div className="dawa-inv-greet" style={{ color: theme.textSoft, fontFamily: font.family }}>
         {lang === "he" ? "מתכבדים להזמינכם," : "يتشرفون بدعوتكم،"}
-        <strong style={{ color: theme.text }}>{guestName || "—"}</strong>
+        <strong
+          className="dawa-inv-grad"
+          style={{
+            background: `linear-gradient(135deg,${theme.gradientStops.join(",")})`,
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+          }}
+        >
+          {guestName || "—"}
+        </strong>
       </div>
 
       <div className="dawa-inv-cue" style={{ color: theme.accent, fontFamily: font.family }}>
@@ -522,7 +543,7 @@ function VenueSection({ venue, venueCity, venueAddress, accessNote, hotels, them
               {hotels.map((h, i) => (
                 <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", fontSize: 14 }}>
                   <span>{h.name}</span>
-                  {h.walk && <small style={{ color: theme.accent }}>{h.walk}</small>}
+                  {h.walk && <small style={{ color: theme.accent }}><Num dir="auto">{h.walk}</Num></small>}
                 </div>
               ))}
             </VenueRow>
@@ -647,9 +668,23 @@ function confettiBurst(palette) {
   setTimeout(() => root.remove(), 1800);
 }
 
-function RSVPSection({ theme, font, lang, opts, mealOptions, onSubmitRsvp, disabled, alreadyAnswered, rsvpDone }) {
+// Lightweight client gate for the guest's phone. The backend re-validates and
+// normalises strictly — this just blocks an obviously-bad submit. Accepts
+// E.164 (+8–15 digits) or a local digits-only number (8–15 digits).
+function isValidGuestPhone(raw) {
+  const cleaned = (raw || "").replace(/[\s\-()]/g, "");
+  if (!cleaned) return false;
+  if (cleaned.startsWith("+")) return /^\+\d{8,15}$/.test(cleaned);
+  return /^\d{8,15}$/.test(cleaned);
+}
+
+function RSVPSection({ theme, font, lang, opts, mealOptions, guestPhone, onSubmitRsvp, disabled, alreadyAnswered, rsvpDone }) {
   const [status, setStatus] = useState(null); // "attending" | "absent"
-  const [companions, setCompanions] = useState(0);
+  // Total headcount INCLUDING the invited guest (min 1). The backend still
+  // stores `companions` = partySize - 1 (people besides the guest), so all
+  // existing "expected attendees" totals and validation stay correct.
+  const [partySize, setPartySize] = useState(1);
+  const [phone, setPhone] = useState(guestPhone || "");
   const [meal, setMeal] = useState("");
   const [song, setSong] = useState("");
   const [note, setNote] = useState("");
@@ -658,9 +693,17 @@ function RSVPSection({ theme, font, lang, opts, mealOptions, onSubmitRsvp, disab
   const [done, setDone] = useState(false);
   const [hearts, setHearts] = useState([]);
 
+  // Pre-fill the phone from the invite token, but let the guest correct it.
+  useEffect(() => { setPhone(guestPhone || ""); }, [guestPhone]);
+
   const submit = async () => {
     if (!status) {
-      setError(lang === "he" ? "אנא בחר תשובה" : "يرجى اختيار إجابة");
+      setError(lang === "he" ? "אנא בחרו תשובה" : "يرجى اختيار إجابة");
+      return;
+    }
+    const phoneClean = (phone || "").trim();
+    if (!isValidGuestPhone(phoneClean)) {
+      setError(lang === "he" ? "אנא הזינו מספר טלפון תקין" : "يرجى إدخال رقم هاتف صحيح");
       return;
     }
     setError("");
@@ -670,7 +713,8 @@ function RSVPSection({ theme, font, lang, opts, mealOptions, onSubmitRsvp, disab
       await onSubmitRsvp?.({
         rsvp: status,
         note: note.trim(),
-        companions: status === "attending" && opts.companions ? companions : null,
+        submittedPhone: phoneClean,
+        companions: status === "attending" && opts.companions ? Math.max(0, partySize - 1) : null,
         mealPreference: status === "attending" && opts.meal ? meal : "",
         songRequest: status === "attending" && opts.song ? song.trim() : "",
       });
@@ -700,8 +744,8 @@ function RSVPSection({ theme, font, lang, opts, mealOptions, onSubmitRsvp, disab
   const successText = status === "absent"
     ? (lang === "he" ? "תודה שהודעת. נתראה בהזדמנות אחרת." : "نشكر إعلامكم، ونلتقي في مناسبة أخرى قريبة.")
     : (lang === "he"
-      ? `שמחים לארח אתכם${opts.companions && companions > 0 ? ` ועוד ${companions}` : ""}. תזכורת תישלח שבוע לפני.`
-      : `سعداء بحضوركم${opts.companions && companions > 0 ? ` مع ${companions} ${companions === 1 ? "مرافق" : "مرافقين"}` : ""}. سيصلكم تذكير قبل الموعد بأسبوع.`);
+      ? `שמחים לארח אתכם${opts.companions && partySize > 1 ? ` (${partySize} אורחים)` : ""}. תזכורת תישלח שבוע לפני.`
+      : `سعداء بحضوركم${opts.companions && partySize > 1 ? ` (${partySize} أشخاص)` : ""}. سيصلكم تذكير قبل الموعد بأسبوع.`);
 
   return (
     <section className="dawa-inv-section" id="rsvp">
@@ -738,13 +782,28 @@ function RSVPSection({ theme, font, lang, opts, mealOptions, onSubmitRsvp, disab
               </div>
             </div>
 
+            {status && (
+              <div className="dawa-inv-field">
+                <label style={{ color: theme.accent, fontFamily: font.family }}>{lang === "he" ? "מספר הטלפון שלך" : "رقم هاتفك"}</label>
+                <input
+                  className="dawa-inv-input"
+                  style={{ color: theme.text, borderColor: theme.accentLine, fontFamily: font.family, direction: "ltr", textAlign: "start" }}
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value.slice(0, 30))}
+                  placeholder="+972 5X-XXX-XXXX"
+                  inputMode="tel"
+                  dir="ltr"
+                />
+              </div>
+            )}
+
             {status === "attending" && opts.companions && (
               <div className="dawa-inv-field">
-                <label style={{ color: theme.accent, fontFamily: font.family }}>{lang === "he" ? "כמה אנשים יגיעו איתך? (מלבד המוזמן)" : "كم شخصاً سيحضر معك؟ (عدا المدعو)"}</label>
+                <label style={{ color: theme.accent, fontFamily: font.family }}>{lang === "he" ? "כמה אתם? (כולל המוזמן)" : "كم عددكم؟ (شاملاً المدعو)"}</label>
                 <div className="dawa-inv-stepper">
-                  <button style={{ borderColor: theme.accentLine, color: theme.accent }} onClick={() => setCompanions((c) => Math.max(0, c - 1))} aria-label="-">−</button>
-                  <span style={{ color: theme.text, fontFamily: font.family }}>{companions}</span>
-                  <button style={{ borderColor: theme.accentLine, color: theme.accent }} onClick={() => setCompanions((c) => Math.min(20, c + 1))} aria-label="+">+</button>
+                  <button style={{ borderColor: theme.accentLine, color: theme.accent }} onClick={() => setPartySize((c) => Math.max(1, c - 1))} aria-label="-">−</button>
+                  <span style={{ color: theme.text, fontFamily: font.family }}><Num>{partySize}</Num></span>
+                  <button style={{ borderColor: theme.accentLine, color: theme.accent }} onClick={() => setPartySize((c) => Math.min(21, c + 1))} aria-label="+">+</button>
                 </div>
               </div>
             )}
@@ -815,6 +874,54 @@ function RSVPSection({ theme, font, lang, opts, mealOptions, onSubmitRsvp, disab
         </div>
       </div>
     </section>
+  );
+}
+
+// Guest-facing Arabic/Hebrew switch on the public invitation. Toggling drives
+// the app `lang`, which re-renders both the built-in UI strings and every
+// localized groom-authored field.
+function LangToggle({ lang, setLang, theme, font }) {
+  return (
+    <div
+      style={{
+        position: "fixed",
+        top: 14,
+        insetInlineEnd: 14,
+        zIndex: 120,
+        display: "inline-flex",
+        borderRadius: 999,
+        overflow: "hidden",
+        border: `1px solid ${theme.chipBorder}`,
+        background: theme.chipBg,
+        backdropFilter: "blur(20px)",
+      }}
+    >
+      {[
+        { code: "ar", label: "عربي" },
+        { code: "he", label: "עברית" },
+      ].map(({ code, label }) => (
+        <button
+          key={code}
+          type="button"
+          onClick={() => setLang(code)}
+          aria-pressed={lang === code}
+          style={{
+            appearance: "none",
+            border: "none",
+            cursor: "pointer",
+            padding: "7px 14px",
+            fontSize: 12,
+            fontWeight: 800,
+            letterSpacing: 0.5,
+            fontFamily: font.family,
+            background: lang === code ? theme.accent : "transparent",
+            color: lang === code ? ON_GOLD : theme.accent,
+          }}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
   );
 }
 
@@ -1081,7 +1188,7 @@ function ViewStyles({ theme }) {
     .dawa-inv .dawa-inv-dateline { display: inline-flex; align-items: center; gap: 16px; margin-top: 28px; padding: 12px 28px; border-radius: 999px; backdrop-filter: blur(20px); font-size: 16px; letter-spacing: .5px; animation: dawa-inv-rise 1.1s .5s ease both; flex-wrap: wrap; justify-content: center; }
     .dawa-inv .dawa-inv-dot { width: 4px; height: 4px; border-radius: 50%; }
     .dawa-inv .dawa-inv-greet { margin-top: 26px; font-style: italic; font-size: 15px; letter-spacing: 1px; animation: dawa-inv-rise 1.1s .6s ease both; }
-    .dawa-inv .dawa-inv-greet strong { font-style: normal; font-weight: 700; font-size: 18px; margin-inline-start: 6px; display: inline-block; }
+    .dawa-inv .dawa-inv-greet strong { display: block; margin-top: 12px; font-style: normal; font-weight: 900; font-size: clamp(30px,7vw,46px); line-height: 1.2; letter-spacing: .5px; padding-block: 4px; text-shadow: 0 0 60px ${theme.accentMuted}; }
     .dawa-inv .dawa-inv-cue { position: absolute; bottom: 28px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 10px; font-size: 11px; font-style: italic; letter-spacing: 3px; text-transform: uppercase; opacity: .7; animation: dawa-inv-cue 2.4s ease-in-out infinite; }
     .dawa-inv .dawa-inv-cue-line { width: 1px; height: 34px; }
 

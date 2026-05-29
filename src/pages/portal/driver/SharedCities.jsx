@@ -13,6 +13,7 @@ import { telLink } from "../../../utils/phone.js";
 import { wazeLink, extractCity as extractCityRaw } from "../../../utils/geo.js";
 import { usePortal } from "../../../context/PortalContext.jsx";
 import { GroomMultiSelect } from "../../../components/GroomMultiSelect.jsx";
+import { Num } from "../../../components/Num.jsx";
 import { C } from "../../../styles/theme.js";
 
 export function SharedCities() {
@@ -201,10 +202,10 @@ export function SharedCities() {
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: 800, color: C.goldLight, fontSize: 14 }}>{city}</div>
                   <div style={{ fontSize: 11, color: C.dim, marginTop: 3, display: "flex", gap: 10, flexWrap: "wrap" }}>
-                    <span>{cGuests.length.toLocaleString("en")} {t("shared_city_count")}</span>
+                    <span><Num>{cGuests.length.toLocaleString("en")}</Num> {t("shared_city_count")}</span>
                     <span>·</span>
                     <span style={{ color: isShared ? C.blue : C.dim }}>
-                      {groomCount.toLocaleString("en")} {groomCount === 1
+                      <Num>{groomCount.toLocaleString("en")}</Num> {groomCount === 1
                         ? (lang === "he" ? "חתן" : "عريس")
                         : (lang === "he" ? "חתנים" : "عرسان")}
                     </span>

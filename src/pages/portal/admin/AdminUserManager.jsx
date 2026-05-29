@@ -9,6 +9,7 @@
 import { useState } from "react";
 import { usePortal } from "../../../context/PortalContext.jsx";
 import { RoleGuard } from "../../../components/RoleGuard.jsx";
+import { Num } from "../../../components/Num.jsx";
 import { PasswordRules } from "../../../components/PasswordRules.jsx";
 import { PhoneInput } from "../../../components/PhoneInput.jsx";
 import { isStrongPassword } from "../../../utils/password.js";
@@ -311,7 +312,7 @@ function UserManagerInner() {
 
       {/* عداد + حالة التحميل */}
       <div style={{ fontSize: 13, color: C.dim, fontWeight: 700, marginBottom: 10, display: "flex", alignItems: "center", gap: 10 }}>
-        <span>{t("admin_existing")} ({filtered.length.toLocaleString("en")})</span>
+        <span>{t("admin_existing")} (<Num>{filtered.length.toLocaleString("en")}</Num>)</span>
         {usersLoading && (
           <span style={{ fontSize: 11, color: C.goldDim, fontWeight: 400 }}>
             ⟳ {lang === "he" ? "טוען…" : "جاري التحميل…"}

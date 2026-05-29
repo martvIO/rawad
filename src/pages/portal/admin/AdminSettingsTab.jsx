@@ -4,6 +4,7 @@
 // message used by the bulk sender for the new public landing page.
 import { useEffect } from "react";
 import { usePortal } from "../../../context/PortalContext.jsx";
+import { Num } from "../../../components/Num.jsx";
 import { C } from "../../../styles/theme.js";
 
 export function AdminSettingsTab() {
@@ -114,7 +115,7 @@ export function AdminSettingsTab() {
                     rows={8}
                     style={{ marginBottom: 6, fontSize: 13, resize: "vertical", fontFamily: "inherit" }}/>
           <div style={{ marginBottom: 16, fontSize: 11, color: C.dim, lineHeight: 1.7 }}>
-            {adminDigitalMessage.length.toLocaleString("en")} / 4000
+            <Num>{adminDigitalMessage.length.toLocaleString("en")} / 4000</Num>
           </div>
 
           <button className="gold-btn" style={{ width: "100%" }}

@@ -1,16 +1,21 @@
-// Shared 0–20 stepper for "how many people will attend besides the invited
-// guest" on the physical confirmation forms (ConfirmationForm + InviteForm).
+// Shared stepper for the TOTAL headcount including the invited guest (min 1,
+// "how many people are you?") on the physical confirmation forms
+// (ConfirmationForm + InviteForm). The forms convert this to the stored
+// `companions` value (= total − 1, people besides the guest) on submit, so the
+// backend validation and "expected attendees" totals stay unchanged.
 import { C } from "../styles/theme.js";
+import { Num } from "./Num.jsx";
 
-const MAX = 20;
+const MIN = 1;
+const MAX = 21; // total = up to 20 companions + the invited guest
 
 // `onChange` is the parent's setState setter, so we pass functional updaters —
 // this keeps rapid taps from under-counting via a stale closure.
 export function CompanionsStepper({ value, onChange }) {
-  const v = Number.isFinite(value) ? value : 0;
-  const clamp = (n) => Math.max(0, Math.min(MAX, n));
-  const dec = () => onChange((c) => clamp((Number.isFinite(c) ? c : 0) - 1));
-  const inc = () => onChange((c) => clamp((Number.isFinite(c) ? c : 0) + 1));
+  const v = Number.isFinite(value) ? value : MIN;
+  const clamp = (n) => Math.max(MIN, Math.min(MAX, n));
+  const dec = () => onChange((c) => clamp((Number.isFinite(c) ? c : MIN) - 1));
+  const inc = () => onChange((c) => clamp((Number.isFinite(c) ? c : MIN) + 1));
   const btn = {
     width: 38,
     height: 38,
@@ -42,7 +47,7 @@ export function CompanionsStepper({ value, onChange }) {
         data-testid="companions-value"
         style={{ fontFamily: "'Amiri',serif", fontWeight: 800, color: C.goldLight, fontSize: 22, minWidth: 28, textAlign: "center" }}
       >
-        {v}
+        <Num>{v}</Num>
       </span>
       <button
         type="button"

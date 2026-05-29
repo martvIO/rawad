@@ -5,6 +5,7 @@
 //   pending   → soft amber card + "⌛ waiting" pill
 import { usePortal } from "../../../context/PortalContext.jsx";
 import { C } from "../../../styles/theme.js";
+import { Num } from "../../../components/Num.jsx";
 import { REPLY_STATUS, replyStateOf } from "../../../data/status.js";
 
 export function AdminSendTab() {
@@ -102,7 +103,7 @@ export function AdminSendTab() {
                           <span style={{ fontSize: 22 }}>{isSel ? "✓" : "♥"}</span>
                           <span style={{ direction: "ltr" }}>{u.username}</span>
                           <span style={{ fontSize: 10, color: C.dim }}>
-                            {t("admin_groom_guests_count")} {count.toLocaleString("en")}
+                            {t("admin_groom_guests_count")} <Num>{count.toLocaleString("en")}</Num>
                           </span>
                         </button>
                       );
@@ -121,7 +122,7 @@ export function AdminSendTab() {
                                 color: "#fff",
                                 border: "none", fontWeight: 900, fontSize: 14, fontFamily: "inherit", marginBottom: 18,
                               }}>
-                        {t("admin_send_to_all")} ({selectedGroomGuests.length.toLocaleString("en")})
+                        {t("admin_send_to_all")} (<Num>{selectedGroomGuests.length.toLocaleString("en")}</Num>)
                       </button>
                     )}
 
@@ -150,7 +151,7 @@ export function AdminSendTab() {
                           background: sec.bg, border: `1px solid ${sec.color}33`,
                         }}>
                           <div style={{ flex: 1, fontWeight: 800, color: sec.color, fontSize: 13 }}>{sec.title}</div>
-                          <span style={{ fontSize: 11, color: sec.color, fontWeight: 700 }}>{sec.list.length.toLocaleString("en")}</span>
+                          <span style={{ fontSize: 11, color: sec.color, fontWeight: 700 }}><Num>{sec.list.length.toLocaleString("en")}</Num></span>
                         </div>
                         {sec.list.map(g => {
                           // Confirmation matching only runs for physical guests

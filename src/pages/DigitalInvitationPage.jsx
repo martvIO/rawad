@@ -20,12 +20,24 @@ const DEMO_MEDIA = [
 ];
 
 const DEMO_CAPTIONS = {
-  "demo/1": "اليوم الذي قلنا فيه نعم",
-  "demo/2": "أمسية الكرمل",
-  "demo/3": "خاتم الخطوبة",
-  "demo/4": "تحت الإضاءة الذهبية",
-  "demo/5": "صباح كل يوم",
+  "demo/1": { ar: "اليوم الذي قلنا فيه نعم", he: "היום שבו אמרנו כן" },
+  "demo/2": { ar: "أمسية الكرمل", he: "ערב בכרמל" },
+  "demo/3": { ar: "خاتم الخطوبة", he: "טבעת האירוסין" },
+  "demo/4": { ar: "تحت الإضاءة الذهبية", he: "תחת האור הזהוב" },
+  "demo/5": { ar: "صباح كل يوم", he: "כל בוקר מחדש" },
 };
+
+// Zip the Arabic + Hebrew sample arrays into per-leaf { ar, he } objects so the
+// demo invitation showcases the live language toggle. Non-listed keys (icon)
+// carry over from the Arabic item.
+function mergeLang(arAr, heAr, keys) {
+  return (arAr || []).map((a, i) => {
+    const h = (heAr || [])[i] || {};
+    const out = { ...a };
+    for (const k of keys) out[k] = { ar: a[k] || "", he: h[k] || "" };
+    return out;
+  });
+}
 
 const DigitalYourPhotos = lazy(() =>
   import("./DigitalYourPhotos.jsx").then((m) => ({ default: m.DigitalYourPhotos })),
@@ -47,7 +59,7 @@ export function DigitalInvitationPage({ t, lang, setLang }) {
   );
 }
 
-function DigitalLandingMain({ lang }) {
+function DigitalLandingMain({ lang, setLang }) {
   const { token } = useParams();
   const [search] = useSearchParams();
   const isDemo = search.get("demo") === "1";
@@ -69,21 +81,21 @@ function DigitalLandingMain({ lang }) {
           media: DEMO_MEDIA,
           mediaCaptions: DEMO_CAPTIONS,
           weddingDate: demoDate ? new Date(demoDate).getTime() : Date.now() + 47 * 86400000,
-          brideName: "ليلى",
-          groomDisplayName: "كريم",
+          brideName: { ar: "ليلى", he: "לילה" },
+          groomDisplayName: { ar: "كريم", he: "כרים" },
           monogram: "ك&ل",
-          venue: "قاعة الأفراح الملكية",
-          venueCity: "حيفا",
-          venueAddress: "شارع النبي 86، حيفا",
-          accessNote: "15–20 دقيقة من وسط المدينة · خدمة فاليه",
-          dressCode: "كاجوال أنيق · ألوان فاتحة",
+          venue: { ar: "قاعة الأفراح الملكية", he: "אולמי המלכות" },
+          venueCity: { ar: "حيفا", he: "חיפה" },
+          venueAddress: { ar: "شارع النبي 86، حيفا", he: "רחוב הנביאים 86, חיפה" },
+          accessNote: { ar: "15–20 دقيقة من وسط المدينة · خدمة فاليه", he: "15–20 דקות ממרכז העיר · שירות ולט" },
+          dressCode: { ar: "كاجوال أنيق · ألوان فاتحة", he: "אלגנט קז'ואל · צבעים בהירים" },
           themeColor: search.get("theme") || "gold",
           fontFamily: search.get("font") || "amiri",
-          storyTimeline: SAMPLE_STORY.ar,
-          details: SAMPLE_DETAILS.ar,
-          hotels: SAMPLE_HOTELS.ar,
-          wishes: SAMPLE_WISHES.ar,
-          mealOptions: DEFAULT_MEAL_OPTIONS.ar,
+          storyTimeline: mergeLang(SAMPLE_STORY.ar, SAMPLE_STORY.he, ["when", "title", "body"]),
+          details: mergeLang(SAMPLE_DETAILS.ar, SAMPLE_DETAILS.he, ["meta", "title", "body"]),
+          hotels: mergeLang(SAMPLE_HOTELS.ar, SAMPLE_HOTELS.he, ["name", "walk"]),
+          wishes: mergeLang(SAMPLE_WISHES.ar, SAMPLE_WISHES.he, ["who", "what"]),
+          mealOptions: DEFAULT_MEAL_OPTIONS.ar.map((a, i) => ({ ar: a, he: DEFAULT_MEAL_OPTIONS.he[i] || a })),
         }
       : null,
   );
@@ -118,14 +130,14 @@ function DigitalLandingMain({ lang }) {
     };
   }, [tokenRec, isDemo]);
 
-  const handleSubmitRsvp = async ({ rsvp, note, companions, mealPreference, songRequest }) => {
+  const handleSubmitRsvp = async ({ rsvp, note, submittedPhone, companions, mealPreference, songRequest }) => {
     if (isDemo) {
       await new Promise((r) => setTimeout(r, 400));
       setDone(true);
       return;
     }
     try {
-      await submitDigitalGuestInvite({ token, rsvp, note, companions, mealPreference, songRequest });
+      await submitDigitalGuestInvite({ token, rsvp, note, submittedPhone, companions, mealPreference, songRequest });
       setDone(true);
     } catch (err) {
       logErr("submitDigitalGuestInvite", err);
@@ -159,7 +171,9 @@ function DigitalLandingMain({ lang }) {
     <DigitalInvitationView
       design={doc}
       guestName={tokenRec.guestName || ""}
+      guestPhone={tokenRec.guestPhone || ""}
       lang={lang}
+      setLang={setLang}
       mode="public"
       onSubmitRsvp={handleSubmitRsvp}
       showEnvelope={true}

@@ -13,6 +13,7 @@
 //   t, lang     — مترجم + اتجاه
 import { useState, useMemo } from "react";
 import { C } from "../styles/theme.js";
+import { Num } from "./Num.jsx";
 
 export function GroomMultiSelect({
   grooms = [],
@@ -61,7 +62,7 @@ export function GroomMultiSelect({
               fontSize: 11, padding: "2px 10px", borderRadius: 20,
               background: "rgba(201,168,76,.2)", color: C.gold, fontWeight: 800,
             }}>
-              {selected.length.toLocaleString("en")} ✓
+              <Num>{selected.length.toLocaleString("en")}</Num> ✓
             </span>
           )}
         </div>

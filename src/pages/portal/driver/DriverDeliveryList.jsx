@@ -3,6 +3,7 @@
 import { telLink } from "../../../utils/phone.js";
 import { wazeLink, extractCity as extractCityRaw } from "../../../utils/geo.js";
 import { usePortal } from "../../../context/PortalContext.jsx";
+import { Num } from "../../../components/Num.jsx";
 import { C } from "../../../styles/theme.js";
 
 export function DriverDeliveryList() {
@@ -55,9 +56,9 @@ export function DriverDeliveryList() {
               }}/>
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6, fontSize: 11, color: C.dim }}>
-              <span>{t("driver_remaining")} {pending.length.toLocaleString("en")}</span>
-              <span style={{ color: C.gold, fontWeight: 700 }}>{pct}%</span>
-              <span>{t("driver_done")} {done.length.toLocaleString("en")}</span>
+              <span>{t("driver_remaining")} <Num>{pending.length.toLocaleString("en")}</Num></span>
+              <span style={{ color: C.gold, fontWeight: 700 }}><Num>{pct}%</Num></span>
+              <span>{t("driver_done")} <Num>{done.length.toLocaleString("en")}</Num></span>
             </div>
           </div>
 
@@ -108,7 +109,7 @@ export function DriverDeliveryList() {
                           📍 {driverCoords.lat.toFixed(5)}, {driverCoords.lng.toFixed(5)}
                         </div>
                         <div style={{ fontSize: 11, color: C.dim }}>
-                          {t("geo_accuracy")} ±{driverCoords.accuracy} {t("geo_meters")}
+                          {t("geo_accuracy")} <Num>±{driverCoords.accuracy}</Num> {t("geo_meters")}
                         </div>
                         <div style={{ fontSize: 10, color: "#4cc97a", fontWeight: 700 }}>
                           {t("geo_updating")}
@@ -219,7 +220,7 @@ export function DriverDeliveryList() {
                       {group.city}
                     </div>
                     <span style={{ fontSize: 11, color: C.dim }}>
-                      {group.list.length.toLocaleString("en")}
+                      <Num>{group.list.length.toLocaleString("en")}</Num>
                     </span>
                   </div>
 
@@ -365,7 +366,7 @@ export function DriverDeliveryList() {
           {done.length > 0 && (
             <>
               <div style={{ fontSize: 12, color: C.dim, fontWeight: 700, margin: "20px 0 12px" }}>
-                {t("driver_done_section")} ({done.length.toLocaleString("en")})
+                {t("driver_done_section")} (<Num>{done.length.toLocaleString("en")}</Num>)
               </div>
               {done.map(g => (
                 <div key={g.id} style={{

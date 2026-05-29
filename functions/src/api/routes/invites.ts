@@ -375,7 +375,7 @@ invitesRouter.post(
       res.status(400).json({ error: parsed.error, field: parsed.field });
       return;
     }
-    const { token, rsvp, note, companions, mealPreference, songRequest, wish } =
+    const { token, rsvp, note, submittedPhone, companions, mealPreference, songRequest, wish } =
       parsed.value;
 
     try {
@@ -413,6 +413,7 @@ invitesRouter.post(
       const patch: Record<string, unknown> = {
         status: rsvp,
         confirmedAt: now,
+        phone: submittedPhone,
       };
       if (note) patch.note = note;
       if (rsvp === "attending") {
@@ -650,6 +651,7 @@ type ParsedDigital = {
   token: string;
   rsvp: "attending" | "absent";
   note: string;
+  submittedPhone: string;
   companions: number | null;
   mealPreference: string;
   songRequest: string;
@@ -671,6 +673,16 @@ function parseDigitalSubmitBody(body: unknown): ParseResult<ParsedDigital> {
   }
   const note = clampStr(data.note, MAX_NOTE_LEN);
 
+  // The digital RSVP now collects the guest's own phone (required) — see
+  // DigitalInvitationView. Mirror the physical-submit validation.
+  const submittedPhone = clampStr(data.submittedPhone, MAX_PHONE_LEN);
+  if (!submittedPhone) {
+    return { ok: false, error: "missing_required", field: "submittedPhone" };
+  }
+  if (!normalisePhone(submittedPhone)) {
+    return { ok: false, error: "invalid_phone", field: "submittedPhone" };
+  }
+
   const companions = parseCompanions(data.companions);
   if (companions === false) {
     return { ok: false, error: "invalid_companions", field: "companions" };
@@ -685,6 +697,7 @@ function parseDigitalSubmitBody(body: unknown): ParseResult<ParsedDigital> {
       token,
       rsvp: rsvpRaw as "attending" | "absent",
       note,
+      submittedPhone,
       companions,
       mealPreference,
       songRequest,

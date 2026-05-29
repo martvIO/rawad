@@ -10,6 +10,7 @@ import {
 import { logErr } from "../../../../utils/logger.js";
 import { load, save, removeKey } from "../../../../utils/storage.js";
 import { C } from "../../../../styles/theme.js";
+import { Num } from "../../../../components/Num.jsx";
 import { getStoredUid } from "../../../../utils/tokenManager.js";
 import { SkeletonList } from "../../../../components/Skeleton.jsx";
 
@@ -398,7 +399,7 @@ export function DigitalPhotographer() {
 
       {/* ── File list (RTDB confirmed + local pending) ─────────────────── */}
       <div style={{ fontSize: 13, fontWeight: 800, color: C.goldLight, marginBottom: 12 }}>
-        {lang === "he" ? "קבצים שהועלו" : "الملفات المرفوعة"} ({displayList.length.toLocaleString("en")})
+        {lang === "he" ? "קבצים שהועלו" : "الملفات المرفوعة"} (<Num>{displayList.length.toLocaleString("en")}</Num>)
       </div>
 
       {displayList.length === 0 ? (

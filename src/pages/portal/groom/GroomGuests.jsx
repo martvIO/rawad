@@ -3,19 +3,19 @@ import { useNavigate } from "react-router-dom";
 import { STATUS, REPLY_STATUS, replyStateOf } from "../../../data/status.js";
 import { usePortal } from "../../../context/PortalContext.jsx";
 import { C } from "../../../styles/theme.js";
+import { Num } from "../../../components/Num.jsx";
 
 export function GroomGuests() {
   const navigate = useNavigate();
   const {
     t, lang, myGuests,
     revealedId, setRevealedId, swipeStartRef, removeGuest, startEdit,
-    sendInviteLink,
   } = usePortal();
   return (
           <div style={{ animation: "fadeUp .3s ease" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
               <div style={{ fontSize: 15, fontWeight: 800, color: C.goldLight }}>
-                {t("guests_count")} ({myGuests.length.toLocaleString("en")})
+                {t("guests_count")} (<Num>{myGuests.length.toLocaleString("en")}</Num>)
               </div>
               <button className="gold-btn" style={{ padding: "8px 16px", fontSize: 12 }} onClick={() => navigate("/portal/groom/handwritten/add")}>
                 {t("guests_add_btn")}
@@ -88,7 +88,7 @@ export function GroomGuests() {
                         {g.area && <div style={{ fontSize: 12, color: C.dim }}>📍 {g.area}</div>}
                         {g.confirmedAt && Number(g.companions) > 0 && (
                           <div data-testid="guest-companions" style={{ fontSize: 11, fontWeight: 800, color: C.gold, marginTop: 2 }}>
-                            +{g.companions} {lang === "he" ? "מלווים" : "مرافق"}
+                            <Num>+{g.companions}</Num> {lang === "he" ? "מלווים" : "مرافق"}
                           </div>
                         )}
                       </div>
@@ -108,18 +108,8 @@ export function GroomGuests() {
                         }}>{g.inviteType==="vip" ? t("type_vip") : t("type_premium")}</span>
                         {canDelete && (
                           <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "stretch" }}>
-                            <button onClick={() => sendInviteLink(g)}
-                                    title={g.inviteLinkSentAt ? t("guests_invite_sent") : t("guests_send_invite")}
-                                    style={{
-                                      background: g.inviteLinkSentAt ? "rgba(76,201,122,.12)" : "rgba(37,211,102,.14)",
-                                      border: `1px solid ${g.inviteLinkSentAt ? "rgba(76,201,122,.35)" : "rgba(37,211,102,.45)"}`,
-                                      color: g.inviteLinkSentAt ? "#4cc97a" : "#25d366",
-                                      fontSize: 11, fontWeight: 800,
-                                      cursor: "pointer", padding: "3px 8px", borderRadius: 8, fontFamily: "inherit",
-                                      whiteSpace: "nowrap",
-                                    }}>
-                              {g.inviteLinkSentAt ? "✓ " + t("guests_invite_sent") : "📲 " + t("guests_send_invite")}
-                            </button>
+                            {/* WhatsApp invite sending is admin-only — the groom
+                                can no longer self-send (digital or manual). */}
                             <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                               <button onClick={() => startEdit(g)}
                                       style={{ background: "rgba(201,168,76,.12)", border: "1px solid rgba(201,168,76,.3)",
@@ -155,7 +145,7 @@ export function GroomGuests() {
                   background: bg, border: `1px solid ${color}33`,
                 }}>
                   <div style={{ flex: 1, fontWeight: 800, color, fontSize: 14 }}>{title}</div>
-                  <span style={{ fontSize: 11, color, fontWeight: 700 }}>{count.toLocaleString("en")}</span>
+                  <span style={{ fontSize: 11, color, fontWeight: 700 }}><Num>{count.toLocaleString("en")}</Num></span>
                 </div>
               );
 

@@ -2,6 +2,7 @@
 import { LiveMap } from "../../../components/LiveMap.jsx";
 import { usePortal } from "../../../context/PortalContext.jsx";
 import { C } from "../../../styles/theme.js";
+import { Num } from "../../../components/Num.jsx";
 
 export function GroomLiveMap() {
   const {
@@ -41,7 +42,7 @@ export function GroomLiveMap() {
                 display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap",
               }}>
                 <div style={{ fontSize: 12, color: "#4cc97a", fontWeight: 700 }}>
-                  🚗 {driversSharingWithMe.length.toLocaleString("en")} {t("map_drivers_count")}{" "}
+                  🚗 <Num>{driversSharingWithMe.length.toLocaleString("en")}</Num> {t("map_drivers_count")}{" "}
                   · <span style={{ direction: "ltr", color: C.gold }}>
                     {driversSharingWithMe.map(d => d.driver).join(", ")}
                   </span>

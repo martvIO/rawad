@@ -4,6 +4,7 @@
 // Edit button that opens EditConfirmationModal.
 import { usePortal } from "../../../context/PortalContext.jsx";
 import { C } from "../../../styles/theme.js";
+import { Num } from "../../../components/Num.jsx";
 import { formatAddress } from "../../../utils/geo.js";
 import { MATCH_STATUS } from "../../../constants/matchStatuses.js";
 
@@ -49,7 +50,7 @@ export function AdminConfirmationsTab() {
             )}
           </div>
           <div style={{ fontSize: 10, color: "#5a5040" }}>
-            {new Date(conf.confirmedAt).toLocaleString(lang === "he" ? "he-IL" : "ar", { numberingSystem: "latn" })}
+            <Num dir="auto">{new Date(conf.confirmedAt).toLocaleString(lang === "he" ? "he-IL" : "ar", { numberingSystem: "latn" })}</Num>
           </div>
         </div>
 
@@ -84,7 +85,7 @@ export function AdminConfirmationsTab() {
             </div>
             {Number(conf.companions) > 0 && (
               <div style={{ fontSize: 11, color: C.gold, fontWeight: 800, marginTop: 4 }}>
-                👥 +{conf.companions} {lang === "he" ? "מלווים" : "مرافق"}
+                👥 <Num>+{conf.companions}</Num> {lang === "he" ? "מלווים" : "مرافق"}
               </div>
             )}
           </div>
@@ -150,7 +151,7 @@ export function AdminConfirmationsTab() {
           {matched.length > 0 && (
             <div style={{ marginBottom: 18 }}>
               <div style={{ fontSize: 13, color: "#4cc97a", fontWeight: 700, marginBottom: 10 }}>
-                {t("admin_conf_matched")} ({matched.length.toLocaleString("en")})
+                {t("admin_conf_matched")} (<Num>{matched.length.toLocaleString("en")}</Num>)
               </div>
               {matched.map(renderConf)}
             </div>
@@ -158,7 +159,7 @@ export function AdminConfirmationsTab() {
           {mismatch.length > 0 && (
             <div style={{ marginBottom: 18 }}>
               <div style={{ fontSize: 13, color: C.red, fontWeight: 700, marginBottom: 10 }}>
-                {t("admin_conf_mismatch_header")} ({mismatch.length.toLocaleString("en")})
+                {t("admin_conf_mismatch_header")} (<Num>{mismatch.length.toLocaleString("en")}</Num>)
               </div>
               {mismatch.map(renderConf)}
             </div>
@@ -166,7 +167,7 @@ export function AdminConfirmationsTab() {
           {unknown.length > 0 && (
             <div>
               <div style={{ fontSize: 13, color: C.red, fontWeight: 700, marginBottom: 10 }}>
-                {t("admin_conf_unknown")} ({unknown.length.toLocaleString("en")})
+                {t("admin_conf_unknown")} (<Num>{unknown.length.toLocaleString("en")}</Num>)
               </div>
               {unknown.map(renderConf)}
             </div>

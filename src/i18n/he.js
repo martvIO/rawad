@@ -306,7 +306,7 @@ export const he = {
   conf_form_city: "יישוב",
   conf_form_street: "שם רחוב",
   conf_form_house_number: "מספר בית",
-  conf_form_companions: "כמה אנשים יגיעו איתך? (מלבד המוזמן)",
+  conf_form_companions: "כמה אתם? (כולל המוזמן)",
   conf_form_submit: "✓ אשר את פרטיי",
   conf_form_thanks_title: "תודה לך! ✓",
   conf_form_thanks_body: "פרטיך התקבלו. ניצור איתכם קשר בקרוב למסירת ההזמנה.",

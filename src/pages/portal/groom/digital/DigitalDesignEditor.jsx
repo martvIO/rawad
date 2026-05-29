@@ -24,8 +24,39 @@ import {
   SAMPLE_HOTELS,
   SAMPLE_WISHES,
 } from "../../../../data/digitalInviteDefaults.js";
+import { hasContent } from "../../../../utils/localize.js";
 
 const tt = (lang, ar, he) => (lang === "he" ? he : ar);
+
+// ── Bilingual field helpers ───────────────────────────────────────────────
+// A localized text field is stored as { ar, he }. The editor edits one language
+// at a time (editLang); a legacy plain string is treated as the Arabic value so
+// existing single-language designs keep working.
+function leaf(value, editLang) {
+  if (value == null) return "";
+  if (typeof value === "string") return editLang === "ar" ? value : "";
+  if (typeof value === "object") return value[editLang] || "";
+  return String(value);
+}
+function setLeaf(value, editLang, next) {
+  const base =
+    value && typeof value === "object" && !Array.isArray(value)
+      ? { ...value }
+      : typeof value === "string" && value
+        ? { ar: value }
+        : {};
+  base[editLang] = next;
+  return base;
+}
+// Zip Arabic + Hebrew sample arrays into per-leaf { ar, he } items (fill-sample).
+function mergeLang(arAr, heAr, keys) {
+  return (arAr || []).map((a, i) => {
+    const h = (heAr || [])[i] || {};
+    const out = { ...a };
+    for (const k of keys) out[k] = { ar: a[k] || "", he: h[k] || "" };
+    return out;
+  });
+}
 
 // Every scalar/array field the groom edits lives in one buffered object so the
 // preview is a simple merge and autosave can target a single key at a time.
@@ -45,6 +76,8 @@ const TOGGLE_KEYS = [
 export function DigitalDesignEditor() {
   const { lang, currentUid, showToast } = usePortal();
   const langKey = lang === "he" ? "he" : "ar";
+  // Which language the text inputs edit. Each localized field stores both.
+  const [editLang, setEditLang] = useState(langKey);
   const [doc, setDoc] = useState(null);
   const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -173,14 +206,15 @@ export function DigitalDesignEditor() {
   // One-click: start from the full sample design for any sections still empty.
   const fillSample = async () => {
     const patch = {};
-    if (!(f.storyTimeline || []).length) patch.storyTimeline = SAMPLE_STORY[langKey];
-    if (!(f.details || []).length) patch.details = SAMPLE_DETAILS[langKey];
-    if (!(f.hotels || []).length) patch.hotels = SAMPLE_HOTELS[langKey];
-    if (!(f.wishes || []).length) patch.wishes = SAMPLE_WISHES[langKey];
-    if (!(f.mealOptions || []).length) patch.mealOptions = DEFAULT_MEAL_OPTIONS[langKey];
-    if (!(f.eyebrow || "").trim()) patch.eyebrow = DEFAULT_EYEBROW[langKey];
-    if (!(f.dressCode || "").trim()) patch.dressCode = tt(lang, "كاجوال أنيق · ألوان فاتحة", "אלגנט קז'ואל · צבעים בהירים");
-    if (!(f.accessNote || "").trim()) patch.accessNote = tt(lang, "15–20 دقيقة من وسط المدينة · خدمة فاليه", "15–20 דקות ממרכז העיר · שירות ולט");
+    // Fill BOTH languages so the guest's toggle has content either way.
+    if (!(f.storyTimeline || []).length) patch.storyTimeline = mergeLang(SAMPLE_STORY.ar, SAMPLE_STORY.he, ["when", "title", "body"]);
+    if (!(f.details || []).length) patch.details = mergeLang(SAMPLE_DETAILS.ar, SAMPLE_DETAILS.he, ["meta", "title", "body"]);
+    if (!(f.hotels || []).length) patch.hotels = mergeLang(SAMPLE_HOTELS.ar, SAMPLE_HOTELS.he, ["name", "walk"]);
+    if (!(f.wishes || []).length) patch.wishes = mergeLang(SAMPLE_WISHES.ar, SAMPLE_WISHES.he, ["who", "what"]);
+    if (!(f.mealOptions || []).length) patch.mealOptions = DEFAULT_MEAL_OPTIONS.ar.map((a, i) => ({ ar: a, he: DEFAULT_MEAL_OPTIONS.he[i] || a }));
+    if (!hasContent(f.eyebrow)) patch.eyebrow = { ar: DEFAULT_EYEBROW.ar, he: DEFAULT_EYEBROW.he };
+    if (!hasContent(f.dressCode)) patch.dressCode = { ar: "كاجوال أنيق · ألوان فاتحة", he: "אלגנט קז'ואל · צבעים בהירים" };
+    if (!hasContent(f.accessNote)) patch.accessNote = { ar: "15–20 دقيقة من وسط المدينة · خدمة فاليه", he: "15–20 דקות ממרכز העיר · שירות ולט" };
     if (Object.keys(patch).length === 0) {
       showToast(tt(lang, "كل الأقسام معبّأة بالفعل", "כל החלקים כבר מלאים"));
       return;
@@ -227,7 +261,7 @@ export function DigitalDesignEditor() {
   };
 
   const onSubmit = async () => {
-    if (!(f.brideName || "").trim() || !(f.groomDisplayName || "").trim()) {
+    if (!hasContent(f.brideName) || !hasContent(f.groomDisplayName)) {
       showToast(tt(lang, "اسما العروسين مطلوبان", "שמות הזוג נדרשים"));
       return;
     }
@@ -267,9 +301,19 @@ export function DigitalDesignEditor() {
   const v = (key) => f[key] ?? "";
   const arr = (key) => f[key] || [];
   const tog = (key) => f[key] !== false;
+  // Localized text input — binds to the editLang leaf of a { ar, he } field.
   const textProps = (key, max) => ({
     className: "input-field",
-    value: v(key),
+    value: leaf(f[key], editLang),
+    disabled: !editable,
+    maxLength: max,
+    onChange: (e) => setField(key, setLeaf(f[key], editLang, e.target.value)),
+    onBlur: () => flush(key, f[key]),
+  });
+  // Latin/single-value text input (IBAN, music URL) — never localized.
+  const latinProps = (key, max) => ({
+    className: "input-field",
+    value: typeof f[key] === "string" ? f[key] : "",
     disabled: !editable,
     maxLength: max,
     onChange: (e) => setField(key, e.target.value),
@@ -308,6 +352,35 @@ export function DigitalDesignEditor() {
         ✨ {tt(lang, "تعبئة الأقسام الفارغة بمحتوى نموذجي", "מלא חלקים ריקים בתוכן לדוגמה")}
       </button>
 
+      {/* Bilingual content tab — each text field below is saved per language, and
+          the guest can toggle between them on the invitation. Fill both. */}
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ fontSize: 11, color: C.dim, marginBottom: 6, fontWeight: 700 }}>
+          {tt(lang, "لغة محتوى الدعوة — يُفضّل تعبئة النصّين (يبدّل الضيف بينهما)", "שפת תוכן ההזמנה — מלא את שני הטקסטים (האורח מחליף ביניהם)")}
+        </div>
+        <div style={{ display: "inline-flex", borderRadius: 10, overflow: "hidden", border: "1px solid rgba(201,168,76,.3)" }}>
+          {[
+            { code: "ar", label: "العربية" },
+            { code: "he", label: "עברית" },
+          ].map(({ code, label }) => (
+            <button
+              key={code}
+              type="button"
+              data-testid={`design-editlang-${code}`}
+              onClick={() => setEditLang(code)}
+              style={{
+                padding: "8px 18px", fontSize: 12, fontWeight: 800, cursor: "pointer",
+                fontFamily: "inherit", border: "none",
+                background: editLang === code ? C.gold : "transparent",
+                color: editLang === code ? "#1a1206" : C.goldLight,
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div style={{ display: "grid", gridTemplateColumns: "minmax(280px, 1fr)", gap: 16 }}>
         {/* Names */}
         <Section title={tt(lang, "أسماء العروسين", "שמות הזוג")}>
@@ -321,7 +394,7 @@ export function DigitalDesignEditor() {
             <input data-testid="design-monogram" type="text" {...textProps("monogram", 12)} />
           </FormField>
           <FormField label={tt(lang, "نص علوي صغير في البداية", "כיתוב עליון קצר")}>
-            <input data-testid="design-eyebrow" type="text" placeholder={DEFAULT_EYEBROW[langKey]} {...textProps("eyebrow", 60)} />
+            <input data-testid="design-eyebrow" type="text" placeholder={DEFAULT_EYEBROW[editLang]} {...textProps("eyebrow", 60)} />
           </FormField>
         </Section>
 
@@ -348,6 +421,7 @@ export function DigitalDesignEditor() {
         >
           <ArrayEditor
             testid="design-story"
+            editLang={editLang}
             items={arr("storyTimeline")}
             disabled={!editable || !tog("storyEnabled")}
             onChange={(next) => setArray("storyTimeline", next)}
@@ -357,9 +431,9 @@ export function DigitalDesignEditor() {
             removeLabel={tt(lang, "حذف", "מחק")}
             schema={[
               { key: "icon", placeholder: "✦", width: 56, maxLength: 8 },
-              { key: "when", placeholder: tt(lang, "متى (صيف 2023)", "מתי"), maxLength: 40 },
-              { key: "title", placeholder: tt(lang, "العنوان", "כותרת"), maxLength: 60 },
-              { key: "body", placeholder: tt(lang, "الوصف", "תיאור"), maxLength: 400, textarea: true },
+              { key: "when", placeholder: tt(lang, "متى (صيف 2023)", "מתי"), maxLength: 40, localized: true },
+              { key: "title", placeholder: tt(lang, "العنوان", "כותרת"), maxLength: 60, localized: true },
+              { key: "body", placeholder: tt(lang, "الوصف", "תיאור"), maxLength: 400, textarea: true, localized: true },
             ]}
           />
         </Section>
@@ -419,6 +493,7 @@ export function DigitalDesignEditor() {
         >
           <ArrayEditor
             testid="design-details"
+            editLang={editLang}
             items={arr("details")}
             disabled={!editable || !tog("detailsEnabled")}
             onChange={(next) => setArray("details", next)}
@@ -428,9 +503,9 @@ export function DigitalDesignEditor() {
             removeLabel={tt(lang, "حذف", "מחק")}
             schema={[
               { key: "icon", placeholder: "♛", width: 56, maxLength: 8 },
-              { key: "meta", placeholder: tt(lang, "تصنيف (حفل العقد)", "תווית"), maxLength: 40 },
-              { key: "title", placeholder: tt(lang, "العنوان (7:00 مساءً)", "כותרת"), maxLength: 80 },
-              { key: "body", placeholder: tt(lang, "الوصف", "תיאור"), maxLength: 300, textarea: true },
+              { key: "meta", placeholder: tt(lang, "تصنيف (حفل العقد)", "תווית"), maxLength: 40, localized: true },
+              { key: "title", placeholder: tt(lang, "العنوان (7:00 مساءً)", "כותרת"), maxLength: 80, localized: true },
+              { key: "body", placeholder: tt(lang, "الوصف", "תיאור"), maxLength: 300, textarea: true, localized: true },
             ]}
           />
         </Section>
@@ -455,6 +530,7 @@ export function DigitalDesignEditor() {
           <FormField label={tt(lang, "فنادق قريبة", "מלונות בקרבת מקום")}>
             <ArrayEditor
               testid="design-hotels"
+              editLang={editLang}
               items={arr("hotels")}
               disabled={!editable || !tog("venueEnabled")}
               onChange={(next) => setArray("hotels", next)}
@@ -463,8 +539,8 @@ export function DigitalDesignEditor() {
               addLabel={tt(lang, "➕ إضافة فندق", "➕ הוסף מלון")}
               removeLabel={tt(lang, "حذف", "מחק")}
               schema={[
-                { key: "name", placeholder: tt(lang, "اسم الفندق", "שם המלון"), maxLength: 80 },
-                { key: "walk", placeholder: tt(lang, "مسافة المشي", "מרחק הליכה"), width: 120, maxLength: 40 },
+                { key: "name", placeholder: tt(lang, "اسم الفندق", "שם המלון"), maxLength: 80, localized: true },
+                { key: "walk", placeholder: tt(lang, "مسافة المشي", "מרחק הליכה"), width: 120, maxLength: 40, localized: true },
               ]}
             />
           </FormField>
@@ -482,7 +558,7 @@ export function DigitalDesignEditor() {
 
         {/* RSVP options */}
         <Section title={tt(lang, "خيارات تأكيد الحضور", "אפשרויות אישור הגעה")}>
-          <ToggleRow label={tt(lang, "عدّاد المرافقين (عدا المدعو)", "מונה מלווים (מלבד המוזמן)")} checked={tog("rsvpCompanionsEnabled")} disabled={!editable} testid="design-toggle-companions" onChange={(c) => toggle("rsvpCompanionsEnabled", c)} />
+          <ToggleRow label={tt(lang, "عدّاد عدد الحضور (شاملاً المدعو)", "מונה מספר אורחים (כולל המוזמן)")} checked={tog("rsvpCompanionsEnabled")} disabled={!editable} testid="design-toggle-companions" onChange={(c) => toggle("rsvpCompanionsEnabled", c)} />
           <ToggleRow label={tt(lang, "تفضيل الطعام", "העדפת מנה")} checked={tog("rsvpMealEnabled")} disabled={!editable} testid="design-toggle-meal" onChange={(c) => toggle("rsvpMealEnabled", c)} />
           <ToggleRow label={tt(lang, "طلب أغنية", "בקשת שיר")} checked={tog("rsvpSongEnabled")} disabled={!editable} testid="design-toggle-song" onChange={(c) => toggle("rsvpSongEnabled", c)} />
           {tog("rsvpMealEnabled") && (
@@ -492,9 +568,13 @@ export function DigitalDesignEditor() {
                 className="input-field"
                 type="text"
                 disabled={!editable}
-                value={(f.mealOptions || []).join("، ")}
-                placeholder={DEFAULT_MEAL_OPTIONS[langKey].join("، ")}
-                onChange={(e) => setField("mealOptions", e.target.value.split(/[،,]/).map((s) => s.trim()).filter(Boolean))}
+                value={(f.mealOptions || []).map((o) => leaf(o, editLang)).join("، ")}
+                placeholder={DEFAULT_MEAL_OPTIONS[editLang].join("، ")}
+                onChange={(e) => {
+                  const parts = e.target.value.split(/[،,]/).map((s) => s.trim()).filter(Boolean);
+                  const prev = f.mealOptions || [];
+                  setField("mealOptions", parts.map((p, i) => setLeaf(prev[i], editLang, p)));
+                }}
                 onBlur={() => flush("mealOptions", (f.mealOptions || []))}
               />
             </FormField>
@@ -511,6 +591,7 @@ export function DigitalDesignEditor() {
           </div>
           <ArrayEditor
             testid="design-wishes"
+            editLang={editLang}
             items={arr("wishes")}
             disabled={!editable || !tog("guestbookEnabled")}
             onChange={(next) => setArray("wishes", next)}
@@ -519,8 +600,8 @@ export function DigitalDesignEditor() {
             addLabel={tt(lang, "➕ إضافة تهنئة", "➕ הוסף ברכה")}
             removeLabel={tt(lang, "حذف", "מחק")}
             schema={[
-              { key: "who", placeholder: tt(lang, "الاسم", "שם"), maxLength: 60 },
-              { key: "what", placeholder: tt(lang, "التهنئة", "הברכה"), maxLength: 300, textarea: true },
+              { key: "who", placeholder: tt(lang, "الاسم", "שם"), maxLength: 60, localized: true },
+              { key: "what", placeholder: tt(lang, "التهنئة", "הברכה"), maxLength: 300, textarea: true, localized: true },
             ]}
           />
         </Section>
@@ -534,7 +615,7 @@ export function DigitalDesignEditor() {
             <textarea data-testid="design-gift-note" rows={2} {...textProps("giftNote", 300)} placeholder={tt(lang, "حضوركم أجمل هدية…", "נוכחותכם היא המתנה…")} style={{ resize: "vertical", minHeight: 50 }} />
           </FormField>
           <FormField label={tt(lang, "IBAN / رقم الحساب (اختياري)", "IBAN / מספר חשבון")}>
-            <input data-testid="design-gift-iban" type="text" {...textProps("giftIban", 60)} placeholder="IL00 0000 0000 0000" style={{ direction: "ltr" }} />
+            <input data-testid="design-gift-iban" type="text" {...latinProps("giftIban", 60)} placeholder="IL00 0000 0000 0000" style={{ direction: "ltr" }} />
           </FormField>
         </Section>
 
@@ -551,7 +632,7 @@ export function DigitalDesignEditor() {
           toggle={{ enabled: tog("musicEnabled"), onChange: (c) => toggle("musicEnabled", c), disabled: !editable, testid: "design-toggle-music" }}
         >
           <FormField label={tt(lang, "رابط ملف صوتي (mp3)", "קישור לקובץ אודיו (mp3)")}>
-            <input data-testid="design-music-url" type="text" {...textProps("musicUrl", 600)} placeholder="https://…/song.mp3" style={{ direction: "ltr" }} />
+            <input data-testid="design-music-url" type="text" {...latinProps("musicUrl", 600)} placeholder="https://…/song.mp3" style={{ direction: "ltr" }} />
           </FormField>
         </Section>
 
@@ -611,7 +692,7 @@ export function DigitalDesignEditor() {
             {tt(lang, "معاينة مباشرة", "תצוגה מקדימה חיה")}
           </div>
           <div data-testid="design-preview" style={{ borderRadius: 16, overflow: "hidden", border: "1px solid rgba(201,168,76,.22)", maxHeight: 640, overflowY: "auto" }}>
-            <DigitalInvitationView design={previewDesign} guestName={tt(lang, "اسم الضيف", "שם האורח")} lang={lang} mode="preview" />
+            <DigitalInvitationView design={previewDesign} guestName={tt(editLang, "اسم الضيف", "שם האורח")} lang={editLang} mode="preview" />
           </div>
         </div>
       </div>
@@ -620,7 +701,7 @@ export function DigitalDesignEditor() {
 }
 
 // ── Generic array editor (story / details / hotels / wishes) ──────────────────
-function ArrayEditor({ items, schema, onChange, onCommit, addLabel, removeLabel, max, disabled, testid }) {
+function ArrayEditor({ items, schema, onChange, onCommit, addLabel, removeLabel, max, disabled, testid, editLang }) {
   const update = (idx, key, val) => onChange(items.map((it, i) => (i === idx ? { ...it, [key]: val } : it)));
   const remove = (idx) => onCommit(items.filter((_, i) => i !== idx));
   const add = () => {
@@ -638,11 +719,11 @@ function ArrayEditor({ items, schema, onChange, onCommit, addLabel, removeLabel,
                 key={s.key}
                 className="input-field"
                 type="text"
-                value={it[s.key] || ""}
+                value={s.localized ? leaf(it[s.key], editLang) : (it[s.key] || "")}
                 disabled={disabled}
                 maxLength={s.maxLength}
                 placeholder={s.placeholder}
-                onChange={(e) => update(idx, s.key, e.target.value)}
+                onChange={(e) => update(idx, s.key, s.localized ? setLeaf(it[s.key], editLang, e.target.value) : e.target.value)}
                 onBlur={() => onCommit(items)}
                 style={s.width ? { width: s.width, textAlign: "center", flex: "0 0 auto" } : { flex: 1, minWidth: 120 }}
               />
@@ -653,11 +734,11 @@ function ArrayEditor({ items, schema, onChange, onCommit, addLabel, removeLabel,
               key={s.key}
               className="input-field"
               rows={2}
-              value={it[s.key] || ""}
+              value={s.localized ? leaf(it[s.key], editLang) : (it[s.key] || "")}
               disabled={disabled}
               maxLength={s.maxLength}
               placeholder={s.placeholder}
-              onChange={(e) => update(idx, s.key, e.target.value)}
+              onChange={(e) => update(idx, s.key, s.localized ? setLeaf(it[s.key], editLang, e.target.value) : e.target.value)}
               onBlur={() => onCommit(items)}
               style={{ resize: "vertical", minHeight: 44, marginBottom: 8 }}
             />

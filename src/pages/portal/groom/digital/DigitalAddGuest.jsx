@@ -6,6 +6,7 @@ import { usePortal } from "../../../../context/PortalContext.jsx";
 import { addDigitalGuest, subscribeDigitalMedia } from "../../../../services/digitalInvitation.js";
 import { logErr } from "../../../../utils/logger.js";
 import { C } from "../../../../styles/theme.js";
+import { Num } from "../../../../components/Num.jsx";
 
 export function DigitalAddGuest() {
   const { lang, currentUid, showToast } = usePortal();
@@ -154,7 +155,7 @@ export function DigitalAddGuest() {
           <span>{lang === "he" ? "רמות המוזמן (אפשר לבחור כמה)" : "رتب المدعو (يمكن اختيار عدة)"}</span>
           {selectedRanks.length > 0 && (
             <span style={{ fontSize: 10, color: C.gold, fontWeight: 700 }}>
-              {selectedRanks.length} {lang === "he" ? "נבחרו" : "محددة"}
+              <Num>{selectedRanks.length}</Num> {lang === "he" ? "נבחרו" : "محددة"}
             </span>
           )}
         </div>

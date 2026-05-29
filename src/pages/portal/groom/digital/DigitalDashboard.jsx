@@ -39,6 +39,7 @@ import {
 } from "../../../../services/digitalInvitation.js";
 import { logErr } from "../../../../utils/logger.js";
 import { C } from "../../../../styles/theme.js";
+import { Num } from "../../../../components/Num.jsx";
 import { getStoredUid } from "../../../../utils/tokenManager.js";
 
 const tt = (lang, ar, he) => (lang === "he" ? he : ar);
@@ -370,7 +371,7 @@ export function DigitalDashboard() {
         <div style={{ fontSize: 13, fontWeight: 800, color: C.goldLight, marginBottom: 10 }}>
           🎬 {tt(lang, "وسائط الدعوة", "מדיית ההזמנה")}
           <span style={{ fontSize: 11, color: C.dim, fontWeight: 600, marginInlineStart: 8 }}>
-            ({media.length.toLocaleString("en")})
+            (<Num>{media.length.toLocaleString("en")}</Num>)
           </span>
         </div>
         <div style={{ fontSize: 11, color: C.dim, marginBottom: 12, lineHeight: 1.7 }}>
@@ -423,11 +424,11 @@ export function DigitalDashboard() {
         />
         {doc?.weddingDate && (
           <div style={{ fontSize: 11, color: C.gold, marginTop: 8 }}>
-            {new Date(doc.weddingDate).toLocaleString(lang === "he" ? "he-IL" : "ar-SA", {
+            <Num dir="auto">{new Date(doc.weddingDate).toLocaleString(lang === "he" ? "he-IL" : "ar-SA", {
               weekday: "long", year: "numeric", month: "long", day: "numeric",
               hour: "2-digit", minute: "2-digit",
               numberingSystem: "latn",
-            })}
+            })}</Num>
           </div>
         )}
       </div>
@@ -500,7 +501,7 @@ export function DigitalDashboard() {
           <div key={s.label} className="card" style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <div style={{ fontSize: 26 }}>{s.icon}</div>
             <div>
-              <div style={{ fontSize: 26, fontWeight: 900, color: s.color }}>{s.val.toLocaleString("en")}</div>
+              <div style={{ fontSize: 26, fontWeight: 900, color: s.color }}><Num>{s.val.toLocaleString("en")}</Num></div>
               <div style={{ fontSize: 11, color: C.dim }}>{s.label}</div>
             </div>
           </div>
@@ -511,7 +512,7 @@ export function DigitalDashboard() {
         <div className="gold-card" data-testid="digital-expected-attendees" style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
           <div style={{ fontSize: 26 }}>👥</div>
           <div>
-            <div style={{ fontSize: 26, fontWeight: 900, color: C.gold }}>{stats.expectedAttendees.toLocaleString("en")}</div>
+            <div style={{ fontSize: 26, fontWeight: 900, color: C.gold }}><Num>{stats.expectedAttendees.toLocaleString("en")}</Num></div>
             <div style={{ fontSize: 11, color: C.dim }}>{tt(lang, "العدد المتوقع للحضور (مع المرافقين)", "צפי נוכחים (כולל מלווים)")}</div>
           </div>
         </div>

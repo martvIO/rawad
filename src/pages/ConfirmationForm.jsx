@@ -22,7 +22,7 @@ export function ConfirmationForm({ t, lang, setLang }) {
   const [city, setCity]     = useState("");
   const [street, setStreet] = useState("");
   const [house, setHouse]   = useState("");
-  const [companions, setCompanions] = useState(0); // people attending besides the invited guest
+  const [partySize, setPartySize] = useState(1); // total headcount including the invited guest
   const [coords, setCoords] = useState(null);   // { lat, lng, accuracy }
   const [locating, setLocating] = useState(false);
   const [locError, setLocError] = useState("");
@@ -57,7 +57,7 @@ export function ConfirmationForm({ t, lang, setLang }) {
         submittedCity:   city.trim(),
         submittedStreet: street.trim(),
         submittedHouse:  house.trim(),
-        companions,
+        companions: Math.max(0, partySize - 1),
       };
       if (coords) {
         payload.lat = coords.lat;
@@ -173,7 +173,7 @@ export function ConfirmationForm({ t, lang, setLang }) {
                  style={{ marginBottom: 14, direction: "ltr", textAlign: "right" }}/>
 
           <div style={{ marginBottom: 6, fontSize: 12, color: C.goldDim }}>{t("conf_form_companions")}</div>
-          <CompanionsStepper value={companions} onChange={setCompanions} />
+          <CompanionsStepper value={partySize} onChange={setPartySize} />
 
           {error && (
             <div data-testid="alert-conf-error" style={{ color: C.red, fontSize: 12, marginBottom: 12, textAlign: "center" }}>{error}</div>

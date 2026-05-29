@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { usePortal } from "../../../context/PortalContext.jsx";
 import { LiveMap } from "../../../components/LiveMap.jsx";
 import { GuestMapModal } from "../../../components/GuestMapModal.jsx";
+import { Num } from "../../../components/Num.jsx";
 import { C } from "../../../styles/theme.js";
 
 const FILTERS = ["pending", "delivered", "all"];
@@ -66,7 +67,7 @@ export function DriverMap() {
               color: active ? C.blue : C.dim,
               fontSize: 12, fontWeight: 700, fontFamily: "inherit",
             }}>
-              {t(`map_filter_${f}`)} ({counts[f].toLocaleString("en")})
+              {t(`map_filter_${f}`)} (<Num>{counts[f].toLocaleString("en")}</Num>)
             </button>
           );
         })}

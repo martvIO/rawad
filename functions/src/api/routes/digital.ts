@@ -1152,54 +1152,60 @@ function sanitizeDigitalGuestPatch(
   return { ok: true, value: out };
 }
 
+// A groom-authored text field may be a plain string (legacy / single-language)
+// or a localized object holding an Arabic and/or Hebrew value. The guest toggles
+// language on the invitation and `localize()` (client) picks the right one with
+// a fallback to the other.
+type Localized = string | { ar?: string; he?: string };
+
 interface EventItem {
   icon: string;
-  title: string;
-  time: string;
-  venue: string;
-  address: string;
+  title: Localized;
+  time: Localized;
+  venue: Localized;
+  address: Localized;
   mapUrl: string;
 }
 
 interface StoryItem {
-  when: string;
+  when: Localized;
   icon: string;
-  title: string;
-  body: string;
+  title: Localized;
+  body: Localized;
 }
 
 interface DetailItem {
   icon: string;
-  meta: string;
-  title: string;
-  body: string;
+  meta: Localized;
+  title: Localized;
+  body: Localized;
 }
 
 interface HotelItem {
-  name: string;
-  walk: string;
+  name: Localized;
+  walk: Localized;
 }
 
 interface WishItem {
-  who: string;
-  what: string;
+  who: Localized;
+  what: Localized;
 }
 
 interface MediaSettings {
   weddingDate?: number | null;
   photographerPublished?: boolean;
   guestRanks?: string[];
-  brideName?: string;
-  groomDisplayName?: string;
-  venue?: string;
-  venueAddress?: string;
-  customMessage?: string;
+  brideName?: Localized;
+  groomDisplayName?: Localized;
+  venue?: Localized;
+  venueAddress?: Localized;
+  customMessage?: Localized;
   themeColor?: string;
   fontFamily?: string;
-  story?: string;
+  story?: Localized;
   events?: EventItem[];
   giftIban?: string;
-  giftNote?: string;
+  giftNote?: Localized;
   musicUrl?: string;
   storyEnabled?: boolean;
   eventsEnabled?: boolean;
@@ -1209,17 +1215,17 @@ interface MediaSettings {
   musicEnabled?: boolean;
   footerDockEnabled?: boolean;
   // New luxury-design fields.
-  eyebrow?: string;
-  monogram?: string;
-  venueCity?: string;
-  accessNote?: string;
-  dressCode?: string;
+  eyebrow?: Localized;
+  monogram?: Localized;
+  venueCity?: Localized;
+  accessNote?: Localized;
+  dressCode?: Localized;
   storyTimeline?: StoryItem[];
   details?: DetailItem[];
   hotels?: HotelItem[];
   wishes?: WishItem[];
-  mealOptions?: string[];
-  mediaCaptions?: Record<string, string>;
+  mealOptions?: Localized[];
+  mediaCaptions?: Record<string, Localized>;
   detailsEnabled?: boolean;
   venueEnabled?: boolean;
   guestbookEnabled?: boolean;
@@ -1276,39 +1282,19 @@ function sanitizeMediaSettings(body: unknown): Sanitized<MediaSettings> {
     out.guestRanks = cleaned;
   }
   if (data.brideName !== undefined) {
-    const v = (data.brideName ?? "").toString().trim();
-    if (v.length > MAX_BRIDE_NAME_LEN) {
-      return { ok: false, error: "bride_name_too_long", field: "brideName" };
-    }
-    out.brideName = v;
+    out.brideName = clampLocalized(data.brideName, MAX_BRIDE_NAME_LEN);
   }
   if (data.groomDisplayName !== undefined) {
-    const v = (data.groomDisplayName ?? "").toString().trim();
-    if (v.length > MAX_BRIDE_NAME_LEN) {
-      return { ok: false, error: "groom_name_too_long", field: "groomDisplayName" };
-    }
-    out.groomDisplayName = v;
+    out.groomDisplayName = clampLocalized(data.groomDisplayName, MAX_BRIDE_NAME_LEN);
   }
   if (data.venue !== undefined) {
-    const v = (data.venue ?? "").toString().trim();
-    if (v.length > MAX_VENUE_LEN) {
-      return { ok: false, error: "venue_too_long", field: "venue" };
-    }
-    out.venue = v;
+    out.venue = clampLocalized(data.venue, MAX_VENUE_LEN);
   }
   if (data.venueAddress !== undefined) {
-    const v = (data.venueAddress ?? "").toString().trim();
-    if (v.length > MAX_VENUE_ADDR_LEN) {
-      return { ok: false, error: "venue_address_too_long", field: "venueAddress" };
-    }
-    out.venueAddress = v;
+    out.venueAddress = clampLocalized(data.venueAddress, MAX_VENUE_ADDR_LEN);
   }
   if (data.customMessage !== undefined) {
-    const v = (data.customMessage ?? "").toString();
-    if (v.length > MAX_CUSTOM_MSG_LEN) {
-      return { ok: false, error: "custom_message_too_long", field: "customMessage" };
-    }
-    out.customMessage = v;
+    out.customMessage = clampLocalized(data.customMessage, MAX_CUSTOM_MSG_LEN);
   }
   if (data.themeColor !== undefined) {
     const v = (data.themeColor ?? "").toString();
@@ -1325,11 +1311,7 @@ function sanitizeMediaSettings(body: unknown): Sanitized<MediaSettings> {
     out.fontFamily = v;
   }
   if (data.story !== undefined) {
-    const v = (data.story ?? "").toString();
-    if (v.length > MAX_STORY_LEN) {
-      return { ok: false, error: "story_too_long", field: "story" };
-    }
-    out.story = v;
+    out.story = clampLocalized(data.story, MAX_STORY_LEN);
   }
   if (data.events !== undefined) {
     if (!Array.isArray(data.events)) {
@@ -1341,10 +1323,10 @@ function sanitizeMediaSettings(body: unknown): Sanitized<MediaSettings> {
       const e = raw as Record<string, unknown>;
       const item: EventItem = {
         icon: clampField(e.icon, MAX_EVENT_ICON_LEN),
-        title: clampField(e.title, MAX_EVENT_TITLE_LEN),
-        time: clampField(e.time, MAX_EVENT_TIME_LEN),
-        venue: clampField(e.venue, MAX_EVENT_VENUE_LEN),
-        address: clampField(e.address, MAX_EVENT_ADDR_LEN),
+        title: clampLocalized(e.title, MAX_EVENT_TITLE_LEN),
+        time: clampLocalized(e.time, MAX_EVENT_TIME_LEN),
+        venue: clampLocalized(e.venue, MAX_EVENT_VENUE_LEN),
+        address: clampLocalized(e.address, MAX_EVENT_ADDR_LEN),
         mapUrl: clampField(e.mapUrl, MAX_MAP_URL_LEN),
       };
       // Drop entirely-empty rows so the editor's blank template doesn't persist.
@@ -1363,11 +1345,7 @@ function sanitizeMediaSettings(body: unknown): Sanitized<MediaSettings> {
     out.giftIban = v;
   }
   if (data.giftNote !== undefined) {
-    const v = (data.giftNote ?? "").toString();
-    if (v.length > MAX_GIFT_NOTE_LEN) {
-      return { ok: false, error: "gift_note_too_long", field: "giftNote" };
-    }
-    out.giftNote = v;
+    out.giftNote = clampLocalized(data.giftNote, MAX_GIFT_NOTE_LEN);
   }
   if (data.musicUrl !== undefined) {
     const v = (data.musicUrl ?? "").toString().trim();
@@ -1379,19 +1357,17 @@ function sanitizeMediaSettings(body: unknown): Sanitized<MediaSettings> {
     }
     out.musicUrl = v;
   }
-  // ── New luxury-design scalar fields ──────────────────────────────────────
-  const scalarFields: [keyof MediaSettings, number, string][] = [
-    ["eyebrow", MAX_EYEBROW_LEN, "eyebrow_too_long"],
-    ["monogram", MAX_MONOGRAM_LEN, "monogram_too_long"],
-    ["venueCity", MAX_VENUE_CITY_LEN, "venue_city_too_long"],
-    ["accessNote", MAX_ACCESS_NOTE_LEN, "access_note_too_long"],
-    ["dressCode", MAX_DRESS_CODE_LEN, "dress_code_too_long"],
+  // ── New luxury-design scalar text fields (all localized) ─────────────────
+  const localizedScalars: [keyof MediaSettings, number][] = [
+    ["eyebrow", MAX_EYEBROW_LEN],
+    ["monogram", MAX_MONOGRAM_LEN],
+    ["venueCity", MAX_VENUE_CITY_LEN],
+    ["accessNote", MAX_ACCESS_NOTE_LEN],
+    ["dressCode", MAX_DRESS_CODE_LEN],
   ];
-  for (const [key, max, err] of scalarFields) {
+  for (const [key, max] of localizedScalars) {
     if (data[key] !== undefined) {
-      const v = (data[key] ?? "").toString().trim();
-      if (v.length > max) return { ok: false, error: err, field: key as string };
-      (out as Record<string, string>)[key as string] = v;
+      (out as Record<string, Localized>)[key as string] = clampLocalized(data[key], max);
     }
   }
 
@@ -1405,10 +1381,10 @@ function sanitizeMediaSettings(body: unknown): Sanitized<MediaSettings> {
       if (!raw || typeof raw !== "object" || Array.isArray(raw)) continue;
       const e = raw as Record<string, unknown>;
       const item: StoryItem = {
-        when: clampField(e.when, MAX_STORY_WHEN_LEN),
+        when: clampLocalized(e.when, MAX_STORY_WHEN_LEN),
         icon: clampField(e.icon, MAX_EVENT_ICON_LEN),
-        title: clampField(e.title, MAX_STORY_TITLE_LEN),
-        body: clampField(e.body, MAX_STORY_BODY_LEN),
+        title: clampLocalized(e.title, MAX_STORY_TITLE_LEN),
+        body: clampLocalized(e.body, MAX_STORY_BODY_LEN),
       };
       if (item.when || item.title || item.body) cleaned.push(item);
       if (cleaned.length >= MAX_STORY_ITEMS) break;
@@ -1427,9 +1403,9 @@ function sanitizeMediaSettings(body: unknown): Sanitized<MediaSettings> {
       const e = raw as Record<string, unknown>;
       const item: DetailItem = {
         icon: clampField(e.icon, MAX_EVENT_ICON_LEN),
-        meta: clampField(e.meta, MAX_DETAIL_META_LEN),
-        title: clampField(e.title, MAX_DETAIL_TITLE_LEN),
-        body: clampField(e.body, MAX_DETAIL_BODY_LEN),
+        meta: clampLocalized(e.meta, MAX_DETAIL_META_LEN),
+        title: clampLocalized(e.title, MAX_DETAIL_TITLE_LEN),
+        body: clampLocalized(e.body, MAX_DETAIL_BODY_LEN),
       };
       if (item.meta || item.title || item.body) cleaned.push(item);
       if (cleaned.length >= MAX_DETAIL_ITEMS) break;
@@ -1447,8 +1423,8 @@ function sanitizeMediaSettings(body: unknown): Sanitized<MediaSettings> {
       if (!raw || typeof raw !== "object" || Array.isArray(raw)) continue;
       const e = raw as Record<string, unknown>;
       const item: HotelItem = {
-        name: clampField(e.name, MAX_HOTEL_NAME_LEN),
-        walk: clampField(e.walk, MAX_HOTEL_WALK_LEN),
+        name: clampLocalized(e.name, MAX_HOTEL_NAME_LEN),
+        walk: clampLocalized(e.walk, MAX_HOTEL_WALK_LEN),
       };
       if (item.name) cleaned.push(item);
       if (cleaned.length >= MAX_HOTEL_ITEMS) break;
@@ -1466,8 +1442,8 @@ function sanitizeMediaSettings(body: unknown): Sanitized<MediaSettings> {
       if (!raw || typeof raw !== "object" || Array.isArray(raw)) continue;
       const e = raw as Record<string, unknown>;
       const item: WishItem = {
-        who: clampField(e.who, MAX_WISH_WHO_LEN),
-        what: clampField(e.what, MAX_WISH_WHAT_LEN),
+        who: clampLocalized(e.who, MAX_WISH_WHO_LEN),
+        what: clampLocalized(e.what, MAX_WISH_WHAT_LEN),
       };
       if (item.what) cleaned.push(item);
       if (cleaned.length >= MAX_WISH_ITEMS) break;
@@ -1480,11 +1456,10 @@ function sanitizeMediaSettings(body: unknown): Sanitized<MediaSettings> {
     if (!Array.isArray(data.mealOptions)) {
       return { ok: false, error: "invalid_meal_options", field: "mealOptions" };
     }
-    const cleaned: string[] = [];
+    const cleaned: Localized[] = [];
     for (const r of data.mealOptions) {
-      if (typeof r !== "string") continue;
-      const v = r.trim().slice(0, MAX_MEAL_OPTION_LEN);
-      if (!v || cleaned.includes(v)) continue;
+      const v = clampLocalized(r, MAX_MEAL_OPTION_LEN);
+      if (!v) continue;
       cleaned.push(v);
       if (cleaned.length >= MAX_MEAL_OPTIONS) break;
     }
@@ -1500,11 +1475,11 @@ function sanitizeMediaSettings(body: unknown): Sanitized<MediaSettings> {
     ) {
       return { ok: false, error: "invalid_media_captions", field: "mediaCaptions" };
     }
-    const cleaned: Record<string, string> = {};
+    const cleaned: Record<string, Localized> = {};
     let count = 0;
     for (const [k, val] of Object.entries(data.mediaCaptions as Record<string, unknown>)) {
       if (count >= MAX_CAPTION_ENTRIES) break;
-      const cap = (typeof val === "string" ? val : "").trim().slice(0, MAX_CAPTION_LEN);
+      const cap = clampLocalized(val, MAX_CAPTION_LEN);
       if (cap) {
         cleaned[k.slice(0, 200)] = cap;
         count++;
@@ -1543,6 +1518,24 @@ function sanitizeMediaSettings(body: unknown): Sanitized<MediaSettings> {
 /** Trim a possibly-non-string field to a max length. */
 function clampField(v: unknown, max: number): string {
   return (typeof v === "string" ? v.trim() : "").slice(0, max);
+}
+
+/**
+ * Sanitize a localized text field. Accepts a plain string (legacy / single
+ * language) or a `{ ar, he }` object; trims + length-caps each present language
+ * and drops empty ones. Returns "" when nothing remains — so the "drop empty
+ * row" truthiness checks in sanitizeMediaSettings keep working unchanged.
+ */
+function clampLocalized(v: unknown, max: number): Localized {
+  if (typeof v === "string") return v.trim().slice(0, max);
+  if (v && typeof v === "object" && !Array.isArray(v)) {
+    const o = v as Record<string, unknown>;
+    const out: { ar?: string; he?: string } = {};
+    if (typeof o.ar === "string" && o.ar.trim()) out.ar = o.ar.trim().slice(0, max);
+    if (typeof o.he === "string" && o.he.trim()) out.he = o.he.trim().slice(0, max);
+    return out.ar || out.he ? out : "";
+  }
+  return "";
 }
 
 

@@ -9,6 +9,7 @@ import {
 } from "../../../services/digitalInvitation.js";
 import { logErr } from "../../../utils/logger.js";
 import { C } from "../../../styles/theme.js";
+import { Num } from "../../../components/Num.jsx";
 import { DigitalInvitationPreviewModal } from "../../../components/digital/DigitalInvitationPreviewModal.jsx";
 import { getDigitalTheme } from "../../../styles/digitalThemes.js";
 
@@ -277,7 +278,7 @@ function Section({ title, count, color, children, testid }) {
         }}
       >
         <div style={{ flex: 1, fontWeight: 800, color, fontSize: 13 }}>{title}</div>
-        <span style={{ fontSize: 11, color, fontWeight: 700 }}>{count.toLocaleString("en")}</span>
+        <span style={{ fontSize: 11, color, fontWeight: 700 }}><Num>{count.toLocaleString("en")}</Num></span>
       </div>
       {children}
     </div>
@@ -321,14 +322,14 @@ function DesignCard({ row, lang, busy, onPreview, onApprove, onReject, showAppro
             {row.brideName || "—"} {row.brideName && row.groomDisplayName && "&"} {row.groomDisplayName || ""}
           </div>
           <div style={{ fontSize: 11, color: C.dim }}>
-            @{row.groomUsername} · {date}
+            @{row.groomUsername} · <Num dir="auto">{date}</Num>
           </div>
           {row.venue && (
             <div style={{ fontSize: 11, color: C.dim, marginTop: 2 }}>📍 {row.venue}</div>
           )}
           {submittedAt && row.designStatus === "pending_approval" && (
             <div style={{ fontSize: 10, color: C.dim, marginTop: 2 }}>
-              {tt(lang, "أُرسل:", "נשלח:")} {submittedAt}
+              {tt(lang, "أُرسل:", "נשלח:")} <Num dir="auto">{submittedAt}</Num>
             </div>
           )}
         </div>
@@ -358,7 +359,7 @@ function DesignCard({ row, lang, busy, onPreview, onApprove, onReject, showAppro
 
       {showApprovedAt && row.designApprovedAt && (
         <div style={{ fontSize: 11, color: "#4cc97a", marginBottom: 10 }}>
-          ✓ {tt(lang, "اعتُمد:", "אושר:")} {new Date(row.designApprovedAt).toLocaleString(lang === "he" ? "he-IL" : "ar-EG", { day: "2-digit", month: "2-digit", numberingSystem: "latn" })}
+          ✓ {tt(lang, "اعتُمد:", "אושר:")} <Num dir="auto">{new Date(row.designApprovedAt).toLocaleString(lang === "he" ? "he-IL" : "ar-EG", { day: "2-digit", month: "2-digit", numberingSystem: "latn" })}</Num>
         </div>
       )}
 

@@ -9,6 +9,7 @@ import {
 } from "../../../../services/digitalInvitation.js";
 import { logErr } from "../../../../utils/logger.js";
 import { C } from "../../../../styles/theme.js";
+import { Num } from "../../../../components/Num.jsx";
 
 /**
  * Normalize the rank shape: new guests carry `ranks: string[]`, legacy
@@ -153,7 +154,7 @@ export function DigitalGuests() {
       {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
         <div style={{ fontSize: 15, fontWeight: 800, color: C.goldLight }}>
-          {lang === "he" ? "רשימת מוזמנים" : "قائمة المدعوين"} ({guests.length.toLocaleString("en")})
+          {lang === "he" ? "רשימת מוזמנים" : "قائمة المدعوين"} (<Num>{guests.length.toLocaleString("en")}</Num>)
         </div>
         <button className="gold-btn" style={{ padding: "8px 16px", fontSize: 12 }}
                 onClick={() => navigate("/portal/groom/digital/add")}>
@@ -239,7 +240,7 @@ export function DigitalGuests() {
                     <span>{lang === "he" ? "רמות (אפשר לבחור כמה)" : "الرتب (يمكن اختيار عدة)"}</span>
                     {editRanks.length > 0 && (
                       <span style={{ color: C.gold, fontWeight: 700 }}>
-                        {editRanks.length} {lang === "he" ? "נבחרו" : "محددة"}
+                        <Num>{editRanks.length}</Num> {lang === "he" ? "נבחרו" : "محددة"}
                       </span>
                     )}
                   </div>
@@ -323,7 +324,7 @@ export function DigitalGuests() {
                     })()}
                     {g.status === "attending" && Number(g.companions) > 0 && (
                       <div data-testid="guest-companions" style={{ marginTop: 5, fontSize: 11, fontWeight: 800, color: C.gold }}>
-                        +{g.companions} {lang === "he" ? "מלווים" : "مرافق"}
+                        <Num>+{g.companions}</Num> {lang === "he" ? "מלווים" : "مرافق"}
                       </div>
                     )}
                   </div>
