@@ -644,6 +644,25 @@ describe("digitalInvitation — media", () => {
     expect(api.post).not.toHaveBeenCalled();
   });
 
+  it("addInvitationMedia tags the upload with target=hero when requested", async () => {
+    api.upload.mockResolvedValueOnce({ url: "u", kind: "image" });
+    const file = new File(["x"], "feature.png", { type: "image/png" });
+    await digital.addInvitationMedia("g1", file, { target: "hero" });
+    const [url, fd] = api.upload.mock.calls[0];
+    expect(url).toBe("/digital/g1/media/upload");
+    expect(fd.get("file")).toBeInstanceOf(File);
+    expect(fd.get("target")).toBe("hero");
+  });
+
+  it("removeInvitationMedia includes target=hero in the delete body when requested", async () => {
+    api.post.mockResolvedValueOnce({ ok: true });
+    await digital.removeInvitationMedia("g1", { storagePath: "path/x.png" }, { target: "hero" });
+    expect(api.post).toHaveBeenCalledWith("/digital/g1/media/delete-item", {
+      storagePath: "path/x.png",
+      target: "hero",
+    });
+  });
+
   it("removeDigitalMedia DELETEs /digital/:uid/media", async () => {
     api.delete.mockResolvedValueOnce({ ok: true });
     await digital.removeDigitalMedia("g1");

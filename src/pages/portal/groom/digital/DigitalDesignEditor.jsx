@@ -69,7 +69,7 @@ const ARRAY_KEYS = ["storyTimeline", "details", "hotels", "wishes", "mealOptions
 const TOGGLE_KEYS = [
   "storyEnabled", "galleryEnabled", "detailsEnabled", "venueEnabled",
   "countdownEnabled", "guestbookEnabled", "giftEnabled", "musicEnabled",
-  "footerDockEnabled", "envelopeEnabled",
+  "footerDockEnabled", "envelopeEnabled", "heroMediaEnabled",
   "rsvpCompanionsEnabled", "rsvpMealEnabled", "rsvpSongEnabled",
 ];
 
@@ -81,7 +81,9 @@ export function DigitalDesignEditor() {
   const [doc, setDoc] = useState(null);
   const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [heroBusy, setHeroBusy] = useState(false);
   const fileInputRef = useRef(null);
+  const heroFileInputRef = useRef(null);
 
   // Buffered field values (scalars + arrays + toggles + mediaCaptions + the
   // wedding-date input string). Autosave fires on blur/change, not per keystroke.
@@ -111,6 +113,7 @@ export function DigitalDesignEditor() {
   const themeColor = doc?.themeColor || "gold";
   const fontFamily = doc?.fontFamily || "amiri";
   const media = Array.isArray(doc?.media) ? doc.media : [];
+  const heroMedia = Array.isArray(doc?.heroMedia) ? doc.heroMedia : [];
 
   // Editor is read-only while awaiting approval. Approved is editable — the
   // first design-field edit demotes back to draft (server-side).
@@ -125,8 +128,9 @@ export function DigitalDesignEditor() {
       themeColor,
       fontFamily,
       media,
+      heroMedia,
     }),
-    [doc, f, themeColor, fontFamily, media],
+    [doc, f, themeColor, fontFamily, media, heroMedia],
   );
 
   // ── Persistence ────────────────────────────────────────────────────────────
@@ -252,6 +256,35 @@ export function DigitalDesignEditor() {
       showToast(tt(lang, "✓ تم الحذف", "✓ נמחק"));
     } catch (err) {
       logErr("removeInvitationMedia", err);
+      showToast(err?.message || tt(lang, "فشل الحذف", "המחיקה נכשלה"));
+    }
+  };
+
+  // Featured media shown under the greeting — separate from the gallery, so
+  // these uploads target the dedicated heroMedia[] array.
+  const onUploadHero = async (file) => {
+    if (!file || !editable) return;
+    setHeroBusy(true);
+    try {
+      await addInvitationMedia(currentUid, file, { target: "hero" });
+      showToast(tt(lang, "✓ تم رفع الوسائط", "✓ המדיה הועלתה"));
+    } catch (err) {
+      logErr("addInvitationMedia.hero", err);
+      showToast(err?.message || tt(lang, "فشل الرفع", "ההעלאה נכשלה"));
+    } finally {
+      setHeroBusy(false);
+      if (heroFileInputRef.current) heroFileInputRef.current.value = "";
+    }
+  };
+
+  const onRemoveHero = async (item) => {
+    if (!editable) return;
+    if (!window.confirm(tt(lang, "حذف هذه الوسائط؟", "למחוק את המדיה הזו?"))) return;
+    try {
+      await removeInvitationMedia(currentUid, item, { target: "hero" });
+      showToast(tt(lang, "✓ تم الحذف", "✓ נמחק"));
+    } catch (err) {
+      logErr("removeInvitationMedia.hero", err);
       showToast(err?.message || tt(lang, "فشل الحذف", "המחיקה נכשלה"));
     }
   };
@@ -396,6 +429,50 @@ export function DigitalDesignEditor() {
           <FormField label={tt(lang, "نص علوي صغير في البداية", "כיתוב עליון קצר")}>
             <input data-testid="design-eyebrow" type="text" placeholder={DEFAULT_EYEBROW[editLang]} {...textProps("eyebrow", 60)} />
           </FormField>
+        </Section>
+
+        {/* Featured media under the greeting */}
+        <Section
+          title={tt(lang, "صور تحت الترحيب (وسائط مميزة)", "מדיה מתחת לברכה")}
+          toggle={{ enabled: tog("heroMediaEnabled"), onChange: (c) => toggle("heroMediaEnabled", c), disabled: !editable, testid: "design-toggle-hero-media" }}
+        >
+          <div style={{ fontSize: 11, color: C.dim, marginBottom: 12, lineHeight: 1.6 }}>
+            {tt(
+              lang,
+              "صور أو فيديو أو GIF تظهر مباشرة تحت جملة الترحيب في الدعوة — منفصلة عن ألبوم الصور.",
+              "תמונות, וידאו או GIF שמוצגים מיד מתחת לברכה בהזמנה — בנפרד מאלבום התמונות.",
+            )}
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))", gap: 10, marginBottom: 12 }}>
+            {heroMedia.map((m, i) => (
+              <div key={m.storagePath || i} style={{ border: "1px solid rgba(201,168,76,.2)", borderRadius: 10, overflow: "hidden", background: "rgba(255,255,255,.02)" }}>
+                <div style={{ position: "relative", aspectRatio: "1" }}>
+                  {m.kind === "video" ? (
+                    <video src={m.url} muted playsInline style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  ) : (
+                    <img src={m.url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  )}
+                  {editable && (
+                    <button
+                      onClick={() => onRemoveHero(m)}
+                      aria-label="delete"
+                      style={{ position: "absolute", top: 4, insetInlineEnd: 4, width: 24, height: 24, borderRadius: 12, background: "rgba(0,0,0,.6)", border: "1px solid rgba(212,80,58,.4)", color: "#fff", fontSize: 12, cursor: "pointer" }}
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+          {editable && (
+            <label style={{ display: "block", padding: "12px 16px", borderRadius: 10, textAlign: "center", border: `2px dashed ${heroBusy ? "rgba(201,168,76,.65)" : "rgba(201,168,76,.32)"}`, background: heroBusy ? "rgba(201,168,76,.06)" : "rgba(201,168,76,.02)", cursor: heroBusy ? "not-allowed" : "pointer" }}>
+              <input ref={heroFileInputRef} type="file" accept="image/*,video/*" style={{ display: "none" }} disabled={heroBusy} data-testid="design-hero-upload-input" onChange={(e) => onUploadHero(e.target.files?.[0])} />
+              <div style={{ color: C.gold, fontSize: 12, fontWeight: 800 }}>
+                {heroBusy ? tt(lang, "⏳ جاري الرفع...", "⏳ מעלה...") : tt(lang, "📁 إضافة صورة / فيديو / GIF", "📁 הוסף תמונה / וידאו / GIF")}
+              </div>
+            </label>
+          )}
         </Section>
 
         {/* Wedding date */}

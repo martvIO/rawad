@@ -150,26 +150,32 @@ export function subscribeDigitalMedia(groomUid, cb, onErrCb, transform) {
 }
 
 /**
- * Upload a new background media item. Returns the newly created media[]
- * entry shape `{ url, kind, storagePath, order }`.
+ * Upload a new media item. Returns the newly created entry shape
+ * `{ url, kind, storagePath, order }`.
+ *
+ * `opts.target === "hero"` appends to the separate hero/featured-media array
+ * (shown under the greeting); otherwise it appends to the gallery (media[]).
+ * `opts` also carries the optional AbortSignal / timeout for api.upload.
  */
 export async function addInvitationMedia(groomUid, file, opts) {
   const uid = resolveUid(groomUid);
   const formData = new FormData();
   formData.append("file", file, file.name);
+  if (opts?.target) formData.append("target", opts.target);
   return api.upload(`/digital/${uid}/media/upload`, formData, opts);
 }
 
 /**
- * Remove one media[] entry by storagePath. Server prunes the array AND
- * best-effort deletes the Storage object.
+ * Remove one media entry by storagePath. Server prunes the array AND
+ * best-effort deletes the Storage object. Pass `opts.target === "hero"` to
+ * target the hero/featured-media array instead of the gallery.
  */
-export async function removeInvitationMedia(groomUid, item) {
+export async function removeInvitationMedia(groomUid, item, opts) {
   const uid = resolveUid(groomUid);
   if (!item?.storagePath) return;
-  return api.post(`/digital/${uid}/media/delete-item`, {
-    storagePath: item.storagePath,
-  });
+  const body = { storagePath: item.storagePath };
+  if (opts?.target) body.target = opts.target;
+  return api.post(`/digital/${uid}/media/delete-item`, body);
 }
 
 export async function setWeddingDate(groomUid, epochMs) {

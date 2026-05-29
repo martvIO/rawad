@@ -141,10 +141,14 @@ const DESIGN_FIELDS = new Set([
   "rsvpCompanionsEnabled",
   "rsvpMealEnabled",
   "rsvpSongEnabled",
+  "heroMediaEnabled",
 ]);
 
 const MAX_INVITE_MEDIA_BYTES = MAX_BYTES.INVITE_MEDIA;
 const MAX_PHOTOG_BYTES = MAX_BYTES.PHOTOGRAPHER;
+// Featured media shown under the hero greeting — a small, separate set kept
+// out of the gallery (media[]). Capped so the hero stays light.
+const MAX_HERO_MEDIA_ITEMS = 8;
 
 const ALLOWED_MEDIA_PREFIX = ["image/", "video/"];
 
@@ -371,10 +375,15 @@ digitalRouter.post(
       return;
     }
 
+    // `target` selects which array the upload appends to: the hero/featured
+    // media shown under the greeting ("hero") or the gallery (default).
+    const target = parsed.fields.target === "hero" ? "hero" : "gallery";
+
     try {
       const uid = req.params.uid;
       const ext = pickExtensionFromFilename(parsed.file.filename, "bin");
-      const path = `${STORAGE_MEDIA_PREFIX}/${uid}/m_${Date.now()}.${ext}`;
+      const prefix = target === "hero" ? "hero" : "m";
+      const path = `${STORAGE_MEDIA_PREFIX}/${uid}/${prefix}_${Date.now()}.${ext}`;
       const url = await uploadAndGetUrl(
         path,
         parsed.file.buffer,
@@ -399,9 +408,15 @@ digitalRouter.post(
       await fs().runTransaction(async (tx) => {
         const docSnap = await tx.get(docRef);
         const data = docSnap.exists ? docSnap.data() : null;
-        const existing = (data?.media ?? []) as unknown[];
-        const migrated = migrateLegacyBackground(data, existing);
-        const update: Record<string, unknown> = { media: [...migrated, item] };
+        const update: Record<string, unknown> = {};
+        if (target === "hero") {
+          const existing = (data?.heroMedia ?? []) as unknown[];
+          update.heroMedia = [...existing, item].slice(-MAX_HERO_MEDIA_ITEMS);
+        } else {
+          const existing = (data?.media ?? []) as unknown[];
+          const migrated = migrateLegacyBackground(data, existing);
+          update.media = [...migrated, item];
+        }
         if (data?.designStatus === "approved") {
           update.designStatus = "draft";
           update.designApprovedAt = null;
@@ -432,6 +447,8 @@ digitalRouter.post(
       res.status(400).json({ error: "invalid_storage_path" });
       return;
     }
+    // `target` selects which array to prune — hero/featured media or gallery.
+    const target = req.body?.target === "hero" ? "hero" : "gallery";
     try {
       // BUG-O003 fix — same read-modify-write race as the upload path.
       // A delete coming in mid-upload could read media[] before the upload's
@@ -443,9 +460,10 @@ digitalRouter.post(
         const snap = await tx.get(docRef);
         if (!snap.exists) return;
         const data = snap.data();
-        const existing = (data?.media ?? []) as { storagePath?: string }[];
+        const field = target === "hero" ? "heroMedia" : "media";
+        const existing = (data?.[field] ?? []) as { storagePath?: string }[];
         const filtered = existing.filter((m) => m.storagePath !== storagePath);
-        const update: Record<string, unknown> = { media: filtered };
+        const update: Record<string, unknown> = { [field]: filtered };
         if (data?.designStatus === "approved") {
           update.designStatus = "draft";
           update.designApprovedAt = null;
@@ -687,6 +705,8 @@ digitalRouter.get(
           rsvpMealEnabled: data.rsvpMealEnabled ?? true,
           rsvpSongEnabled: data.rsvpSongEnabled ?? true,
           media: Array.isArray(data.media) ? data.media : [],
+          heroMedia: Array.isArray(data.heroMedia) ? data.heroMedia : [],
+          heroMediaEnabled: data.heroMediaEnabled ?? true,
           designStatus: data.designStatus ?? "draft",
           designSubmittedAt: data.designSubmittedAt ?? null,
           designApprovedAt: data.designApprovedAt ?? null,
@@ -1233,6 +1253,7 @@ interface MediaSettings {
   rsvpCompanionsEnabled?: boolean;
   rsvpMealEnabled?: boolean;
   rsvpSongEnabled?: boolean;
+  heroMediaEnabled?: boolean;
 }
 
 function sanitizeMediaSettings(body: unknown): Sanitized<MediaSettings> {
@@ -1503,6 +1524,7 @@ function sanitizeMediaSettings(body: unknown): Sanitized<MediaSettings> {
     "rsvpCompanionsEnabled",
     "rsvpMealEnabled",
     "rsvpSongEnabled",
+    "heroMediaEnabled",
   ];
   for (const key of boolKeys) {
     if (data[key] !== undefined) {

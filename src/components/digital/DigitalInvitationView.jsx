@@ -65,6 +65,13 @@ export function DigitalInvitationView({
     return arr.map((m) => ({ ...m, cap: localize(captions[m.storagePath], lang) || localize(m.cap, lang) || "" }));
   }, [design?.media, captions, lang]);
 
+  // Featured media shown directly under the hero greeting — a separate set
+  // from the gallery (media[]), so it never duplicates the album below.
+  const heroMedia = useMemo(
+    () => (Array.isArray(design?.heroMedia) ? design.heroMedia : []),
+    [design?.heroMedia],
+  );
+
   const storyItems = localizeItems(design?.storyTimeline, ["when", "title", "body"], lang);
   const detailItems = localizeItems(design?.details, ["meta", "title", "body"], lang);
   const hotels = localizeItems(design?.hotels, ["name", "walk"], lang);
@@ -85,6 +92,7 @@ export function DigitalInvitationView({
   const showGift = on(design?.giftEnabled) && (!!giftIban || !!giftNote);
   const showDock = on(design?.footerDockEnabled);
   const showMusic = on(design?.musicEnabled) && !!musicUrl;
+  const showHeroMedia = on(design?.heroMediaEnabled) && heroMedia.length > 0;
   const showEnvelopeNow = isPublic && showEnvelope && on(design?.envelopeEnabled);
 
   const rsvpOpts = {
@@ -159,6 +167,7 @@ export function DigitalInvitationView({
         eyebrow={eyebrow}
         dateText={dateText}
         venueLine={venueLine}
+        heroMedia={showHeroMedia ? heroMedia : []}
         theme={theme}
         font={font}
         lang={lang}
@@ -267,7 +276,7 @@ function SectionHead({ eyebrow, title, sub, theme, font }) {
 }
 
 // ── Hero ──────────────────────────────────────────────────────────────────────
-function Hero({ guestName, groomName, brideName, monogram, eyebrow, dateText, venueLine, theme, font, lang }) {
+function Hero({ guestName, groomName, brideName, monogram, eyebrow, dateText, venueLine, heroMedia = [], theme, font, lang }) {
   return (
     <section className="dawa-inv-hero">
       <div
@@ -372,6 +381,24 @@ function Hero({ guestName, groomName, brideName, monogram, eyebrow, dateText, ve
           {guestName || "—"}
         </strong>
       </div>
+
+      {heroMedia.length > 0 && (
+        <div className="dawa-inv-hero-media">
+          {heroMedia.map((m, i) => (
+            <div
+              key={m.storagePath || i}
+              className="dawa-inv-hero-media-item"
+              style={{ borderColor: theme.accentLine, boxShadow: `0 18px 40px -18px ${theme.accentMuted}` }}
+            >
+              {m.kind === "video" ? (
+                <video src={m.url} autoPlay muted loop playsInline />
+              ) : (
+                <img src={m.url} alt="" loading="lazy" />
+              )}
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="dawa-inv-cue" style={{ color: theme.accent, fontFamily: font.family }}>
         <span>{lang === "he" ? "גלול לסיפור" : "اسحب للقصة"}</span>
@@ -799,7 +826,7 @@ function RSVPSection({ theme, font, lang, opts, mealOptions, guestPhone, onSubmi
 
             {status === "attending" && opts.companions && (
               <div className="dawa-inv-field">
-                <label style={{ color: theme.accent, fontFamily: font.family }}>{lang === "he" ? "כמה אתם? (כולל המוזמן)" : "كم عددكم؟ (شاملاً المدعو)"}</label>
+                <label style={{ color: theme.accent, fontFamily: font.family }}>{lang === "he" ? "כמה אתם?" : "كم شخصاً انتم ؟"}</label>
                 <div className="dawa-inv-stepper">
                   <button style={{ borderColor: theme.accentLine, color: theme.accent }} onClick={() => setPartySize((c) => Math.max(1, c - 1))} aria-label="-">−</button>
                   <span style={{ color: theme.text, fontFamily: font.family }}><Num>{partySize}</Num></span>
@@ -1187,8 +1214,11 @@ function ViewStyles({ theme }) {
     .dawa-inv .dawa-inv-amp { display: block; font-style: italic; font-size: clamp(28px,6vw,52px); margin: 6px 0; opacity: .8; padding-block: 4px; animation: dawa-inv-rise 1.1s .4s ease both; }
     .dawa-inv .dawa-inv-dateline { display: inline-flex; align-items: center; gap: 16px; margin-top: 28px; padding: 12px 28px; border-radius: 999px; backdrop-filter: blur(20px); font-size: 16px; letter-spacing: .5px; animation: dawa-inv-rise 1.1s .5s ease both; flex-wrap: wrap; justify-content: center; }
     .dawa-inv .dawa-inv-dot { width: 4px; height: 4px; border-radius: 50%; }
-    .dawa-inv .dawa-inv-greet { margin-top: 26px; font-style: italic; font-size: 15px; letter-spacing: 1px; animation: dawa-inv-rise 1.1s .6s ease both; }
-    .dawa-inv .dawa-inv-greet strong { display: block; margin-top: 12px; font-style: normal; font-weight: 900; font-size: clamp(30px,7vw,46px); line-height: 1.2; letter-spacing: .5px; padding-block: 4px; text-shadow: 0 0 60px ${theme.accentMuted}; }
+    .dawa-inv .dawa-inv-greet { margin-top: 26px; font-style: italic; font-size: clamp(19px,3.4vw,28px); letter-spacing: 1px; line-height: 1.5; animation: dawa-inv-rise 1.1s .6s ease both; }
+    .dawa-inv .dawa-inv-greet strong { display: block; margin-top: 12px; font-style: normal; font-weight: 900; font-size: clamp(34px,7.5vw,52px); line-height: 1.2; letter-spacing: .5px; padding-block: 4px; text-shadow: 0 0 60px ${theme.accentMuted}; }
+    .dawa-inv .dawa-inv-hero-media { margin-top: 30px; width: 100%; max-width: 440px; display: grid; gap: 14px; animation: dawa-inv-rise 1.1s .7s ease both; }
+    .dawa-inv .dawa-inv-hero-media-item { border: 1px solid; border-radius: 16px; overflow: hidden; background: ${theme.cardBg}; }
+    .dawa-inv .dawa-inv-hero-media-item img, .dawa-inv .dawa-inv-hero-media-item video { width: 100%; display: block; max-height: 56vh; object-fit: cover; }
     .dawa-inv .dawa-inv-cue { position: absolute; bottom: 28px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 10px; font-size: 11px; font-style: italic; letter-spacing: 3px; text-transform: uppercase; opacity: .7; animation: dawa-inv-cue 2.4s ease-in-out infinite; }
     .dawa-inv .dawa-inv-cue-line { width: 1px; height: 34px; }
 

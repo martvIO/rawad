@@ -321,6 +321,7 @@ invitesRouter.post(
         themeColor: invData.themeColor ?? "gold",
         fontFamily: invData.fontFamily ?? "amiri",
         media: Array.isArray(invData.media) ? invData.media : [],
+        heroMedia: Array.isArray(invData.heroMedia) ? invData.heroMedia : [],
         designVersion: invData.designVersion ?? 1,
       };
 
