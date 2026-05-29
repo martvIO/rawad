@@ -1,9 +1,10 @@
 // Per-guest invite-link callables.
 //
-//   createGuestInvite — groom (or admin) generates a random 32-char token
-//     bound to one guest. Writes /inviteTokens/{token} (90-day TTL) and stamps
-//     the guest record with inviteLinkToken + inviteLinkSentAt. The groom-side
-//     UI then opens WhatsApp with the resulting /invite/{token} URL.
+//   createGuestInvite — admin generates a random 32-char token bound to one
+//     guest. Writes /inviteTokens/{token} (90-day TTL) and stamps the guest
+//     record with inviteLinkToken + inviteLinkSentAt. The admin Send tab then
+//     opens WhatsApp with the resulting /invite/{token} URL. Sending invite
+//     links is admin-only — grooms manage the list but never self-send.
 //
 //   submitGuestInvite — public/unauthenticated callable. The guest opens the
 //     link, fills in city/location/note, and submits. We look up the token,
@@ -24,16 +25,15 @@ function clampStr(v: unknown, max: number): string {
   return (typeof v === "string" ? v.trim() : "").slice(0, max);
 }
 
-// Groom/admin → mint a new token for a specific guest under this groom.
+// Admin → mint a new token for a specific guest under a groom.
 // Returns { token } so the client can build the /invite/{token} URL.
 export const createGuestInvite = onCall(
   { enforceAppCheck: false },
   async (req) => {
     if (!req.auth) throw new HttpsError("unauthenticated", "Sign in required.");
     const callerUid = req.auth.uid;
-    const role = getClaims(req).role;
-    if (role !== "groom" && role !== "admin") {
-      throw new HttpsError("permission-denied", "Groom or admin only.");
+    if (getClaims(req).role !== "admin") {
+      throw new HttpsError("permission-denied", "Admins only.");
     }
 
     // Per-caller rate limit — see RATE.CREATE_INVITE_PER_USER.
@@ -50,9 +50,6 @@ export const createGuestInvite = onCall(
     const guestId  = (data.guestId  ?? "").toString();
     if (!groomUid || !guestId) {
       throw new HttpsError("invalid-argument", "groomUid and guestId are required.");
-    }
-    if (role === "groom" && groomUid !== callerUid) {
-      throw new HttpsError("permission-denied", "Grooms can only invite their own guests.");
     }
 
     const db = getDatabase();

@@ -1,9 +1,9 @@
 // Per-guest invite-link endpoints (physical + digital).
 //
 // Replaces four onCall functions and a public RTDB read:
-//   POST /invites                 groom/admin (60/hr): mint physical invite
+//   POST /invites                 admin only (60/hr): mint physical invite
 //   POST /invites/submit          PUBLIC (5/hr/IP):    submit physical reply
-//   POST /invites/digital         groom/admin (60/hr): mint digital invite
+//   POST /invites/digital         admin only (60/hr): mint digital invite
 //   POST /invites/digital/submit  PUBLIC (10/hr/IP):   submit digital reply
 //   GET  /invites/token/:token    PUBLIC:              read the token record
 //
@@ -25,7 +25,7 @@ import { randomBytes } from "crypto";
 import {
   AuthRequest,
   requireAuth,
-  requireAnyRole,
+  requireAdmin,
 } from "../middleware/auth";
 import { ipRateLimit, uidRateLimit } from "../middleware/rateLimit";
 import { isFiniteInRange, normalisePhone } from "../../helpers";
@@ -100,10 +100,11 @@ invitesRouter.get("/token/:token", async (req: Request, res: Response) => {
 // ─── POST /invites (physical) ─────────────────────────────────────────────────
 
 /**
- * Mint a physical-invite token for a specific guest under a groom. Allowed
- * for groom (own guests only) and admin (any groom). Stamps the guest
- * record with `inviteLinkToken` + `inviteLinkSentAt` so the groom's UI can
- * show the "sent" pill.
+ * Mint a physical-invite token for a specific guest under a groom.
+ * Admin only — sending invite links is an admin operation; grooms manage
+ * the guest list but never self-send. Stamps the guest record with
+ * `inviteLinkToken` + `inviteLinkSentAt` so the groom's UI can show the
+ * "sent" pill.
  *
  * Body: `{ groomUid, guestId }`
  * Returns: `{ token, expiresAt }`.
@@ -111,20 +112,15 @@ invitesRouter.get("/token/:token", async (req: Request, res: Response) => {
 invitesRouter.post(
   "/",
   requireAuth,
-  requireAnyRole("admin", "groom"),
+  requireAdmin,
   uidRateLimit("createInvite", CREATE_INVITE_MAX_PER_HOUR, HOUR_MS),
   async (req: AuthRequest, res: Response) => {
     const callerUid = req.caller!.uid;
-    const role = req.caller!.claims.role;
 
     const groomUid = (req.body?.groomUid ?? "").toString();
     const guestId = (req.body?.guestId ?? "").toString();
     if (!groomUid || !guestId) {
       res.status(400).json({ error: "missing_required" });
-      return;
-    }
-    if (role === "groom" && groomUid !== callerUid) {
-      res.status(403).json({ error: "groom_can_only_invite_own_guests" });
       return;
     }
 
@@ -253,26 +249,23 @@ invitesRouter.post(
  * happen against Firestore while the token record itself still lives in
  * RTDB (single source of truth for token lookups).
  *
+ * Admin only — same rule as the physical route: grooms never self-send.
+ *
  * Body: `{ groomUid, guestId }`
  * Returns: `{ token, expiresAt }`.
  */
 invitesRouter.post(
   "/digital",
   requireAuth,
-  requireAnyRole("admin", "groom"),
+  requireAdmin,
   uidRateLimit("createDigitalInvite", CREATE_INVITE_MAX_PER_HOUR, HOUR_MS),
   async (req: AuthRequest, res: Response) => {
     const callerUid = req.caller!.uid;
-    const role = req.caller!.claims.role;
 
     const groomUid = (req.body?.groomUid ?? "").toString();
     const guestId = (req.body?.guestId ?? "").toString();
     if (!groomUid || !guestId) {
       res.status(400).json({ error: "missing_required" });
-      return;
-    }
-    if (role === "groom" && groomUid !== callerUid) {
-      res.status(403).json({ error: "groom_can_only_invite_own_guests" });
       return;
     }
 

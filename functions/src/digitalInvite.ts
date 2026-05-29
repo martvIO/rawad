@@ -1,10 +1,11 @@
 // Per-guest digital invite-link callables.
 //
-//   createDigitalGuestInvite — groom (or admin) generates a random 32-char
-//     token bound to one digital guest (stored in Firestore). Writes
-//     /inviteTokens/{token} (90-day TTL) with guestType: "digital" and stamps
-//     digitalGuests/{groomUid}/guests/{guestId}.inviteLinkSentAt. The groom-
-//     side UI then opens WhatsApp with the resulting /invite/digital/{token}.
+//   createDigitalGuestInvite — admin generates a random 32-char token bound
+//     to one digital guest (stored in Firestore). Writes /inviteTokens/{token}
+//     (90-day TTL) with guestType: "digital" and stamps
+//     digitalGuests/{groomUid}/guests/{guestId}.inviteLinkSentAt. The admin
+//     Send tab then opens WhatsApp with the resulting /invite/digital/{token}.
+//     Sending invite links is admin-only — grooms never self-send.
 //
 //   submitDigitalGuestInvite — public/unauthenticated callable. The guest
 //     opens the link, picks attending|absent and optionally adds a note.
@@ -30,9 +31,8 @@ export const createDigitalGuestInvite = onCall(
   async (req) => {
     if (!req.auth) throw new HttpsError("unauthenticated", "Sign in required.");
     const callerUid = req.auth.uid;
-    const role = getClaims(req).role;
-    if (role !== "groom" && role !== "admin") {
-      throw new HttpsError("permission-denied", "Groom or admin only.");
+    if (getClaims(req).role !== "admin") {
+      throw new HttpsError("permission-denied", "Admins only.");
     }
 
     if (!allow(
@@ -48,9 +48,6 @@ export const createDigitalGuestInvite = onCall(
     const guestId  = (data.guestId  ?? "").toString();
     if (!groomUid || !guestId) {
       throw new HttpsError("invalid-argument", "groomUid and guestId are required.");
-    }
-    if (role === "groom" && groomUid !== callerUid) {
-      throw new HttpsError("permission-denied", "Grooms can only invite their own guests.");
     }
 
     const fs = getFirestore();
