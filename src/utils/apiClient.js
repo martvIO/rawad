@@ -23,6 +23,7 @@ import {
   setAuthClearedCallback,
 } from "./tokenManager.js";
 import { logErr, log } from "./logger.js";
+import { westernizeDeep } from "./digits.js";
 import { API_BASE_URL, API_TIMEOUT_MS } from "../config/index.js";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -124,6 +125,10 @@ async function request(method, path, body, opts) {
   const headers = { Accept: JSON_MIME };
   if (body !== undefined) headers[HEADER_CONTENT_TYPE] = JSON_MIME;
 
+  // Normalize Arabic-Indic digits to Western before they ever reach the API,
+  // so the database only stores ASCII digits. Password fields are preserved.
+  const safeBody = body === undefined ? undefined : westernizeDeep(body);
+
   if (!skipAuth) {
     const tok = await getIdToken().catch(() => null);
     if (tok) headers[HEADER_AUTH] = `${BEARER_PREFIX}${tok}`;
@@ -132,11 +137,11 @@ async function request(method, path, body, opts) {
   const res = await fetchWithTimeout(url, {
     method,
     headers,
-    body: body === undefined ? undefined : JSON.stringify(body),
+    body: safeBody === undefined ? undefined : JSON.stringify(safeBody),
   }, timeoutMs, `${method} ${path}`);
 
   if (res.status === HTTP_UNAUTHORIZED && !skipAuth) {
-    return handleUnauthorized(method, url, headers, body, path, timeoutMs);
+    return handleUnauthorized(method, url, headers, safeBody, path, timeoutMs);
   }
   return parseResponse(res, method, path);
 }

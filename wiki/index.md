@@ -26,6 +26,7 @@ _(ideas, frameworks, patterns, principles — pages that describe a concept)_
 - [[Digital Invitations]] — the Firestore-backed WhatsApp-link invite flow
 - [[Optimistic UI Pattern]] — recurring bug class from the polling architecture, and its fix convention
 - [[Inline Styling Convention]] — 100% inline styles + `theme.js` tokens, no CSS framework
+- [[Digit Normalization]] — Western ASCII digits everywhere: `numberingSystem: latn` dates, apiClient input scrubbing, DB migration script
 
 ## Sources
 

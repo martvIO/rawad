@@ -32,6 +32,7 @@ const fmtDate = (ts, lang) => {
   return new Date(ts).toLocaleString(lang === "he" ? "he-IL" : "ar-SA", {
     day: "2-digit", month: "2-digit", year: "2-digit",
     hour: "2-digit", minute: "2-digit",
+    numberingSystem: "latn",
   });
 };
 

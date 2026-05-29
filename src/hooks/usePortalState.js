@@ -892,7 +892,7 @@ export function usePortalState({ onBack, t, lang, setLang }) {
       } else if (pTaken) {
         proofPhotoPath = "📸"; // legacy fallback marker
       }
-      const time = new Date().toLocaleTimeString("ar", { hour: "2-digit", minute: "2-digit" });
+      const time = new Date().toLocaleTimeString("ar", { hour: "2-digit", minute: "2-digit", numberingSystem: "latn" });
       const patch = {
         status: "delivered",
         deliveredAt: time,

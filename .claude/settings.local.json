@@ -47,12 +47,40 @@
       "Bash(chmod +x \"C:/Users/martv/.claude/skills/wiki-brain/hooks/session-start.sh\")",
       "Bash(bash \"C:/Users/martv/.claude/skills/wiki-brain/hooks/session-start.sh\")",
       "Bash(python3 -c \"import json; print\\(json.load\\(open\\('/c/Users/martv/.claude/skills/wiki-brain/config.json'\\)\\).get\\('vaultPath',''\\)\\)\")",
-      "Bash(python3 -c \"import json; print\\(json.load\\(open\\('C:/Users/martv/.claude/skills/wiki-brain/config.json'\\)\\).get\\('vaultPath',''\\)\\)\")"
+      "Bash(python3 -c \"import json; print\\(json.load\\(open\\('C:/Users/martv/.claude/skills/wiki-brain/config.json'\\)\\).get\\('vaultPath',''\\)\\)\")",
+      "Bash(graphify query *)"
     ]
   },
   "mcpServers": {
     "playwright": {
       "url": "http://localhost:8931/mcp"
     }
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/session-start.sh",
+            "statusMessage": "Pulling latest from origin/main..."
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/session-end.sh",
+            "statusMessage": "Building + deploying to Firebase...",
+            "timeout": 600
+          }
+        ]
+      }
+    ]
   }
 }

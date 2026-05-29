@@ -426,6 +426,7 @@ export function DigitalDashboard() {
             {new Date(doc.weddingDate).toLocaleString(lang === "he" ? "he-IL" : "ar-SA", {
               weekday: "long", year: "numeric", month: "long", day: "numeric",
               hour: "2-digit", minute: "2-digit",
+              numberingSystem: "latn",
             })}
           </div>
         )}

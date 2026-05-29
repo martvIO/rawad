@@ -91,6 +91,7 @@ export function DigitalInvitationView({
         day: "numeric",
         month: "long",
         year: "numeric",
+        numberingSystem: "latn",
       })
     : "";
   const venueLine = [venue, venueCity].filter(Boolean).join(" · ");
@@ -234,7 +235,7 @@ function SectionHead({ eyebrow, title, sub, theme, font }) {
         {eyebrow}
       </div>
       <h2
-        className="dawa-inv-title"
+        className="dawa-inv-title dawa-inv-grad"
         style={{
           fontFamily: font.family,
           background: `linear-gradient(135deg,${theme.gradientStops.join(",")})`,
@@ -291,7 +292,7 @@ function Hero({ guestName, groomName, brideName, monogram, eyebrow, dateText, ve
           <circle cx="100" cy="100" r="80" fill="none" stroke={theme.accentMuted} strokeDasharray="2 6" />
         </svg>
         <span
-          className="dawa-inv-monogram-letters"
+          className="dawa-inv-monogram-letters dawa-inv-grad"
           style={{
             fontFamily: font.family,
             background: `linear-gradient(135deg,${theme.monoStops.join(",")})`,
@@ -305,7 +306,7 @@ function Hero({ guestName, groomName, brideName, monogram, eyebrow, dateText, ve
 
       {groomName && (
         <h1
-          className="dawa-inv-couple"
+          className="dawa-inv-couple dawa-inv-grad"
           style={{
             fontFamily: font.family,
             background: `linear-gradient(135deg,${theme.gradientStops.join(",")})`,
@@ -323,7 +324,7 @@ function Hero({ guestName, groomName, brideName, monogram, eyebrow, dateText, ve
       )}
       {brideName && (
         <h1
-          className="dawa-inv-couple"
+          className="dawa-inv-couple dawa-inv-grad"
           style={{
             fontFamily: font.family,
             background: `linear-gradient(135deg,${theme.gradientStops.join(",")})`,
@@ -583,7 +584,7 @@ function CountdownCell({ value, label, theme, font }) {
   return (
     <div className="dawa-inv-cd-cell" style={{ "--line": theme.accentLine }}>
       <div
-        className={`dawa-inv-cd-num${flip ? " is-flip" : ""}`}
+        className={`dawa-inv-cd-num dawa-inv-grad${flip ? " is-flip" : ""}`}
         style={{
           fontFamily: font.family,
           background: `linear-gradient(135deg,${theme.gradientStops.join(",")})`,
@@ -715,14 +716,14 @@ function RSVPSection({ theme, font, lang, opts, mealOptions, onSubmitRsvp, disab
         {alreadyAnswered && !showDone ? (
           <div className="dawa-inv-rsvp-success">
             <div className="dawa-inv-seal" style={{ background: `radial-gradient(circle at 30% 30%, ${theme.gradientStops[1]} 0%, ${theme.accent} 65%)`, color: ON_GOLD }}>✓</div>
-            <h3 style={{ fontFamily: font.family, background: `linear-gradient(135deg,${theme.gradientStops.join(",")})`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+            <h3 className="dawa-inv-grad" style={{ fontFamily: font.family, background: `linear-gradient(135deg,${theme.gradientStops.join(",")})`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
               {lang === "he" ? "כבר אישרת" : "تم تأكيد ردك"}
             </h3>
           </div>
         ) : showDone ? (
           <div className="dawa-inv-rsvp-success">
             <div className="dawa-inv-seal" style={{ background: `radial-gradient(circle at 30% 30%, ${theme.gradientStops[1]} 0%, ${theme.accent} 65%)`, color: ON_GOLD }}>✓</div>
-            <h3 style={{ fontFamily: font.family, background: `linear-gradient(135deg,${theme.gradientStops.join(",")})`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+            <h3 className="dawa-inv-grad" style={{ fontFamily: font.family, background: `linear-gradient(135deg,${theme.gradientStops.join(",")})`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
               {status === "absent" ? (lang === "he" ? "תודה שהודעת" : "نشكر إعلامكم") : (lang === "he" ? "תודה רבה! נתראה" : "شكراً لكم! ننتظركم")}
             </h3>
             <p style={{ color: theme.textSoft, fontFamily: font.family }}>{successText}</p>
@@ -912,7 +913,7 @@ function InviteFooter({ theme, font, lang }) {
   return (
     <footer className="dawa-inv-foot">
       <div
-        className="dawa-inv-foot-mark"
+        className="dawa-inv-foot-mark dawa-inv-grad"
         style={{ fontFamily: font.family, background: `linear-gradient(135deg,${theme.gradientStops.join(",")})`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}
       >
         {lang === "he" ? "דעוה" : "دعوة"}
@@ -1002,7 +1003,7 @@ function EnvelopeIntro({ guestName, font, lang }) {
         <div className="dawa-inv-wax" aria-hidden="true">د</div>
       </div>
       <div className="dawa-inv-env-hint">— {lang === "he" ? "לחץ לפתיחת ההזמנה" : "اضغط لفتح الدعوة"} —</div>
-      {guestName && <div className="dawa-inv-env-name" style={{ fontFamily: font.family }}>{guestName}</div>}
+      {guestName && <div className="dawa-inv-env-name dawa-inv-grad" style={{ fontFamily: font.family }}>{guestName}</div>}
     </div>
   );
 }
@@ -1046,6 +1047,20 @@ function ViewStyles({ theme }) {
     .dawa-inv ::selection { background: ${theme.accentMuted}; }
     .dawa-inv .dawa-inv-reveal { opacity: 0; transform: translateY(40px); transition: opacity .9s cubic-bezier(.2,.7,.2,1), transform .9s cubic-bezier(.2,.7,.2,1); }
     .dawa-inv .dawa-inv-reveal.is-in { opacity: 1; transform: none; }
+
+    /* Gold-gradient text. The headings clip a gradient to the text via
+     * background-clip:text + transparent fill. On engines that DON'T support
+     * background-clip:text the fill stays transparent and the text would
+     * vanish against the colored background — so fall back to a solid,
+     * high-contrast theme color there. */
+    .dawa-inv .dawa-inv-grad { -webkit-background-clip: text; background-clip: text; }
+    @supports not ((-webkit-background-clip: text) or (background-clip: text)) {
+      .dawa-inv .dawa-inv-grad {
+        background: none !important;
+        -webkit-text-fill-color: ${theme.text} !important;
+        color: ${theme.text} !important;
+      }
+    }
 
     /* Section shell */
     .dawa-inv .dawa-inv-section { position: relative; padding: 96px 24px; max-width: 1080px; margin: 0 auto; z-index: 6; }

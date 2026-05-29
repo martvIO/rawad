@@ -180,7 +180,7 @@ export function DigitalDesignEditor() {
     if (!(f.mealOptions || []).length) patch.mealOptions = DEFAULT_MEAL_OPTIONS[langKey];
     if (!(f.eyebrow || "").trim()) patch.eyebrow = DEFAULT_EYEBROW[langKey];
     if (!(f.dressCode || "").trim()) patch.dressCode = tt(lang, "كاجوال أنيق · ألوان فاتحة", "אלגנט קז'ואל · צבעים בהירים");
-    if (!(f.accessNote || "").trim()) patch.accessNote = tt(lang, "١٥–٢٠ دقيقة من وسط المدينة · خدمة فاليه", "15–20 דקות ממרכז העיר · שירות ולט");
+    if (!(f.accessNote || "").trim()) patch.accessNote = tt(lang, "15–20 دقيقة من وسط المدينة · خدمة فاليه", "15–20 דקות ממרכז העיר · שירות ולט");
     if (Object.keys(patch).length === 0) {
       showToast(tt(lang, "كل الأقسام معبّأة بالفعل", "כל החלקים כבר מלאים"));
       return;
@@ -357,7 +357,7 @@ export function DigitalDesignEditor() {
             removeLabel={tt(lang, "حذف", "מחק")}
             schema={[
               { key: "icon", placeholder: "✦", width: 56, maxLength: 8 },
-              { key: "when", placeholder: tt(lang, "متى (صيف ٢٠٢٣)", "מתי"), maxLength: 40 },
+              { key: "when", placeholder: tt(lang, "متى (صيف 2023)", "מתי"), maxLength: 40 },
               { key: "title", placeholder: tt(lang, "العنوان", "כותרת"), maxLength: 60 },
               { key: "body", placeholder: tt(lang, "الوصف", "תיאור"), maxLength: 400, textarea: true },
             ]}
@@ -429,7 +429,7 @@ export function DigitalDesignEditor() {
             schema={[
               { key: "icon", placeholder: "♛", width: 56, maxLength: 8 },
               { key: "meta", placeholder: tt(lang, "تصنيف (حفل العقد)", "תווית"), maxLength: 40 },
-              { key: "title", placeholder: tt(lang, "العنوان (٧:٠٠ مساءً)", "כותרת"), maxLength: 80 },
+              { key: "title", placeholder: tt(lang, "العنوان (7:00 مساءً)", "כותרת"), maxLength: 80 },
               { key: "body", placeholder: tt(lang, "الوصف", "תיאור"), maxLength: 300, textarea: true },
             ]}
           />

@@ -100,7 +100,7 @@ export function GroomLiveMap() {
                       </div>
                     </div>
                     <div style={{ fontSize: 11, color: "#4cc97a", fontWeight: 700, whiteSpace: "nowrap" }}>
-                      {d.time ? d.time.toLocaleTimeString(lang === "he" ? "he-IL" : "ar", { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : ""}
+                      {d.time ? d.time.toLocaleTimeString(lang === "he" ? "he-IL" : "ar", { hour: "2-digit", minute: "2-digit", second: "2-digit", numberingSystem: "latn" }) : ""}
                     </div>
                   </div>
                 ))}

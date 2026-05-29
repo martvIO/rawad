@@ -6,6 +6,7 @@
 // Israeli/Palestinian numbers strip a leading 0 automatically; users can
 // also paste a full "+972…" string and the country chip updates itself.
 import { useEffect, useRef, useState } from "react";
+import { toWesternDigits } from "../utils/digits.js";
 
 const COUNTRIES = [
   { code: "IL", dial: "+972", flag: "🇮🇱", name_ar: "إسرائيل",       name_he: "ישראל",       len: 9,  startsWith: ["5", "7"] },
@@ -101,7 +102,10 @@ export function PhoneInput({
     onChange(digits ? c.dial + digits : "");
   };
 
-  const handleType = (raw) => {
+  const handleType = (rawInput) => {
+    // Convert any Arabic-Indic digits first; otherwise the `\D` strip below
+    // would treat them as non-digits and silently drop what the user typed.
+    const raw = toWesternDigits(rawInput);
     let workCountry = country;
     let digits      = raw.replace(/\D/g, "");
 

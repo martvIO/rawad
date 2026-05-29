@@ -367,6 +367,53 @@ Three enforced layers:
 4. **Client UI** — `RoleGuard` prevents wrong-role rendering (convenience only — not authoritative)
 
 JWT custom claims: `{ role: "admin"|"driver"|"groom", username }`. Drivers also carry `assignedGrooms: { [groomUid]: true }`.
+
+---
+
+## Session Workflow — Start & End
+
+These are standing instructions for every session in this project.
+
+### Start of session (automatic)
+
+A `SessionStart` hook in `.claude/settings.local.json` runs `git pull --ff-only`
+to bring the working tree up to date with `origin/main` before any work begins.
+This is non-destructive: if the fast-forward can't apply (local commits diverged,
+or uncommitted changes block it) the hook just reports the error and the session
+continues on the current state — resolve it manually before relying on a clean base.
+
+### End of session (Claude-driven checklist)
+
+Before ending any session that changed code, run these steps **in order**. Each
+gate must pass before moving to the next; if a step can't be completed, stop and
+tell the user rather than skipping ahead. (Hooks can't do these — testing and
+fixing need active reasoning — so they live here as instructions Claude follows.)
+
+1. **Test every change with Playwright MCP.** Start the dev server
+   (`npm run dev:emulator`, or `npm run dev` against prod Firebase), then drive
+   the affected flows in the browser via the Playwright MCP
+   (`http://localhost:8931/mcp`). Cover the critical paths the change touches
+   (see the tables under "Deploy & Smoke-Test" and "Browser Testing"). **If
+   anything is broken, fix it, rebuild, and re-test** — loop until the changed
+   flows pass or you hit a genuine blocker worth surfacing to the user.
+2. **Update the wiki-brain files.** Per the Wiki-Brain Session Rules below:
+   update/create the relevant `wiki/` pages, refresh `wiki/index.md`, and append
+   the session line to `log.md`.
+3. **Commit to `main`.** Stage the *specific* changed files (never blind
+   `git add -A` — the Firebase admin-SDK key lives in the repo root), write a
+   conventional commit message (see the "Git Workflow" prefixes), and
+   `git push origin main`.
+4. **Build + deploy to Firebase (automatic on session end).** A `SessionEnd`
+   hook runs `.claude/hooks/session-end.sh` when the session ends — it re-runs
+   the unit-test gate, builds the frontend + functions, and deploys everything
+   to `dawa-aa793`. Do **not** run it manually here as well, or you'll deploy
+   twice; just ensure steps 1–3 are finished so the on-disk state it deploys is
+   tested and committed. (The script never commits — step 3 owns staging, for
+   the secret-safety reason above.) Smoke-test the hosted URL after the deploy.
+
+If the session was trivial (no code change), skip steps 1, 3, and 4 — but still
+append the `log.md` line per the Wiki-Brain rules.
+
 ## Context Navigation (Wiki-Brain)
 
 You have access to a personal wiki at `C:\Users\martv\OneDrive\Documents\github\rawad`. This is the user's

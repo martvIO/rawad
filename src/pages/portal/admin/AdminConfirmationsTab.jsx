@@ -49,7 +49,7 @@ export function AdminConfirmationsTab() {
             )}
           </div>
           <div style={{ fontSize: 10, color: "#5a5040" }}>
-            {new Date(conf.confirmedAt).toLocaleString(lang === "he" ? "he-IL" : "ar")}
+            {new Date(conf.confirmedAt).toLocaleString(lang === "he" ? "he-IL" : "ar", { numberingSystem: "latn" })}
           </div>
         </div>
 

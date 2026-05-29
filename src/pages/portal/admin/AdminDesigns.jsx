@@ -287,9 +287,9 @@ function Section({ title, count, color, children, testid }) {
 function DesignCard({ row, lang, busy, onPreview, onApprove, onReject, showApprovedAt, showRejectionNote }) {
   const meta = STATUS_META[row.designStatus] || STATUS_META.draft;
   const theme = getDigitalTheme(row.themeColor);
-  const date = row.weddingDate ? new Date(row.weddingDate).toLocaleDateString(lang === "he" ? "he-IL" : "ar-EG", { day: "numeric", month: "long", year: "numeric" }) : "—";
+  const date = row.weddingDate ? new Date(row.weddingDate).toLocaleDateString(lang === "he" ? "he-IL" : "ar-EG", { day: "numeric", month: "long", year: "numeric", numberingSystem: "latn" }) : "—";
   const submittedAt = row.designSubmittedAt
-    ? new Date(row.designSubmittedAt).toLocaleString(lang === "he" ? "he-IL" : "ar-EG", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })
+    ? new Date(row.designSubmittedAt).toLocaleString(lang === "he" ? "he-IL" : "ar-EG", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", numberingSystem: "latn" })
     : null;
 
   return (
@@ -358,7 +358,7 @@ function DesignCard({ row, lang, busy, onPreview, onApprove, onReject, showAppro
 
       {showApprovedAt && row.designApprovedAt && (
         <div style={{ fontSize: 11, color: "#4cc97a", marginBottom: 10 }}>
-          ✓ {tt(lang, "اعتُمد:", "אושר:")} {new Date(row.designApprovedAt).toLocaleString(lang === "he" ? "he-IL" : "ar-EG", { day: "2-digit", month: "2-digit" })}
+          ✓ {tt(lang, "اعتُمد:", "אושר:")} {new Date(row.designApprovedAt).toLocaleString(lang === "he" ? "he-IL" : "ar-EG", { day: "2-digit", month: "2-digit", numberingSystem: "latn" })}
         </div>
       )}
 

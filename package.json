@@ -11,6 +11,7 @@
     "emulators": "firebase emulators:start --only auth,database,firestore,storage,functions,hosting --project dawa-aa793",
     "emulators:build": "cd functions && npm run build && cd .. && npm run emulators",
     "emulators:seed": "node scripts/seed-emulator.cjs",
+    "migrate:digits": "node scripts/migrate-arabic-digits.cjs",
     "build": "vite build",
     "preview": "vite preview",
     "test": "firebase emulators:exec --only database --project demo-dawa-test \"vitest run --project integration\"",
