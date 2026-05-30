@@ -26,6 +26,7 @@ export function DigitalInvitationView({
   setLang,
   mode = "preview",
   onSubmitRsvp,
+  onOpenSorek,
   showEnvelope = false,
   alreadyAnswered = false,
   rsvpDone = false,
@@ -156,6 +157,10 @@ export function DigitalInvitationView({
         <LangToggle lang={lang} setLang={setLang} theme={theme} font={font} />
       )}
 
+      {(mode === "preview" || (isPublic && typeof onOpenSorek === "function")) && (
+        <SorekButton lang={lang} isPublic={isPublic} onClick={onOpenSorek} theme={theme} font={font} />
+      )}
+
       {showEnvelopeNow && <EnvelopeIntro guestName={guestName} font={font} lang={lang} />}
       <Ambience theme={theme} fixed={isPublic} />
 
@@ -227,7 +232,8 @@ export function DigitalInvitationView({
           style={{
             position: "absolute",
             top: 14,
-            insetInlineStart: 14,
+            // Opposite corner from the صورك button (inline-start) so they don't overlap.
+            insetInlineEnd: 14,
             padding: "6px 12px",
             borderRadius: 999,
             background: theme.chipBg,
@@ -949,6 +955,43 @@ function LangToggle({ lang, setLang, theme, font }) {
         </button>
       ))}
     </div>
+  );
+}
+
+// Guest-facing "صورك" button in the top menu of the public invitation. Sits in
+// the opposite top corner from the language toggle so together they read as a
+// top bar. Navigation is owned by the route wrapper (passed as onClick).
+function SorekButton({ lang, isPublic = true, onClick, theme, font }) {
+  return (
+    <button
+      onClick={onClick}
+      aria-label={lang === "he" ? "התמונות שלך" : "صورك"}
+      style={{
+        // Fixed on the real invite (floats as the guest scrolls); absolute in
+        // the editor/admin preview so it sits inside the preview box, not the page.
+        position: isPublic ? "fixed" : "absolute",
+        top: 14,
+        insetInlineStart: 14,
+        zIndex: 120,
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 6,
+        borderRadius: 999,
+        padding: "7px 14px",
+        cursor: "pointer",
+        border: `1px solid ${theme.chipBorder}`,
+        background: theme.chipBg,
+        backdropFilter: "blur(20px)",
+        color: theme.accent,
+        fontSize: 12,
+        fontWeight: 800,
+        letterSpacing: 0.5,
+        fontFamily: font.family,
+      }}
+    >
+      <span aria-hidden="true">📸</span>
+      {lang === "he" ? "התמונות שלך" : "صورك"}
+    </button>
   );
 }
 

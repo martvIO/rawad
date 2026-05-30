@@ -3,7 +3,7 @@
 // rendering to <DigitalInvitationView/>. RSVP submission lives here so the
 // view stays presentational.
 import { useEffect, useState, lazy, Suspense } from "react";
-import { useParams, Routes, Route, useSearchParams } from "react-router-dom";
+import { useParams, Routes, Route, useSearchParams, useNavigate } from "react-router-dom";
 import { subscribeInviteToken } from "../services/invites.js";
 import { getDigitalInvitationPublic, submitDigitalGuestInvite } from "../services/digitalInvitation.js";
 import { logErr } from "../utils/logger.js";
@@ -61,6 +61,7 @@ export function DigitalInvitationPage({ t, lang, setLang }) {
 
 function DigitalLandingMain({ lang, setLang }) {
   const { token } = useParams();
+  const navigate = useNavigate();
   const [search] = useSearchParams();
   const isDemo = search.get("demo") === "1";
   const demoName = search.get("name");
@@ -176,6 +177,7 @@ function DigitalLandingMain({ lang, setLang }) {
       setLang={setLang}
       mode="public"
       onSubmitRsvp={handleSubmitRsvp}
+      onOpenSorek={() => navigate("photos")}
       showEnvelope={true}
       alreadyAnswered={!!tokenRec.usedAt && !done}
       rsvpDone={done}
