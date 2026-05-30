@@ -6,6 +6,18 @@ Grooms manage a guest list. Drivers deliver physical invitations and upload proo
 
 ---
 
+## Working Agreement — Ask First, Never Assume
+
+- If anything in a request is unclear or ambiguous, **ask before acting** — do not
+  guess or fill gaps with assumptions.
+- **Always ask for explicit confirmation before adding or editing any website
+  feature, or any change to the database** (schema, RTDB/Firestore rules, or
+  stored data). Describe what you intend to change and wait for a go-ahead.
+- Sessions default to **plan mode** (`defaultMode: "plan"` in
+  `.claude/settings.local.json`) — present the approach before implementing.
+
+---
+
 ## Roles
 
 | Role | Primary tasks |
@@ -381,6 +393,22 @@ to bring the working tree up to date with `origin/main` before any work begins.
 This is non-destructive: if the fast-forward can't apply (local commits diverged,
 or uncommitted changes block it) the hook just reports the error and the session
 continues on the current state — resolve it manually before relying on a clean base.
+
+The hook also runs a best-effort **Playwright MCP availability check** and prints
+a warning if the MCP server isn't launchable.
+
+### Start of session — read the wiki-brain (Claude-driven, every session)
+
+**At the very start of every session, before any substantive work, actively read
+the wiki-brain** to load the compounding knowledge base. Do all of the following:
+
+1. **Read** `wiki/index.md` — the catalog hub — to orient on the full wiki structure.
+2. **Run `/recall`** — surfaces the last 5 activities and reads their linked wiki pages.
+3. **Invoke `/wiki-brain`** — the knowledge-base status/overview.
+
+The global `SessionStart` hook already prints the wiki index + recent `log.md`
+lines into context automatically; treat that as the starting point, then actively
+read/recall as above (and `graphify query "..."` before reading any raw files).
 
 ### End of session (Claude-driven checklist)
 
