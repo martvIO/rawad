@@ -3,10 +3,21 @@
 // the Confirmations tab now. Remaining guests render in two reply states:
 //   not sent  → neutral card, no reply pill
 //   pending   → soft amber card + "⌛ waiting" pill
+import { useState, useEffect } from "react";
 import { usePortal } from "../../../context/PortalContext.jsx";
 import { C } from "../../../styles/theme.js";
 import { Num } from "../../../components/Num.jsx";
 import { REPLY_STATUS, replyStateOf } from "../../../data/status.js";
+import { subscribeDesigns, assignGuestDesign } from "../../../services/digitalInvitation.js";
+import { localize } from "../../../utils/localize.js";
+import { logErr } from "../../../utils/logger.js";
+
+// Guest ranks may be the new `ranks: string[]` or a legacy single `rank: string`.
+function guestRanks(g) {
+  if (Array.isArray(g?.ranks)) return g.ranks;
+  if (g?.rank) return [g.rank];
+  return [];
+}
 
 export function AdminSendTab() {
   const {
@@ -14,6 +25,33 @@ export function AdminSendTab() {
     t, lang, sendInviteLink, sendDigitalInviteLink, digitalGuestsForSelectedGroom,
     guestConfirmationStatus, showToast, adminMode,
   } = usePortal();
+
+  // The selected groom's designs — drives the per-guest design picker so the
+  // admin can choose which (approved) design each guest receives.
+  const [designs, setDesigns] = useState([]);
+  // Optimistic per-guest design selection { [guestId]: designId } for instant
+  // dropdown feedback before the guest subscription echoes the persisted value.
+  const [designOverrides, setDesignOverrides] = useState({});
+
+  useEffect(() => {
+    const groomUser = adminSelectedGroom ? users.find((u) => u.username === adminSelectedGroom) : null;
+    const uid = groomUser?.uid || groomUser?.id || null;
+    if (!uid) { setDesigns([]); return undefined; }
+    setDesignOverrides({});
+    return subscribeDesigns(uid, (list) => setDesigns(Array.isArray(list) ? list : []));
+  }, [adminSelectedGroom, users]);
+
+  const approvedDesigns = designs.filter((d) => d.designStatus === "approved");
+
+  const pickDesign = async (groomUid, guestId, designId) => {
+    setDesignOverrides((prev) => ({ ...prev, [guestId]: designId }));
+    try {
+      await assignGuestDesign(groomUid, guestId, designId);
+    } catch (err) {
+      logErr("assignGuestDesign", err);
+      showToast(lang === "he" ? "שמירת העיצוב נכשלה" : "فشل حفظ التصميم");
+    }
+  };
   // Per-guest invite tokens are minted on demand (createGuestInvite Cloud
   // Function); each guest gets a unique 90-day link, so there's no global
   // adminFormLink to gate the buttons on anymore.
@@ -209,6 +247,51 @@ export function AdminSendTab() {
                               </div>
                               <div style={{ fontSize: 11, color: "#5a5040", direction: "ltr", textAlign: "right" }}>{g.phone}</div>
                               {g.area && <div style={{ fontSize: 11, color: C.dim }}>📍 {g.area}</div>}
+                              {/* Guest role / ranks */}
+                              {guestRanks(g).length > 0 && (
+                                <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 5 }}>
+                                  {guestRanks(g).map((r) => (
+                                    <span key={r} style={{
+                                      fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 999,
+                                      background: "rgba(201,168,76,.12)", border: "1px solid rgba(201,168,76,.3)", color: C.gold,
+                                    }}>{r}</span>
+                                  ))}
+                                </div>
+                              )}
+                              {/* Per-guest design picker — digital guests only; only approved designs are sendable */}
+                              {sec.digital && (
+                                approvedDesigns.length === 0 ? (
+                                  <div style={{ marginTop: 6, fontSize: 10, color: C.dim }}>
+                                    {lang === "he" ? "אין עיצוב מאושר לשליחה" : "لا يوجد تصميم معتمد للإرسال"}
+                                  </div>
+                                ) : (() => {
+                                  const curId = designOverrides[g.id]
+                                    ?? (approvedDesigns.find((d) => d.id === g.designId)?.id)
+                                    ?? (approvedDesigns.find((d) => d.isDefault)?.id)
+                                    ?? approvedDesigns[0]?.id ?? "";
+                                  return (
+                                    <div style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 6 }}>
+                                      <span style={{ fontSize: 10, color: C.goldDim, whiteSpace: "nowrap" }}>🎨 {lang === "he" ? "עיצוב:" : "التصميم:"}</span>
+                                      <select
+                                        value={curId}
+                                        onChange={(e) => pickDesign(selectedGroomUid, g.id, e.target.value)}
+                                        style={{
+                                          flex: 1, minWidth: 0, fontSize: 11, fontFamily: "inherit",
+                                          padding: "5px 8px", borderRadius: 8,
+                                          background: "rgba(255,255,255,.04)", color: C.goldLight,
+                                          border: "1px solid rgba(201,168,76,.3)", cursor: "pointer",
+                                        }}
+                                      >
+                                        {approvedDesigns.map((d) => (
+                                          <option key={d.id} value={d.id} style={{ background: "#0f0f15" }}>
+                                            {localize(d.title, lang) || (lang === "he" ? "עיצוב" : "تصميم")}{d.isDefault ? " ★" : ""}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </div>
+                                  );
+                                })()
+                              )}
                               {/* Explain what's mismatched — without shouting */}
                               {isMismatch && (
                                 <div style={{
