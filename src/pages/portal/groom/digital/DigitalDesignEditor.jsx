@@ -243,6 +243,9 @@ function DesignEditorBody({ groomUid, designId }) {
   const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
   const [heroBusy, setHeroBusy] = useState(false);
+  // An APPROVED design is read-only until the groom presses "تعديل التصميم".
+  // Reset per design so a fresh/approved design always starts locked.
+  const [editUnlocked, setEditUnlocked] = useState(false);
   const fileInputRef = useRef(null);
   const heroFileInputRef = useRef(null);
 
@@ -257,6 +260,7 @@ function DesignEditorBody({ groomUid, designId }) {
     setLoaded(false);
     setDoc(null);
     setF({});
+    setEditUnlocked(false);
     dirty.current = new Set();
     return subscribeDesign(currentUid, designId, (d) => {
       setDoc(d);
@@ -281,9 +285,10 @@ function DesignEditorBody({ groomUid, designId }) {
   const media = Array.isArray(doc?.media) ? doc.media : [];
   const heroMedia = Array.isArray(doc?.heroMedia) ? doc.heroMedia : [];
 
-  // Editor is read-only while awaiting approval. Approved is editable — the
-  // first design-field edit demotes back to draft (server-side).
-  const editable = status === "draft" || status === "approved" || status === "rejected";
+  // Draft & rejected are directly editable; pending is read-only (awaiting admin).
+  // Approved is LOCKED until the groom deliberately presses "تعديل التصميم"
+  // (editUnlocked) — then the first field edit demotes it to draft (server-side).
+  const editable = status === "draft" || status === "rejected" || (status === "approved" && editUnlocked);
 
   // The live design that drives the preview: saved doc + buffered overrides.
   const previewDesign = useMemo(
@@ -307,9 +312,14 @@ function DesignEditorBody({ groomUid, designId }) {
       "עריכת העיצוב תדרוש אישור מחדש. הזמנות שכבר נשלחו ישמרו על הגרסה הקודמת. להמשיך?",
     ));
 
+  // Unlock editing of an approved design after an explicit confirmation. The
+  // first saved edit then demotes it to draft (server-side) for re-approval.
+  const onEditApproved = () => {
+    if (confirmApproved()) setEditUnlocked(true);
+  };
+
   const persist = async (patch) => {
     if (!editable) return false;
-    if (status === "approved" && !confirmApproved()) return false;
     try {
       await patchDesignById(currentUid, designId,patch);
       return true;
@@ -362,13 +372,11 @@ function DesignEditorBody({ groomUid, designId }) {
 
   const onPickTheme = async (key) => {
     if (!editable || themeColor === key) return;
-    if (status === "approved" && !confirmApproved()) return;
     try { await patchDesignById(currentUid, designId,{ themeColor: key }); }
     catch (err) { logErr("patchDesignFields.themeColor", err); showToast(err?.message || tt(lang, "فشل الحفظ", "השמירה נכשלה")); }
   };
   const onPickFont = async (key) => {
     if (!editable || fontFamily === key) return;
-    if (status === "approved" && !confirmApproved()) return;
     try { await patchDesignById(currentUid, designId,{ fontFamily: key }); }
     catch (err) { logErr("patchDesignFields.fontFamily", err); showToast(err?.message || tt(lang, "فشل الحفظ", "השמירה נכשלה")); }
   };
@@ -553,7 +561,8 @@ function DesignEditorBody({ groomUid, designId }) {
         />
       </div>
 
-      <StatusBanner status={status} doc={doc} lang={lang} onCancel={onCancelSubmission} busy={busy} />
+      <StatusBanner status={status} doc={doc} lang={lang} onCancel={onCancelSubmission} busy={busy}
+        editUnlocked={editUnlocked} onEditApproved={onEditApproved} />
 
       <button
         data-testid="design-fill-sample"
@@ -1028,7 +1037,7 @@ function ArrayEditor({ items, schema, onChange, onCommit, addLabel, removeLabel,
   );
 }
 
-function StatusBanner({ status, doc, lang, onCancel, busy }) {
+function StatusBanner({ status, doc, lang, onCancel, busy, editUnlocked, onEditApproved }) {
   if (status === "pending_approval") {
     return (
       <div data-testid="design-status-banner" data-design-status="pending_approval" style={{ padding: "14px 16px", borderRadius: 12, marginBottom: 18, background: "rgba(75,159,212,.08)", border: "1px solid rgba(75,159,212,.32)", display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
@@ -1045,12 +1054,26 @@ function StatusBanner({ status, doc, lang, onCancel, busy }) {
   }
   if (status === "approved") {
     return (
-      <div data-testid="design-status-banner" data-design-status="approved" style={{ padding: "14px 16px", borderRadius: 12, marginBottom: 18, background: "rgba(76,201,122,.08)", border: "1px solid rgba(76,201,122,.35)", display: "flex", gap: 12, alignItems: "center" }}>
-        <div style={{ fontSize: 28 }}>✓</div>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 14, fontWeight: 900, color: "#4cc97a", marginBottom: 4 }}>{tt(lang, "تم اعتماد التصميم", "העיצוב אושר")}</div>
-          <div style={{ fontSize: 11, color: C.dim }}>{tt(lang, "يمكنك إرسال الدعوات الآن. أي تعديل سيُعيد التصميم لمسوّدة ويتطلب اعتماداً جديداً.", "ניתן לשלוח הזמנות. כל עריכה תחזיר לטיוטה ותדרוש אישור מחדש.")}</div>
+      <div data-testid="design-status-banner" data-design-status="approved" style={{ padding: "14px 16px", borderRadius: 12, marginBottom: 18, background: editUnlocked ? "rgba(201,168,76,.08)" : "rgba(76,201,122,.08)", border: `1px solid ${editUnlocked ? "rgba(201,168,76,.4)" : "rgba(76,201,122,.35)"}`, display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+        <div style={{ fontSize: 28 }}>{editUnlocked ? "✎" : "✓"}</div>
+        <div style={{ flex: 1, minWidth: 200 }}>
+          {editUnlocked ? (
+            <>
+              <div style={{ fontSize: 14, fontWeight: 900, color: C.gold, marginBottom: 4 }}>{tt(lang, "وضع التعديل مفعّل", "מצב עריכה פעיל")}</div>
+              <div style={{ fontSize: 11, color: C.dim }}>{tt(lang, "أي تغيير سيعيد التصميم لمسوّدة ويتطلب إعادة اعتماد. الدعوات المُرسلة سابقاً تبقى كما هي.", "כל שינוי יחזיר את העיצוב לטיוטה ויידרש אישור מחדש. הזמנות שכבר נשלחו לא ישתנו.")}</div>
+            </>
+          ) : (
+            <>
+              <div style={{ fontSize: 14, fontWeight: 900, color: "#4cc97a", marginBottom: 4 }}>{tt(lang, "تم اعتماد التصميم", "העיצוב אושר")}</div>
+              <div style={{ fontSize: 11, color: C.dim }}>{tt(lang, "يمكنك إرسال الدعوات الآن. لتعديله اضغط «تعديل التصميم» — سيعود لمسوّدة ويتطلب اعتماداً جديداً.", "ניתן לשלוח הזמנות. לעריכה לחץ «ערוך עיצוב» — יחזור לטיוטה ויידרש אישור מחדש.")}</div>
+            </>
+          )}
         </div>
+        {!editUnlocked && (
+          <button onClick={onEditApproved} data-testid="design-edit-approved-btn" style={{ padding: "8px 14px", borderRadius: 10, background: "rgba(201,168,76,.12)", border: "1px solid rgba(201,168,76,.35)", color: C.gold, cursor: "pointer", fontSize: 12, fontWeight: 800, fontFamily: "inherit", whiteSpace: "nowrap" }}>
+            ✎ {tt(lang, "تعديل التصميم", "ערוך עיצוב")}
+          </button>
+        )}
       </div>
     );
   }
