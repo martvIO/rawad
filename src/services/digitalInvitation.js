@@ -209,6 +209,117 @@ export async function patchDesignFields(groomUid, patch) {
   return api.patch(`/digital/${uid}/media/settings`, patch || {});
 }
 
+// ─── Multiple designs per groom ────────────────────────────────────────────────
+// A groom can have several full designs in a `designs` subcollection. The legacy
+// functions above operate on the groom's DEFAULT design (server resolves it); the
+// `*Design`/`*ById` functions below target a specific designId.
+
+/** Poll the groom's design list (lightweight rows for the editor switcher). */
+export function subscribeDesigns(groomUid, cb, onErrCb) {
+  const uid = resolveUid(groomUid);
+  return pollList(`/digital/${uid}/designs`, cb, onErrCb);
+}
+
+/** Create a design — blank, or a duplicate of `copyFromId`. */
+export async function createDesign(groomUid, { title, copyFromId } = {}) {
+  const uid = resolveUid(groomUid);
+  return api.post(`/digital/${uid}/designs`, {
+    title: title || "",
+    ...(copyFromId ? { copyFromId } : {}),
+  });
+}
+
+/** Delete a design (server refuses the last one; reassigns guests + default). */
+export async function deleteDesign(groomUid, designId) {
+  const uid = resolveUid(groomUid);
+  return api.delete(`/digital/${uid}/designs/${designId}`);
+}
+
+/** Subscribe to one design's full doc (drives the editor body + preview). */
+export function subscribeDesign(groomUid, designId, cb, onErrCb, transform) {
+  const uid = resolveUid(groomUid);
+  return createPoller(
+    async () => {
+      try {
+        return await api.get(`/digital/${uid}/designs/${designId}`);
+      } catch (err) {
+        logErr(`subscribeDesign(${uid}/${designId})`, err);
+        if (typeof onErrCb === "function") onErrCb(err);
+        return null;
+      }
+    },
+    (value) => {
+      const next = value ?? null;
+      cb(typeof transform === "function" ? transform(next) : next);
+    },
+    { intervalMs: DIGITAL_POLL_INTERVAL_MS },
+  );
+}
+
+/** Patch a specific design's fields (editor body). */
+export async function patchDesignById(groomUid, designId, patch) {
+  const uid = resolveUid(groomUid);
+  return api.patch(`/digital/${uid}/designs/${designId}`, patch || {});
+}
+
+/** Upload media into a specific design (opts.target "hero" | gallery). */
+export async function addDesignMedia(groomUid, designId, file, opts) {
+  const uid = resolveUid(groomUid);
+  const formData = new FormData();
+  formData.append("file", file, file.name);
+  if (opts?.target) formData.append("target", opts.target);
+  return api.upload(`/digital/${uid}/designs/${designId}/media/upload`, formData, opts);
+}
+
+/** Remove one media item from a specific design. */
+export async function removeDesignMedia(groomUid, designId, item, opts) {
+  const uid = resolveUid(groomUid);
+  if (!item?.storagePath) return;
+  const body = { storagePath: item.storagePath };
+  if (opts?.target) body.target = opts.target;
+  return api.post(`/digital/${uid}/designs/${designId}/media/delete-item`, body);
+}
+
+/** State-machine transitions for a specific design. */
+export async function submitDesignById(groomUid, designId) {
+  const uid = resolveUid(groomUid);
+  return api.post(`/digital/${uid}/designs/${designId}/design/submit`, {});
+}
+export async function cancelDesignById(groomUid, designId) {
+  const uid = resolveUid(groomUid);
+  return api.post(`/digital/${uid}/designs/${designId}/design/cancel`, {});
+}
+export async function approveDesignById(groomUid, designId) {
+  return api.post(`/digital/${groomUid}/designs/${designId}/design/approve`, {});
+}
+export async function rejectDesignById(groomUid, designId, note) {
+  return api.post(`/digital/${groomUid}/designs/${designId}/design/reject`, { note: note || "" });
+}
+
+/** Operational settings (guestRanks, photographerPublished) on the parent doc. */
+export function subscribeDigitalSettings(groomUid, cb, onErrCb) {
+  const uid = resolveUid(groomUid);
+  return createPoller(
+    async () => {
+      try {
+        return await api.get(`/digital/${uid}/settings`);
+      } catch (err) {
+        logErr(`subscribeDigitalSettings(${uid})`, err);
+        if (typeof onErrCb === "function") onErrCb(err);
+        return null;
+      }
+    },
+    (value) => cb(value ?? null),
+    { intervalMs: DIGITAL_POLL_INTERVAL_MS },
+  );
+}
+
+/** Assign (or clear) which design a guest receives. */
+export async function assignGuestDesign(groomUid, guestId, designId) {
+  const uid = resolveUid(groomUid);
+  return api.patch(`/digital/${uid}/guests/${guestId}`, { designId: designId || "" });
+}
+
 // ─── Design approval state machine ────────────────────────────────────────────
 
 export async function submitDesignForApproval(groomUid) {

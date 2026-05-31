@@ -4,8 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { usePortal } from "../../../context/PortalContext.jsx";
 import {
   subscribeAdminDesignList,
-  approveDigitalDesign,
-  rejectDigitalDesign,
+  approveDesignById,
+  rejectDesignById,
 } from "../../../services/digitalInvitation.js";
 import { logErr } from "../../../utils/logger.js";
 import { C } from "../../../styles/theme.js";
@@ -14,6 +14,14 @@ import { DigitalInvitationPreviewModal } from "../../../components/digital/Digit
 import { getDigitalTheme } from "../../../styles/digitalThemes.js";
 
 const tt = (lang, ar, he) => (lang === "he" ? he : ar);
+
+// A groom may have several designs, so cards key on groomUid + designId.
+const cidOf = (r) => `${r.groomUid}:${r.designId || ""}`;
+const titleOf = (r, lang) => {
+  const t = r.title;
+  const v = t && typeof t === "object" ? (t[lang === "he" ? "he" : "ar"] || t.ar || t.he) : t;
+  return (v || "").trim();
+};
 
 const STATUS_META = {
   pending_approval: { icon: "👀", color: "#c084fc", label_ar: "بانتظار الموافقة", label_he: "ממתין לאישור", bucket: "pending" },
@@ -26,9 +34,9 @@ export function AdminDesigns() {
   const { lang, showToast, users } = usePortal();
   const [rows, setRows] = useState([]);
   const [previewDesign, setPreviewDesign] = useState(null);
-  const [rejecting, setRejecting] = useState(null); // groomUid
+  const [rejecting, setRejecting] = useState(null); // the row being rejected
   const [rejectNote, setRejectNote] = useState("");
-  const [busy, setBusy] = useState(null); // groomUid
+  const [busy, setBusy] = useState(null); // composite id (groomUid:designId)
 
   useEffect(() => subscribeAdminDesignList(setRows), []);
 
@@ -46,12 +54,12 @@ export function AdminDesigns() {
   }), [withUsernames]);
 
   const onApprove = async (row) => {
-    setBusy(row.groomUid);
+    setBusy(cidOf(row));
     try {
-      await approveDigitalDesign(row.groomUid);
+      await approveDesignById(row.groomUid, row.designId);
       showToast(tt(lang, "✓ تم اعتماد التصميم", "✓ העיצוב אושר"));
     } catch (err) {
-      logErr("approveDigitalDesign", err);
+      logErr("approveDesignById", err);
       showToast(err?.message || tt(lang, "فشل الاعتماد", "האישור נכשל"));
     } finally {
       setBusy(null);
@@ -63,14 +71,14 @@ export function AdminDesigns() {
       showToast(tt(lang, "اكتب سبب الرفض", "כתוב סיבת הדחייה"));
       return;
     }
-    setBusy(rejecting);
+    setBusy(cidOf(rejecting));
     try {
-      await rejectDigitalDesign(rejecting, rejectNote.trim());
+      await rejectDesignById(rejecting.groomUid, rejecting.designId, rejectNote.trim());
       showToast(tt(lang, "✓ تم رفض التصميم", "✓ העיצוב נדחה"));
       setRejecting(null);
       setRejectNote("");
     } catch (err) {
-      logErr("rejectDigitalDesign", err);
+      logErr("rejectDesignById", err);
       showToast(err?.message || tt(lang, "فشل الرفض", "הדחייה נכשלה"));
     } finally {
       setBusy(null);
@@ -106,13 +114,13 @@ export function AdminDesigns() {
       >
         {groups.pending.map((row) => (
           <DesignCard
-            key={row.groomUid}
+            key={cidOf(row)}
             row={row}
             lang={lang}
-            busy={busy === row.groomUid}
+            busy={busy === cidOf(row)}
             onPreview={() => setPreviewDesign(row)}
             onApprove={() => onApprove(row)}
-            onReject={() => { setRejecting(row.groomUid); setRejectNote(""); }}
+            onReject={() => { setRejecting(row); setRejectNote(""); }}
           />
         ))}
       </Section>
@@ -125,10 +133,10 @@ export function AdminDesigns() {
       >
         {groups.approved.map((row) => (
           <DesignCard
-            key={row.groomUid}
+            key={cidOf(row)}
             row={row}
             lang={lang}
-            busy={busy === row.groomUid}
+            busy={busy === cidOf(row)}
             onPreview={() => setPreviewDesign(row)}
             showApprovedAt
           />
@@ -143,10 +151,10 @@ export function AdminDesigns() {
       >
         {groups.rejected.map((row) => (
           <DesignCard
-            key={row.groomUid}
+            key={cidOf(row)}
             row={row}
             lang={lang}
-            busy={busy === row.groomUid}
+            busy={busy === cidOf(row)}
             onPreview={() => setPreviewDesign(row)}
             showRejectionNote
           />
@@ -161,10 +169,10 @@ export function AdminDesigns() {
       >
         {groups.other.map((row) => (
           <DesignCard
-            key={row.groomUid}
+            key={cidOf(row)}
             row={row}
             lang={lang}
-            busy={busy === row.groomUid}
+            busy={busy === cidOf(row)}
             onPreview={() => setPreviewDesign(row)}
           />
         ))}
@@ -324,6 +332,11 @@ function DesignCard({ row, lang, busy, onPreview, onApprove, onReject, showAppro
           <div style={{ fontSize: 11, color: C.dim }}>
             @{row.groomUsername} · <Num dir="auto">{date}</Num>
           </div>
+          {titleOf(row, lang) && (
+            <div style={{ fontSize: 11, color: C.gold, fontWeight: 700, marginTop: 2 }}>
+              🎨 {titleOf(row, lang)}
+            </div>
+          )}
           {row.venue && (
             <div style={{ fontSize: 11, color: C.dim, marginTop: 2 }}>📍 {row.venue}</div>
           )}

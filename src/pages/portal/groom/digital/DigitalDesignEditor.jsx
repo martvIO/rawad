@@ -5,12 +5,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { usePortal } from "../../../../context/PortalContext.jsx";
 import {
-  subscribeDigitalMedia,
-  patchDesignFields,
-  submitDesignForApproval,
-  cancelDesignSubmission,
-  addInvitationMedia,
-  removeInvitationMedia,
+  subscribeDesigns,
+  createDesign,
+  deleteDesign,
+  subscribeDesign,
+  patchDesignById,
+  submitDesignById,
+  cancelDesignById,
+  addDesignMedia,
+  removeDesignMedia,
 } from "../../../../services/digitalInvitation.js";
 import { logErr } from "../../../../utils/logger.js";
 import { C } from "../../../../styles/theme.js";
@@ -61,6 +64,7 @@ function mergeLang(arAr, heAr, keys) {
 // Every scalar/array field the groom edits lives in one buffered object so the
 // preview is a simple merge and autosave can target a single key at a time.
 const SCALAR_KEYS = [
+  "title",
   "brideName", "groomDisplayName", "eyebrow", "monogram",
   "venue", "venueCity", "venueAddress", "accessNote", "dressCode",
   "giftNote", "giftIban", "musicUrl",
@@ -73,8 +77,165 @@ const TOGGLE_KEYS = [
   "rsvpCompanionsEnabled", "rsvpMealEnabled", "rsvpSongEnabled",
 ];
 
+const DESIGN_STATUS_META = {
+  draft:            { ar: "مسوّدة", he: "טיוטה", color: "#c9a84c" },
+  pending_approval: { ar: "بانتظار الموافقة", he: "ממתין לאישור", color: "#4b9fd4" },
+  approved:         { ar: "معتمد", he: "מאושר", color: "#4cc97a" },
+  rejected:         { ar: "مرفوض", he: "נדחה", color: "#d4533a" },
+};
+
+function pillBtn(enabled) {
+  return {
+    background: "rgba(201,168,76,.08)", border: "1px solid rgba(201,168,76,.3)", color: C.gold,
+    padding: "6px 12px", borderRadius: 9, fontSize: 11, fontWeight: 800,
+    cursor: enabled ? "pointer" : "not-allowed", opacity: enabled ? 1 : 0.5, fontFamily: "inherit",
+  };
+}
+
+// Top-level Design tab: lets the groom switch between / create / duplicate /
+// delete designs, then edits the selected one via <DesignEditorBody/>.
 export function DigitalDesignEditor() {
   const { lang, currentUid, showToast } = usePortal();
+  const [designs, setDesigns] = useState(null); // null = loading
+  const [selectedId, setSelectedId] = useState(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!currentUid) return undefined;
+    return subscribeDesigns(currentUid, (list) => {
+      const arr = Array.isArray(list) ? list : [];
+      setDesigns(arr);
+      setSelectedId((cur) => {
+        if (cur && arr.some((d) => d.id === cur)) return cur;
+        let saved = null;
+        try { saved = localStorage.getItem(`dawa_sel_design_${currentUid}`); } catch { /* ignore */ }
+        if (saved && arr.some((d) => d.id === saved)) return saved;
+        const def = arr.find((d) => d.isDefault) || arr[0];
+        return def ? def.id : null;
+      });
+    });
+  }, [currentUid]);
+
+  const select = (id) => {
+    setSelectedId(id);
+    try { localStorage.setItem(`dawa_sel_design_${currentUid}`, id); } catch { /* ignore */ }
+  };
+
+  const onCreate = async (copyFromId) => {
+    setBusy(true);
+    try {
+      const res = await createDesign(currentUid, copyFromId ? { copyFromId } : {});
+      if (res?.id) select(res.id);
+      showToast(tt(lang, "✓ تم إنشاء التصميم", "✓ העיצוב נוצר"));
+    } catch (err) {
+      logErr("createDesign", err);
+      const code = err?.body?.error;
+      showToast(code === "too_many_designs"
+        ? tt(lang, "بلغت الحد الأقصى للتصاميم", "הגעת למספר העיצובים המרבי")
+        : (err?.message || tt(lang, "فشل الإنشاء", "היצירה נכשלה")));
+    } finally { setBusy(false); }
+  };
+
+  const onDelete = async (id) => {
+    if (!window.confirm(tt(lang, "حذف هذا التصميم؟ لا يمكن التراجع.", "למחוק את העיצוב הזה? אי אפשר לבטל."))) return;
+    setBusy(true);
+    try {
+      const res = await deleteDesign(currentUid, id);
+      if (id === selectedId && res?.defaultDesignId) select(res.defaultDesignId);
+      showToast(tt(lang, "✓ تم حذف التصميم", "✓ העיצוב נמחק"));
+    } catch (err) {
+      logErr("deleteDesign", err);
+      const code = err?.body?.error;
+      showToast(code === "last_design"
+        ? tt(lang, "لا يمكن حذف التصميم الوحيد", "אי אפשר למחוק את העיצוב היחיד")
+        : (err?.message || tt(lang, "فشل الحذف", "המחיקה נכשלה")));
+    } finally { setBusy(false); }
+  };
+
+  if (designs === null) {
+    return (
+      <div style={{ textAlign: "center", padding: 40, color: C.dim }}>
+        <span className="spinner" /> {tt(lang, "جاري التحميل...", "טוען...")}
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ animation: "fadeUp .3s ease" }}>
+      <DesignSwitcher
+        designs={designs} selectedId={selectedId} lang={lang} busy={busy}
+        onSelect={select} onCreate={onCreate} onDelete={onDelete}
+      />
+      {selectedId && <DesignEditorBody key={selectedId} groomUid={currentUid} designId={selectedId} />}
+    </div>
+  );
+}
+
+function DesignSwitcher({ designs, selectedId, lang, busy, onSelect, onCreate, onDelete }) {
+  const canAdd = designs.length < 8;
+  const editLang = lang === "he" ? "he" : "ar";
+  return (
+    <div className="gold-card" style={{ padding: 14, marginBottom: 16 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, gap: 8, flexWrap: "wrap" }}>
+        <div style={{ fontSize: 13, color: C.goldLight, fontWeight: 800, letterSpacing: 1 }}>
+          {tt(lang, "تصاميمك", "העיצובים שלך")} <span style={{ color: C.dim, fontWeight: 600 }}>({designs.length})</span>
+        </div>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          <button data-testid="design-new" disabled={!canAdd || busy} onClick={() => onCreate(null)} style={pillBtn(canAdd && !busy)}>
+            ➕ {tt(lang, "تصميم جديد", "עיצוב חדש")}
+          </button>
+          {selectedId && (
+            <button data-testid="design-duplicate" disabled={!canAdd || busy} onClick={() => onCreate(selectedId)} style={pillBtn(canAdd && !busy)}>
+              ⧉ {tt(lang, "نسخ المحدد", "שכפל")}
+            </button>
+          )}
+        </div>
+      </div>
+      <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4 }}>
+        {designs.map((d) => {
+          const active = d.id === selectedId;
+          const meta = DESIGN_STATUS_META[d.designStatus] || DESIGN_STATUS_META.draft;
+          const title = leaf(d.title, editLang) || tt(lang, "بدون اسم", "ללא שם");
+          return (
+            <div
+              key={d.id}
+              data-testid="design-chip"
+              onClick={() => onSelect(d.id)}
+              style={{
+                flex: "0 0 auto", minWidth: 132, maxWidth: 180, cursor: "pointer", padding: "10px 12px",
+                borderRadius: 12, position: "relative",
+                border: `2px solid ${active ? C.gold : "rgba(255,255,255,.08)"}`,
+                background: active ? "rgba(201,168,76,.10)" : "rgba(255,255,255,.02)",
+              }}
+            >
+              <div style={{ fontSize: 12, fontWeight: 800, color: active ? C.gold : C.goldLight, marginBottom: 6, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", paddingInlineEnd: 16 }}>
+                {title}
+              </div>
+              <span style={{ fontSize: 10, fontWeight: 700, color: meta.color, background: `${meta.color}22`, padding: "2px 7px", borderRadius: 8 }}>
+                {tt(lang, meta.ar, meta.he)}
+              </span>
+              {designs.length > 1 && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onDelete(d.id); }}
+                  aria-label="delete"
+                  style={{ position: "absolute", top: 4, insetInlineEnd: 4, width: 20, height: 20, borderRadius: 10, background: "rgba(0,0,0,.5)", border: "1px solid rgba(212,80,58,.4)", color: "#fff", fontSize: 11, cursor: "pointer", lineHeight: 1, padding: 0 }}
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// The editor body, bound to ONE design (groomUid + designId). Wrapped by the
+// DigitalDesignManager below, which lets the groom switch between designs.
+function DesignEditorBody({ groomUid, designId }) {
+  const { lang, showToast } = usePortal();
+  const currentUid = groomUid;
   const langKey = lang === "he" ? "he" : "ar";
   // Which language the text inputs edit. Each localized field stores both.
   const [editLang, setEditLang] = useState(langKey);
@@ -90,9 +251,14 @@ export function DigitalDesignEditor() {
   const [f, setF] = useState({});
   const dirty = useRef(new Set());
 
+  // Re-subscribe (and reset the buffer) whenever the selected design changes.
   useEffect(() => {
-    if (!currentUid) return undefined;
-    return subscribeDigitalMedia(currentUid, (d) => {
+    if (!currentUid || !designId) return undefined;
+    setLoaded(false);
+    setDoc(null);
+    setF({});
+    dirty.current = new Set();
+    return subscribeDesign(currentUid, designId, (d) => {
       setDoc(d);
       setLoaded(true);
       const next = d || {};
@@ -107,7 +273,7 @@ export function DigitalDesignEditor() {
         return merged;
       });
     });
-  }, [currentUid]);
+  }, [currentUid, designId]);
 
   const status = doc?.designStatus || "draft";
   const themeColor = doc?.themeColor || "gold";
@@ -145,7 +311,7 @@ export function DigitalDesignEditor() {
     if (!editable) return false;
     if (status === "approved" && !confirmApproved()) return false;
     try {
-      await patchDesignFields(currentUid, patch);
+      await patchDesignById(currentUid, designId,patch);
       return true;
     } catch (err) {
       logErr("patchDesignFields", err);
@@ -197,13 +363,13 @@ export function DigitalDesignEditor() {
   const onPickTheme = async (key) => {
     if (!editable || themeColor === key) return;
     if (status === "approved" && !confirmApproved()) return;
-    try { await patchDesignFields(currentUid, { themeColor: key }); }
+    try { await patchDesignById(currentUid, designId,{ themeColor: key }); }
     catch (err) { logErr("patchDesignFields.themeColor", err); showToast(err?.message || tt(lang, "فشل الحفظ", "השמירה נכשלה")); }
   };
   const onPickFont = async (key) => {
     if (!editable || fontFamily === key) return;
     if (status === "approved" && !confirmApproved()) return;
-    try { await patchDesignFields(currentUid, { fontFamily: key }); }
+    try { await patchDesignById(currentUid, designId,{ fontFamily: key }); }
     catch (err) { logErr("patchDesignFields.fontFamily", err); showToast(err?.message || tt(lang, "فشل الحفظ", "השמירה נכשלה")); }
   };
 
@@ -237,7 +403,7 @@ export function DigitalDesignEditor() {
     if (!file || !editable) return;
     setBusy(true);
     try {
-      await addInvitationMedia(currentUid, file);
+      await addDesignMedia(currentUid, designId, file);
       showToast(tt(lang, "✓ تم رفع الصورة", "✓ התמונה הועלתה"));
     } catch (err) {
       logErr("addInvitationMedia", err);
@@ -252,7 +418,7 @@ export function DigitalDesignEditor() {
     if (!editable) return;
     if (!window.confirm(tt(lang, "حذف هذه الصورة؟", "למחוק את התמונה הזו?"))) return;
     try {
-      await removeInvitationMedia(currentUid, item);
+      await removeDesignMedia(currentUid, designId, item);
       showToast(tt(lang, "✓ تم الحذف", "✓ נמחק"));
     } catch (err) {
       logErr("removeInvitationMedia", err);
@@ -266,7 +432,7 @@ export function DigitalDesignEditor() {
     if (!file || !editable) return;
     setHeroBusy(true);
     try {
-      await addInvitationMedia(currentUid, file, { target: "hero" });
+      await addDesignMedia(currentUid, designId, file, { target: "hero" });
       showToast(tt(lang, "✓ تم رفع الوسائط", "✓ המדיה הועלתה"));
     } catch (err) {
       logErr("addInvitationMedia.hero", err);
@@ -281,7 +447,7 @@ export function DigitalDesignEditor() {
     if (!editable) return;
     if (!window.confirm(tt(lang, "حذف هذه الوسائط؟", "למחוק את המדיה הזו?"))) return;
     try {
-      await removeInvitationMedia(currentUid, item, { target: "hero" });
+      await removeDesignMedia(currentUid, designId, item, { target: "hero" });
       showToast(tt(lang, "✓ تم الحذف", "✓ נמחק"));
     } catch (err) {
       logErr("removeInvitationMedia.hero", err);
@@ -300,7 +466,7 @@ export function DigitalDesignEditor() {
     }
     setBusy(true);
     try {
-      await submitDesignForApproval(currentUid);
+      await submitDesignById(currentUid, designId);
       showToast(tt(lang, "✓ تم الإرسال للموافقة", "✓ נשלח לאישור"));
     } catch (err) {
       logErr("submitDesignForApproval", err);
@@ -313,7 +479,7 @@ export function DigitalDesignEditor() {
   const onCancelSubmission = async () => {
     setBusy(true);
     try {
-      await cancelDesignSubmission(currentUid);
+      await cancelDesignById(currentUid, designId);
       showToast(tt(lang, "↶ تم الإلغاء، يمكنك التعديل", "↶ בוטל, ניתן לערוך"));
     } catch (err) {
       logErr("cancelDesignSubmission", err);
@@ -367,6 +533,24 @@ export function DigitalDesignEditor() {
             "עצב את ההזמנה במלואה — טקסטים, תאריכים, תמונות, הסיפור שלכם — ושלח לאישור. כל חלק מוצג כברירת מחדל; הסר סימון כדי להסתיר.",
           )}
         </div>
+      </div>
+
+      {/* Design name — a groom-facing label to tell designs apart. */}
+      <div style={{ marginBottom: 14 }}>
+        <div style={{ fontSize: 12, color: C.goldDim, marginBottom: 5 }}>
+          {tt(lang, "اسم هذا التصميم (لك فقط)", "שם העיצוב (לשימושך)")}
+        </div>
+        <input
+          data-testid="design-title"
+          type="text"
+          className="input-field"
+          value={leaf(f.title, editLang)}
+          disabled={!editable}
+          maxLength={60}
+          placeholder={tt(lang, "مثال: تصميم العائلة", "למשל: עיצוב למשפחה")}
+          onChange={(e) => setField("title", setLeaf(f.title, editLang, e.target.value))}
+          onBlur={() => flush("title", f.title)}
+        />
       </div>
 
       <StatusBanner status={status} doc={doc} lang={lang} onCancel={onCancelSubmission} busy={busy} />
