@@ -58,6 +58,11 @@ export function AdminDesigns() {
     setBusy(cidOf(row));
     try {
       await approveDesignById(row.groomUid, row.designId);
+      // Move the card to "معتمد" immediately instead of waiting for the next
+      // poll — that lag made approved designs look like they stayed in drafts.
+      setRows((prev) => prev.map((r) => (cidOf(r) === cidOf(row)
+        ? { ...r, designStatus: "approved", designApprovedAt: Date.now(), designRejectionNote: null }
+        : r)));
       showToast(tt(lang, "✓ تم اعتماد التصميم", "✓ העיצוב אושר"));
     } catch (err) {
       logErr("approveDesignById", err);
@@ -74,7 +79,13 @@ export function AdminDesigns() {
     }
     setBusy(cidOf(rejecting));
     try {
-      await rejectDesignById(rejecting.groomUid, rejecting.designId, rejectNote.trim());
+      const note = rejectNote.trim();
+      const rid = cidOf(rejecting);
+      await rejectDesignById(rejecting.groomUid, rejecting.designId, note);
+      // Optimistically move the card to "مرفوض" with the note.
+      setRows((prev) => prev.map((r) => (cidOf(r) === rid
+        ? { ...r, designStatus: "rejected", designRejectedAt: Date.now(), designRejectionNote: note }
+        : r)));
       showToast(tt(lang, "✓ تم رفض التصميم", "✓ העיצוב נדחה"));
       setRejecting(null);
       setRejectNote("");
