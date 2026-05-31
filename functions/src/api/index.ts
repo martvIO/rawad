@@ -174,6 +174,12 @@ function buildCorsOriginCheck() {
       cb(null, true);
       return;
     }
-    cb(new Error(`origin_not_allowed:${origin}`));
+    // Disallowed origin: do NOT throw (that turns into a 500 and takes the whole
+    // API down for that browser). Instead deny CORS headers — the browser blocks
+    // genuine cross-origin reads, while same-origin requests (the app calling its
+    // own /api) still succeed because same-origin doesn't require CORS headers.
+    // eslint-disable-next-line no-console
+    console.warn(`[api] CORS: origin not in allowlist: ${origin}`);
+    cb(null, false);
   };
 }
