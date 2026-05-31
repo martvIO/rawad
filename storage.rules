@@ -22,9 +22,11 @@ service firebase.storage {
     }
 
     // Invitation media (multi-image/video gallery for the digital invitation).
+    // Recursive so per-design paths `digitalMedia/{groomUid}/{designId}/{file}`
+    // and legacy flat `digitalMedia/{groomUid}/{file}` both match.
     // PUBLIC READ at all times — guests opening their invite link must be able
     // to view these without auth. Write restricted to the groom/admin.
-    match /digitalMedia/{groomUid}/{file} {
+    match /digitalMedia/{groomUid}/{allPaths=**} {
       allow read: if true;
       allow write: if request.auth != null
                    && (request.auth.uid == groomUid || request.auth.token.role == 'admin')

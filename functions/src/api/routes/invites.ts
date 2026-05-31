@@ -282,16 +282,36 @@ invitesRouter.post(
         res.status(404).json({ error: "guest_not_found" });
         return;
       }
-      // Gate: minting requires an approved design. The admin's Send tab
-      // surfaces this as a localized toast.
-      const invData = invDocSnap.exists ? invDocSnap.data() ?? {} : {};
-      if (invData.designStatus !== "approved") {
+      const guest = guestSnap.data() as
+        | { name?: string; phone?: string; designId?: string }
+        | undefined;
+      const parentData = (invDocSnap.exists ? invDocSnap.data() ?? {} : {}) as Record<string, unknown>;
+
+      // Resolve the design this guest receives: their assigned design, else the
+      // groom's default. Un-migrated (v1) grooms still hold the single design on
+      // the parent doc, so fall back to that.
+      const designId =
+        (guest?.designId as string) || (parentData.defaultDesignId as string) || "";
+      let designData: Record<string, unknown>;
+      if (designId) {
+        const dSnap = await fs
+          .doc(`digitalInvitations/${groomUid}/designs/${designId}`)
+          .get();
+        if (!dSnap.exists) {
+          res.status(404).json({ error: "design_not_found" });
+          return;
+        }
+        designData = (dSnap.data() ?? {}) as Record<string, unknown>;
+      } else {
+        designData = parentData;
+      }
+
+      // Gate: minting requires the (assigned) design to be approved. The admin's
+      // Send tab surfaces this as a localized toast.
+      if (designData.designStatus !== "approved") {
         res.status(403).json({ error: "design_not_approved" });
         return;
       }
-      const guest = guestSnap.data() as
-        | { name?: string; phone?: string }
-        | undefined;
 
       const groomUsername = await resolveGroomUsername(undefined, groomUid);
       if (!groomUsername) {
@@ -299,10 +319,9 @@ invitesRouter.post(
         return;
       }
 
-      // Snapshot the approved design at mint time so later groom edits
-      // never alter invitations already sent to guests. Spread the whole doc
-      // so every design field (story timeline, details, hotels, captions,
-      // section toggles, …) is captured — operational-only flags are dropped.
+      // Snapshot the approved design at mint time so later edits never alter
+      // invitations already sent. Operational + state-machine + design-doc meta
+      // keys are dropped; every other field (timeline, details, toggles, …) is kept.
       const {
         photographerPublished: _pp,
         guestRanks: _gr,
@@ -311,18 +330,24 @@ invitesRouter.post(
         designApprovedAt: _daa,
         designRejectedAt: _dra,
         designRejectionNote: _drn,
+        schemaVersion: _sv,
+        defaultDesignId: _ddi,
+        designCount: _dc,
+        title: _ti,
+        order: _or,
+        createdAt: _ca,
         ...designFields
-      } = invData as Record<string, unknown>;
+      } = designData;
       const designSnapshot = {
         ...designFields,
-        brideName: invData.brideName ?? "",
-        groomDisplayName: invData.groomDisplayName ?? "",
-        weddingDate: invData.weddingDate ?? null,
-        themeColor: invData.themeColor ?? "gold",
-        fontFamily: invData.fontFamily ?? "amiri",
-        media: Array.isArray(invData.media) ? invData.media : [],
-        heroMedia: Array.isArray(invData.heroMedia) ? invData.heroMedia : [],
-        designVersion: invData.designVersion ?? 1,
+        brideName: designData.brideName ?? "",
+        groomDisplayName: designData.groomDisplayName ?? "",
+        weddingDate: designData.weddingDate ?? null,
+        themeColor: designData.themeColor ?? "gold",
+        fontFamily: designData.fontFamily ?? "amiri",
+        media: Array.isArray(designData.media) ? designData.media : [],
+        heroMedia: Array.isArray(designData.heroMedia) ? designData.heroMedia : [],
+        designVersion: designData.designVersion ?? 1,
       };
 
       const { token, expiresAt, now } = mintToken();
@@ -335,6 +360,7 @@ invitesRouter.post(
         guestType: "digital",
         createdAt: now,
         expiresAt,
+        designId: designId || null,
         designSnapshot,
       });
       await guestRef.update({

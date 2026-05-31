@@ -158,18 +158,37 @@ export const digitalInvitePreview = onRequest(
         const db = getDatabase();
         const snap = await db.ref(`inviteTokens/${token}`).get();
         if (snap.exists()) {
-          const tk = snap.val() as { groomUid?: string; guestName?: string };
+          type DesignLike = {
+            media?: Array<{ url?: string; kind?: string }>;
+            backgroundUrl?: string;
+            brideName?: string;
+            groomDisplayName?: string;
+          };
+          const tk = snap.val() as {
+            groomUid?: string;
+            guestName?: string;
+            designId?: string;
+            designSnapshot?: DesignLike;
+          };
           inputs.guestName = tk.guestName || "";
           if (tk.groomUid) {
-            const fs = getFirestore();
-            const docSnap = await fs.doc(`digitalInvitations/${tk.groomUid}`).get();
-            if (docSnap.exists) {
-              const d = docSnap.data() as {
-                media?: Array<{ url?: string; kind?: string }>;
-                backgroundUrl?: string;
-                brideName?: string;
-                groomDisplayName?: string;
-              };
+            // Prefer the token's embedded snapshot (what the guest actually
+            // sees). Fall back to the assigned/default design doc for any legacy
+            // token that predates snapshots, or the parent doc for un-migrated grooms.
+            let d: DesignLike | undefined = tk.designSnapshot;
+            if (!d) {
+              const fs = getFirestore();
+              const parentSnap = await fs.doc(`digitalInvitations/${tk.groomUid}`).get();
+              const parent = (parentSnap.exists ? parentSnap.data() : {}) as Record<string, unknown>;
+              const did = (tk.designId as string) || (parent.defaultDesignId as string) || "";
+              if (did) {
+                const dSnap = await fs.doc(`digitalInvitations/${tk.groomUid}/designs/${did}`).get();
+                if (dSnap.exists) d = dSnap.data() as DesignLike;
+              } else {
+                d = parent as DesignLike;
+              }
+            }
+            if (d) {
               inputs.brideName        = d.brideName;
               inputs.groomDisplayName = d.groomDisplayName;
               const firstImage = (d.media || []).find(m => m.kind !== "video" && m.url)?.url

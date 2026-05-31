@@ -45,6 +45,15 @@ import { MAX_BYTES, MAX_LEN } from "../../constants/limits";
 const COLL_ROOT = "digitalInvitations";
 const COLL_GUESTS = "guests";
 const COLL_PHOTOG = "photographerFiles";
+const COLL_DESIGNS = "designs";
+
+// Schema v2 = each design is its own doc in the `designs` subcollection (so a
+// groom can have many), instead of a single design baked into the parent doc.
+// `ensureMigrated` lifts a legacy (v1) parent design into `designs/{autoId}` on
+// first authed touch, non-destructively.
+const SCHEMA_VERSION = 2;
+const MAX_DESIGNS_PER_GROOM = 8;
+const MAX_DESIGN_TITLE_LEN = 60;
 
 const STORAGE_MEDIA_PREFIX = "digitalMedia";
 const STORAGE_PHOTOG_PREFIX = "photographerFiles";
@@ -275,12 +284,13 @@ digitalRouter.delete(
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /**
- * Read the parent invitation doc. Returns the projected shape (auto-
- * migrates legacy `backgroundUrl` into a synthetic media[0] entry so the
- * frontend can read media[] uniformly).
+ * Read one design (projected). Legacy `/:uid/media` resolves the default
+ * design; `/:uid/designs/:designId` reads that specific design. The response
+ * merges the parent's operational fields (photographerPublished, guestRanks)
+ * so legacy callers that read them off this doc keep working.
  */
 digitalRouter.get(
-  "/:uid/media",
+  ["/:uid/media", "/:uid/designs/:designId"],
   requireAuth,
   async (req: AuthRequest, res: Response) => {
     if (!canActOnUid(req, req.params.uid)) {
@@ -288,8 +298,24 @@ digitalRouter.get(
       return;
     }
     try {
-      const snap = await mediaDoc(req.params.uid).get();
-      res.json(snap.exists ? projectMediaDoc(snap.data()) : null);
+      const uid = req.params.uid;
+      const designId = await resolveDesignId(req);
+      const [dSnap, pSnap] = await Promise.all([
+        designDoc(uid, designId).get(),
+        parentDoc(uid).get(),
+      ]);
+      if (!dSnap.exists) {
+        res.json(null);
+        return;
+      }
+      const design = projectMediaDoc(dSnap.data()) as Record<string, unknown>;
+      const p = pSnap.exists ? (pSnap.data() as Record<string, unknown>) : {};
+      res.json({
+        ...design,
+        designId,
+        photographerPublished: p.photographerPublished === true,
+        guestRanks: Array.isArray(p.guestRanks) ? p.guestRanks : [],
+      });
     } catch (err) {
       res.status(500).json({ error: "read_failed", detail: safeDetail(err) });
     }
@@ -297,12 +323,15 @@ digitalRouter.get(
 );
 
 /**
- * Patch invitation doc settings (weddingDate, photographerPublished,
- * guestRanks, brideName, groomDisplayName). Unknown keys are dropped.
- * Setting `weddingDate: null` clears it (legacy code allowed this).
+ * Patch a design's fields. Legacy `/:uid/media/settings` targets the default
+ * design; `/:uid/designs/:designId` targets a specific one. Design fields are
+ * written to the design doc (editing while approved demotes it to draft — sent
+ * tokens carry an immutable snapshot, so they're unaffected). The two
+ * operational keys (photographerPublished, guestRanks) are routed to the PARENT
+ * doc, so the legacy combined endpoint keeps working during migration.
  */
 digitalRouter.patch(
-  "/:uid/media/settings",
+  ["/:uid/media/settings", "/:uid/designs/:designId"],
   requireAuth,
   async (req: AuthRequest, res: Response) => {
     if (!canActOnUid(req, req.params.uid)) {
@@ -319,21 +348,89 @@ digitalRouter.patch(
       return;
     }
     try {
-      const patch: Record<string, unknown> = { ...sanitized.value };
-      const touchesDesign = Object.keys(sanitized.value).some((k) =>
-        DESIGN_FIELDS.has(k)
-      );
-      if (touchesDesign) {
-        // Edits to a design field while approved demote it back to draft —
-        // already-sent invite tokens are unaffected because they carry a
-        // designSnapshot embedded at mint time.
-        const snap = await mediaDoc(req.params.uid).get();
-        if (snap.exists && snap.data()?.designStatus === "approved") {
-          patch.designStatus = "draft";
-          patch.designApprovedAt = null;
-        }
+      const uid = req.params.uid;
+      const designId = await resolveDesignId(req);
+
+      const parentPatch: Record<string, unknown> = {};
+      const designPatch: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(sanitized.value)) {
+        if (k === "photographerPublished" || k === "guestRanks") parentPatch[k] = v;
+        else designPatch[k] = v;
       }
-      await mediaDoc(req.params.uid).set(patch, { merge: true });
+
+      if (Object.keys(designPatch).length > 0) {
+        const dRef = designDoc(uid, designId);
+        const touchesDesign = Object.keys(designPatch).some((k) => DESIGN_FIELDS.has(k));
+        if (touchesDesign) {
+          const dSnap = await dRef.get();
+          if (dSnap.exists && dSnap.data()?.designStatus === "approved") {
+            designPatch.designStatus = "draft";
+            designPatch.designApprovedAt = null;
+          }
+        }
+        await dRef.set(designPatch, { merge: true });
+      }
+      if (Object.keys(parentPatch).length > 0) {
+        await parentDoc(uid).set(parentPatch, { merge: true });
+      }
+      res.json({ ok: true });
+    } catch (err) {
+      res.status(500).json({ error: "write_failed", detail: safeDetail(err) });
+    }
+  }
+);
+
+/**
+ * Operational settings on the PARENT doc (guestRanks, photographerPublished) —
+ * NOT design fields, so they never demote a design. Used by the guests UI and
+ * the photographer publish toggle.
+ */
+digitalRouter.get(
+  "/:uid/settings",
+  requireAuth,
+  async (req: AuthRequest, res: Response) => {
+    if (!canActOnUid(req, req.params.uid)) {
+      res.status(403).json({ error: "forbidden" });
+      return;
+    }
+    try {
+      await ensureMigrated(req.params.uid);
+      const snap = await parentDoc(req.params.uid).get();
+      const p = snap.exists ? (snap.data() as Record<string, unknown>) : {};
+      res.json({
+        photographerPublished: p.photographerPublished === true,
+        guestRanks: Array.isArray(p.guestRanks) ? p.guestRanks : [],
+        defaultDesignId: (p.defaultDesignId as string) ?? null,
+      });
+    } catch (err) {
+      res.status(500).json({ error: "read_failed", detail: safeDetail(err) });
+    }
+  }
+);
+
+digitalRouter.patch(
+  "/:uid/settings",
+  requireAuth,
+  async (req: AuthRequest, res: Response) => {
+    if (!canActOnUid(req, req.params.uid)) {
+      res.status(403).json({ error: "forbidden" });
+      return;
+    }
+    const sanitized = sanitizeMediaSettings(req.body);
+    if (!sanitized.ok) {
+      res.status(400).json({ error: sanitized.error, field: sanitized.field });
+      return;
+    }
+    const patch: Record<string, unknown> = {};
+    for (const k of ["photographerPublished", "guestRanks"] as const) {
+      if (k in sanitized.value) patch[k] = (sanitized.value as Record<string, unknown>)[k];
+    }
+    if (Object.keys(patch).length === 0) {
+      res.status(400).json({ error: "empty_patch" });
+      return;
+    }
+    try {
+      await parentDoc(req.params.uid).set(patch, { merge: true });
       res.json({ ok: true });
     } catch (err) {
       res.status(500).json({ error: "write_failed", detail: safeDetail(err) });
@@ -348,7 +445,7 @@ digitalRouter.patch(
  * uploads don't clobber.
  */
 digitalRouter.post(
-  "/:uid/media/upload",
+  ["/:uid/media/upload", "/:uid/designs/:designId/media/upload"],
   requireAuth,
   async (req: AuthRequest, res: Response) => {
     if (!canActOnUid(req, req.params.uid)) {
@@ -381,9 +478,10 @@ digitalRouter.post(
 
     try {
       const uid = req.params.uid;
+      const designId = await resolveDesignId(req);
       const ext = pickExtensionFromFilename(parsed.file.filename, "bin");
       const prefix = target === "hero" ? "hero" : "m";
-      const path = `${STORAGE_MEDIA_PREFIX}/${uid}/${prefix}_${Date.now()}.${ext}`;
+      const path = `${STORAGE_MEDIA_PREFIX}/${uid}/${designId}/${prefix}_${Date.now()}.${ext}`;
       const url = await uploadAndGetUrl(
         path,
         parsed.file.buffer,
@@ -397,14 +495,8 @@ digitalRouter.post(
         order: Date.now(),
       };
 
-      // BUG-O003 fix — atomic append via transaction.
-      // The previous code read media[], appended, and wrote back in three
-      // separate steps. Parallel uploads (Promise.allSettled on N files)
-      // all read the same `existing`, then each wrote `[existing, file_i]`,
-      // so later writes clobbered earlier ones and only the last upload
-      // survived. A transaction serializes the read-modify-write per doc
-      // so concurrent uploads each see the prior commits and append safely.
-      const docRef = mediaDoc(uid);
+      // BUG-O003 fix — atomic append via transaction (now per design doc).
+      const docRef = designDoc(uid, designId);
       await fs().runTransaction(async (tx) => {
         const docSnap = await tx.get(docRef);
         const data = docSnap.exists ? docSnap.data() : null;
@@ -435,7 +527,7 @@ digitalRouter.post(
  * media[] (read-modify-write) and best-effort deletes the Storage object.
  */
 digitalRouter.post(
-  "/:uid/media/delete-item",
+  ["/:uid/media/delete-item", "/:uid/designs/:designId/media/delete-item"],
   requireAuth,
   async (req: AuthRequest, res: Response) => {
     if (!canActOnUid(req, req.params.uid)) {
@@ -450,12 +542,10 @@ digitalRouter.post(
     // `target` selects which array to prune — hero/featured media or gallery.
     const target = req.body?.target === "hero" ? "hero" : "gallery";
     try {
-      // BUG-O003 fix — same read-modify-write race as the upload path.
-      // A delete coming in mid-upload could read media[] before the upload's
-      // commit, then write back the pre-upload array — silently restoring a
-      // file that was just deleted, or vice versa. Transaction makes both
-      // operations linearizable against each other.
-      const docRef = mediaDoc(req.params.uid);
+      const uid = req.params.uid;
+      const designId = await resolveDesignId(req);
+      // BUG-O003 fix — same read-modify-write race as the upload path (per design doc).
+      const docRef = designDoc(uid, designId);
       await fs().runTransaction(async (tx) => {
         const snap = await tx.get(docRef);
         if (!snap.exists) return;
@@ -482,6 +572,11 @@ digitalRouter.post(
  * Clear the entire invitation doc + every file under digitalMedia/{uid}.
  * Used by the "remove background" admin/groom action.
  */
+/**
+ * Legacy "remove all media" — now scoped to the DEFAULT design: clears its
+ * media[]/heroMedia[] and deletes that design's storage folder. The parent doc
+ * (operational fields + design pointers) and other designs are preserved.
+ */
 digitalRouter.delete(
   "/:uid/media",
   requireAuth,
@@ -491,9 +586,157 @@ digitalRouter.delete(
       return;
     }
     try {
-      await mediaDoc(req.params.uid).delete().catch(() => undefined);
-      await deleteStorageFolder(`${STORAGE_MEDIA_PREFIX}/${req.params.uid}/`);
+      const uid = req.params.uid;
+      const designId = await resolveDefaultDesignId(uid);
+      await designDoc(uid, designId).set({ media: [], heroMedia: [] }, { merge: true });
+      await deleteStorageFolder(`${STORAGE_MEDIA_PREFIX}/${uid}/${designId}/`);
       res.json({ ok: true });
+    } catch (err) {
+      res.status(500).json({ error: "delete_failed", detail: safeDetail(err) });
+    }
+  }
+);
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// DESIGNS CRUD  —  digitalInvitations/{uid}/designs/{designId}
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/** List a groom's designs (lightweight rows for the editor switcher). */
+digitalRouter.get(
+  "/:uid/designs",
+  requireAuth,
+  async (req: AuthRequest, res: Response) => {
+    if (!canActOnUid(req, req.params.uid)) {
+      res.status(403).json({ error: "forbidden" });
+      return;
+    }
+    try {
+      const uid = req.params.uid;
+      const defaultDesignId = await ensureMigrated(uid);
+      const snap = await designsCol(uid).get();
+      const rows = snap.docs.map((d) => {
+        const data = d.data() || {};
+        return {
+          id: d.id,
+          title: data.title ?? "",
+          order: typeof data.order === "number" ? data.order : 0,
+          createdAt: data.createdAt ?? 0,
+          designStatus: data.designStatus ?? "draft",
+          designVersion: data.designVersion ?? 1,
+          designRejectionNote: data.designRejectionNote ?? null,
+          brideName: data.brideName ?? "",
+          groomDisplayName: data.groomDisplayName ?? "",
+          themeColor: data.themeColor ?? "gold",
+          isDefault: d.id === defaultDesignId,
+        };
+      });
+      rows.sort((a, b) => a.order - b.order || a.createdAt - b.createdAt);
+      res.json(rows);
+    } catch (err) {
+      res.status(500).json({ error: "read_failed", detail: safeDetail(err) });
+    }
+  }
+);
+
+/**
+ * Create a design — blank, or a duplicate of `copyFromId` (deep-copies fields +
+ * media[] entries, reusing the source's storage URLs; resets the state machine
+ * to draft). Body: `{ title?, copyFromId? }`. Enforces MAX_DESIGNS_PER_GROOM.
+ */
+digitalRouter.post(
+  "/:uid/designs",
+  requireAuth,
+  async (req: AuthRequest, res: Response) => {
+    if (!canActOnUid(req, req.params.uid)) {
+      res.status(403).json({ error: "forbidden" });
+      return;
+    }
+    try {
+      const uid = req.params.uid;
+      await ensureMigrated(uid);
+      const existing = await designsCol(uid).get();
+      if (existing.size >= MAX_DESIGNS_PER_GROOM) {
+        res.status(409).json({ error: "too_many_designs", max: MAX_DESIGNS_PER_GROOM });
+        return;
+      }
+      const titleRaw = (req.body?.title ?? "").toString().trim().slice(0, MAX_DESIGN_TITLE_LEN);
+      const copyFromId = (req.body?.copyFromId ?? "").toString();
+
+      let payload: Record<string, unknown> = {};
+      if (copyFromId) {
+        const src = await designDoc(uid, copyFromId).get();
+        if (!src.exists) {
+          res.status(404).json({ error: "source_not_found" });
+          return;
+        }
+        payload = { ...(src.data() as Record<string, unknown>) };
+        delete payload.designApprovedAt;
+        delete payload.designRejectedAt;
+        delete payload.designSubmittedAt;
+        delete payload.designRejectionNote;
+      }
+      payload.title = titleRaw || payload.title || { ar: "تصميم جديد", he: "עיצוב חדש" };
+      payload.order = existing.size;
+      payload.createdAt = Date.now();
+      payload.designStatus = "draft";
+      payload.designVersion = 1;
+
+      const ref = await designsCol(uid).add(payload);
+      await parentDoc(uid).set({ designCount: existing.size + 1 }, { merge: true });
+      res.json({ id: ref.id, ...payload });
+    } catch (err) {
+      res.status(500).json({ error: "write_failed", detail: safeDetail(err) });
+    }
+  }
+);
+
+/**
+ * Delete a design. Refuses the last remaining design. If it was the default,
+ * another design is promoted to default. Guests assigned to it are reassigned
+ * to the new default. Storage files are left in place (cheap; avoids breaking a
+ * duplicate that references the same URLs).
+ */
+digitalRouter.delete(
+  "/:uid/designs/:designId",
+  requireAuth,
+  async (req: AuthRequest, res: Response) => {
+    if (!canActOnUid(req, req.params.uid)) {
+      res.status(403).json({ error: "forbidden" });
+      return;
+    }
+    try {
+      const uid = req.params.uid;
+      const targetId = req.params.designId;
+      await ensureMigrated(uid);
+      const all = await designsCol(uid).get();
+      if (all.size <= 1) {
+        res.status(409).json({ error: "last_design" });
+        return;
+      }
+      if (!all.docs.some((d) => d.id === targetId)) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+
+      const pSnap = await parentDoc(uid).get();
+      const currentDefault = pSnap.exists ? (pSnap.data()?.defaultDesignId as string) : null;
+      let newDefault = currentDefault;
+      if (currentDefault === targetId) {
+        const other = all.docs.find((d) => d.id !== targetId);
+        newDefault = other ? other.id : null;
+      }
+
+      const affected = await guestsCol(uid).where("designId", "==", targetId).get();
+      const batch = fs().batch();
+      affected.docs.forEach((g) => batch.update(g.ref, { designId: newDefault }));
+      batch.delete(designDoc(uid, targetId));
+      await batch.commit();
+
+      await parentDoc(uid).set(
+        { defaultDesignId: newDefault, designCount: all.size - 1 },
+        { merge: true }
+      );
+      res.json({ ok: true, defaultDesignId: newDefault, reassignedGuests: affected.size });
     } catch (err) {
       res.status(500).json({ error: "delete_failed", detail: safeDetail(err) });
     }
@@ -661,11 +904,15 @@ digitalRouter.get(
   requireAdmin,
   async (_req: AuthRequest, res: Response) => {
     try {
-      const snap = await getFirestore().collection(COLL_ROOT).get();
+      const snap = await getFirestore().collectionGroup(COLL_DESIGNS).get();
       const rows = snap.docs.map((d) => {
         const data = d.data() || {};
+        const groomUid = d.ref.parent.parent?.id ?? "";
         return {
-          groomUid: d.id,
+          groomUid,
+          designId: d.id,
+          title: data.title ?? "",
+          order: typeof data.order === "number" ? data.order : 0,
           brideName: data.brideName ?? "",
           groomDisplayName: data.groomDisplayName ?? "",
           weddingDate: data.weddingDate ?? null,
@@ -727,7 +974,7 @@ digitalRouter.get(
  * Increments designVersion, clears any rejection note, stamps designSubmittedAt.
  */
 digitalRouter.post(
-  "/:uid/design/submit",
+  ["/:uid/design/submit", "/:uid/designs/:designId/design/submit"],
   requireAuth,
   async (req: AuthRequest, res: Response) => {
     if (!canActOnUid(req, req.params.uid)) {
@@ -735,7 +982,7 @@ digitalRouter.post(
       return;
     }
     try {
-      const docRef = mediaDoc(req.params.uid);
+      const docRef = designDoc(req.params.uid, await resolveDesignId(req));
       const result = await fs().runTransaction(async (tx) => {
         const snap = await tx.get(docRef);
         const data = snap.exists ? snap.data() : null;
@@ -773,7 +1020,7 @@ digitalRouter.post(
  * keep editing without admin intervention.
  */
 digitalRouter.post(
-  "/:uid/design/cancel",
+  ["/:uid/design/cancel", "/:uid/designs/:designId/design/cancel"],
   requireAuth,
   async (req: AuthRequest, res: Response) => {
     if (!canActOnUid(req, req.params.uid)) {
@@ -781,7 +1028,7 @@ digitalRouter.post(
       return;
     }
     try {
-      const docRef = mediaDoc(req.params.uid);
+      const docRef = designDoc(req.params.uid, await resolveDesignId(req));
       const result = await fs().runTransaction(async (tx) => {
         const snap = await tx.get(docRef);
         const data = snap.exists ? snap.data() : null;
@@ -808,12 +1055,12 @@ digitalRouter.post(
  * rejection note (in case the groom resubmitted after a prior rejection).
  */
 digitalRouter.post(
-  "/:uid/design/approve",
+  ["/:uid/design/approve", "/:uid/designs/:designId/design/approve"],
   requireAuth,
   requireAdmin,
   async (req: AuthRequest, res: Response) => {
     try {
-      const docRef = mediaDoc(req.params.uid);
+      const docRef = designDoc(req.params.uid, await resolveDesignId(req));
       const result = await fs().runTransaction(async (tx) => {
         const snap = await tx.get(docRef);
         const data = snap.exists ? snap.data() : null;
@@ -849,7 +1096,7 @@ digitalRouter.post(
  * see in their Design tab. Body: `{ note: string }`.
  */
 digitalRouter.post(
-  "/:uid/design/reject",
+  ["/:uid/design/reject", "/:uid/designs/:designId/design/reject"],
   requireAuth,
   requireAdmin,
   async (req: AuthRequest, res: Response) => {
@@ -863,7 +1110,7 @@ digitalRouter.post(
       return;
     }
     try {
-      const docRef = mediaDoc(req.params.uid);
+      const docRef = designDoc(req.params.uid, await resolveDesignId(req));
       const result = await fs().runTransaction(async (tx) => {
         const snap = await tx.get(docRef);
         const data = snap.exists ? snap.data() : null;
@@ -904,14 +1151,40 @@ digitalRouter.post(
  * sign-in. Returns `null` (HTTP 200) when the doc doesn't exist so the
  * client can decide how to render that case.
  */
-digitalRouter.get("/:uid/public", async (req: Request, res: Response) => {
-  try {
-    const snap = await mediaDoc(req.params.uid).get();
-    res.json(snap.exists ? projectMediaDoc(snap.data()) : null);
-  } catch (err) {
-    res.status(500).json({ error: "read_failed", detail: safeDetail(err) });
+digitalRouter.get(
+  ["/:uid/public", "/:uid/designs/:designId/public"],
+  async (req: Request, res: Response) => {
+    try {
+      const uid = req.params.uid;
+      // Explicit `/designs/:designId/public` is approved-only (never leaks a
+      // draft). Legacy `/:uid/public` returns the default design (any status) —
+      // it's only a fallback; sent links render from the token's snapshot.
+      const designId = (req.params as { designId?: string }).designId;
+      const requireApproved = !!designId;
+      const targetId = designId || (await resolveDefaultDesignId(uid));
+      const [dSnap, pSnap] = await Promise.all([
+        designDoc(uid, targetId).get(),
+        parentDoc(uid).get(),
+      ]);
+      if (!dSnap.exists) {
+        res.json(null);
+        return;
+      }
+      const data = dSnap.data();
+      if (requireApproved && data?.designStatus !== "approved") {
+        res.json(null);
+        return;
+      }
+      const p = pSnap.exists ? (pSnap.data() as Record<string, unknown>) : {};
+      res.json({
+        ...(projectMediaDoc(data) as Record<string, unknown>),
+        photographerPublished: p.photographerPublished === true,
+      });
+    } catch (err) {
+      res.status(500).json({ error: "read_failed", detail: safeDetail(err) });
+    }
   }
-});
+);
 
 // ─── Firestore + Storage helpers ──────────────────────────────────────────────
 
@@ -919,8 +1192,91 @@ function fs(): Firestore {
   return getFirestore();
 }
 
-function mediaDoc(uid: string): DocumentReference {
+// The PARENT invitation doc. Post-v2 it holds operational fields only
+// (photographerPublished, guestRanks) + migration pointers (schemaVersion,
+// defaultDesignId). `mediaDoc` is kept as an alias for the few callers that
+// still read the parent directly (photographer auth).
+function parentDoc(uid: string): DocumentReference {
   return fs().doc(`${COLL_ROOT}/${uid}`);
+}
+function mediaDoc(uid: string): DocumentReference {
+  return parentDoc(uid);
+}
+
+function designsCol(uid: string): CollectionReference {
+  return fs().collection(`${COLL_ROOT}/${uid}/${COLL_DESIGNS}`);
+}
+function designDoc(uid: string, designId: string): DocumentReference {
+  return designsCol(uid).doc(designId);
+}
+
+// Keys that live on the PARENT doc and must never be copied into a design doc
+// (nor treated as design fields). Everything else on a legacy parent is design payload.
+const PARENT_ONLY_KEYS = new Set([
+  "photographerPublished",
+  "guestRanks",
+  "schemaVersion",
+  "defaultDesignId",
+  "designCount",
+]);
+
+/**
+ * Lazily migrate a groom from v1 (single design on the parent doc) to v2
+ * (designs subcollection). Idempotent and NON-destructive: copies the legacy
+ * parent design into `designs/{autoId}`, stamps the parent with
+ * `schemaVersion`+`defaultDesignId`, and leaves the old parent fields in place
+ * (new reads ignore them). Returns the groom's defaultDesignId. Already-minted
+ * invite tokens (immutable RTDB snapshots) are untouched.
+ */
+async function ensureMigrated(uid: string): Promise<string> {
+  const pRef = parentDoc(uid);
+  return fs().runTransaction(async (tx) => {
+    const snap = await tx.get(pRef);
+    const data = snap.exists ? (snap.data() as Record<string, unknown>) : null;
+
+    if (
+      data &&
+      data.schemaVersion === SCHEMA_VERSION &&
+      typeof data.defaultDesignId === "string" &&
+      data.defaultDesignId
+    ) {
+      return data.defaultDesignId as string;
+    }
+
+    const designRef = designsCol(uid).doc();
+    const defaultDesignId = designRef.id;
+
+    // projectMediaDoc folds a legacy single `backgroundUrl` into media[0].
+    const legacy = data ? (projectMediaDoc(data) as Record<string, unknown>) : {};
+    const designPayload: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(legacy || {})) {
+      if (!PARENT_ONLY_KEYS.has(k)) designPayload[k] = v;
+    }
+    if (!designPayload.title) designPayload.title = { ar: "التصميم الأساسي", he: "עיצוב ראשי" };
+    designPayload.order = 0;
+    if (designPayload.createdAt == null) designPayload.createdAt = Date.now();
+    if (designPayload.designStatus == null) designPayload.designStatus = "draft";
+    if (designPayload.designVersion == null) designPayload.designVersion = 1;
+
+    tx.set(designRef, designPayload);
+    tx.set(pRef, { schemaVersion: SCHEMA_VERSION, defaultDesignId, designCount: 1 }, { merge: true });
+    return defaultDesignId;
+  });
+}
+
+/** Resolve (migrating if needed) the groom's default design id. */
+async function resolveDefaultDesignId(uid: string): Promise<string> {
+  return ensureMigrated(uid);
+}
+
+/**
+ * Resolve which design a request targets: the explicit `:designId` path param
+ * (new per-design routes) or the groom's default design (legacy routes, which
+ * also triggers the lazy migration).
+ */
+async function resolveDesignId(req: AuthRequest): Promise<string> {
+  if (req.params.designId) return req.params.designId;
+  return resolveDefaultDesignId(req.params.uid);
 }
 
 function guestsCol(uid: string): CollectionReference {
@@ -1059,6 +1415,7 @@ interface DigitalGuestCreate {
   name: string;
   phone: string;
   ranks?: string[];
+  designId?: string;
 }
 
 /**
@@ -1115,6 +1472,10 @@ function sanitizeDigitalGuestCreate(
   if (ranksResult.value && ranksResult.value.length > 0) {
     out.ranks = ranksResult.value;
   }
+  if (data.designId !== undefined) {
+    const v = (data.designId ?? "").toString().trim();
+    if (v) out.designId = v.slice(0, 200);
+  }
   return { ok: true, value: out };
 }
 
@@ -1124,6 +1485,7 @@ interface DigitalGuestPatch {
   ranks?: string[];
   status?: string;
   note?: string;
+  designId?: string;
 }
 
 function sanitizeDigitalGuestPatch(
@@ -1168,6 +1530,9 @@ function sanitizeDigitalGuestPatch(
       return { ok: false, error: "note_too_long", field: "note" };
     }
     out.note = v;
+  }
+  if (data.designId !== undefined) {
+    out.designId = (data.designId ?? "").toString().trim().slice(0, 200);
   }
   return { ok: true, value: out };
 }
@@ -1254,6 +1619,7 @@ interface MediaSettings {
   rsvpMealEnabled?: boolean;
   rsvpSongEnabled?: boolean;
   heroMediaEnabled?: boolean;
+  title?: Localized;
 }
 
 function sanitizeMediaSettings(body: unknown): Sanitized<MediaSettings> {
@@ -1385,6 +1751,7 @@ function sanitizeMediaSettings(body: unknown): Sanitized<MediaSettings> {
     ["venueCity", MAX_VENUE_CITY_LEN],
     ["accessNote", MAX_ACCESS_NOTE_LEN],
     ["dressCode", MAX_DRESS_CODE_LEN],
+    ["title", MAX_DESIGN_TITLE_LEN], // groom-facing design label (NOT a DESIGN_FIELD → no demotion)
   ];
   for (const [key, max] of localizedScalars) {
     if (data[key] !== undefined) {
