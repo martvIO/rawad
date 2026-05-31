@@ -12,6 +12,7 @@ import { C } from "../../../styles/theme.js";
 import { Num } from "../../../components/Num.jsx";
 import { DigitalInvitationPreviewModal } from "../../../components/digital/DigitalInvitationPreviewModal.jsx";
 import { getDigitalTheme } from "../../../styles/digitalThemes.js";
+import { localize } from "../../../utils/localize.js";
 
 const tt = (lang, ar, he) => (lang === "he" ? he : ar);
 
@@ -296,6 +297,11 @@ function Section({ title, count, color, children, testid }) {
 function DesignCard({ row, lang, busy, onPreview, onApprove, onReject, showApprovedAt, showRejectionNote }) {
   const meta = STATUS_META[row.designStatus] || STATUS_META.draft;
   const theme = getDigitalTheme(row.themeColor);
+  // Groom-authored fields are localized { ar, he } objects — resolve to a string
+  // before rendering, or React throws "Objects are not valid as a React child".
+  const bride = localize(row.brideName, lang);
+  const groomName = localize(row.groomDisplayName, lang);
+  const venue = localize(row.venue, lang);
   const date = row.weddingDate ? new Date(row.weddingDate).toLocaleDateString(lang === "he" ? "he-IL" : "ar-EG", { day: "numeric", month: "long", year: "numeric", numberingSystem: "latn" }) : "—";
   const submittedAt = row.designSubmittedAt
     ? new Date(row.designSubmittedAt).toLocaleString(lang === "he" ? "he-IL" : "ar-EG", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", numberingSystem: "latn" })
@@ -327,7 +333,7 @@ function DesignCard({ row, lang, busy, onPreview, onApprove, onReject, showAppro
         />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 14, fontWeight: 900, color: C.goldLight, marginBottom: 2 }}>
-            {row.brideName || "—"} {row.brideName && row.groomDisplayName && "&"} {row.groomDisplayName || ""}
+            {bride || "—"} {bride && groomName && "&"} {groomName || ""}
           </div>
           <div style={{ fontSize: 11, color: C.dim }}>
             @{row.groomUsername} · <Num dir="auto">{date}</Num>
@@ -337,8 +343,8 @@ function DesignCard({ row, lang, busy, onPreview, onApprove, onReject, showAppro
               🎨 {titleOf(row, lang)}
             </div>
           )}
-          {row.venue && (
-            <div style={{ fontSize: 11, color: C.dim, marginTop: 2 }}>📍 {row.venue}</div>
+          {venue && (
+            <div style={{ fontSize: 11, color: C.dim, marginTop: 2 }}>📍 {venue}</div>
           )}
           {submittedAt && row.designStatus === "pending_approval" && (
             <div style={{ fontSize: 10, color: C.dim, marginTop: 2 }}>
