@@ -5,11 +5,18 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { usePortal } from "../../../../context/PortalContext.jsx";
 import {
   subscribeDigitalGuests, updateDigitalGuest, removeDigitalGuest,
-  subscribeDigitalMedia,
+  subscribeDigitalMedia, subscribeDesigns,
 } from "../../../../services/digitalInvitation.js";
 import { logErr } from "../../../../utils/logger.js";
 import { C } from "../../../../styles/theme.js";
 import { Num } from "../../../../components/Num.jsx";
+
+// Groom-facing design label (localized { ar, he } or plain string).
+function designTitle(d, lang) {
+  const t = d?.title;
+  const v = t && typeof t === "object" ? (t[lang === "he" ? "he" : "ar"] || t.ar || t.he) : t;
+  return (v || "").trim() || (lang === "he" ? "עיצוב" : "تصميم");
+}
 
 /**
  * Normalize the rank shape: new guests carry `ranks: string[]`, legacy
@@ -37,14 +44,23 @@ export function DigitalGuests() {
   const [editName,       setEditName]       = useState("");
   const [editPhone,      setEditPhone]      = useState("");
   const [editRanks,      setEditRanks]      = useState([]); // chip-picker state during inline edit
+  const [editDesignId,   setEditDesignId]   = useState(""); // assigned design during inline edit
   const [revealedId,     setRevealedId]     = useState(null); // guest pending delete confirm
   const [availableRanks, setAvailableRanks] = useState([]);   // master list from parent invite doc
+  const [designs,        setDesigns]        = useState([]);   // groom's designs (for per-guest assignment)
 
   // Master rank list — needed for the chip picker shown in edit mode and
   // for filtering out stale ranks before rendering chips on each guest.
   useEffect(() => {
     if (!currentUid) return;
     return subscribeDigitalMedia(currentUid, (d) => setAvailableRanks(d?.guestRanks || []));
+  }, [currentUid]);
+
+  // Designs list — drives the per-guest design picker (only approved designs
+  // can be assigned, since only approved designs can be sent).
+  useEffect(() => {
+    if (!currentUid) return;
+    return subscribeDesigns(currentUid, (list) => setDesigns(Array.isArray(list) ? list : []));
   }, [currentUid]);
 
   // ── Optimistic insert from navigation state ──────────────────────────────────
@@ -81,6 +97,7 @@ export function DigitalGuests() {
     setEditName(g.name);
     setEditPhone(g.phone);
     setEditRanks(getGuestRanks(g));
+    setEditDesignId(g.designId || "");
     setRevealedId(null);
   };
 
@@ -106,11 +123,11 @@ export function DigitalGuests() {
     const cleanedRanks = editRanks.filter((r) => availableRanks.includes(r));
     try {
       await updateDigitalGuest(currentUid, editingId, {
-        name: trimName, phone: digits, ranks: cleanedRanks,
+        name: trimName, phone: digits, ranks: cleanedRanks, designId: editDesignId,
       });
       // Optimistic local update — no subscription needed
       setGuests(prev => prev.map(g => g.id === editingId
-        ? { ...g, name: trimName, phone: digits, ranks: cleanedRanks }
+        ? { ...g, name: trimName, phone: digits, ranks: cleanedRanks, designId: editDesignId }
         : g));
       setEditingId(null);
     } catch (err) {
@@ -283,6 +300,43 @@ export function DigitalGuests() {
                     </div>
                   )}
 
+                  {/* Per-guest design picker — only approved designs are selectable. */}
+                  {designs.length > 1 && (
+                    <>
+                      <div style={{ fontSize: 10, color: C.goldDim, marginBottom: 6 }}>
+                        {lang === "he" ? "עיצוב למוזמן זה" : "تصميم هذا المدعو"}
+                      </div>
+                      <div style={{
+                        display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 8, padding: 6,
+                        borderRadius: 8, background: "rgba(255,255,255,.02)", border: "1px solid rgba(255,255,255,.06)",
+                      }}>
+                        {designs.map((d) => {
+                          const on = editDesignId ? editDesignId === d.id : d.isDefault;
+                          const approved = d.designStatus === "approved";
+                          return (
+                            <button
+                              key={d.id}
+                              type="button"
+                              disabled={!approved}
+                              onClick={() => setEditDesignId(d.id)}
+                              title={approved ? "" : (lang === "he" ? "ממתין לאישור" : "بانتظار الاعتماد")}
+                              style={{
+                                padding: "4px 10px", borderRadius: 999, fontSize: 11, fontFamily: "inherit",
+                                border: on ? `1px solid ${C.gold}` : "1px solid rgba(255,255,255,.12)",
+                                background: on ? "rgba(201,168,76,.18)" : "transparent",
+                                color: !approved ? C.dim : (on ? C.gold : C.goldDim),
+                                fontWeight: on ? 800 : 600,
+                                cursor: approved ? "pointer" : "not-allowed", opacity: approved ? 1 : 0.55,
+                              }}
+                            >
+                              {on ? "✓ " : ""}{designTitle(d, lang)}{approved ? "" : " ⏳"}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </>
+                  )}
+
                   <div style={{ display: "flex", gap: 8 }}>
                     <button className="gold-btn"  style={{ flex: 1, padding: "8px 0", fontSize: 12 }} onClick={saveEdit}>
                       {lang === "he" ? "💾 שמור" : "💾 حفظ"}
@@ -327,6 +381,15 @@ export function DigitalGuests() {
                         <Num>+{g.companions}</Num> {lang === "he" ? "מלווים" : "مرافق"}
                       </div>
                     )}
+                    {designs.length > 1 && (() => {
+                      const assigned = designs.find((d) => d.id === g.designId) || designs.find((d) => d.isDefault);
+                      if (!assigned) return null;
+                      return (
+                        <div style={{ marginTop: 5, fontSize: 10, color: C.gold, fontWeight: 700 }}>
+                          🎨 {designTitle(assigned, lang)}
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   {/* Right side: status badge + edit + delete */}
