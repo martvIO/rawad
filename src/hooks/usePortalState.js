@@ -402,8 +402,21 @@ export function usePortalState({ onBack, t, lang, setLang }) {
       : user.role === ROLES.DRIVER ? "/portal/driver/pending"
       :                              "/portal/groom";
       navigate(path, { replace: true });
-    } catch {
-      setLoginError(t("login_error"));
+    } catch (err) {
+      // Distinguish the failure so the user isn't told "wrong password" when the
+      // real cause is rate-limiting or a server error.
+      const status = err?.status;
+      if (status === 429) {
+        setLoginError(lang === "he"
+          ? "יותר מדי ניסיונות התחברות — נסה שוב בעוד מספר דקות."
+          : "محاولات دخول كثيرة — يرجى المحاولة بعد عدة دقائق.");
+      } else if (status >= 500) {
+        setLoginError(lang === "he"
+          ? "שגיאת שרת — נסה שוב בעוד רגע."
+          : "خطأ في الخادم — يرجى المحاولة بعد قليل.");
+      } else {
+        setLoginError(t("login_error"));
+      }
     } finally {
       setLoginLoading(false);
     }

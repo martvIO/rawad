@@ -63,7 +63,11 @@ function effectiveApiKey(): string | null {
 
 /** Rate-limit windows. */
 const ONE_HOUR_MS = HOUR_MS;
-const LOGIN_RATE_PER_HOUR = 10;
+// 10/hour/IP was too aggressive — a user fumbling their password, or several
+// users behind one NAT/carrier IP, got locked out and (worse) saw a generic
+// "wrong password" message. 50/hour still blocks real brute-force given the
+// non-enumerable synthetic emails + required strong passwords.
+const LOGIN_RATE_PER_HOUR = 50;
 const REFRESH_RATE_PER_HOUR = 60;
 const OTP_RATE_PER_HOUR = 5;
 const VERIFY_OTP_RATE_PER_HOUR = 5;
