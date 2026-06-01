@@ -45,10 +45,12 @@ export function DigitalYourPhotos({ lang, setLang }) {
   const [error, setError]    = useState("");
   const [groomUid, setGroomUid] = useState(null);
   const [livenessProgress, setLivenessProgress] = useState({ left: false, right: false });
+  const [faceDetected, setFaceDetected] = useState(false);
   const [matchProgress, setMatchProgress] = useState({ done: 0, total: 0 });
   const [matches, setMatches] = useState([]);
 
   const videoRef        = useRef(null);
+  const canvasRef       = useRef(null);
   const streamRef       = useRef(null);
   const faceapiRef      = useRef(null);
   const livenessRafRef  = useRef(0);
@@ -98,29 +100,68 @@ export function DigitalYourPhotos({ lang, setLang }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stage]);
 
+  // Attach the live MediaStream to the <video> element. Safe to call any time:
+  // it only binds when both the stream and a (mounted) video element exist, and
+  // never re-binds the same stream. This is the fix for the black-screen bug —
+  // getUserMedia resolves before the <video> is guaranteed mounted, so binding
+  // is driven by an effect that re-runs on every render instead of a one-shot.
+  function bindStream() {
+    const v = videoRef.current;
+    if (v && streamRef.current && v.srcObject !== streamRef.current) {
+      v.srcObject = streamRef.current;
+      v.play().catch(() => { /* autoplay rejection is non-fatal; user gesture already granted */ });
+    }
+  }
+
+  // Draw the green tracking box + landmark dots over the live video. The canvas
+  // shares the video's CSS mirror (scaleX -1), so drawing raw detection coords
+  // lines up with the mirrored selfie view. Pass `null` to clear (no face).
+  function drawOverlay(result) {
+    const canvas = canvasRef.current;
+    const video = videoRef.current;
+    const faceapi = faceapiRef.current;
+    if (!canvas || !video || !faceapi || !video.videoWidth) return;
+    const dims = { width: video.videoWidth, height: video.videoHeight };
+    faceapi.matchDimensions(canvas, dims);
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (!result) return;
+    const resized = faceapi.resizeResults(result, dims);
+    if (resized?.detection?.box) {
+      new faceapi.draw.DrawBox(resized.detection.box, { boxColor: "#4cc97a", lineWidth: 3 }).draw(canvas);
+    }
+    if (resized?.landmarks) {
+      faceapi.draw.drawFaceLandmarks(canvas, resized);
+    }
+  }
+
   // ── Step 3: open camera ─────────────────────────────────────────────────
   useEffect(() => {
     if (stage !== "requesting-camera") return;
+    let cancelled = false;
     (async () => {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } },
           audio: false,
         });
+        if (cancelled || cancelledRef.current) { stream.getTracks().forEach(t => t.stop()); return; }
         streamRef.current = stream;
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          await videoRef.current.play();
-        }
-        setStage("liveness");
+        bindStream();            // bind immediately if the <video> is already mounted
+        setStage("liveness");    // re-render mounts the video; the bind effect below catches it
       } catch (err) {
         logErr("getUserMedia", err);
         setStage("error");
         setError(tt(lang, "تم رفض الوصول للكاميرا", "הגישה למצלמה נדחתה"));
       }
     })();
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stage]);
+
+  // Re-bind on every render so the stream attaches the moment the <video> mounts
+  // (covers the case where getUserMedia resolved before the element existed).
+  useEffect(() => { bindStream(); });
 
   // ── Step 4: liveness check via head-yaw tracking ────────────────────────
   useEffect(() => {
@@ -128,6 +169,8 @@ export function DigitalYourPhotos({ lang, setLang }) {
     const faceapi = faceapiRef.current;
     let left = false, right = false;
     setLivenessProgress({ left, right });
+    setFaceDetected(false);
+    bindStream(); // ensure the stream is attached before we start reading frames
 
     livenessTimeout.current = setTimeout(() => {
       cancelAnimationFrame(livenessRafRef.current);
@@ -144,6 +187,8 @@ export function DigitalYourPhotos({ lang, setLang }) {
           .detectSingleFace(videoRef.current, detectorOpts)
           .withFaceLandmarks();
         if (result?.landmarks) {
+          setFaceDetected(true);
+          drawOverlay(result);                 // green box + landmarks over the face
           const yaw = estimateYaw(result.landmarks);
           if (yaw < -YAW_TRIGGER_DEG) left  = true;
           if (yaw >  YAW_TRIGGER_DEG) right = true;
@@ -154,6 +199,9 @@ export function DigitalYourPhotos({ lang, setLang }) {
             setStage("extracting");
             return;
           }
+        } else {
+          setFaceDetected(false);
+          drawOverlay(null);                   // clear the overlay when no face is visible
         }
       } catch (err) { /* ignore frame errors */ }
       livenessRafRef.current = requestAnimationFrame(tick);
@@ -253,6 +301,24 @@ export function DigitalYourPhotos({ lang, setLang }) {
   useEffect(() => () => { cancelledRef.current = true; cleanupCamera(); }, []);
 
   // ── Render ──────────────────────────────────────────────────────────────
+  const cameraActive = stage === "requesting-camera" || stage === "liveness" || stage === "extracting";
+
+  // Guidance text that changes with what the guest needs to do right now.
+  function guidanceText() {
+    if (stage === "requesting-camera") return tt(lang, "جاري تشغيل الكاميرا... 📷", "מפעיל מצלמה... 📷");
+    if (stage === "extracting")        return tt(lang, "تم التحقق بنجاح! ✓", "אומת בהצלחה! ✓");
+    // liveness
+    if (!faceDetected)
+      return tt(lang, "ضع وجهك داخل الإطار 🙂", "מקם את פניך במסגרת 🙂");
+    if (!livenessProgress.right && !livenessProgress.left)
+      return tt(lang, "أدِر رأسك ببطء يميناً ثم يساراً 🟢", "סובב את ראשך לאט ימינה ואז שמאלה 🟢");
+    if (!livenessProgress.right)
+      return tt(lang, "التفت لليمين الآن 🟢 →", "פנה ימינה עכשיו 🟢 →");
+    if (!livenessProgress.left)
+      return tt(lang, "ممتاز! الآن التفت لليسار 🟢 ←", "מצוין! עכשיו פנה שמאלה 🟢 ←");
+    return tt(lang, "تم! ✓", "בוצע! ✓");
+  }
+
   return (
     <div style={{ minHeight: "100vh", background: C.bg }}>
       <div style={{
@@ -291,31 +357,44 @@ export function DigitalYourPhotos({ lang, setLang }) {
         )}
 
         {stage === "loading-models" && <Status icon="⏳" text={tt(lang, "جاري تحميل مكتبة التعرف...", "טוען ספריית זיהוי...")} />}
-        {stage === "requesting-camera" && <Status icon="📷" text={tt(lang, "يرجى السماح للكاميرا", "אנא אשר גישה למצלמה")} />}
 
-        {stage === "liveness" && (
+        {cameraActive && (
           <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: 14, fontWeight: 800, color: C.goldLight, marginBottom: 14 }}>
-              {tt(lang, "أدر رأسك يميناً ثم يساراً", "סובב את הראש ימינה ושמאלה")}
+            <div style={{
+              fontSize: 15, fontWeight: 800, marginBottom: 14, minHeight: 24,
+              color: stage === "extracting" ? "#4cc97a" : C.goldLight,
+            }}>
+              {guidanceText()}
             </div>
-            <video ref={videoRef} autoPlay playsInline muted
-                   style={{
-                     width: "100%", maxWidth: 360, aspectRatio: "4/3", objectFit: "cover",
-                     borderRadius: 18, border: "3px solid rgba(201,168,76,.5)",
-                     transform: "scaleX(-1)", // mirror
-                   }}/>
-            <div style={{ display: "flex", justifyContent: "center", gap: 16, marginTop: 16 }}>
-              <LivenessIndicator done={livenessProgress.left}  label={tt(lang, "← يسار", "← שמאלה")}/>
-              <LivenessIndicator done={livenessProgress.right} label={tt(lang, "يمين →", "ימינה →")}/>
+            <div style={{ position: "relative", width: "100%", maxWidth: 360, margin: "0 auto", aspectRatio: "4/3" }}>
+              <video ref={videoRef} autoPlay playsInline muted
+                     style={{
+                       position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover",
+                       borderRadius: 18, border: "3px solid rgba(201,168,76,.5)",
+                       transform: "scaleX(-1)", background: "#0b0b0f",
+                     }}/>
+              {/* Overlay canvas — same mirror as the video so the green box aligns. */}
+              <canvas ref={canvasRef}
+                      style={{
+                        position: "absolute", inset: 0, width: "100%", height: "100%",
+                        borderRadius: 18, transform: "scaleX(-1)", pointerEvents: "none",
+                      }}/>
+              {stage === "requesting-camera" && (
+                <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 44 }}>📷</div>
+              )}
             </div>
+            {stage === "liveness" && (
+              <div style={{ display: "flex", justifyContent: "center", gap: 16, marginTop: 16 }}>
+                <LivenessIndicator done={livenessProgress.left}  label={tt(lang, "← يسار", "← שמאלה")}/>
+                <LivenessIndicator done={livenessProgress.right} label={tt(lang, "يمين →", "ימינה →")}/>
+              </div>
+            )}
             <div style={{ fontSize: 11, color: C.dim, marginTop: 14, lineHeight: 1.7 }}>
-              {tt(lang, "هذه خطوة لحماية الخصوصية — تجري كل المعالجة في متصفحك فقط",
-                        "שלב לאבטחת פרטיות — כל העיבוד מתבצע בדפדפן שלך בלבד")}
+              {tt(lang, "كل المعالجة تجري في متصفحك فقط — لا تُرفع صورتك إلى أي مكان",
+                        "כל העיבוד מתבצע בדפדפן שלך בלבד — תמונתך לא נשלחת לשום מקום")}
             </div>
           </div>
         )}
-
-        {stage === "extracting" && <Status icon="✨" text={tt(lang, "جاري الاستخراج...", "מחלץ...")} />}
 
         {stage === "matching" && (
           <div style={{ textAlign: "center" }}>
