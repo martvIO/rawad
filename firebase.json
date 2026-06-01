@@ -25,6 +25,7 @@
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
     "rewrites": [
       { "source": "/api/**", "function": "api", "region": "us-central1" },
+      { "source": "/og/**", "function": "digitalOgImage", "region": "us-central1" },
       { "source": "/d/**", "function": "digitalInvitePreview", "region": "us-central1" },
       { "source": "**",     "destination": "/index.html" }
     ],
@@ -48,6 +49,12 @@
         "source": "/assets/**",
         "headers": [
           { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+        ]
+      },
+      {
+        "source": "/og/**",
+        "headers": [
+          { "key": "Cache-Control", "value": "public, max-age=86400, s-maxage=259200" }
         ]
       }
     ]

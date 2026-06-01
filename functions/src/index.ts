@@ -48,3 +48,7 @@ export const api = onRequest(
 // `onRequest` export lets it scale and cache independently of the `api`
 // function above.
 export { digitalInvitePreview } from "./digitalInvitePreview";
+
+// Dynamic Open Graph image (1200×630 JPEG) for WhatsApp/social link previews —
+// its own hosting rewrite (`/og/**`) and cache strategy.
+export { digitalOgImage } from "./digitalOgImage";

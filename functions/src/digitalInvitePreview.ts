@@ -136,6 +136,7 @@ function buildOgTags(inputs: OgInputs): string {
   ];
   if (inputs.imageUrl) {
     tags.push(`<meta property="og:image" content="${escapeHtml(inputs.imageUrl)}" />`);
+    tags.push(`<meta property="og:image:type" content="image/jpeg" />`);
     tags.push(`<meta property="og:image:width" content="1200" />`);
     tags.push(`<meta property="og:image:height" content="630" />`);
     tags.push(`<meta name="twitter:image" content="${escapeHtml(inputs.imageUrl)}" />`);
@@ -150,6 +151,8 @@ export const digitalInvitePreview = onRequest(
     const parts = req.path.split("/").filter(Boolean);   // ["d", "groom", "token", ...]
     const token = parts[2] || "";
     const fullUrl = `https://${req.hostname}${req.path}`;
+    // Public origin (e.g. https://dawa.to) for building the OG-image URL.
+    const origin = resolveIndexUrl(req).replace(/\/index\.html$/, "");
 
     let inputs: OgInputs = { guestName: "", url: fullUrl };
 
@@ -171,6 +174,9 @@ export const digitalInvitePreview = onRequest(
             designSnapshot?: DesignLike;
           };
           inputs.guestName = tk.guestName || "";
+          // The OG image is generated on the fly by the digitalOgImage function
+          // (the design's photo + the couple names/date/venue drawn over it).
+          if (origin && token) inputs.imageUrl = `${origin}/og/${token}.jpg`;
           if (tk.groomUid) {
             // Prefer the token's embedded snapshot (what the guest actually
             // sees). Fall back to the assigned/default design doc for any legacy
@@ -191,9 +197,7 @@ export const digitalInvitePreview = onRequest(
             if (d) {
               inputs.brideName        = d.brideName;
               inputs.groomDisplayName = d.groomDisplayName;
-              const firstImage = (d.media || []).find(m => m.kind !== "video" && m.url)?.url
-                              || d.backgroundUrl;
-              if (firstImage) inputs.imageUrl = firstImage;
+              // (Background photo is fetched inside the OG-image generator.)
             }
           }
         }
