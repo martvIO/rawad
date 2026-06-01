@@ -295,6 +295,13 @@ export async function approveDesignById(groomUid, designId) {
 export async function rejectDesignById(groomUid, designId, note) {
   return api.post(`/digital/${groomUid}/designs/${designId}/design/reject`, { note: note || "" });
 }
+/** Admin override: set a design to any of "approved" | "draft" | "rejected". */
+export async function setDesignStatus(groomUid, designId, status, note) {
+  return api.post(`/digital/${groomUid}/designs/${designId}/design/set-status`, {
+    status,
+    ...(note ? { note } : {}),
+  });
+}
 
 /** Operational settings (guestRanks, photographerPublished) on the parent doc. */
 export function subscribeDigitalSettings(groomUid, cb, onErrCb) {

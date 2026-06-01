@@ -1141,6 +1141,45 @@ digitalRouter.post(
   }
 );
 
+/**
+ * Admin override: set a design to ANY of approved | draft | rejected, from any
+ * current state (no state-machine guard). Powers the admin's manual status
+ * switcher. Body: `{ status, note? }` (note only used for rejected).
+ */
+digitalRouter.post(
+  "/:uid/designs/:designId/design/set-status",
+  requireAuth,
+  requireAdmin,
+  async (req: AuthRequest, res: Response) => {
+    const status = (req.body?.status ?? "").toString();
+    if (status !== "approved" && status !== "draft" && status !== "rejected") {
+      res.status(400).json({ error: "invalid_status", field: "status" });
+      return;
+    }
+    const note = (req.body?.note ?? "").toString().trim().slice(0, MAX_REJECT_NOTE_LEN);
+    try {
+      const docRef = designDoc(req.params.uid, req.params.designId);
+      const now = Date.now();
+      const update: Record<string, unknown> = { designStatus: status };
+      if (status === "approved") {
+        update.designApprovedAt = now;
+        update.designRejectionNote = null;
+      } else if (status === "rejected") {
+        update.designRejectedAt = now;
+        update.designRejectionNote = note || null;
+      } else {
+        // draft — back to the groom for editing
+        update.designApprovedAt = null;
+        update.designRejectionNote = null;
+      }
+      await docRef.set(update, { merge: true });
+      res.json({ ok: true, designStatus: status });
+    } catch (err) {
+      res.status(500).json({ error: "write_failed", detail: safeDetail(err) });
+    }
+  }
+);
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // PUBLIC INVITATION READ  —  /digital/:uid/public
 // ═══════════════════════════════════════════════════════════════════════════════

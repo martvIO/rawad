@@ -4,8 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { usePortal } from "../../../context/PortalContext.jsx";
 import {
   subscribeAdminDesignList,
-  approveDesignById,
-  rejectDesignById,
+  setDesignStatus,
 } from "../../../services/digitalInvitation.js";
 import { logErr } from "../../../utils/logger.js";
 import { C } from "../../../styles/theme.js";
@@ -54,19 +53,33 @@ export function AdminDesigns() {
     other: withUsernames.filter((r) => r.designStatus === "draft" || !r.designStatus),
   }), [withUsernames]);
 
-  const onApprove = async (row) => {
+  // Admin can move a design to ANY of the 3 states. "rejected" opens the note
+  // modal first (the actual set happens in onConfirmReject); the others apply
+  // immediately with an optimistic move to the right section.
+  const onSetStatus = async (row, status) => {
+    if (status === "rejected") {
+      setRejecting(row);
+      setRejectNote("");
+      return;
+    }
     setBusy(cidOf(row));
     try {
-      await approveDesignById(row.groomUid, row.designId);
-      // Move the card to "معتمد" immediately instead of waiting for the next
-      // poll — that lag made approved designs look like they stayed in drafts.
+      await setDesignStatus(row.groomUid, row.designId, status);
       setRows((prev) => prev.map((r) => (cidOf(r) === cidOf(row)
-        ? { ...r, designStatus: "approved", designApprovedAt: Date.now(), designRejectionNote: null }
+        ? {
+            ...r,
+            designStatus: status,
+            ...(status === "approved"
+              ? { designApprovedAt: Date.now(), designRejectionNote: null }
+              : { designApprovedAt: null, designRejectionNote: null }),
+          }
         : r)));
-      showToast(tt(lang, "✓ تم اعتماد التصميم", "✓ העיצוב אושר"));
+      showToast(status === "approved"
+        ? tt(lang, "✓ تم اعتماد التصميم", "✓ העיצוב אושר")
+        : tt(lang, "↩ أُعيد التصميم لمسوّدة", "↩ הוחזר לטיוטה"));
     } catch (err) {
-      logErr("approveDesignById", err);
-      showToast(err?.message || tt(lang, "فشل الاعتماد", "האישור נכשל"));
+      logErr("setDesignStatus", err);
+      showToast(err?.message || tt(lang, "فشل تغيير الحالة", "שינוי הסטטוס נכשל"));
     } finally {
       setBusy(null);
     }
@@ -81,7 +94,7 @@ export function AdminDesigns() {
     try {
       const note = rejectNote.trim();
       const rid = cidOf(rejecting);
-      await rejectDesignById(rejecting.groomUid, rejecting.designId, note);
+      await setDesignStatus(rejecting.groomUid, rejecting.designId, "rejected", note);
       // Optimistically move the card to "مرفوض" with the note.
       setRows((prev) => prev.map((r) => (cidOf(r) === rid
         ? { ...r, designStatus: "rejected", designRejectedAt: Date.now(), designRejectionNote: note }
@@ -90,7 +103,7 @@ export function AdminDesigns() {
       setRejecting(null);
       setRejectNote("");
     } catch (err) {
-      logErr("rejectDesignById", err);
+      logErr("setDesignStatus.rejected", err);
       showToast(err?.message || tt(lang, "فشل الرفض", "הדחייה נכשלה"));
     } finally {
       setBusy(null);
@@ -131,8 +144,7 @@ export function AdminDesigns() {
             lang={lang}
             busy={busy === cidOf(row)}
             onPreview={() => setPreviewDesign(row)}
-            onApprove={() => onApprove(row)}
-            onReject={() => { setRejecting(row); setRejectNote(""); }}
+            onSetStatus={(status) => onSetStatus(row, status)}
           />
         ))}
       </Section>
@@ -150,6 +162,7 @@ export function AdminDesigns() {
             lang={lang}
             busy={busy === cidOf(row)}
             onPreview={() => setPreviewDesign(row)}
+            onSetStatus={(status) => onSetStatus(row, status)}
             showApprovedAt
           />
         ))}
@@ -168,6 +181,7 @@ export function AdminDesigns() {
             lang={lang}
             busy={busy === cidOf(row)}
             onPreview={() => setPreviewDesign(row)}
+            onSetStatus={(status) => onSetStatus(row, status)}
             showRejectionNote
           />
         ))}
@@ -186,6 +200,7 @@ export function AdminDesigns() {
             lang={lang}
             busy={busy === cidOf(row)}
             onPreview={() => setPreviewDesign(row)}
+            onSetStatus={(status) => onSetStatus(row, status)}
           />
         ))}
       </Section>
@@ -305,7 +320,7 @@ function Section({ title, count, color, children, testid }) {
   );
 }
 
-function DesignCard({ row, lang, busy, onPreview, onApprove, onReject, showApprovedAt, showRejectionNote }) {
+function DesignCard({ row, lang, busy, onPreview, onSetStatus, showApprovedAt, showRejectionNote }) {
   const meta = STATUS_META[row.designStatus] || STATUS_META.draft;
   const theme = getDigitalTheme(row.themeColor);
   // Groom-authored fields are localized { ar, he } objects — resolve to a string
@@ -412,49 +427,38 @@ function DesignCard({ row, lang, busy, onPreview, onApprove, onReject, showAppro
         >
           👁 {tt(lang, "معاينة", "תצוגה מקדימה")}
         </button>
-        {onApprove && (
-          <button
-            data-testid="design-approve-btn"
-            onClick={onApprove}
-            disabled={busy}
-            style={{
-              flex: "1 1 100px",
-              padding: "10px 12px",
-              borderRadius: 10,
-              background: "linear-gradient(135deg,#4cc97a,#2da85a)",
-              border: "none",
-              color: "#fff",
-              cursor: busy ? "not-allowed" : "pointer",
-              fontFamily: "inherit",
-              fontSize: 12,
-              fontWeight: 900,
-              opacity: busy ? 0.6 : 1,
-            }}
-          >
-            ✓ {tt(lang, "اعتماد", "אישור")}
-          </button>
-        )}
-        {onReject && (
-          <button
-            data-testid="design-reject-btn"
-            onClick={onReject}
-            disabled={busy}
-            style={{
-              flex: "1 1 100px",
-              padding: "10px 12px",
-              borderRadius: 10,
-              background: "rgba(212,80,58,.10)",
-              border: "1px solid rgba(212,80,58,.35)",
-              color: "#d4533a",
-              cursor: busy ? "not-allowed" : "pointer",
-              fontFamily: "inherit",
-              fontSize: 12,
-              fontWeight: 800,
-              opacity: busy ? 0.6 : 1,
-            }}
-          >
-            ✗ {tt(lang, "رفض", "דחה")}
-          </button>
+        {/* Status switcher — admin can set the design to any of the 3 states.
+            The current state is the active (filled) button. */}
+        {onSetStatus && (
+          <div style={{ display: "flex", gap: 6, flex: "2 1 220px" }}>
+            {[
+              { key: "approved", ar: "✓ اعتماد", he: "✓ אישור", color: "#4cc97a" },
+              { key: "draft",    ar: "✎ مسوّدة", he: "✎ טיוטה", color: C.gold },
+              { key: "rejected", ar: "✗ رفض",    he: "✗ דחה",   color: "#d4533a" },
+            ].map((o) => {
+              const active = row.designStatus === o.key;
+              return (
+                <button
+                  key={o.key}
+                  data-testid={`design-set-${o.key}`}
+                  onClick={() => { if (!active) onSetStatus(o.key); }}
+                  disabled={busy || active}
+                  title={active ? tt(lang, "الحالة الحالية", "הסטטוס הנוכחי") : ""}
+                  style={{
+                    flex: 1, padding: "9px 6px", borderRadius: 10, fontFamily: "inherit",
+                    fontSize: 12, fontWeight: 800, whiteSpace: "nowrap",
+                    cursor: (busy || active) ? "default" : "pointer",
+                    border: `1px solid ${o.color}${active ? "" : "55"}`,
+                    background: active ? o.color : `${o.color}14`,
+                    color: active ? "#0b0b0f" : o.color,
+                    opacity: busy && !active ? 0.55 : 1,
+                  }}
+                >
+                  {tt(lang, o.ar, o.he)}
+                </button>
+              );
+            })}
+          </div>
         )}
       </div>
     </div>
