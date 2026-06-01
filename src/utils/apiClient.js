@@ -180,8 +180,13 @@ async function handleUnauthorized(method, url, headers, body, path, timeoutMs) {
  * with the proper boundary. We still attach Authorization unless skipped.
  *
  * Honors `opts.signal` (caller-supplied AbortSignal) so a component can
- * abort the upload on unmount. The internal timeout uses a separate signal
- * combined with the caller's via AbortSignal.any() when available.
+ * abort the upload on unmount, and `opts.timeoutMs` for the request budget.
+ *
+ * `opts.onProgress(fraction)` — when a function is supplied, the upload is
+ * sent via `XMLHttpRequest` (the only browser API that reports upload bytes)
+ * and `onProgress` is called with 0..1 as the file streams out. Without it,
+ * the original `fetch` path is used verbatim, so every existing caller (and
+ * the unit tests) is byte-for-byte unaffected.
  */
 async function upload(path, formData, opts) {
   if (!(formData instanceof FormData)) {
@@ -190,17 +195,23 @@ async function upload(path, formData, opts) {
   const url = buildApiUrl(path);
   const skipAuth = !!opts?.skipAuth;
   const timeoutMs = opts?.timeoutMs ?? API_TIMEOUT_MS.UPLOAD;
+  const onProgress = typeof opts?.onProgress === "function" ? opts.onProgress : null;
+  const useXhr = !!onProgress && typeof XMLHttpRequest !== "undefined";
   const headers = { Accept: JSON_MIME };
   if (!skipAuth) {
     const tok = await getIdToken().catch(() => null);
     if (tok) headers[HEADER_AUTH] = `${BEARER_PREFIX}${tok}`;
   }
 
-  let res = await fetchWithTimeout(url, {
-    method: "POST",
-    headers,
-    body: formData,
-  }, timeoutMs, `upload ${path}`, opts?.signal);
+  // Both attempts go through the same sender so the 401 → refresh → retry
+  // logic is identical whether we're on the XHR or the fetch path. `headers`
+  // is mutated in place on refresh; the sender reads it fresh each call.
+  const send = (label) =>
+    useXhr
+      ? xhrUpload(url, formData, { headers, timeoutMs, signal: opts?.signal, onProgress })
+      : fetchWithTimeout(url, { method: "POST", headers, body: formData }, timeoutMs, label, opts?.signal);
+
+  let res = await send(`upload ${path}`);
   if (res.status === HTTP_UNAUTHORIZED && !skipAuth) {
     try {
       const fresh = await refreshIdToken();
@@ -210,11 +221,7 @@ async function upload(path, formData, opts) {
       if (authChangeCb) authChangeCb(null);
       throw new ApiError(HTTP_UNAUTHORIZED, null, "session_expired");
     }
-    res = await fetchWithTimeout(url, {
-      method: "POST",
-      headers,
-      body: formData,
-    }, timeoutMs, `upload ${path} (retry)`, opts?.signal);
+    res = await send(`upload ${path} (retry)`);
     if (res.status === HTTP_UNAUTHORIZED) {
       clearTokens();
       if (authChangeCb) authChangeCb(null);
@@ -222,6 +229,80 @@ async function upload(path, formData, opts) {
     }
   }
   return parseResponse(res, "POST", path);
+}
+
+/**
+ * XHR-based multipart upload that reports outgoing progress. Resolves to a
+ * minimal fetch-`Response`-like object (`{ status, ok, json() }`) so the
+ * shared `parseResponse()` treats it exactly like a `fetch` response.
+ *
+ * Error parity with `fetchWithTimeout`:
+ *   - timeout    → rejects `Error("request_timeout")`
+ *   - user abort → rejects the original `signal.reason` (AbortError)
+ *   - network    → rejects `Error("network_error")`
+ * so the components' existing `reason?.message`/`reason?.name` branches work
+ * unchanged.
+ */
+function xhrUpload(url, formData, { headers, timeoutMs, signal, onProgress }) {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(signal.reason ?? new DOMException("Aborted", "AbortError"));
+      return;
+    }
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", url, true);
+    xhr.responseType = "text";
+    if (timeoutMs) xhr.timeout = timeoutMs;
+    // Apply auth/accept headers. Never set Content-Type — XHR derives the
+    // multipart boundary from the FormData body, same as the fetch path.
+    for (const [k, v] of Object.entries(headers || {})) {
+      if (k.toLowerCase() === HEADER_CONTENT_TYPE.toLowerCase()) continue;
+      try { xhr.setRequestHeader(k, v); } catch { /* ignore invalid header */ }
+    }
+
+    let settled = false;
+    const finish = (fn, arg) => {
+      if (settled) return;
+      settled = true;
+      if (signal) signal.removeEventListener("abort", onAbort);
+      fn(arg);
+    };
+    const onAbort = () => {
+      try { xhr.abort(); } catch { /* noop */ }
+      finish(reject, signal.reason ?? new DOMException("Aborted", "AbortError"));
+    };
+    if (signal) signal.addEventListener("abort", onAbort, { once: true });
+
+    if (onProgress && xhr.upload) {
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable && e.total > 0) {
+          try { onProgress(Math.min(1, e.loaded / e.total)); } catch { /* noop */ }
+        }
+      };
+    }
+    xhr.onload = () => {
+      if (onProgress) { try { onProgress(1); } catch { /* noop */ } }
+      const status = xhr.status;
+      const text = xhr.responseText;
+      finish(resolve, {
+        status,
+        ok: status >= 200 && status < 300,
+        json: async () => (text ? JSON.parse(text) : null),
+      });
+    };
+    xhr.onerror = () => {
+      logErr("apiClient.xhrUpload", `network error for ${url}`);
+      finish(reject, new Error("network_error"));
+    };
+    xhr.ontimeout = () => {
+      logErr("apiClient.xhrUpload", `timeout after ${timeoutMs}ms for ${url}`);
+      finish(reject, new Error("request_timeout"));
+    };
+    // A programmatic abort not driven by `signal` (rare) still rejects cleanly.
+    xhr.onabort = () => finish(reject, new DOMException("Aborted", "AbortError"));
+
+    xhr.send(formData);
+  });
 }
 
 // ─── Fetch with timeout ──────────────────────────────────────────────────────

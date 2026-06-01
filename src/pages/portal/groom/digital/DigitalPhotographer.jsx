@@ -47,6 +47,7 @@ export function DigitalPhotographer() {
   // True while the first Storage scan is in flight
   const [loadingStorage, setLoadingStorage] = useState(true);
   const [uploading,  setUploading]  = useState(false);
+  const [progress,   setProgress]   = useState(0); // 0..1 aggregate upload progress
   const [inProgress, setInProgress] = useState([]);
   const [deletingId, setDeletingId] = useState(null);
   const [editingId,  setEditingId]  = useState(null);
@@ -175,12 +176,19 @@ export function DigitalPhotographer() {
     }
 
     setUploading(true);
+    setProgress(0);
     setInProgress(arr.map(f => f.name));
     const controller = new AbortController();
     uploadAbortRef.current = controller;
+    // Aggregate per-file fractions into one 0..1 progress value.
+    const fracs = new Array(arr.length).fill(0);
+    const onFileProgress = (i) => (frac) => {
+      fracs[i] = frac;
+      setProgress(fracs.reduce((a, b) => a + b, 0) / fracs.length);
+    };
     try {
       const results = await Promise.allSettled(
-        arr.map(f => uploadPhotographerFile(uid, f, { signal: controller.signal })),
+        arr.map((f, i) => uploadPhotographerFile(uid, f, { signal: controller.signal, onProgress: onFileProgress(i) })),
       );
 
       // Always revoke + clear every preview so pending state can't strand.
@@ -231,6 +239,7 @@ export function DigitalPhotographer() {
     } finally {
       uploadAbortRef.current = null;
       setUploading(false);
+      setProgress(0);
       setInProgress([]);
       if (inputRef.current) inputRef.current.value = "";
     }
@@ -334,7 +343,7 @@ export function DigitalPhotographer() {
           <>
             <div style={{ fontSize: 44, marginBottom: 8 }}>⏳</div>
             <div style={{ fontSize: 14, fontWeight: 800, color: C.gold, marginBottom: 6 }}>
-              {lang === "he" ? "מעלה קבצים..." : "جاري رفع الملفات..."}
+              {(lang === "he" ? "מעלה קבצים..." : "جاري رفع الملفات...")} {Math.round(progress * 100)}%
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 4, justifyContent: "center", marginTop: 8 }}>
               {inProgress.map(n => (

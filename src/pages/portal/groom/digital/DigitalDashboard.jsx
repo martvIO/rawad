@@ -68,6 +68,7 @@ export function DigitalDashboard() {
   const [guests, setGuests] = useState([]);
   const [doc,    setDoc]    = useState(null);     // full invitation doc
   const [busy,   setBusy]   = useState(false);
+  const [progress, setProgress] = useState(0);    // 0..1 aggregate upload progress
   // Pending uploads — shown in the gallery while uploading completes.
   const [pendingMedia, setPendingMedia] = useState([]); // [{ id, url, kind, pending: true }]
   const [newRank, setNewRank] = useState("");
@@ -173,13 +174,21 @@ export function DigitalDashboard() {
     }
 
     setBusy(true);
+    setProgress(0);
     const controller = new AbortController();
     uploadAbortRef.current = controller;
+    // Aggregate per-file fractions into one 0..1 progress value.
+    const fracs = new Array(files.length).fill(0);
+    const onFileProgress = (i) => (frac) => {
+      fracs[i] = frac;
+      setProgress(fracs.reduce((a, b) => a + b, 0) / fracs.length);
+    };
     const results = await Promise.allSettled(
-      files.map(f => addInvitationMedia(uid, f, { signal: controller.signal })),
+      files.map((f, i) => addInvitationMedia(uid, f, { signal: controller.signal, onProgress: onFileProgress(i) })),
     );
     uploadAbortRef.current = null;
     setBusy(false);
+    setProgress(0);
 
     // BUG-001 fix — optimistic merge.
     // The dashboard refreshes via a 15s poller, so without this step the
@@ -399,7 +408,7 @@ export function DigitalDashboard() {
                    disabled={busy} onChange={handleAddMedia}/>
             <div style={{ fontSize: 28 }}>{busy ? "⏳" : "➕"}</div>
             <div style={{ fontSize: 10, color: C.blue, fontWeight: 800 }}>
-              {busy ? tt(lang, "جاري الرفع", "מעלה") : tt(lang, "أضف", "הוסף")}
+              {busy ? `${Math.round(progress * 100)}%` : tt(lang, "أضف", "הוסף")}
             </div>
           </label>
         </div>

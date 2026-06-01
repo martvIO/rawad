@@ -242,7 +242,9 @@ function DesignEditorBody({ groomUid, designId }) {
   const [doc, setDoc] = useState(null);
   const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState(0);
   const [heroBusy, setHeroBusy] = useState(false);
+  const [heroProgress, setHeroProgress] = useState(0);
   // An APPROVED design is read-only until the groom presses "تعديل التصميم".
   // Reset per design so a fresh/approved design always starts locked.
   const [editUnlocked, setEditUnlocked] = useState(false);
@@ -410,14 +412,25 @@ function DesignEditorBody({ groomUid, designId }) {
   const onUpload = async (file) => {
     if (!file || !editable) return;
     setBusy(true);
+    setProgress(0);
     try {
-      await addDesignMedia(currentUid, designId, file);
+      const item = await addDesignMedia(currentUid, designId, file, { onProgress: setProgress });
+      // Optimistic insert — show the new image instantly instead of waiting
+      // up to a full poll cycle for subscribeDesign to echo it back.
+      if (item && item.storagePath) {
+        setDoc((prev) => {
+          const existing = Array.isArray(prev?.media) ? prev.media : [];
+          if (existing.some((m) => m?.storagePath === item.storagePath)) return prev;
+          return { ...(prev || {}), media: [...existing, item] };
+        });
+      }
       showToast(tt(lang, "✓ تم رفع الصورة", "✓ התמונה הועלתה"));
     } catch (err) {
       logErr("addInvitationMedia", err);
       showToast(err?.message || tt(lang, "فشل الرفع", "ההעלאה נכשלה"));
     } finally {
       setBusy(false);
+      setProgress(0);
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
@@ -439,14 +452,23 @@ function DesignEditorBody({ groomUid, designId }) {
   const onUploadHero = async (file) => {
     if (!file || !editable) return;
     setHeroBusy(true);
+    setHeroProgress(0);
     try {
-      await addDesignMedia(currentUid, designId, file, { target: "hero" });
+      const item = await addDesignMedia(currentUid, designId, file, { target: "hero", onProgress: setHeroProgress });
+      if (item && item.storagePath) {
+        setDoc((prev) => {
+          const existing = Array.isArray(prev?.heroMedia) ? prev.heroMedia : [];
+          if (existing.some((m) => m?.storagePath === item.storagePath)) return prev;
+          return { ...(prev || {}), heroMedia: [...existing, item] };
+        });
+      }
       showToast(tt(lang, "✓ تم رفع الوسائط", "✓ המדיה הועלתה"));
     } catch (err) {
       logErr("addInvitationMedia.hero", err);
       showToast(err?.message || tt(lang, "فشل الرفع", "ההעלאה נכשלה"));
     } finally {
       setHeroBusy(false);
+      setHeroProgress(0);
       if (heroFileInputRef.current) heroFileInputRef.current.value = "";
     }
   };
@@ -662,7 +684,7 @@ function DesignEditorBody({ groomUid, designId }) {
             <label style={{ display: "block", padding: "12px 16px", borderRadius: 10, textAlign: "center", border: `2px dashed ${heroBusy ? "rgba(201,168,76,.65)" : "rgba(201,168,76,.32)"}`, background: heroBusy ? "rgba(201,168,76,.06)" : "rgba(201,168,76,.02)", cursor: heroBusy ? "not-allowed" : "pointer" }}>
               <input ref={heroFileInputRef} type="file" accept="image/*,video/*" style={{ display: "none" }} disabled={heroBusy} data-testid="design-hero-upload-input" onChange={(e) => onUploadHero(e.target.files?.[0])} />
               <div style={{ color: C.gold, fontSize: 12, fontWeight: 800 }}>
-                {heroBusy ? tt(lang, "⏳ جاري الرفع...", "⏳ מעלה...") : tt(lang, "📁 إضافة صورة / فيديو / GIF", "📁 הוסף תמונה / וידאו / GIF")}
+                {heroBusy ? `⏳ ${Math.round(heroProgress * 100)}%` : tt(lang, "📁 إضافة صورة / فيديو / GIF", "📁 הוסף תמונה / וידאו / GIF")}
               </div>
             </label>
           )}
@@ -750,7 +772,7 @@ function DesignEditorBody({ groomUid, designId }) {
             <label style={{ display: "block", padding: "12px 16px", borderRadius: 10, textAlign: "center", border: `2px dashed ${busy ? "rgba(201,168,76,.65)" : "rgba(201,168,76,.32)"}`, background: busy ? "rgba(201,168,76,.06)" : "rgba(201,168,76,.02)", cursor: busy ? "not-allowed" : "pointer" }}>
               <input ref={fileInputRef} type="file" accept="image/*,video/*" style={{ display: "none" }} disabled={busy} data-testid="design-upload-input" onChange={(e) => onUpload(e.target.files?.[0])} />
               <div style={{ color: C.gold, fontSize: 12, fontWeight: 800 }}>
-                {busy ? tt(lang, "⏳ جاري الرفع...", "⏳ מעלה...") : tt(lang, "📁 إضافة صورة أو فيديو", "📁 הוסף תמונה או סרטון")}
+                {busy ? `⏳ ${Math.round(progress * 100)}%` : tt(lang, "📁 إضافة صورة أو فيديو", "📁 הוסף תמונה או סרטון")}
               </div>
             </label>
           )}
