@@ -56,20 +56,33 @@ export function DigitalYourPhotos({ lang, setLang }) {
   const livenessRafRef  = useRef(0);
   const livenessTimeout = useRef(null);
   const cancelledRef    = useRef(false);
+  // True once we've routed into the camera flow. The token endpoint is POLLED
+  // (fires every few seconds even when unchanged), so without this guard the
+  // callback would keep calling setStage("loading-models") and restart the
+  // whole camera flow in a loop. We decide the stage once; later polls only
+  // refresh groomUid.
+  const routedRef       = useRef(false);
 
   // ── Step 1: resolve token + publish flag ────────────────────────────────
   useEffect(() => {
     if (!token) { setStage("error"); setError(tt(lang, "رابط غير صالح", "קישור לא תקין")); return; }
+    cancelledRef.current = false;
+    routedRef.current = false;
     const unsub = subscribeInviteToken(token, async (rec) => {
       if (cancelledRef.current) return;
-      if (!rec) { setStage("error"); setError(tt(lang, "رابط غير صالح", "קישור לא תקין")); return; }
+      if (!rec) {
+        if (!routedRef.current) { setStage("error"); setError(tt(lang, "رابط غير صالح", "קישור לא תקין")); }
+        return;
+      }
       const uid = rec.groomUid;
       setGroomUid(uid);
+      if (routedRef.current) return;            // already in the camera flow — don't restart it
       const doc = await getDigitalInvitationPublic(uid).catch(() => null);
-      if (cancelledRef.current) return;
+      if (cancelledRef.current || routedRef.current) return;
       if (!doc || doc.photographerPublished !== true) {
-        setStage("not-published");
+        setStage("not-published");              // keep polling — advances once the groom publishes
       } else {
+        routedRef.current = true;               // lock: the camera flow now owns the stage
         setStage("loading-models");
       }
     });
@@ -139,6 +152,7 @@ export function DigitalYourPhotos({ lang, setLang }) {
   useEffect(() => {
     if (stage !== "requesting-camera") return;
     let cancelled = false;
+    cleanupCamera(); // stop any prior stream (e.g. on retry) before re-acquiring
     (async () => {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
