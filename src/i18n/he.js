@@ -371,6 +371,7 @@ export const he = {
   map_empty_title: "אין מיקומים להצגה",
   map_empty_body: "המוזמנים יופיעו כאן לאחר שילחצו «שתף את המיקום שלי» בטופס האישור",
   map_empty_body_groom: "מיקומי המוזמנים יופיעו כאן לאחר שישתפו אותם בטופס האישור",
+  map_approx_location: "מיקום משוער לפי הכתובת",
   map_open_in: "פתח ניווט ב:",
   map_layer_street: "רחוב",
   map_layer_satellite: "לוויין",

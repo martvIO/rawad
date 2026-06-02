@@ -3,6 +3,7 @@
 // mark-delivered form that mirrors the list view's optional photo + note.
 import { useState } from "react";
 import { telLink } from "../utils/phone.js";
+import { compressImageToDataUrl } from "../utils/imageCompress.js";
 import {
   wazeLinkCoords, googleMapsLinkCoords, appleMapsLinkCoords,
 } from "../utils/geo.js";
@@ -71,6 +72,11 @@ export function GuestMapModal({ guest, t, onClose, onMarkDelivered }) {
             {guest.area && (
               <div style={{ fontSize: 12, color: C.dim, marginTop: 2 }}>📍 {guest.area}</div>
             )}
+            {guest.approxLocation && (
+              <div style={{ fontSize: 10, color: "#c9a84c", marginTop: 2 }}>
+                ⓘ {t("map_approx_location")}
+              </div>
+            )}
           </div>
           <button onClick={onClose} style={{
             background: "none", border: "none", color: C.dim, fontSize: 24,
@@ -133,15 +139,11 @@ export function GuestMapModal({ guest, t, onClose, onMarkDelivered }) {
             }}>
               <input type="file" accept="image/*" capture="environment"
                      style={{ display: "none" }}
-                     onChange={e => {
+                     onChange={async e => {
                        const file = e.target.files?.[0];
                        if (!file) { setPhotoTaken(false); setPhotoData(null); return; }
-                       const reader = new FileReader();
-                       reader.onloadend = () => {
-                         setPhotoTaken(true);
-                         setPhotoData(typeof reader.result === "string" ? reader.result : null);
-                       };
-                       reader.readAsDataURL(file);
+                       setPhotoTaken(true);
+                       setPhotoData(await compressImageToDataUrl(file));
                      }}/>
               {photoTaken && photoData ? (
                 <>

@@ -1,11 +1,13 @@
 // Driver → Map: spatial view of every guest the driver is delivering for.
 // Pins are colour-coded by status. Tapping one opens GuestMapModal with
 // nav-app links + a mark-delivered form that mirrors the list view.
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { usePortal } from "../../../context/PortalContext.jsx";
 import { LiveMap } from "../../../components/LiveMap.jsx";
 import { GuestMapModal } from "../../../components/GuestMapModal.jsx";
 import { Num } from "../../../components/Num.jsx";
+import { geocodeAddress } from "../../../utils/geocode.js";
+import { extractCity } from "../../../utils/geo.js";
 import { C } from "../../../styles/theme.js";
 
 const FILTERS = ["pending", "delivered", "all"];
@@ -15,11 +17,54 @@ export function DriverMap() {
   const [filter, setFilter] = useState("pending");
   const [selectedId, setSelectedId] = useState(null);
 
+  // Guests who didn't share precise GPS are placed by geocoding their written
+  // address, so ALL guests show on the map (approximate pins). Each address is
+  // geocoded once (cached); a ref tracks which ids we've already attempted.
+  const [geo, setGeo] = useState({});            // guestId -> { lat, lng }
+  const [geoProgress, setGeoProgress] = useState({ done: 0, total: 0 });
+  const geocodedRef = useRef(new Set());
+
+  useEffect(() => {
+    let cancelled = false;
+    const need = myGuests.filter(g =>
+      !(typeof g.lat === "number" && typeof g.lng === "number") &&
+      (g.area || "").trim() &&
+      !geocodedRef.current.has(g.id),
+    );
+    if (need.length === 0) return undefined;
+    need.forEach(g => geocodedRef.current.add(g.id));
+    setGeoProgress(p => ({ done: p.done, total: p.total + need.length }));
+    (async () => {
+      for (const g of need) {
+        if (cancelled) return;
+        // Full address first, fall back to just the city. (geocodeAddress
+        // self-throttles network calls and caches, so cache hits are instant.)
+        // Hard per-guest cap so one slow/hanging lookup can't stall the batch.
+        const coords = await Promise.race([
+          geocodeAddress(g.area, extractCity(g.area)),
+          new Promise(res => setTimeout(() => res(undefined), 8000)),
+        ]);
+        if (cancelled) return;
+        if (coords) setGeo(prev => ({ ...prev, [g.id]: coords }));
+        setGeoProgress(p => ({ done: p.done + 1, total: p.total }));
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [myGuests]);
+
+  // Merge precise GPS + geocoded coords; flag the approximate ones.
+  const withCoords = useMemo(() => myGuests.map(g => {
+    if (typeof g.lat === "number" && typeof g.lng === "number") return g;
+    const c = geo[g.id];
+    return c ? { ...g, lat: c.lat, lng: c.lng, approxLocation: true } : g;
+  }), [myGuests, geo]);
+
   const located = useMemo(
-    () => myGuests.filter(g => typeof g.lat === "number" && typeof g.lng === "number"),
-    [myGuests],
+    () => withCoords.filter(g => typeof g.lat === "number" && typeof g.lng === "number"),
+    [withCoords],
   );
   const missingLocation = myGuests.length - located.length;
+  const geocoding = geoProgress.total > geoProgress.done;
 
   const visible = useMemo(() => {
     if (filter === "pending")   return located.filter(g => g.status !== "delivered");
@@ -73,7 +118,18 @@ export function DriverMap() {
         })}
       </div>
 
-      {missingLocation > 0 && (
+      {geocoding && (
+        <div style={{
+          marginBottom: 12, padding: "8px 12px", borderRadius: 10,
+          background: "rgba(75,159,212,.06)", border: "1px solid rgba(75,159,212,.22)",
+          fontSize: 11, color: C.blue, lineHeight: 1.6,
+        }}>
+          📍 {lang === "he" ? "מאתר מיקומי מוזמנים" : "جارٍ تحديد مواقع المعزومين"}…{" "}
+          <Num>{geoProgress.done.toLocaleString("en")}</Num>/<Num>{geoProgress.total.toLocaleString("en")}</Num>
+        </div>
+      )}
+
+      {!geocoding && missingLocation > 0 && (
         <div style={{
           marginBottom: 12, padding: "8px 12px", borderRadius: 10,
           background: "rgba(240,200,76,.06)", border: "1px solid rgba(240,200,76,.22)",

@@ -2,6 +2,7 @@
 // the live-location share panel, and the completed list.
 import { telLink } from "../../../utils/phone.js";
 import { wazeLink, extractCity as extractCityRaw } from "../../../utils/geo.js";
+import { compressImageToDataUrl } from "../../../utils/imageCompress.js";
 import { usePortal } from "../../../context/PortalContext.jsx";
 import { Num } from "../../../components/Num.jsx";
 import { C } from "../../../styles/theme.js";
@@ -316,15 +317,12 @@ export function DriverDeliveryList() {
                           }}>
                             <input type="file" accept="image/*" capture="environment"
                                    style={{ display: "none" }}
-                                   onChange={e => {
+                                   onChange={async e => {
                                      const file = e.target.files?.[0];
                                      if (!file) { setPhotoTaken(false); setPhotoData(null); return; }
-                                     const reader = new FileReader();
-                                     reader.onloadend = () => {
-                                       setPhotoTaken(true);
-                                       setPhotoData(typeof reader.result === "string" ? reader.result : null);
-                                     };
-                                     reader.readAsDataURL(file);
+                                     setPhotoTaken(true);
+                                     // Compress before upload so it sends fast + reliably on cellular.
+                                     setPhotoData(await compressImageToDataUrl(file));
                                    }}/>
                             {photoTaken && photoData ? (
                               <>

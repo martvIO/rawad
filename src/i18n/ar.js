@@ -381,6 +381,7 @@ export const ar = {
   map_empty_title: "لا توجد مواقع لعرضها",
   map_empty_body: "سيظهر المعزومون هنا بعد أن يضغطوا «شارك موقعي» في نموذج التأكيد",
   map_empty_body_groom: "ستظهر مواقع المعزومين هنا بعد أن يشاركوا موقعهم في نموذج التأكيد",
+  map_approx_location: "موقع تقريبي مبني على العنوان",
   map_open_in: "افتح التوجيه في:",
   map_layer_street: "شارع",
   map_layer_satellite: "قمر",

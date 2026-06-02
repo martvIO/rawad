@@ -3,7 +3,7 @@
 // Firebase; local state is reserved for transient UI (form inputs, modals,
 // tab selection). The shape of the returned object matches the original
 // localStorage-backed version so the role-view slices can stay untouched.
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { load, save, removeKey } from "../utils/storage.js";
 import { buildWaLink, toIntlPhone, validatePhone } from "../utils/phone.js";
@@ -273,15 +273,31 @@ export function usePortalState({ onBack, t, lang, setLang }) {
 
   // ── Guests subscription ─────────────────────────────────────────────────────
   const [guests, setGuests] = useState([]);
+  // Guest ids the driver just marked delivered, kept until the server echoes
+  // "delivered". A 15s poll arriving mid-confirm would otherwise flip the row
+  // back to pending; this overlay keeps it delivered so there's no flicker.
+  const optimisticDeliveredRef = useRef(new Set());
+  const setGuestsWithOverlay = useCallback((listOrFn) => {
+    setGuests((prev) => {
+      const list = typeof listOrFn === "function" ? listOrFn(prev) : listOrFn;
+      const set = optimisticDeliveredRef.current;
+      if (!set.size || !Array.isArray(list)) return list;
+      return list.map((g) => {
+        if (!set.has(g.id)) return g;
+        if (g.status === "delivered") { set.delete(g.id); return g; } // server caught up
+        return { ...g, status: "delivered" };
+      });
+    });
+  }, []);
   useEffect(() => {
     if (!authed) { setGuests([]); return; }
-    if (isAdmin)                                 return subscribeAllGuests(setGuests);
+    if (isAdmin)                                 return subscribeAllGuests(setGuestsWithOverlay);
     if (userType === ROLES.DRIVER && driverServingGroomUid)
-      return subscribeGuestsForGroom(driverServingGroomUid, setGuests);
+      return subscribeGuestsForGroom(driverServingGroomUid, setGuestsWithOverlay);
     if (userType === ROLES.GROOM && currentUid)
-      return subscribeGuestsForGroom(currentUid, setGuests);
+      return subscribeGuestsForGroom(currentUid, setGuestsWithOverlay);
     setGuests([]);
-  }, [authed, isAdmin, userType, currentUid, driverServingGroomUid]);
+  }, [authed, isAdmin, userType, currentUid, driverServingGroomUid, setGuestsWithOverlay]);
 
   // ── قائمة الـ UIDs المُسنَدة للمرسل (من JWT claim assignedGrooms) ────────────
   // تُستخدم في البلدات المشتركة لمعرفة أي عرسان يمكنه قراءة معازيمهم.
@@ -909,30 +925,41 @@ export function usePortalState({ onBack, t, lang, setLang }) {
   const markGuestDelivered = async (id, { photoData: pData, photoTaken: pTaken, deliveryNote: pNote } = {}) => {
     const guest = myGuests.find(g => g.id === id) || sharedGuests.find(g => g.id === id);
     if (!guest) return false;
-    let proofPhotoPath;
-    try {
-      if (pData) {
-        const blob = dataUrlToBlob(pData);
-        proofPhotoPath = await uploadProofBlob(guest.groomUid, id, blob);
-      } else if (pTaken) {
-        proofPhotoPath = "📸"; // legacy fallback marker
+    const priorStatus = guest.status;
+    const deliveredBy = lang === "he" ? "השליח (אתה)" : "المرسل (أنت)";
+    const time = new Date().toLocaleTimeString("ar", { hour: "2-digit", minute: "2-digit", numberingSystem: "latn" });
+
+    // Optimistic: move the guest to "delivered" instantly so the driver sees it
+    // accept immediately (no 15s poll wait). The proof upload + status PATCH run
+    // in the background; the overlay above keeps it delivered until the server
+    // echoes it. On failure we revert so the driver can retry.
+    optimisticDeliveredRef.current.add(id);
+    setGuests(prev => prev.map(g => g.id === id ? { ...g, status: "delivered", deliveredAt: time, deliveredBy } : g));
+    showToast(t("driver_confirm"));
+
+    (async () => {
+      try {
+        let proofPhotoPath;
+        if (pData) {
+          const blob = dataUrlToBlob(pData);
+          proofPhotoPath = await uploadProofBlob(guest.groomUid, id, blob);
+        } else if (pTaken) {
+          proofPhotoPath = "📸"; // legacy fallback marker
+        }
+        const patch = { status: "delivered", deliveredAt: time, deliveredBy };
+        if (proofPhotoPath)        patch.proofPhotoPath = proofPhotoPath;
+        if (pNote && pNote.trim())  patch.deliveryNote  = pNote.trim();
+        await updateGuestSrv(guest.groomUid, id, patch);
+        // Leave the id in the overlay set — the next poll showing "delivered" clears it.
+      } catch (e) {
+        logErr("markGuestDelivered", e);
+        optimisticDeliveredRef.current.delete(id);
+        setGuests(prev => prev.map(g => g.id === id ? { ...g, status: priorStatus } : g));
+        showToast(lang === "he" ? "המסירה נכשלה — נסה שוב" : "فشل تأكيد التسليم — حاول مرة أخرى");
       }
-      const time = new Date().toLocaleTimeString("ar", { hour: "2-digit", minute: "2-digit", numberingSystem: "latn" });
-      const patch = {
-        status: "delivered",
-        deliveredAt: time,
-        deliveredBy: lang === "he" ? "השליח (אתה)" : "المرسل (أنت)",
-      };
-      if (proofPhotoPath)              patch.proofPhotoPath = proofPhotoPath;
-      if (pNote && pNote.trim())       patch.deliveryNote   = pNote.trim();
-      await updateGuestSrv(guest.groomUid, id, patch);
-      showToast(t("driver_confirm"));
-      return true;
-    } catch (e) {
-      logErr("markGuestDelivered", e);
-      showToast(e?.message || "");
-      return false;
-    }
+    })();
+
+    return true;
   };
 
   // List-view wrapper — reads from the global delivery-form state and clears
