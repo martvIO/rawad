@@ -23,8 +23,9 @@ import { logErr } from "../utils/logger.js";
 import { C } from "../styles/theme.js";
 
 const MATCH_THRESHOLD     = 0.5;     // face-api default; lower = stricter
-const LIVENESS_TIMEOUT_MS = 12000;   // max time to complete the head-turn
-const YAW_TRIGGER_DEG     = 15;      // degrees of yaw required on each side
+const STEP_TIMEOUT_MS     = 20000;   // time budget per turn (resets after the 1st turn)
+const YAW_TRIGGER_DEG     = 13;      // degrees of yaw to register a turn (eased from 15)
+const HOLD_FRAMES         = 2;       // consecutive frames beyond threshold to confirm (debounce)
 const MAX_PHOTOS_TO_SCAN  = 80;      // cap to keep mobile UX bearable
 
 export function DigitalYourPhotos({ lang, setLang }) {
@@ -178,21 +179,32 @@ export function DigitalYourPhotos({ lang, setLang }) {
   useEffect(() => { bindStream(); });
 
   // ── Step 4: liveness check via head-yaw tracking ────────────────────────
+  // Sequential, two-step turn: first turn (either physical direction — raw
+  // front-camera mirroring differs per device, so we accept whichever way the
+  // guest turns first and remember its sign), then the OPPOSITE turn. This
+  // guarantees two genuine turns while the on-screen labels still read
+  // "right then left" because step 1 follows the guest's prompted first turn.
   useEffect(() => {
     if (stage !== "liveness") return;
     const faceapi = faceapiRef.current;
-    let left = false, right = false;
-    setLivenessProgress({ left, right });
+    let right = false, left = false;   // right = 1st turn confirmed, left = 2nd (opposite)
+    let firstSign = 0;                 // sign of the 1st turn; the 2nd must be its negative
+    let hold = 0;                      // consecutive in-direction frames (debounce)
+    setLivenessProgress({ right, left });
     setFaceDetected(false);
     bindStream(); // ensure the stream is attached before we start reading frames
 
-    livenessTimeout.current = setTimeout(() => {
-      cancelAnimationFrame(livenessRafRef.current);
-      setStage("error");
-      setError(tt(lang, "انتهت مهلة الفحص — حاول مرة أخرى", "תם הזמן — נסה שוב"));
-    }, LIVENESS_TIMEOUT_MS);
+    const armTimeout = () => {
+      clearTimeout(livenessTimeout.current);
+      livenessTimeout.current = setTimeout(() => {
+        cancelAnimationFrame(livenessRafRef.current);
+        setStage("error");
+        setError(tt(lang, "لم يكتمل الفحص — جرّب مجدداً وأدِر رأسك ببطء", "הבדיקה לא הושלמה — נסה שוב ולאט"));
+      }, STEP_TIMEOUT_MS);
+    };
+    armTimeout();
 
-    const detectorOpts = new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 });
+    const detectorOpts = new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.4 });
 
     const tick = async () => {
       if (cancelledRef.current || !videoRef.current) return;
@@ -204,10 +216,25 @@ export function DigitalYourPhotos({ lang, setLang }) {
           setFaceDetected(true);
           drawOverlay(result);                 // green box + landmarks over the face
           const yaw = estimateYaw(result.landmarks);
-          if (yaw < -YAW_TRIGGER_DEG) left  = true;
-          if (yaw >  YAW_TRIGGER_DEG) right = true;
-          setLivenessProgress({ left, right });
-          if (left && right) {
+          if (!right) {
+            // Step 1: any clear turn confirms; remember its direction.
+            if (Math.abs(yaw) > YAW_TRIGGER_DEG) {
+              if (++hold >= HOLD_FRAMES) {
+                right = true; firstSign = Math.sign(yaw); hold = 0;
+                setLivenessProgress({ right, left });
+                armTimeout();                  // fresh time budget for the 2nd turn
+              }
+            } else hold = 0;
+          } else if (!left) {
+            // Step 2: must turn the OPPOSITE way.
+            if (Math.sign(yaw) === -firstSign && Math.abs(yaw) > YAW_TRIGGER_DEG) {
+              if (++hold >= HOLD_FRAMES) {
+                left = true; hold = 0;
+                setLivenessProgress({ right, left });
+              }
+            } else hold = 0;
+          }
+          if (right && left) {
             cancelAnimationFrame(livenessRafRef.current);
             clearTimeout(livenessTimeout.current);
             setStage("extracting");
@@ -216,6 +243,7 @@ export function DigitalYourPhotos({ lang, setLang }) {
         } else {
           setFaceDetected(false);
           drawOverlay(null);                   // clear the overlay when no face is visible
+          hold = 0;
         }
       } catch (err) { /* ignore frame errors */ }
       livenessRafRef.current = requestAnimationFrame(tick);
@@ -321,16 +349,14 @@ export function DigitalYourPhotos({ lang, setLang }) {
   function guidanceText() {
     if (stage === "requesting-camera") return tt(lang, "جاري تشغيل الكاميرا... 📷", "מפעיל מצלמה... 📷");
     if (stage === "extracting")        return tt(lang, "تم التحقق بنجاح! ✓", "אומת בהצלחה! ✓");
-    // liveness
+    // liveness — one step at a time
     if (!faceDetected)
       return tt(lang, "ضع وجهك داخل الإطار 🙂", "מקם את פניך במסגרת 🙂");
-    if (!livenessProgress.right && !livenessProgress.left)
-      return tt(lang, "أدِر رأسك ببطء يميناً ثم يساراً 🟢", "סובב את ראשך לאט ימינה ואז שמאלה 🟢");
     if (!livenessProgress.right)
-      return tt(lang, "التفت لليمين الآن 🟢 →", "פנה ימינה עכשיו 🟢 →");
+      return tt(lang, "الخطوة 1: أدِر رأسك إلى اليمين ببطء 👉", "שלב 1: סובב ראשך ימינה לאט 👉");
     if (!livenessProgress.left)
-      return tt(lang, "ممتاز! الآن التفت لليسار 🟢 ←", "מצוין! עכשיו פנה שמאלה 🟢 ←");
-    return tt(lang, "تم! ✓", "בוצע! ✓");
+      return tt(lang, "ممتاز ✓ — الخطوة 2: الآن أدِر رأسك إلى اليسار 👈", "מצוין ✓ — שלב 2: עכשיו סובב שמאלה 👈");
+    return tt(lang, "تم التحقق ✓", "אומת ✓");
   }
 
   return (
@@ -399,8 +425,8 @@ export function DigitalYourPhotos({ lang, setLang }) {
             </div>
             {stage === "liveness" && (
               <div style={{ display: "flex", justifyContent: "center", gap: 16, marginTop: 16 }}>
-                <LivenessIndicator done={livenessProgress.left}  label={tt(lang, "← يسار", "← שמאלה")}/>
-                <LivenessIndicator done={livenessProgress.right} label={tt(lang, "يمين →", "ימינה →")}/>
+                <LivenessIndicator done={livenessProgress.right} label={tt(lang, "👉 يمين", "👉 ימינה")}/>
+                <LivenessIndicator done={livenessProgress.left}  label={tt(lang, "يسار 👈", "שמאלה 👈")}/>
               </div>
             )}
             <div style={{ fontSize: 11, color: C.dim, marginTop: 14, lineHeight: 1.7 }}>
