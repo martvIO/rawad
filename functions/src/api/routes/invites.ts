@@ -445,6 +445,37 @@ invitesRouter.post(
       await guestRef.update(patch);
       await db.ref(`inviteTokens/${token}/usedAt`).set(now);
 
+      // Mirror an ATTENDING digital RSVP into RTDB /confirmations so it appears
+      // on the admin Confirmations page (with the headcount) exactly like the
+      // public form + physical-invite RSVPs. Keyed deterministically per guest
+      // so a re-sent invite upserts instead of duplicating. Best-effort: a
+      // mirror hiccup must never fail the guest's RSVP (the Firestore patch and
+      // token already succeeded).
+      try {
+        const confRef = db.ref(`confirmations/dg_${tk.guestId}`);
+        if (rsvp === "attending") {
+          const groomUsername = await resolveGroomUsername(tk.groomUsername, tk.groomUid);
+          const guestName = (guestSnap.data()?.name ?? "").toString();
+          const record: Record<string, unknown> = {
+            groomUid: tk.groomUid,
+            groomUsername,
+            submittedName: guestName,
+            submittedPhone,
+            confirmedAt: now,
+            source: "digital",
+            attachedGuestId: tk.guestId,
+          };
+          if (companions !== null) record.companions = companions;
+          await confRef.set(record);
+        } else {
+          // Declined — drop any prior mirrored confirmation so the page stays
+          // attendees-only.
+          await confRef.remove();
+        }
+      } catch (mirrorErr) {
+        console.error("[invites/digital/submit] confirmations mirror failed", mirrorErr);
+      }
+
       res.json({ ok: true });
     } catch (err) {
       res.status(500).json({ error: "write_failed", detail: errorMessage(err) });

@@ -46,6 +46,15 @@ export function AdminConfirmationsTab() {
               <>
                 {t("admin_conf_for_groom")}{" "}
                 <span style={{ color: C.gold, fontWeight: 700, direction: "ltr" }}>{conf.groomUsername}</span>
+                {conf.source === "digital" && (
+                  <span style={{
+                    marginInlineStart: 8, fontSize: 10, fontWeight: 800, color: "#4cc97a",
+                    padding: "2px 7px", borderRadius: 10,
+                    background: "rgba(76,201,122,.12)", border: "1px solid rgba(76,201,122,.3)",
+                  }}>
+                    📱 {lang === "he" ? "דיגיטלי" : "رقمي"}
+                  </span>
+                )}
               </>
             )}
           </div>
@@ -80,14 +89,14 @@ export function AdminConfirmationsTab() {
             </div>
             <div style={{ fontSize: 13, color: C.goldLight, fontWeight: 800 }}>{conf.submittedName}</div>
             <div style={{ fontSize: 11, color: C.goldDim, direction: "ltr", textAlign: "right" }}>{conf.submittedPhone}</div>
-            <div style={{ fontSize: 11, color: C.dim, marginTop: 4 }}>
-              📍 {fullAddress || t("admin_conf_no_address")}
-            </div>
-            {Number(conf.companions) > 0 && (
-              <div style={{ fontSize: 11, color: C.gold, fontWeight: 800, marginTop: 4 }}>
-                👥 <Num>+{conf.companions}</Num> {lang === "he" ? "מלווים" : "مرافق"}
+            {conf.source !== "digital" && (
+              <div style={{ fontSize: 11, color: C.dim, marginTop: 4 }}>
+                📍 {fullAddress || t("admin_conf_no_address")}
               </div>
             )}
+            <div style={{ fontSize: 11, color: C.gold, fontWeight: 800, marginTop: 4 }}>
+              👥 {lang === "he" ? "סה״כ" : "العدد"}: <Num>{(Number(conf.companions) || 0) + 1}</Num> {lang === "he" ? "אנשים" : "أشخاص"}
+            </div>
           </div>
         </div>
 

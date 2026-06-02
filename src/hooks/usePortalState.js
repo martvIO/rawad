@@ -564,7 +564,19 @@ export function usePortalState({ onBack, t, lang, setLang }) {
   // of spelling variants, Arabic/Hebrew/English transliteration, and word
   // reordering (see src/utils/matchUtils.js for details).
   const classificationMap = useMemo(
-    () => classifyAll(confirmations, guests),
+    () => {
+      const map = classifyAll(confirmations, guests);
+      // Digital-invite RSVPs are confirmed through the digital flow and have no
+      // RTDB guest to fuzzy-match against, so classifyAll would mark them
+      // "unknown". They are valid confirmations — show them green with no
+      // mismatch reasons.
+      for (const conf of confirmations) {
+        if (conf?.source === "digital") {
+          map.set(conf.id, { status: MATCH_STATUS.GREEN, guest: null, reasons: [] });
+        }
+      }
+      return map;
+    },
     [confirmations, guests],
   );
 
