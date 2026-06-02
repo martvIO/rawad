@@ -376,9 +376,9 @@ export function DigitalGuests() {
                         </div>
                       );
                     })()}
-                    {g.status === "attending" && Number(g.companions) > 0 && (
+                    {g.status === "attending" && g.companions != null && (
                       <div data-testid="guest-companions" style={{ marginTop: 5, fontSize: 11, fontWeight: 800, color: C.gold }}>
-                        <Num>+{g.companions}</Num> {lang === "he" ? "מלווים" : "مرافق"}
+                        👥 <Num>{Number(g.companions) + 1}</Num> {lang === "he" ? "אנשים" : "أشخاص"}
                       </div>
                     )}
                     {designs.length > 1 && (() => {
