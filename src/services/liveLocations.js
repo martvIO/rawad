@@ -9,9 +9,10 @@
 // so we attach the idToken via `?token=` query string. The TLS layer keeps
 // it confidential in transit; the token never appears in non-SSE URLs.
 
-import { api, buildApiUrl } from "../utils/apiClient.js";
+import { api } from "../utils/apiClient.js";
 import { peekIdToken } from "../utils/tokenManager.js";
 import { logErr } from "../utils/logger.js";
+import { SSE_BASE_URL } from "../config/index.js";
 
 // ─── REST writes ──────────────────────────────────────────────────────────────
 
@@ -72,7 +73,9 @@ export function subscribeDriversForGroom(groomUid, cb) {
     queueMicrotask(() => cb({}));
     return () => {};
   }
-  const url = `${buildApiUrl(`/live-locations/${groomUid}/stream`)}?token=${encodeURIComponent(token)}`;
+  // Direct Cloud Run URL (NOT same-origin /api) — Hosting buffers SSE so the
+  // stream never connects through the rewrite. See SSE_BASE_URL in config.
+  const url = `${SSE_BASE_URL}/live-locations/${groomUid}/stream?token=${encodeURIComponent(token)}`;
   let es;
   try {
     es = new EventSource(url);

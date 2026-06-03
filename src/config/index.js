@@ -24,6 +24,16 @@
 export const API_BASE_URL = (import.meta.env?.VITE_API_BASE_URL ?? "/api").replace(/\/$/, "");
 
 /**
+ * Base URL for the live-location SSE stream ONLY. Firebase Hosting buffers
+ * streamed responses, so an EventSource to the same-origin `/api/.../stream`
+ * rewrite never connects. We hit the api function's direct Cloud Run URL
+ * instead (allowed by the CSP `connect-src` + the function's CORS). Regular
+ * JSON requests keep using same-origin `/api`. Override via `VITE_SSE_BASE_URL`.
+ */
+export const SSE_BASE_URL =
+  (import.meta.env?.VITE_SSE_BASE_URL ?? "https://api-je74slt7ra-uc.a.run.app").replace(/\/$/, "");
+
+/**
  * Base URL used when constructing per-guest invite links (e.g. for WhatsApp
  * "send invite" messages). Defaults to the production invite domain; dev
  * envs can override via VITE_INVITE_BASE_URL (e.g. point to localhost).
