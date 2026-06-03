@@ -1,11 +1,13 @@
 // Groom → Guest Map: spatial view of the groom's own guest list, colour-coded
 // by delivery status. Grooms don't deliver, so the popup only surfaces
 // navigation links (no mark-delivered button — that's driver-only).
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { usePortal } from "../../../context/PortalContext.jsx";
 import { LiveMap } from "../../../components/LiveMap.jsx";
 import { GuestMapModal } from "../../../components/GuestMapModal.jsx";
 import { Num } from "../../../components/Num.jsx";
+import { geocodeAddress } from "../../../utils/geocode.js";
+import { extractCity } from "../../../utils/geo.js";
 import { C } from "../../../styles/theme.js";
 
 const FILTERS = ["all", "pending", "delivered"];
@@ -15,11 +17,51 @@ export function GroomGuestsMap() {
   const [filter, setFilter] = useState("all");
   const [selectedId, setSelectedId] = useState(null);
 
+  // Guests without precise GPS are placed by geocoding their written address so
+  // ALL guests show on the map (approximate pins). Each address is geocoded once
+  // (cached); a ref tracks which ids we've already attempted.
+  const [geo, setGeo] = useState({});
+  const [geoProgress, setGeoProgress] = useState({ done: 0, total: 0 });
+  const geocodedRef = useRef(new Set());
+
+  useEffect(() => {
+    let cancelled = false;
+    const need = myGuests.filter(g =>
+      !(typeof g.lat === "number" && typeof g.lng === "number") &&
+      (g.area || "").trim() &&
+      !geocodedRef.current.has(g.id),
+    );
+    if (need.length === 0) return undefined;
+    need.forEach(g => geocodedRef.current.add(g.id));
+    setGeoProgress(p => ({ done: p.done, total: p.total + need.length }));
+    (async () => {
+      for (const g of need) {
+        if (cancelled) return;
+        // Hard per-guest cap so one slow lookup can't stall the batch.
+        const coords = await Promise.race([
+          geocodeAddress(g.area, extractCity(g.area)),
+          new Promise(res => setTimeout(() => res(undefined), 8000)),
+        ]);
+        if (cancelled) return;
+        if (coords) setGeo(prev => ({ ...prev, [g.id]: coords }));
+        setGeoProgress(p => ({ done: p.done + 1, total: p.total }));
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [myGuests]);
+
+  const withCoords = useMemo(() => myGuests.map(g => {
+    if (typeof g.lat === "number" && typeof g.lng === "number") return g;
+    const c = geo[g.id];
+    return c ? { ...g, lat: c.lat, lng: c.lng, approxLocation: true } : g;
+  }), [myGuests, geo]);
+
   const located = useMemo(
-    () => myGuests.filter(g => typeof g.lat === "number" && typeof g.lng === "number"),
-    [myGuests],
+    () => withCoords.filter(g => typeof g.lat === "number" && typeof g.lng === "number"),
+    [withCoords],
   );
   const missingLocation = myGuests.length - located.length;
+  const geocoding = geoProgress.total > geoProgress.done;
 
   const visible = useMemo(() => {
     if (filter === "pending")   return located.filter(g => g.status !== "delivered");
@@ -72,7 +114,18 @@ export function GroomGuestsMap() {
         })}
       </div>
 
-      {missingLocation > 0 && (
+      {geocoding && (
+        <div style={{
+          marginBottom: 12, padding: "8px 12px", borderRadius: 10,
+          background: "rgba(201,168,76,.07)", border: "1px solid rgba(201,168,76,.25)",
+          fontSize: 11, color: C.gold, lineHeight: 1.6,
+        }}>
+          📍 {lang === "he" ? "מאתר מיקומי מוזמנים" : "جارٍ تحديد مواقع المعزومين"}…{" "}
+          <Num>{geoProgress.done.toLocaleString("en")}</Num>/<Num>{geoProgress.total.toLocaleString("en")}</Num>
+        </div>
+      )}
+
+      {!geocoding && missingLocation > 0 && (
         <div style={{
           marginBottom: 12, padding: "8px 12px", borderRadius: 10,
           background: "rgba(240,200,76,.06)", border: "1px solid rgba(240,200,76,.22)",
