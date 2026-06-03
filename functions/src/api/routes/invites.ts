@@ -219,6 +219,22 @@ invitesRouter.post(
         submission.submittedHouse
       );
       const guestPatch = buildPhysicalGuestPatch(submission, area, now);
+      // The guest's own submission is authoritative for their location. A pin /
+      // GPS already overwrites lat/lng above. If instead they entered a NEW
+      // address WITHOUT a pin, drop any stale coordinates (e.g. a pin the groom
+      // set earlier) so the map reflects the address the guest actually entered
+      // (geocoded) rather than the old location.
+      if (!submission.hasCoords) {
+        const cur = guestSnap.val() as { area?: string; lat?: unknown } | null;
+        const curArea = (cur?.area ?? "").toString().trim();
+        if (area.trim() && area.trim() !== curArea && typeof cur?.lat === "number") {
+          guestPatch.lat = null;
+          guestPatch.lng = null;
+          guestPatch.locationSource = null;
+          guestPatch.locationAccuracy = null;
+          guestPatch.locationUpdatedAt = now;
+        }
+      }
       await guestRef.update(guestPatch);
 
       const groomUsername = await resolveGroomUsername(
