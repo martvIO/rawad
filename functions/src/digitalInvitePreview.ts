@@ -111,10 +111,28 @@ function escapeHtml(s: string): string {
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c] as string));
 }
 
+// Design text fields are stored bilingually as { ar, he }; resolve to a string
+// (Arabic preferred) so the OG description isn't "[object Object]".
+type Localized = string | { ar?: string; he?: string } | undefined | null;
+function loc(v: Localized): string {
+  if (v == null) return "";
+  if (typeof v === "string") return v;
+  return (v.ar || v.he || "").toString();
+}
+function formatDate(ms?: number | null): string {
+  if (!ms) return "";
+  try {
+    return new Date(ms).toLocaleDateString("ar-EG", {
+      day: "numeric", month: "long", year: "numeric", numberingSystem: "latn",
+    } as Intl.DateTimeFormatOptions);
+  } catch { return ""; }
+}
+
 interface OgInputs {
   guestName: string;
   brideName?: string;
   groomDisplayName?: string;
+  dateText?: string;
   imageUrl?: string;
   url: string;
 }
@@ -124,9 +142,10 @@ function buildOgTags(inputs: OgInputs): string {
     ? `دعوة زفاف — ${inputs.guestName}`
     : "دعوة زفاف";
   const couple = [inputs.groomDisplayName, inputs.brideName].filter(Boolean).join(" و ");
-  const description = couple
-    ? `${couple} يدعونكم لحضور زفافهم`
+  let description = couple
+    ? `${couple} يتشرّفون بدعوتكم لحضور حفل زفافهم`
     : "تفضّل بفتح بطاقة الدعوة الرقمية";
+  if (inputs.dateText) description += ` — ${inputs.dateText}`;
   const tags: string[] = [
     `<meta property="og:type" content="website" />`,
     `<meta property="og:title" content="${escapeHtml(title)}" />`,
@@ -164,8 +183,9 @@ export const digitalInvitePreview = onRequest(
           type DesignLike = {
             media?: Array<{ url?: string; kind?: string }>;
             backgroundUrl?: string;
-            brideName?: string;
-            groomDisplayName?: string;
+            brideName?: Localized;
+            groomDisplayName?: Localized;
+            weddingDate?: number | null;
           };
           const tk = snap.val() as {
             groomUid?: string;
@@ -195,8 +215,9 @@ export const digitalInvitePreview = onRequest(
               }
             }
             if (d) {
-              inputs.brideName        = d.brideName;
-              inputs.groomDisplayName = d.groomDisplayName;
+              inputs.brideName        = loc(d.brideName);
+              inputs.groomDisplayName = loc(d.groomDisplayName);
+              inputs.dateText         = formatDate(d.weddingDate);
               // (Background photo is fetched inside the OG-image generator.)
             }
           }

@@ -77,8 +77,12 @@ function drawCover(
 /**
  * Render the OG card to a JPEG buffer. Exported so the layout can be rendered
  * and inspected locally without deploying.
+ *
+ * @param design     the invite's design snapshot (couple/date/venue/photo)
+ * @param guestName  the per-link guest name, drawn over the card so the
+ *                   WhatsApp preview is personalised to whoever received it.
  */
-export async function renderOgImage(design: DesignLike | null): Promise<Buffer> {
+export async function renderOgImage(design: DesignLike | null, guestName = ""): Promise<Buffer> {
   ensureFonts();
   const lang = "ar";
   const groom = localize(design?.groomDisplayName, lang);
@@ -124,34 +128,52 @@ export async function renderOgImage(design: DesignLike | null): Promise<Buffer> 
   ctx.direction = "rtl";
   ctx.textAlign = "center";
   const cx = W / 2;
-  const shadow = () => { ctx.shadowColor = "rgba(0,0,0,0.6)"; ctx.shadowBlur = 16; ctx.shadowOffsetY = 3; };
-  const noShadow = () => { ctx.shadowColor = "transparent"; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0; };
+  const guest = (guestName || "").toString().trim();
+  const detailsLine = [dateText, venue].filter(Boolean).join("   ·   ");
+
+  // Auto-shrink a font so `text` fits within `maxW`.
+  const fit = (text: string, family: string, start: number, min: number, maxW: number): number => {
+    let s = start;
+    ctx.font = `${s}px "${family}"`;
+    while (ctx.measureText(text).width > maxW && s > min) { s -= 3; ctx.font = `${s}px "${family}"`; }
+    return s;
+  };
+
+  ctx.shadowColor = "rgba(0,0,0,0.65)";
+  ctx.shadowBlur = 16;
+  ctx.shadowOffsetY = 3;
 
   // eyebrow
-  shadow();
   ctx.font = '30px "Amiri"';
   ctx.fillStyle = accent;
-  ctx.fillText("يتشرّفون بدعوتكم", cx, H * 0.52);
+  ctx.fillText("يتشرّفون بدعوتكم", cx, H * 0.50);
 
-  // couple names (auto-shrink to fit)
-  let size = 96;
-  ctx.font = `${size}px "AmiriBold"`;
-  while (ctx.measureText(couple).width > W - 170 && size > 44) { size -= 4; ctx.font = `${size}px "AmiriBold"`; }
+  // couple names — the hero line (auto-shrink to fit)
+  fit(couple, "AmiriBold", 92, 44, W - 180);
   ctx.shadowBlur = 22;
   ctx.fillStyle = "#fbf4e0";
-  ctx.fillText(couple, cx, H * 0.70);
+  ctx.fillText(couple, cx, H * 0.66);
 
-  // date
-  ctx.shadowBlur = 12;
-  ctx.font = '40px "Amiri"';
-  ctx.fillStyle = "#f3ead2";
-  if (dateText) ctx.fillText(dateText, cx, H * 0.82);
+  // guest name — personalised per link
+  if (guest) {
+    const gtext = `إلى: ${guest}`;
+    fit(gtext, "AmiriBold", 40, 24, W - 220);
+    ctx.shadowBlur = 14;
+    ctx.fillStyle = accent;
+    ctx.fillText(gtext, cx, H * 0.79);
+  }
 
-  // venue
-  ctx.font = '30px "Amiri"';
-  ctx.fillStyle = "rgba(243,234,210,0.9)";
-  if (venue) ctx.fillText(venue, cx, H * 0.90);
-  noShadow();
+  // date · venue
+  if (detailsLine) {
+    fit(detailsLine, "Amiri", 30, 18, W - 160);
+    ctx.shadowBlur = 12;
+    ctx.fillStyle = "rgba(243,234,210,0.92)";
+    ctx.fillText(detailsLine, cx, guest ? H * 0.89 : H * 0.83);
+  }
+
+  ctx.shadowColor = "transparent";
+  ctx.shadowBlur = 0;
+  ctx.shadowOffsetY = 0;
 
   return canvas.encode("jpeg", 90);
 }
@@ -163,11 +185,16 @@ export const digitalOgImage = onRequest(
       // Path shape: /og/{token}.jpg  (or /og/{token})
       const last = (req.path.split("/").filter(Boolean).pop() || "").replace(/\.(jpe?g|png)$/i, "");
       let design: DesignLike | null = null;
+      let guestName = "";
       if (last && TOKEN_HEX_RE.test(last)) {
         const snap = await getDatabase().ref(`inviteTokens/${last}`).get();
-        if (snap.exists()) design = (snap.val()?.designSnapshot ?? null) as DesignLike | null;
+        if (snap.exists()) {
+          const tk = snap.val() as { designSnapshot?: DesignLike; guestName?: string };
+          design = (tk?.designSnapshot ?? null) as DesignLike | null;
+          guestName = (tk?.guestName ?? "").toString();
+        }
       }
-      const buf = await renderOgImage(design);
+      const buf = await renderOgImage(design, guestName);
       res.set("Content-Type", "image/jpeg");
       res.set("Cache-Control", "public, max-age=86400, s-maxage=604800");
       res.status(200).send(buf);
