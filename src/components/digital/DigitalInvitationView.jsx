@@ -1218,25 +1218,24 @@ function Ambience({ theme, fixed }) {
 
 // ── Scoped styles (all under .dawa-inv so other surfaces are untouched) ─────────
 function ViewStyles({ theme }) {
-  const grad = `linear-gradient(135deg,${theme.gradientStops.join(",")})`;
   return (
     <style>{`
     .dawa-inv ::selection { background: ${theme.accentMuted}; }
     .dawa-inv .dawa-inv-reveal { opacity: 0; transform: translateY(40px); transition: opacity .9s cubic-bezier(.2,.7,.2,1), transform .9s cubic-bezier(.2,.7,.2,1); }
     .dawa-inv .dawa-inv-reveal.is-in { opacity: 1; transform: none; }
 
-    /* Gold-gradient text. The headings clip a gradient to the text via
-     * background-clip:text + transparent fill. On engines that DON'T support
-     * background-clip:text the fill stays transparent and the text would
-     * vanish against the colored background — so fall back to a solid,
-     * high-contrast theme color there. */
-    .dawa-inv .dawa-inv-grad { -webkit-background-clip: text; background-clip: text; }
-    @supports not ((-webkit-background-clip: text) or (background-clip: text)) {
-      .dawa-inv .dawa-inv-grad {
-        background: none !important;
-        -webkit-text-fill-color: ${theme.text} !important;
-        color: ${theme.text} !important;
-      }
+    /* Headings / names: SOLID high-contrast color, not background-clip:text.
+     * The clip trick (gradient bg + transparent fill) renders as an unreadable
+     * solid BLOCK on several mobile / in-app browsers (Samsung Internet, older
+     * Android WebView, some iOS in-app views) that report support but mis-render
+     * it — and those are exactly where guests open the WhatsApp invite link.
+     * theme.text equals the gradient's brightest stop on every dark theme, so
+     * this is visually near-identical yet always readable. !important overrides
+     * the per-element inline gradient styles (background + transparent fill). */
+    .dawa-inv .dawa-inv-grad {
+      background: none !important;
+      -webkit-text-fill-color: ${theme.text} !important;
+      color: ${theme.text} !important;
     }
 
     /* Section shell */
@@ -1379,7 +1378,7 @@ function ViewStyles({ theme }) {
     .dawa-inv .dawa-inv-wax { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); width: 86px; height: 86px; border-radius: 50%; background: radial-gradient(circle at 30% 30%, ${theme.gradientStops[1]} 0%, ${theme.accent} 60%); display: flex; align-items: center; justify-content: center; color: ${ON_GOLD}; font-weight: 900; font-size: 36px; box-shadow: 0 8px 26px ${theme.accentMuted}, 0 0 32px ${theme.accentMuted}; animation: dawa-inv-wax 3s ease-in-out infinite; }
     .dawa-inv .dawa-inv-env-overlay.is-opening .dawa-inv-wax { animation: dawa-inv-crack 1s cubic-bezier(.2,.95,.25,1.1) forwards; }
     .dawa-inv .dawa-inv-env-hint { margin-top: 34px; color: ${theme.accent}; font-size: 13px; letter-spacing: 3px; text-transform: uppercase; font-style: italic; animation: dawa-inv-cue 2.6s ease-in-out infinite; }
-    .dawa-inv .dawa-inv-env-name { margin-top: 22px; font-weight: 900; font-size: clamp(28px,5vw,44px); background: ${grad}; -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+    .dawa-inv .dawa-inv-env-name { margin-top: 22px; font-weight: 900; font-size: clamp(28px,5vw,44px); color: ${theme.text}; }
 
     /* Petals + sparkles */
     .dawa-inv .dawa-inv-petals { inset: 0; pointer-events: none; z-index: 5; overflow: hidden; }

@@ -276,14 +276,18 @@ function DesignEditorBody({ groomUid, designId }) {
         ARRAY_KEYS.forEach((k) => apply(k, Array.isArray(next[k]) ? next[k] : []));
         TOGGLE_KEYS.forEach((k) => apply(k, next[k] !== false));
         apply("mediaCaptions", next.mediaCaptions && typeof next.mediaCaptions === "object" ? next.mediaCaptions : {});
+        apply("themeColor", next.themeColor || "gold");
+        apply("fontFamily", next.fontFamily || "amiri");
         return merged;
       });
     });
   }, [currentUid, designId]);
 
   const status = doc?.designStatus || "draft";
-  const themeColor = doc?.themeColor || "gold";
-  const fontFamily = doc?.fontFamily || "amiri";
+  // Read from the buffered `f` first so theme/font picks update the preview
+  // instantly (optimistic), before the background save round-trips.
+  const themeColor = f.themeColor || doc?.themeColor || "gold";
+  const fontFamily = f.fontFamily || doc?.fontFamily || "amiri";
   const media = Array.isArray(doc?.media) ? doc.media : [];
   const heroMedia = Array.isArray(doc?.heroMedia) ? doc.heroMedia : [];
 
@@ -341,6 +345,8 @@ function DesignEditorBody({ groomUid, designId }) {
       if (ARRAY_KEYS.includes(key)) return { ...prev, [key]: Array.isArray(cur[key]) ? cur[key] : [] };
       if (TOGGLE_KEYS.includes(key)) return { ...prev, [key]: cur[key] !== false };
       if (key === "mediaCaptions") return { ...prev, mediaCaptions: cur.mediaCaptions || {} };
+      if (key === "themeColor") return { ...prev, themeColor: cur.themeColor || "gold" };
+      if (key === "fontFamily") return { ...prev, fontFamily: cur.fontFamily || "amiri" };
       return { ...prev, [key]: cur[key] || "" };
     });
     dirty.current.delete(key);
@@ -372,15 +378,18 @@ function DesignEditorBody({ groomUid, designId }) {
     else revert(key);
   };
 
-  const onPickTheme = async (key) => {
+  // Optimistic: update the buffered field so the preview re-themes instantly,
+  // then persist in the background (no await → no lag). flush() reverts + toasts
+  // on failure, and the dirty flag keeps the next poll from clobbering the pick.
+  const onPickTheme = (key) => {
     if (!editable || themeColor === key) return;
-    try { await patchDesignById(currentUid, designId,{ themeColor: key }); }
-    catch (err) { logErr("patchDesignFields.themeColor", err); showToast(err?.message || tt(lang, "فشل الحفظ", "השמירה נכשלה")); }
+    setField("themeColor", key);
+    flush("themeColor", key);
   };
-  const onPickFont = async (key) => {
+  const onPickFont = (key) => {
     if (!editable || fontFamily === key) return;
-    try { await patchDesignById(currentUid, designId,{ fontFamily: key }); }
-    catch (err) { logErr("patchDesignFields.fontFamily", err); showToast(err?.message || tt(lang, "فشل الحفظ", "השמירה נכשלה")); }
+    setField("fontFamily", key);
+    flush("fontFamily", key);
   };
 
   // One-click: start from the full sample design for any sections still empty.
