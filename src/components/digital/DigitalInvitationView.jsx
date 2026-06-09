@@ -15,6 +15,7 @@ import {
 } from "../../data/digitalInviteDefaults.js";
 import { localize, localizeItems, localizeList } from "../../utils/localize.js";
 import { Num } from "../Num.jsx";
+import { BrandLogo } from "../BrandLogo.jsx";
 
 const ON_GOLD = "#2a0f00"; // dark ink for text sitting on the gold gradient
 
@@ -327,7 +328,7 @@ function Hero({ guestName, groomName, brideName, monogram, eyebrow, dateText, ve
         }}
       />
       <div className="dawa-inv-hero-logo">
-        <img className="dawa-inv-hero-logoimg" src="/dawa-logo.png" alt="دعوة" width="144" height="135" />
+        <BrandLogo size={96} />
       </div>
       <div className="dawa-inv-hero-flourish">
         <FloralFlourish theme={theme} width={200} />
@@ -1432,8 +1433,7 @@ function ViewStyles({ theme }) {
     .dawa-inv .dawa-inv-foot-tag { font-size: 11px; letter-spacing: 3px; text-transform: uppercase; font-style: italic; opacity: .85; }
 
     /* Brand logo crown + floral flourish */
-    .dawa-inv .dawa-inv-hero-logo { margin-bottom: 8px; animation: dawa-inv-rise .8s ease both, dawa-inv-float 6s ease-in-out 1s infinite; }
-    .dawa-inv .dawa-inv-hero-logoimg { display: block; width: 144px; height: auto; border-radius: 22px; border: 1px solid ${theme.accentLine}; box-shadow: 0 18px 44px -14px rgba(0,0,0,.6), 0 0 30px -10px ${theme.accentMuted}; }
+    .dawa-inv .dawa-inv-hero-logo { margin-bottom: 10px; animation: dawa-inv-rise .8s ease both, dawa-inv-float 6s ease-in-out 1.4s infinite; }
     .dawa-inv .dawa-inv-flourish { display: block; }
     .dawa-inv .dawa-inv-hero-flourish { position: relative; margin-bottom: 16px; animation: dawa-inv-rise .9s .1s ease both; opacity: .92; }
     @keyframes dawa-inv-float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
