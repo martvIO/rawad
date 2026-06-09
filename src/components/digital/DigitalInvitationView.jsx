@@ -282,6 +282,40 @@ function SectionHead({ eyebrow, title, sub, theme, font }) {
 }
 
 // ── Hero ──────────────────────────────────────────────────────────────────────
+// Elegant symmetric floral flourish — a central blossom flanked by two leafy
+// vines, themed to the design's accent. Used as a hero crown + footer ornament.
+function FloralFlourish({ theme, width = 230, className = "" }) {
+  const a = theme.accent;
+  const m = theme.accentMuted;
+  const petals = [0, 60, 120, 180, 240, 300];
+  return (
+    <svg className={`dawa-inv-flourish ${className}`.trim()} width={width} height={Math.round(width * 0.2)}
+         viewBox="0 0 280 56" fill="none" aria-hidden="true">
+      <g stroke={a} strokeWidth="1.4" strokeLinecap="round" fill="none" opacity="0.9">
+        <path d="M140 28 C 112 30 88 18 54 24" />
+        <path d="M140 28 C 168 30 192 18 226 24" />
+      </g>
+      <g fill={m} stroke={a} strokeWidth="0.7">
+        <path d="M112 26 q -11 -10 -24 -7 q 9 11 24 7 Z" />
+        <path d="M98 31 q -11 9 -24 6 q 9 -11 24 -6 Z" />
+        <path d="M168 26 q 11 -10 24 -7 q -9 11 -24 7 Z" />
+        <path d="M182 31 q 11 9 24 6 q -9 -11 -24 -6 Z" />
+      </g>
+      <g fill={a}>
+        <circle cx="54" cy="24" r="3.4" />
+        <circle cx="226" cy="24" r="3.4" />
+      </g>
+      <g transform="translate(140 28)">
+        {petals.map((d) => (
+          <ellipse key={d} rx="3.6" ry="9.5" fill={m} stroke={a} strokeWidth="0.9" transform={`rotate(${d})`} />
+        ))}
+        <circle r="4.6" fill={a} />
+        <circle r="2" fill={theme.bg} opacity="0.5" />
+      </g>
+    </svg>
+  );
+}
+
 function Hero({ guestName, groomName, brideName, monogram, eyebrow, dateText, venueLine, heroMedia = [], theme, font, lang }) {
   return (
     <section className="dawa-inv-hero">
@@ -292,6 +326,9 @@ function Hero({ guestName, groomName, brideName, monogram, eyebrow, dateText, ve
           background: `radial-gradient(ellipse 80% 60% at 50% 30%, ${theme.accentMuted} 0%, transparent 60%), radial-gradient(ellipse 60% 40% at 50% 80%, ${theme.accentMuted} 0%, transparent 65%)`,
         }}
       />
+      <div className="dawa-inv-hero-flourish">
+        <FloralFlourish theme={theme} width={240} />
+      </div>
       <div className="dawa-inv-hero-eyebrow" style={{ color: theme.accent, fontFamily: font.family }}>
         <span style={{ width: 40, height: 1, background: `linear-gradient(90deg, transparent, ${theme.accent})` }} />
         {eyebrow}
@@ -1089,6 +1126,9 @@ function GuestbookSection({ wishes, theme, font, lang, disabled }) {
 function InviteFooter({ theme, font, lang }) {
   return (
     <footer className="dawa-inv-foot">
+      <div className="dawa-inv-foot-flourish">
+        <FloralFlourish theme={theme} width={210} />
+      </div>
       <div
         className="dawa-inv-foot-mark dawa-inv-grad"
         style={{ fontFamily: font.family, background: `linear-gradient(135deg,${theme.gradientStops.join(",")})`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}
@@ -1096,7 +1136,7 @@ function InviteFooter({ theme, font, lang }) {
         {lang === "he" ? "דעוה" : "دعوة"}
       </div>
       <div className="dawa-inv-foot-tag" style={{ color: theme.accent, fontFamily: font.family }}>
-        {lang === "he" ? "— נעשה באהבה —" : "— صُنعت بحبّ —"}
+        {lang === "he" ? "— הזמנה דיגיטלית · נעשה באהבה —" : "— بطاقة دعوة رقمية · صُنعت بحبّ —"}
       </div>
     </footer>
   );
@@ -1187,11 +1227,11 @@ function EnvelopeIntro({ guestName, font, lang }) {
 
 // ── Ambient petals + sparkles ───────────────────────────────────────────────────
 function Ambience({ theme, fixed }) {
-  const petals = useMemo(() => Array.from({ length: 12 }, () => ({
+  const petals = useMemo(() => Array.from({ length: 18 }, () => ({
     left: Math.random() * 100,
-    dur: 16 + Math.random() * 14,
+    dur: 15 + Math.random() * 14,
     delay: Math.random() * 18,
-    size: 10 + Math.random() * 8,
+    size: 11 + Math.random() * 9,
   })), []);
   const sparkles = useMemo(() => Array.from({ length: 20 }, () => ({
     top: Math.random() * 100,
@@ -1360,9 +1400,14 @@ function ViewStyles({ theme }) {
     .dawa-inv .dawa-inv-wish-what { font-size: 16px; line-height: 1.8; }
 
     /* Footer */
-    .dawa-inv .dawa-inv-foot { padding: 72px 24px 96px; text-align: center; position: relative; z-index: 6; }
-    .dawa-inv .dawa-inv-foot-mark { font-weight: 900; font-size: 34px; margin-bottom: 14px; padding-block: 6px; }
+    .dawa-inv .dawa-inv-foot { padding: 64px 24px 96px; text-align: center; position: relative; z-index: 6; }
+    .dawa-inv .dawa-inv-foot-flourish { margin-bottom: 16px; opacity: .92; }
+    .dawa-inv .dawa-inv-foot-mark { font-weight: 900; font-size: 38px; margin-bottom: 12px; padding-block: 6px; }
     .dawa-inv .dawa-inv-foot-tag { font-size: 11px; letter-spacing: 3px; text-transform: uppercase; font-style: italic; opacity: .85; }
+
+    /* Floral flourish (hero crown + footer ornament) */
+    .dawa-inv .dawa-inv-flourish { display: block; }
+    .dawa-inv .dawa-inv-hero-flourish { position: relative; margin-bottom: 14px; animation: dawa-inv-rise .9s ease both; filter: drop-shadow(0 4px 14px ${theme.accentMuted}); }
 
     /* Floating dock */
     .dawa-inv .dawa-inv-dock { bottom: 22px; inset-inline-end: 22px; display: flex; flex-direction: column; gap: 8px; z-index: 100; }
@@ -1382,7 +1427,7 @@ function ViewStyles({ theme }) {
 
     /* Petals + sparkles */
     .dawa-inv .dawa-inv-petals { inset: 0; pointer-events: none; z-index: 5; overflow: hidden; }
-    .dawa-inv .dawa-inv-petal { position: absolute; top: -40px; border-radius: 60% 40% 60% 40% / 70% 60% 40% 30%; opacity: .45; filter: blur(.4px); animation: dawa-inv-petal linear infinite; }
+    .dawa-inv .dawa-inv-petal { position: absolute; top: -40px; border-radius: 60% 40% 60% 40% / 70% 60% 40% 30%; opacity: .55; filter: blur(.4px); animation: dawa-inv-petal linear infinite; }
     .dawa-inv .dawa-inv-sparkles { inset: 0; pointer-events: none; z-index: 4; }
     .dawa-inv .dawa-inv-sparkle { position: absolute; width: 2px; height: 2px; border-radius: 50%; animation: dawa-inv-sparkle ease-in-out infinite; }
 
