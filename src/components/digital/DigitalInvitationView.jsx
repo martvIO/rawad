@@ -316,48 +316,6 @@ function FloralFlourish({ theme, width = 230, className = "" }) {
   );
 }
 
-// Dawa brand mark — a gold vector of the logo (a home whose walls sweep into a
-// pin, sheltering an envelope sealed with a ring + heart, with a flowing swirl).
-// Single gold gradient so it sits as the crown of every invitation.
-function DawaLogo({ theme, size = 104 }) {
-  const id = `dawa-logo-${theme.key}`;
-  const g = `url(#${id})`;
-  return (
-    <svg className="dawa-inv-logo" width={size} height={size} viewBox="0 0 240 240" fill="none" aria-hidden="true">
-      <defs>
-        <linearGradient id={id} x1="0.1" y1="0" x2="0.9" y2="1">
-          <stop offset="0%" stopColor={theme.gradientStops[0]} />
-          <stop offset="50%" stopColor={theme.gradientStops[1]} />
-          <stop offset="100%" stopColor={theme.gradientStops[2]} />
-        </linearGradient>
-      </defs>
-      {/* ground */}
-      <ellipse cx="121" cy="224" rx="38" ry="6" fill={g} opacity="0.4" />
-      {/* house body → pin */}
-      <path d="M70 80 C 58 130 66 168 121 214 C 176 168 184 130 172 80"
-            stroke={g} strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-      {/* roof + chimney */}
-      <path d="M62 82 L120 34 L178 82" stroke={g} strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-      <path d="M158 58 L158 44 L172 44 L172 70" stroke={g} strokeWidth="7" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-      {/* swirl from lower-left */}
-      <path d="M98 164 C 56 174 36 150 53 125 C 64 110 88 115 83 134 C 80 143 66 141 72 130"
-            stroke={g} strokeWidth="7" strokeLinecap="round" fill="none" />
-      {/* envelope */}
-      <g transform="rotate(-8 121 136)">
-        <rect x="82" y="110" width="86" height="58" rx="7" stroke={g} strokeWidth="6" fill={theme.bg} />
-        <path d="M82 117 L125 146 L168 117" stroke={g} strokeWidth="6" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-        <circle cx="125" cy="150" r="9" fill={g} />
-      </g>
-      {/* ring + diamond + heart above the envelope */}
-      <g>
-        <circle cx="110" cy="92" r="11" stroke={g} strokeWidth="5" fill="none" />
-        <path d="M110 81 l-6 -9 l12 0 z" fill={g} />
-        <path d="M139 86 c -5 -8 -15 -3 -10 5 l 10 11 l 10 -11 c 5 -8 -5 -13 -10 -5 Z" fill={g} />
-      </g>
-    </svg>
-  );
-}
-
 function Hero({ guestName, groomName, brideName, monogram, eyebrow, dateText, venueLine, heroMedia = [], theme, font, lang }) {
   return (
     <section className="dawa-inv-hero">
@@ -369,7 +327,7 @@ function Hero({ guestName, groomName, brideName, monogram, eyebrow, dateText, ve
         }}
       />
       <div className="dawa-inv-hero-logo">
-        <DawaLogo theme={theme} size={122} />
+        <img className="dawa-inv-hero-logoimg" src="/dawa-logo.png" alt="دعوة" width="144" height="135" />
       </div>
       <div className="dawa-inv-hero-flourish">
         <FloralFlourish theme={theme} width={200} />
@@ -1474,8 +1432,8 @@ function ViewStyles({ theme }) {
     .dawa-inv .dawa-inv-foot-tag { font-size: 11px; letter-spacing: 3px; text-transform: uppercase; font-style: italic; opacity: .85; }
 
     /* Brand logo crown + floral flourish */
-    .dawa-inv .dawa-inv-logo { display: block; }
-    .dawa-inv .dawa-inv-hero-logo { margin-bottom: 6px; animation: dawa-inv-rise .8s ease both, dawa-inv-float 6s ease-in-out 1s infinite; filter: drop-shadow(0 10px 28px ${theme.accentMuted}); }
+    .dawa-inv .dawa-inv-hero-logo { margin-bottom: 8px; animation: dawa-inv-rise .8s ease both, dawa-inv-float 6s ease-in-out 1s infinite; }
+    .dawa-inv .dawa-inv-hero-logoimg { display: block; width: 144px; height: auto; border-radius: 22px; border: 1px solid ${theme.accentLine}; box-shadow: 0 18px 44px -14px rgba(0,0,0,.6), 0 0 30px -10px ${theme.accentMuted}; }
     .dawa-inv .dawa-inv-flourish { display: block; }
     .dawa-inv .dawa-inv-hero-flourish { position: relative; margin-bottom: 16px; animation: dawa-inv-rise .9s .1s ease both; opacity: .92; }
     @keyframes dawa-inv-float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
