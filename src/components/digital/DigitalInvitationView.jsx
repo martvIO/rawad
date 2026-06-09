@@ -259,6 +259,9 @@ export function DigitalInvitationView({
 function SectionHead({ eyebrow, title, sub, theme, font }) {
   return (
     <div className="dawa-inv-reveal" style={{ textAlign: "center", marginBottom: 56 }}>
+      <div className="dawa-inv-secflourish">
+        <FloralFlourish theme={theme} width={156} />
+      </div>
       <div className="dawa-inv-eyebrow" style={{ color: theme.accent, fontFamily: font.family }}>
         {eyebrow}
       </div>
@@ -273,6 +276,11 @@ function SectionHead({ eyebrow, title, sub, theme, font }) {
       >
         {title}
       </h2>
+      <div className="dawa-inv-secrule" aria-hidden="true">
+        <span style={{ background: `linear-gradient(90deg, transparent, ${theme.accent})` }} />
+        <span className="dawa-inv-secrule-dot" style={{ background: theme.accent, boxShadow: `0 0 10px ${theme.sparkleGlow}` }} />
+        <span style={{ background: `linear-gradient(90deg, ${theme.accent}, transparent)` }} />
+      </div>
       {sub && (
         <p className="dawa-inv-sub" style={{ color: theme.textSoft, fontFamily: font.family }}>
           {sub}
@@ -327,6 +335,12 @@ function Hero({ guestName, groomName, brideName, monogram, eyebrow, dateText, ve
           background: `radial-gradient(ellipse 80% 60% at 50% 30%, ${theme.accentMuted} 0%, transparent 60%), radial-gradient(ellipse 60% 40% at 50% 80%, ${theme.accentMuted} 0%, transparent 65%)`,
         }}
       />
+      <div className="dawa-inv-hero-frame" aria-hidden="true" style={{ borderColor: theme.accent }}>
+        <span className="dawa-inv-corner dawa-inv-corner-tl" style={{ borderColor: theme.accent }} />
+        <span className="dawa-inv-corner dawa-inv-corner-tr" style={{ borderColor: theme.accent }} />
+        <span className="dawa-inv-corner dawa-inv-corner-bl" style={{ borderColor: theme.accent }} />
+        <span className="dawa-inv-corner dawa-inv-corner-br" style={{ borderColor: theme.accent }} />
+      </div>
       <div className="dawa-inv-hero-logo">
         <BrandLogo size={96} />
       </div>
@@ -1284,10 +1298,26 @@ function Ambience({ theme, fixed }) {
 }
 
 // ── Scoped styles (all under .dawa-inv so other surfaces are untouched) ─────────
-function ViewStyles({ theme }) {
+function ViewStyles({ theme, fixed }) {
   return (
     <style>{`
     .dawa-inv ::selection { background: ${theme.accentMuted}; }
+
+    /* Faint damask lattice — a barely-there ornamental texture over the whole
+     * invitation. Tinted with the live accent so it adapts to every palette; kept
+     * at ~4% so it reads as luxury paper grain, never noise. Robust everywhere
+     * (a tiled background image — no clip/mask tricks that mis-render in-app). */
+    .dawa-inv::before {
+      content: "";
+      position: ${fixed ? "fixed" : "absolute"};
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      opacity: .045;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='72' height='72' viewBox='0 0 72 72'%3E%3Cg fill='none' stroke='${encodeURIComponent(theme.accent)}' stroke-width='1.1'%3E%3Cpath d='M36 10 L50 36 L36 62 L22 36 Z'/%3E%3Ccircle cx='36' cy='36' r='3.4'/%3E%3Cpath d='M36 0 L36 8 M36 64 L36 72 M0 36 L8 36 M64 36 L72 36'/%3E%3C/g%3E%3C/svg%3E");
+      background-size: 72px 72px;
+    }
+
     .dawa-inv .dawa-inv-reveal { opacity: 0; transform: translateY(40px); transition: opacity .9s cubic-bezier(.2,.7,.2,1), transform .9s cubic-bezier(.2,.7,.2,1); }
     .dawa-inv .dawa-inv-reveal.is-in { opacity: 1; transform: none; }
 
@@ -1310,10 +1340,23 @@ function ViewStyles({ theme }) {
     .dawa-inv .dawa-inv-eyebrow { font-size: 11.5px; letter-spacing: 4px; text-transform: uppercase; font-style: italic; display: inline-flex; align-items: center; gap: 14px; margin-bottom: 16px; }
     .dawa-inv .dawa-inv-title { font-weight: 900; font-size: clamp(30px,5vw,48px); line-height: 1.35; margin-bottom: 16px; padding-block: 6px; }
     .dawa-inv .dawa-inv-sub { font-style: italic; font-size: 14px; max-width: 540px; margin: 0 auto; line-height: 1.85; }
+    .dawa-inv .dawa-inv-secflourish { margin-bottom: 14px; opacity: .9; }
+    .dawa-inv .dawa-inv-secrule { display: flex; align-items: center; justify-content: center; gap: 9px; width: 132px; margin: 4px auto 16px; }
+    .dawa-inv .dawa-inv-secrule > span { height: 1px; flex: 1; }
+    .dawa-inv .dawa-inv-secrule .dawa-inv-secrule-dot { flex: 0 0 auto; width: 5px; height: 5px; transform: rotate(45deg); }
 
     /* Hero */
     .dawa-inv .dawa-inv-hero { position: relative; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 60px 24px; overflow: hidden; z-index: 6; }
     .dawa-inv .dawa-inv-hero-glow { position: absolute; inset: 0; pointer-events: none; }
+    /* Gold filigree frame inset on the hero — thin border + heavier corner
+     * brackets for an engraved-invitation feel. Perimeter only, never over text. */
+    .dawa-inv .dawa-inv-hero-frame { position: absolute; inset: 16px; border: 1px solid; border-radius: 16px; pointer-events: none; opacity: .4; animation: dawa-inv-frame 1.6s .3s ease both; }
+    .dawa-inv .dawa-inv-corner { position: absolute; width: 28px; height: 28px; border-style: solid; border-width: 0; opacity: .9; }
+    .dawa-inv .dawa-inv-corner-tl { top: -1px; inset-inline-start: -1px; border-top-width: 2px; border-inline-start-width: 2px; border-start-start-radius: 16px; }
+    .dawa-inv .dawa-inv-corner-tr { top: -1px; inset-inline-end: -1px; border-top-width: 2px; border-inline-end-width: 2px; border-start-end-radius: 16px; }
+    .dawa-inv .dawa-inv-corner-bl { bottom: -1px; inset-inline-start: -1px; border-bottom-width: 2px; border-inline-start-width: 2px; border-end-start-radius: 16px; }
+    .dawa-inv .dawa-inv-corner-br { bottom: -1px; inset-inline-end: -1px; border-bottom-width: 2px; border-inline-end-width: 2px; border-end-end-radius: 16px; }
+    @keyframes dawa-inv-frame { from { opacity: 0; transform: scale(1.03); } to { opacity: .4; transform: none; } }
     .dawa-inv .dawa-inv-hero-eyebrow { position: relative; font-size: 13px; letter-spacing: 4px; text-transform: uppercase; font-style: italic; margin-bottom: 24px; display: inline-flex; align-items: center; gap: 14px; animation: dawa-inv-rise .9s ease both; }
     .dawa-inv .dawa-inv-monogram { width: 170px; height: 170px; margin: 0 auto 28px; position: relative; display: flex; align-items: center; justify-content: center; animation: dawa-inv-rise 1.1s .15s cubic-bezier(.17,.67,.35,1.4) both; }
     .dawa-inv .dawa-inv-monogram svg { width: 100%; height: 100%; position: absolute; inset: 0; }
@@ -1321,7 +1364,7 @@ function ViewStyles({ theme }) {
     .dawa-inv .dawa-inv-monogram-letters { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 56px; line-height: 1.4; padding-block: 8px; }
     .dawa-inv .dawa-inv-couple { font-weight: 900; font-size: clamp(48px,9vw,96px); line-height: 1.25; margin: 8px 0; padding-block: 8px; text-shadow: 0 0 80px ${theme.accentMuted}; animation: dawa-inv-rise 1.1s .3s cubic-bezier(.2,.7,.2,1) both; }
     .dawa-inv .dawa-inv-amp { display: block; font-style: italic; font-size: clamp(28px,6vw,52px); margin: 6px 0; opacity: .8; padding-block: 4px; animation: dawa-inv-rise 1.1s .4s ease both; }
-    .dawa-inv .dawa-inv-dateline { display: inline-flex; align-items: center; gap: 16px; margin-top: 28px; padding: 12px 28px; border-radius: 999px; backdrop-filter: blur(20px); font-size: 16px; letter-spacing: .5px; animation: dawa-inv-rise 1.1s .5s ease both; flex-wrap: wrap; justify-content: center; }
+    .dawa-inv .dawa-inv-dateline { display: inline-flex; align-items: center; gap: 16px; margin-top: 28px; padding: 12px 28px; border-radius: 999px; backdrop-filter: blur(20px); font-size: 16px; letter-spacing: .5px; animation: dawa-inv-rise 1.1s .5s ease both; flex-wrap: wrap; justify-content: center; box-shadow: 0 12px 36px -14px ${theme.accentMuted}, inset 0 0 0 1px ${theme.accentLine}; }
     .dawa-inv .dawa-inv-dot { width: 4px; height: 4px; border-radius: 50%; }
     .dawa-inv .dawa-inv-greet { margin-top: 26px; font-style: italic; font-size: clamp(19px,3.4vw,28px); letter-spacing: 1px; line-height: 1.5; animation: dawa-inv-rise 1.1s .6s ease both; }
     .dawa-inv .dawa-inv-greet strong { display: block; margin-top: 12px; font-style: normal; font-weight: 900; font-size: clamp(34px,7.5vw,52px); line-height: 1.2; letter-spacing: .5px; padding-block: 4px; text-shadow: 0 0 60px ${theme.accentMuted}; }
