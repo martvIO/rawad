@@ -105,8 +105,19 @@ const MAX_CAPTION_LEN = 120;
 const MAX_CAPTION_ENTRIES = 60;
 const MAX_GUEST_STATUSES = new Set(["pending", "attending", "absent"]);
 
-const THEME_COLORS = new Set(["gold", "rose", "blue", "emerald", "white"]);
-const FONT_FAMILIES = new Set(["amiri", "noto", "cairo"]);
+// Keep in sync with THEMES / FONTS in src/styles/digitalThemes.js.
+const THEME_COLORS = new Set([
+  "gold", "rose", "blue", "emerald", "white",
+  // Light luxe palettes
+  "champagne", "blush", "sage", "dustyblue", "lavender",
+  "pearl", "peach", "mint", "mauve", "ivorygold",
+]);
+const FONT_FAMILIES = new Set([
+  "amiri", "noto", "cairo",
+  // Arabic+Hebrew paired stacks
+  "aref", "messiri", "reem", "tajawal", "markazi",
+  "scheherazade", "changa", "lalezar", "lemonada",
+]);
 
 // Fields whose change demotes an approved design back to draft. Operational
 // flags (photographerPublished, guestRanks) are intentionally NOT design fields.

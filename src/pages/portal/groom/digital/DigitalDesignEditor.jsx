@@ -16,6 +16,7 @@ import {
   removeDesignMedia,
 } from "../../../../services/digitalInvitation.js";
 import { logErr } from "../../../../utils/logger.js";
+import { ensureDigitalFonts } from "../../../../utils/digitalFonts.js";
 import { C } from "../../../../styles/theme.js";
 import { DIGITAL_THEMES, DIGITAL_FONTS, DIGITAL_THEME_KEYS, DIGITAL_FONT_KEYS } from "../../../../styles/digitalThemes.js";
 import { DigitalInvitationView } from "../../../../components/digital/DigitalInvitationView.jsx";
@@ -255,6 +256,10 @@ function DesignEditorBody({ groomUid, designId }) {
   // wedding-date input string). Autosave fires on blur/change, not per keystroke.
   const [f, setF] = useState({});
   const dirty = useRef(new Set());
+
+  // Load the extended Arabic+Hebrew wedding fonts so the font-picker previews
+  // (and the live preview) render in the real faces.
+  useEffect(() => { ensureDigitalFonts(); }, []);
 
   // Re-subscribe (and reset the buffer) whenever the selected design changes.
   useEffect(() => {

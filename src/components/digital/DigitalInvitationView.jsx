@@ -14,6 +14,7 @@ import {
   DEFAULT_MEAL_OPTIONS,
 } from "../../data/digitalInviteDefaults.js";
 import { localize, localizeItems, localizeList } from "../../utils/localize.js";
+import { ensureDigitalFonts } from "../../utils/digitalFonts.js";
 import { Num } from "../Num.jsx";
 import { BrandLogo } from "../BrandLogo.jsx";
 
@@ -36,6 +37,10 @@ export function DigitalInvitationView({
   const font = getDigitalFont(design?.fontFamily);
   const isPublic = mode === "public";
   const rootRef = useRef(null);
+
+  // Load the extended Arabic+Hebrew wedding fonts only when an invitation
+  // actually renders (lazy — other pages don't pay for them).
+  useEffect(() => { ensureDigitalFonts(); }, []);
 
   // ── Field extraction with sensible fallbacks ────────────────────────────
   // Every groom-authored text field may be a plain string (legacy / single-

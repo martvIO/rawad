@@ -17,8 +17,12 @@ const W = 1200;
 const H = 630;
 
 // Accent (gold/rose/…) per the design's themeColor — mirrors digitalThemes.
+// Light-palette accents use a slightly brightened tone so they stay legible on
+// the dark photo scrim of the OG card.
 const ACCENTS: Record<string, string> = {
   gold: "#d8bd63", rose: "#e3a6b3", blue: "#82c0e6", emerald: "#6fcb9c", white: "#ece5d2",
+  champagne: "#d4b483", blush: "#e6b3aa", sage: "#a3ad82", dustyblue: "#9bb0c8", lavender: "#b3a3cc",
+  pearl: "#bdb3a0", peach: "#e8b193", mint: "#84c4aa", mauve: "#c39bb3", ivorygold: "#ddc488",
 };
 
 type Localized = string | { ar?: string; he?: string } | undefined | null;
