@@ -367,39 +367,43 @@ function Hero({ guestName, groomName, brideName, monogram, eyebrow, dateText, ve
               <stop offset="100%" stopColor={theme.monoStops[2]} />
             </linearGradient>
           </defs>
-          <circle
-            className="dawa-inv-ring"
-            cx="100"
-            cy="100"
-            r="76"
-            fill="none"
-            stroke={`url(#dawa-mono-${theme.key})`}
-            strokeWidth="1.2"
-          />
-          {/* delicate floral wreath — leaves + berries around the initials */}
-          {Array.from({ length: 22 }).map((_, i) => (
-            <ellipse
-              key={`l${i}`}
-              cx="100"
-              cy="9"
-              rx="2.6"
-              ry="7"
-              fill={theme.accentMuted}
+          {/* Royal crest: a crown above the initials + symmetric laurel
+              sprigs + a bottom flourish. Open (no enclosing ring) so it reads
+              luxurious and draws the eye. All strokes/fills use the theme's
+              mono gradient so it adapts to every palette. */}
+          <g className="dawa-inv-crown">
+            <path
+              d="M68 52 L68 35 L83.5 47 L100 28 L116.5 47 L132 35 L132 52 Z"
+              fill="none"
               stroke={`url(#dawa-mono-${theme.key})`}
-              strokeWidth="0.6"
-              transform={`rotate(${(i / 22) * 360} 100 100)`}
+              strokeWidth="2"
+              strokeLinejoin="round"
             />
+            <path d="M66 54 H134" stroke={`url(#dawa-mono-${theme.key})`} strokeWidth="1.4" strokeLinecap="round" />
+            <circle cx="68" cy="32" r="2.6" fill={theme.accent} />
+            <circle className="dawa-inv-crown-gem" cx="100" cy="24.5" r="3.4" fill={theme.accent} />
+            <circle cx="132" cy="32" r="2.6" fill={theme.accent} />
+            <circle cx="100" cy="46" r="2.2" fill={theme.accent} />
+          </g>
+
+          {/* side laurel sprigs — left, then mirrored to the right */}
+          {[false, true].map((mirror) => (
+            <g key={mirror ? "sprig-r" : "sprig-l"} transform={mirror ? "translate(200,0) scale(-1,1)" : undefined}>
+              <path d="M27 124 C 22 106, 28 91, 43 82" fill="none" stroke={`url(#dawa-mono-${theme.key})`} strokeWidth="1.3" strokeLinecap="round" opacity="0.85" />
+              <ellipse cx="26" cy="118" rx="2.6" ry="7" fill={`url(#dawa-mono-${theme.key})`} transform="rotate(30 26 118)" />
+              <ellipse cx="24" cy="105" rx="2.6" ry="7.5" fill={`url(#dawa-mono-${theme.key})`} transform="rotate(8 24 105)" />
+              <ellipse cx="28" cy="92" rx="2.5" ry="7" fill={`url(#dawa-mono-${theme.key})`} transform="rotate(-16 28 92)" />
+              <ellipse cx="37" cy="83" rx="2.3" ry="6.2" fill={`url(#dawa-mono-${theme.key})`} transform="rotate(-34 37 83)" />
+            </g>
           ))}
-          {Array.from({ length: 11 }).map((_, i) => (
-            <circle
-              key={`b${i}`}
-              cx="100"
-              cy="9"
-              r="1.7"
-              fill={theme.accent}
-              transform={`rotate(${((i + 0.5) / 11) * 360} 100 100)`}
-            />
-          ))}
+
+          {/* bottom flourish */}
+          <g fill={`url(#dawa-mono-${theme.key})`}>
+            <path d="M100 150 q6 11 0 22 q-6 -11 0 -22 Z" />
+            <ellipse cx="86" cy="160" rx="2.4" ry="6.5" transform="rotate(44 86 160)" />
+            <ellipse cx="114" cy="160" rx="2.4" ry="6.5" transform="rotate(-44 114 160)" />
+            <circle cx="100" cy="176" r="1.7" />
+          </g>
         </svg>
         <span
           className="dawa-inv-monogram-letters dawa-inv-grad"
@@ -1365,7 +1369,9 @@ function ViewStyles({ theme, fixed }) {
     .dawa-inv .dawa-inv-hero-eyebrow { position: relative; font-size: 13px; letter-spacing: 4px; text-transform: uppercase; font-style: italic; margin-bottom: 24px; display: inline-flex; align-items: center; gap: 14px; animation: dawa-inv-rise .9s ease both; }
     .dawa-inv .dawa-inv-monogram { width: 170px; height: 170px; margin: 0 auto 28px; position: relative; display: flex; align-items: center; justify-content: center; animation: dawa-inv-rise 1.1s .15s cubic-bezier(.17,.67,.35,1.4) both; }
     .dawa-inv .dawa-inv-monogram svg { width: 100%; height: 100%; position: absolute; inset: 0; }
-    .dawa-inv .dawa-inv-ring { stroke-dasharray: 580; stroke-dashoffset: 580; animation: dawa-inv-draw 2.4s .4s cubic-bezier(.2,.7,.2,1) forwards; }
+    .dawa-inv .dawa-inv-crown { animation: dawa-inv-rise 1s .35s cubic-bezier(.2,.7,.2,1) both; }
+    .dawa-inv .dawa-inv-crown-gem { animation: dawa-inv-twinkle 2.6s ease-in-out infinite; }
+    @keyframes dawa-inv-twinkle { 0%,100% { opacity: 1; } 50% { opacity: .5; } }
     .dawa-inv .dawa-inv-monogram-letters { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 56px; line-height: 1.4; padding-block: 8px; }
     .dawa-inv .dawa-inv-couple { font-weight: 900; font-size: clamp(48px,9vw,96px); line-height: 1.25; margin: 8px 0; padding-block: 8px; text-shadow: 0 0 80px ${theme.accentMuted}; animation: dawa-inv-rise 1.1s .3s cubic-bezier(.2,.7,.2,1) both; }
     .dawa-inv .dawa-inv-amp { display: block; font-style: italic; font-size: clamp(28px,6vw,52px); margin: 6px 0; opacity: .8; padding-block: 4px; animation: dawa-inv-rise 1.1s .4s ease both; }
