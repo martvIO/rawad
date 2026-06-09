@@ -316,6 +316,48 @@ function FloralFlourish({ theme, width = 230, className = "" }) {
   );
 }
 
+// Dawa brand mark — a gold vector of the logo (a home whose walls sweep into a
+// pin, sheltering an envelope sealed with a ring + heart, with a flowing swirl).
+// Single gold gradient so it sits as the crown of every invitation.
+function DawaLogo({ theme, size = 104 }) {
+  const id = `dawa-logo-${theme.key}`;
+  const g = `url(#${id})`;
+  return (
+    <svg className="dawa-inv-logo" width={size} height={size} viewBox="0 0 240 240" fill="none" aria-hidden="true">
+      <defs>
+        <linearGradient id={id} x1="0.1" y1="0" x2="0.9" y2="1">
+          <stop offset="0%" stopColor={theme.gradientStops[0]} />
+          <stop offset="50%" stopColor={theme.gradientStops[1]} />
+          <stop offset="100%" stopColor={theme.gradientStops[2]} />
+        </linearGradient>
+      </defs>
+      {/* ground */}
+      <ellipse cx="121" cy="224" rx="38" ry="6" fill={g} opacity="0.4" />
+      {/* house body → pin */}
+      <path d="M70 80 C 58 130 66 168 121 214 C 176 168 184 130 172 80"
+            stroke={g} strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      {/* roof + chimney */}
+      <path d="M62 82 L120 34 L178 82" stroke={g} strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      <path d="M158 58 L158 44 L172 44 L172 70" stroke={g} strokeWidth="7" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      {/* swirl from lower-left */}
+      <path d="M98 164 C 56 174 36 150 53 125 C 64 110 88 115 83 134 C 80 143 66 141 72 130"
+            stroke={g} strokeWidth="7" strokeLinecap="round" fill="none" />
+      {/* envelope */}
+      <g transform="rotate(-8 121 136)">
+        <rect x="82" y="110" width="86" height="58" rx="7" stroke={g} strokeWidth="6" fill={theme.bg} />
+        <path d="M82 117 L125 146 L168 117" stroke={g} strokeWidth="6" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+        <circle cx="125" cy="150" r="9" fill={g} />
+      </g>
+      {/* ring + diamond + heart above the envelope */}
+      <g>
+        <circle cx="110" cy="92" r="11" stroke={g} strokeWidth="5" fill="none" />
+        <path d="M110 81 l-6 -9 l12 0 z" fill={g} />
+        <path d="M139 86 c -5 -8 -15 -3 -10 5 l 10 11 l 10 -11 c 5 -8 -5 -13 -10 -5 Z" fill={g} />
+      </g>
+    </svg>
+  );
+}
+
 function Hero({ guestName, groomName, brideName, monogram, eyebrow, dateText, venueLine, heroMedia = [], theme, font, lang }) {
   return (
     <section className="dawa-inv-hero">
@@ -326,8 +368,11 @@ function Hero({ guestName, groomName, brideName, monogram, eyebrow, dateText, ve
           background: `radial-gradient(ellipse 80% 60% at 50% 30%, ${theme.accentMuted} 0%, transparent 60%), radial-gradient(ellipse 60% 40% at 50% 80%, ${theme.accentMuted} 0%, transparent 65%)`,
         }}
       />
+      <div className="dawa-inv-hero-logo">
+        <DawaLogo theme={theme} size={122} />
+      </div>
       <div className="dawa-inv-hero-flourish">
-        <FloralFlourish theme={theme} width={240} />
+        <FloralFlourish theme={theme} width={200} />
       </div>
       <div className="dawa-inv-hero-eyebrow" style={{ color: theme.accent, fontFamily: font.family }}>
         <span style={{ width: 40, height: 1, background: `linear-gradient(90deg, transparent, ${theme.accent})` }} />
@@ -348,12 +393,35 @@ function Hero({ guestName, groomName, brideName, monogram, eyebrow, dateText, ve
             className="dawa-inv-ring"
             cx="100"
             cy="100"
-            r="92"
+            r="76"
             fill="none"
             stroke={`url(#dawa-mono-${theme.key})`}
-            strokeWidth="1.5"
+            strokeWidth="1.2"
           />
-          <circle cx="100" cy="100" r="80" fill="none" stroke={theme.accentMuted} strokeDasharray="2 6" />
+          {/* delicate floral wreath — leaves + berries around the initials */}
+          {Array.from({ length: 22 }).map((_, i) => (
+            <ellipse
+              key={`l${i}`}
+              cx="100"
+              cy="9"
+              rx="2.6"
+              ry="7"
+              fill={theme.accentMuted}
+              stroke={`url(#dawa-mono-${theme.key})`}
+              strokeWidth="0.6"
+              transform={`rotate(${(i / 22) * 360} 100 100)`}
+            />
+          ))}
+          {Array.from({ length: 11 }).map((_, i) => (
+            <circle
+              key={`b${i}`}
+              cx="100"
+              cy="9"
+              r="1.7"
+              fill={theme.accent}
+              transform={`rotate(${((i + 0.5) / 11) * 360} 100 100)`}
+            />
+          ))}
         </svg>
         <span
           className="dawa-inv-monogram-letters dawa-inv-grad"
@@ -1405,9 +1473,12 @@ function ViewStyles({ theme }) {
     .dawa-inv .dawa-inv-foot-mark { font-weight: 900; font-size: 38px; margin-bottom: 12px; padding-block: 6px; }
     .dawa-inv .dawa-inv-foot-tag { font-size: 11px; letter-spacing: 3px; text-transform: uppercase; font-style: italic; opacity: .85; }
 
-    /* Floral flourish (hero crown + footer ornament) */
+    /* Brand logo crown + floral flourish */
+    .dawa-inv .dawa-inv-logo { display: block; }
+    .dawa-inv .dawa-inv-hero-logo { margin-bottom: 6px; animation: dawa-inv-rise .8s ease both, dawa-inv-float 6s ease-in-out 1s infinite; filter: drop-shadow(0 10px 28px ${theme.accentMuted}); }
     .dawa-inv .dawa-inv-flourish { display: block; }
-    .dawa-inv .dawa-inv-hero-flourish { position: relative; margin-bottom: 14px; animation: dawa-inv-rise .9s ease both; filter: drop-shadow(0 4px 14px ${theme.accentMuted}); }
+    .dawa-inv .dawa-inv-hero-flourish { position: relative; margin-bottom: 16px; animation: dawa-inv-rise .9s .1s ease both; opacity: .92; }
+    @keyframes dawa-inv-float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
 
     /* Floating dock */
     .dawa-inv .dawa-inv-dock { bottom: 22px; inset-inline-end: 22px; display: flex; flex-direction: column; gap: 8px; z-index: 100; }
