@@ -1,7 +1,7 @@
 ﻿// Driver → main route: pending guests grouped by city, the delivery form,
 // the live-location share panel, and the completed list.
 import { telLink } from "../../../utils/phone.js";
-import { wazeLink, extractCity as extractCityRaw } from "../../../utils/geo.js";
+import { wazeLink, wazeLinkCoords, extractCity as extractCityRaw } from "../../../utils/geo.js";
 import { compressImageToDataUrl } from "../../../utils/imageCompress.js";
 import { usePortal } from "../../../context/PortalContext.jsx";
 import { Num } from "../../../components/Num.jsx";
@@ -246,6 +246,15 @@ export function DriverDeliveryList() {
                           <div>
                             <div style={{ fontWeight: 800, color: C.goldLight, fontSize: 15 }}>{g.name}</div>
                             {g.area && <div style={{ fontSize: 12, color: C.dim, marginTop: 4 }}>📍 {g.area}</div>}
+                            {g.deliveryNote && (
+                              <div style={{
+                                fontSize: 12, color: C.gold, marginTop: 6, lineHeight: 1.5,
+                                padding: "5px 8px", borderRadius: 8,
+                                background: "rgba(201,168,76,.08)", border: "1px solid rgba(201,168,76,.22)",
+                              }}>
+                                📝 {g.deliveryNote}
+                              </div>
+                            )}
                           </div>
                         </div>
                         {isNext && (
@@ -267,7 +276,7 @@ export function DriverDeliveryList() {
                           📞 <span style={{ direction: "ltr" }}>{g.phone}</span>
                         </a>
                         {g.area ? (
-                          <a href={wazeLink(g.area)} target="_blank" rel="noreferrer" style={{
+                          <a href={(typeof g.lat === "number" && typeof g.lng === "number") ? wazeLinkCoords(g.lat, g.lng) : wazeLink(g.area)} target="_blank" rel="noreferrer" style={{
                             flex: 1, padding: "10px 0", borderRadius: 10, textAlign: "center",
                             background: "rgba(0,160,220,.12)", border: "1px solid rgba(0,160,220,.35)",
                             color: "#00b4dc", fontSize: 13, fontWeight: 700, display: "flex",

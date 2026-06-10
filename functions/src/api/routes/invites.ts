@@ -641,8 +641,15 @@ function parsePhysicalSubmitBody(body: unknown): ParseResult<ParsedPhysical> {
 
 /**
  * Build the RTDB guest-record patch for a physical invite submission.
- * Always sets name/phone/area/confirmedAt; conditionally sets coords
- * and delivery note based on what the guest provided.
+ * Sets area/confirmedAt; conditionally sets coords and delivery note.
+ *
+ * We deliberately do NOT overwrite the guest's name/phone here. Keeping the
+ * originally-invited name/phone lets the admin Confirmations tab compare them
+ * against what the guest actually entered (submittedName/submittedPhone) and
+ * flag a different responder — a changed name shows as a red "name_differs"
+ * mismatch, a changed phone fails the phone match and surfaces as "unknown".
+ * The admin applies the entered values explicitly via "use guest data" when
+ * the response is legitimate.
  */
 function buildPhysicalGuestPatch(
   s: ParsedPhysical,
@@ -650,8 +657,6 @@ function buildPhysicalGuestPatch(
   now: number
 ): Record<string, unknown> {
   const patch: Record<string, unknown> = {
-    name: s.submittedName,
-    phone: s.submittedPhone,
     area,
     confirmedAt: now,
   };
@@ -691,6 +696,10 @@ function buildPhysicalConfirmationRecord(
     confirmedAt: now,
     attachedGuestId: tk.guestId,
   };
+  // Mirror the guest's note-to-driver onto the (immutable) confirmation so the
+  // admin always sees it, even after the driver later overwrites the guest
+  // record's deliveryNote with their own delivery note.
+  if (s.deliveryNote) record.deliveryNote = s.deliveryNote;
   if (s.companions !== null) record.companions = s.companions;
   if (s.hasCoords) {
     record.lat = s.lat;

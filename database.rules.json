@@ -119,6 +119,7 @@
         "submittedCity":   { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 80)" },
         "submittedStreet": { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 120)" },
         "submittedHouse":  { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 20)" },
+        "deliveryNote":    { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 240)" },
         "lat":               { ".validate": "!newData.exists() || (newData.isNumber() && newData.val() >= -90  && newData.val() <= 90)" },
         "lng":               { ".validate": "!newData.exists() || (newData.isNumber() && newData.val() >= -180 && newData.val() <= 180)" },
         "locationAccuracy":  { ".validate": "!newData.exists() || (newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000)" },

@@ -5,7 +5,7 @@
 import { usePortal } from "../../../context/PortalContext.jsx";
 import { C } from "../../../styles/theme.js";
 import { Num } from "../../../components/Num.jsx";
-import { formatAddress } from "../../../utils/geo.js";
+import { formatAddress, googleMapsLinkCoords } from "../../../utils/geo.js";
 import { MATCH_STATUS } from "../../../constants/matchStatuses.js";
 
 export function AdminConfirmationsTab() {
@@ -97,6 +97,24 @@ export function AdminConfirmationsTab() {
             <div style={{ fontSize: 11, color: C.gold, fontWeight: 800, marginTop: 4 }}>
               👥 {lang === "he" ? "סה״כ" : "العدد"}: <Num>{(Number(conf.companions) || 0) + 1}</Num> {lang === "he" ? "אנשים" : "أشخاص"}
             </div>
+            {typeof conf.lat === "number" && typeof conf.lng === "number" && (
+              <a href={googleMapsLinkCoords(conf.lat, conf.lng)} target="_blank" rel="noreferrer"
+                 style={{
+                   display: "inline-flex", alignItems: "center", gap: 4, marginTop: 6,
+                   fontSize: 11, fontWeight: 800, color: "#4cc97a", textDecoration: "none",
+                 }}>
+                📍 {lang === "he" ? "המיקום שהמוזמן סימן" : "الموقع الذي حدّده المعزوم"} ↗
+              </a>
+            )}
+            {conf.deliveryNote && (
+              <div style={{
+                marginTop: 6, padding: "6px 10px", borderRadius: 8,
+                background: "rgba(201,168,76,.08)", border: "1px solid rgba(201,168,76,.22)",
+                fontSize: 11, color: C.goldLight, lineHeight: 1.6,
+              }}>
+                📝 <span style={{ fontWeight: 800, color: C.goldDim }}>{lang === "he" ? "הערה לשליח" : "ملاحظة للمرسل"}:</span> {conf.deliveryNote}
+              </div>
+            )}
           </div>
         </div>
 
