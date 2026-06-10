@@ -79,23 +79,25 @@ export function AdminSendTab() {
     }
   };
             const groomList = users.filter(u => u.role === "groom");
-            // Confirmed guests move to the Confirmations tab; hide them here so
-            // the Send list is a true "outstanding invites" view.
+            // Show ALL of the groom's guests (confirmed + not). Each card labels
+            // its confirmation status; "send to all" still targets only the
+            // not-yet-confirmed so confirmed guests aren't re-messaged.
             const selectedGroomGuests = adminSelectedGroom
-              ? guests.filter(g => g.groomUsername === adminSelectedGroom && !g.confirmedAt) : [];
+              ? guests.filter(g => g.groomUsername === adminSelectedGroom) : [];
             // Manual mode splits the list by address; Digital mode shows a single
             // unified list (address is irrelevant for a digital invite link).
             const isDigital = adminMode === "digital";
             const withoutAddr = selectedGroomGuests.filter(g => !g.area || !g.area.trim());
             const withAddr    = selectedGroomGuests.filter(g =>  g.area &&  g.area.trim());
             // Digital guests for the selected groom (Firestore-backed, subscribed
-            // in usePortalState). Hide confirmed ones — same convention as above.
+            // in usePortalState). Show ALL — confirmed + not — like the physical list.
             const selectedGroomUser = adminSelectedGroom
               ? users.find(u => u.username === adminSelectedGroom) : null;
             const selectedGroomUid  = selectedGroomUser?.uid || selectedGroomUser?.id || null;
-            const digitalGuests = (digitalGuestsForSelectedGroom || [])
-              .filter(g => !g.confirmedAt);
+            const digitalGuests = digitalGuestsForSelectedGroom || [];
             const digitalMsg = digitalMsgByGroom[adminSelectedGroom] || "";
+            // "Send to all" only messages physical guests who haven't confirmed yet.
+            const unconfirmedGuests = selectedGroomGuests.filter(g => !g.confirmedAt);
             const sections = isDigital
               ? [{ title: (lang === "he" ? "כל המוזמנים" : "كل المدعوين"),
                    list: selectedGroomGuests, color: C.gold, bg: "rgba(201,168,76,.06)" }]
@@ -164,15 +166,15 @@ export function AdminSendTab() {
                 {/* Guests of selected groom + send buttons */}
                 {adminSelectedGroom && (
                   <>
-                    {selectedGroomGuests.length > 0 && (
-                      <button onClick={() => sendAll(selectedGroomGuests)}
+                    {unconfirmedGuests.length > 0 && (
+                      <button onClick={() => sendAll(unconfirmedGuests)}
                               style={{
                                 width: "100%", padding: "13px 0", borderRadius: 12, cursor: "pointer",
                                 background: "linear-gradient(135deg,#25d366,#1ea84d)",
                                 color: "#fff",
                                 border: "none", fontWeight: 900, fontSize: 14, fontFamily: "inherit", marginBottom: 18,
                               }}>
-                        {t("admin_send_to_all")} (<Num>{selectedGroomGuests.length.toLocaleString("en")}</Num>)
+                        {t("admin_send_to_all")} (<Num>{unconfirmedGuests.length.toLocaleString("en")}</Num>)
                       </button>
                     )}
 
@@ -262,6 +264,9 @@ export function AdminSendTab() {
                                 ?? NODESIGN)
                             : null;
                           const noDesign = effDesignId === NODESIGN;
+                          // Confirmation status, shown under every guest (digital + physical).
+                          const isConfirmed = sec.digital ? g.status === "attending" : !!g.confirmedAt;
+                          const isDeclined  = sec.digital && g.status === "absent";
                           return (
                           <div key={g.id} style={{
                             background: cardBg,
@@ -296,6 +301,16 @@ export function AdminSendTab() {
                                 )}
                               </div>
                               <div style={{ fontSize: 11, color: "#5a5040", direction: "ltr", textAlign: "right" }}>{g.phone}</div>
+                              <div style={{
+                                fontSize: 10.5, fontWeight: 800, marginTop: 4,
+                                color: isConfirmed ? "#4cc97a" : isDeclined ? C.red : "#7a6a4a",
+                              }}>
+                                {isConfirmed
+                                  ? "✓ " + (lang === "he" ? "אישר הגעה" : "تم التأكيد")
+                                  : isDeclined
+                                    ? "✗ " + (lang === "he" ? "התנצל — לא יגיע" : "اعتذر — لن يحضر")
+                                    : "○ " + (lang === "he" ? "טרם אישר" : "لم يؤكد بعد")}
+                              </div>
                               {g.area && <div style={{ fontSize: 11, color: C.dim }}>📍 {g.area}</div>}
                               {/* Guest role / ranks */}
                               {guestRanks(g).length > 0 && (
