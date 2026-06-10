@@ -8,7 +8,7 @@
 // On submit the data is written straight onto /guestsByGroom/{groomUid}/{guestId}
 // (no admin "attach" step), and the token is marked used so re-opening the
 // same link shows the "already used" screen.
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { BrandLogo } from "../components/BrandLogo.jsx";
 import { LangSwitcher } from "../components/LangSwitcher.jsx";
@@ -39,15 +39,24 @@ export function InviteForm({ t, lang, setLang }) {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
+  // Pre-fill name + phone from the token ONCE. subscribeInviteToken polls, so it
+  // re-fires repeatedly; the previous `if (!name)` check used a stale closure
+  // (name was always "" from the first render) and re-set the fields on every
+  // poll — wiping whatever the guest typed, so they could never change their
+  // name/phone. The ref guard pre-fills a single time and then leaves the
+  // fields fully editable.
+  const prefilled = useRef(false);
   useEffect(() => {
     if (!token) { setTokenRec(null); return; }
     const unsub = subscribeInviteToken(token, (rec) => {
       setTokenRec(rec);
-      if (rec && !name)  setName(rec.guestName  || "");
-      if (rec && !phone) setPhone(rec.guestPhone || "");
+      if (rec && !prefilled.current) {
+        setName(rec.guestName || "");
+        setPhone(rec.guestPhone || "");
+        prefilled.current = true;
+      }
     });
     return () => unsub();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
   const shareLocation = async () => {
