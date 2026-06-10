@@ -22,11 +22,12 @@ export function AdminConfirmationsTab() {
   const selectedGroomUid = selectedGroomUser?.uid || selectedGroomUser?.id || null;
   const forGroom = (c) => !selectedGroomUid || c.groomUid === selectedGroomUid;
 
-  // Matched + mismatch are scoped to the selected groom; unknowns (phone matches
-  // no guest of ANY groom) are always shown in full.
+  // Every confirmation — matched, mismatch, AND unknown — is scoped to the groom
+  // whose confirmation form was used (each record carries groomUid). So an
+  // unknown reply submitted to one groom never shows under another groom.
   const matched  = confirmations.filter(c => matchColor(c) === MATCH_STATUS.GREEN && forGroom(c));
   const mismatch = confirmations.filter(c => matchColor(c) === MATCH_STATUS.RED && forGroom(c));
-  const unknown  = confirmations.filter(c => matchColor(c) === MATCH_STATUS.UNKNOWN);
+  const unknown  = confirmations.filter(c => matchColor(c) === MATCH_STATUS.UNKNOWN && forGroom(c));
   // Declined / "can't come" — digital guests of the selected groom marked absent.
   const declined = adminSelectedGroom
     ? (digitalGuestsForSelectedGroom || []).filter(g => g.status === "absent")
