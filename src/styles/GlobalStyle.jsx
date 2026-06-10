@@ -300,5 +300,27 @@ export const GlobalStyle = () => (
       border-radius: 50%; animation: spin .7s linear infinite;
       vertical-align: -2px;
     }
+
+    /* ── Groom portal header (brand · tabs · controls) ─────────────────── */
+    .dawa-phead {
+      max-width: 900px; margin: 0 auto; min-height: 54px;
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    }
+    .dawa-phead-brand { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+    .dawa-phead-tabs  { display: flex; align-items: center; flex-wrap: wrap; justify-content: center; gap: 4px; }
+    .dawa-phead-ctrl  { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+
+    /* ── Mobile breakpoint ─────────────────────────────────────────────── */
+    @media (max-width: 620px) {
+      /* Header becomes two tidy rows: [brand … controls] over a centered tab row. */
+      .dawa-phead { flex-wrap: wrap; min-height: 0; padding: 9px 0; gap: 8px; }
+      .dawa-phead-brand { order: 1; }
+      .dawa-phead-ctrl  { order: 2; margin-inline-start: auto; }
+      .dawa-phead-tabs  {
+        order: 3; width: 100%; justify-content: center; gap: 6px;
+        padding-top: 8px; border-top: 1px solid rgba(201,168,76,.08);
+      }
+      .dawa-phead-tabs .nav-tab { font-size: 12px !important; padding: 6px 9px !important; }
+    }
   `}</style>
 );

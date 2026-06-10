@@ -41,8 +41,8 @@ export function GroomHandwrittenShell() {
         position: "sticky", top: 0, zIndex: 50, background: "rgba(7,7,10,.95)",
         backdropFilter: "blur(12px)", borderBottom: "1px solid rgba(201,168,76,.1)", padding: "0 16px",
       }}>
-        <div style={{ maxWidth: 900, margin: "0 auto", height: 54, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div className="dawa-phead">
+          <div className="dawa-phead-brand">
             <button onClick={onBack} style={{ background: "none", border: "none", color: C.dim, cursor: "pointer", fontSize: 16 }}>←</button>
             <span style={{ fontFamily: "'Amiri',serif", color: C.gold, fontWeight: 900, fontSize: 18 }}>
               {lang === "he" ? "דעוה" : "دعوة"}
@@ -54,12 +54,14 @@ export function GroomHandwrittenShell() {
               {lang === "he" ? "כתב יד" : "يدوي"}
             </span>
           </div>
-          <div style={{ display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center" }}>
+          <div className="dawa-phead-tabs">
             <NavLink data-testid="nav-groom-dashboard" to="/portal/groom/handwritten/dashboard" className={navClass} style={navStyle}>{t("tab_dashboard")}</NavLink>
             <NavLink data-testid="nav-groom-guests"    to="/portal/groom/handwritten/guests"    className={navClass} style={navStyle}>{t("tab_guests")}</NavLink>
             <NavLink data-testid="nav-groom-add"       to="/portal/groom/handwritten/add"       className={navClass} style={navStyle}>{t("tab_add")}</NavLink>
             <NavLink data-testid="nav-groom-proofs"    to="/portal/groom/handwritten/proofs"    className={navClass} style={navStyle}>{t("tab_proofs")}</NavLink>
             <NavLink data-testid="nav-groom-map"       to="/portal/groom/handwritten/map"       className={navClass} style={navStyle}>{t("tab_guest_map")}</NavLink>
+          </div>
+          <div className="dawa-phead-ctrl">
             <button
               onClick={changeType}
               title={lang === "he" ? "החלף סוג הזמנה" : "تغيير نوع المكتوب"}

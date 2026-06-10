@@ -37,8 +37,8 @@ export function DigitalPortal() {
         position: "sticky", top: 0, zIndex: 50, background: "rgba(7,7,10,.95)",
         backdropFilter: "blur(12px)", borderBottom: "1px solid rgba(75,159,212,.15)", padding: "0 16px",
       }}>
-        <div style={{ maxWidth: 900, margin: "0 auto", height: 54, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div className="dawa-phead">
+          <div className="dawa-phead-brand">
             <button onClick={onBack} style={{ background: "none", border: "none", color: C.dim, cursor: "pointer", fontSize: 16 }}>←</button>
             <span style={{ fontFamily: "'Amiri',serif", color: C.blue, fontWeight: 900, fontSize: 18 }}>
               {lang === "he" ? "דעוה" : "دعوة"}
@@ -50,7 +50,7 @@ export function DigitalPortal() {
               {lang === "he" ? "דיגיטלי" : "رقمي"}
             </span>
           </div>
-          <div style={{ display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center" }}>
+          <div className="dawa-phead-tabs">
             <NavLink to="/portal/groom/digital/dashboard"    className={navClass} style={navStyle}>
               {lang === "he" ? "ראשי" : "الرئيسية"}
             </NavLink>
@@ -66,6 +66,8 @@ export function DigitalPortal() {
             <NavLink to="/portal/groom/digital/design"       className={navClass} style={navStyle}>
               {lang === "he" ? "🎨 עיצוב" : "🎨 التصميم"}
             </NavLink>
+          </div>
+          <div className="dawa-phead-ctrl">
             <button
               onClick={changeType}
               title={lang === "he" ? "החלף סוג הזמנה" : "تغيير نوع المكتوب"}
