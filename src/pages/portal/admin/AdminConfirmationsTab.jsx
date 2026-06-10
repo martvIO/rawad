@@ -12,12 +12,25 @@ export function AdminConfirmationsTab() {
   const {
     confirmations, matchColor, matchedGuestFor,
     confirmationReasons, useConfirmationData, setEditingConf,
+    users, adminSelectedGroom, setAdminSelectedGroom, digitalGuestsForSelectedGroom,
     t, lang,
   } = usePortal();
 
-  const matched  = confirmations.filter(c => matchColor(c) === MATCH_STATUS.GREEN);
-  const mismatch = confirmations.filter(c => matchColor(c) === MATCH_STATUS.RED);
+  const groomList = users.filter(u => u.role === "groom");
+  const selectedGroomUser = adminSelectedGroom
+    ? users.find(u => u.username === adminSelectedGroom) : null;
+  const selectedGroomUid = selectedGroomUser?.uid || selectedGroomUser?.id || null;
+  const forGroom = (c) => !selectedGroomUid || c.groomUid === selectedGroomUid;
+
+  // Matched + mismatch are scoped to the selected groom; unknowns (phone matches
+  // no guest of ANY groom) are always shown in full.
+  const matched  = confirmations.filter(c => matchColor(c) === MATCH_STATUS.GREEN && forGroom(c));
+  const mismatch = confirmations.filter(c => matchColor(c) === MATCH_STATUS.RED && forGroom(c));
   const unknown  = confirmations.filter(c => matchColor(c) === MATCH_STATUS.UNKNOWN);
+  // Declined / "can't come" — digital guests of the selected groom marked absent.
+  const declined = adminSelectedGroom
+    ? (digitalGuestsForSelectedGroom || []).filter(g => g.status === "absent")
+    : [];
 
   const renderConf = (conf) => {
     const guest = matchedGuestFor(conf);
@@ -169,7 +182,45 @@ export function AdminConfirmationsTab() {
         {t("admin_conf_subtitle")}
       </div>
 
-      {confirmations.length === 0 ? (
+      {/* Groom selector — click a groom to see only his replies (+ all unknowns + his declined) */}
+      <div style={{ fontSize: 12, color: C.goldDim, fontWeight: 700, marginBottom: 8 }}>
+        {lang === "he" ? "בחר חתן" : "اختر العريس"}
+      </div>
+      {groomList.length === 0 ? (
+        <div className="card" style={{ textAlign: "center", padding: 24, color: C.dim }}>
+          {lang === "he" ? "אין חתנים" : "لا يوجد عرسان"}
+        </div>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))", gap: 10, marginBottom: 18 }}>
+          {groomList.map(u => {
+            const uid = u.uid || u.id;
+            const cnt = confirmations.filter(c => c.groomUid === uid).length;
+            const isSel = adminSelectedGroom === u.username;
+            return (
+              <button key={u.id} onClick={() => setAdminSelectedGroom(isSel ? null : u.username)} style={{
+                padding: "12px 10px", borderRadius: 12, cursor: "pointer",
+                background: isSel ? "rgba(201,168,76,.22)" : "rgba(255,255,255,.03)",
+                border: `1.5px solid ${isSel ? C.gold : "rgba(255,255,255,.08)"}`,
+                color: isSel ? C.gold : C.goldDim,
+                fontWeight: 800, fontSize: 13, fontFamily: "inherit",
+                display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
+              }}>
+                <span style={{ fontSize: 22 }}>{isSel ? "✓" : "♥"}</span>
+                <span style={{ direction: "ltr" }}>{u.username}</span>
+                <span style={{ fontSize: 10, color: C.dim }}>
+                  {lang === "he" ? "אישורים" : "تأكيدات"} <Num>{cnt.toLocaleString("en")}</Num>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {!adminSelectedGroom ? (
+        <div className="card" style={{ textAlign: "center", padding: 32, color: C.dim }}>
+          {lang === "he" ? "בחר חתן כדי להציג את אישוריו" : "اختر عريساً لعرض تأكيداته"}
+        </div>
+      ) : (matched.length + mismatch.length + unknown.length + declined.length === 0) ? (
         <div className="card" style={{ textAlign: "center", padding: 32, color: C.dim }}>
           {t("admin_conf_empty")}
         </div>
@@ -192,11 +243,34 @@ export function AdminConfirmationsTab() {
             </div>
           )}
           {unknown.length > 0 && (
-            <div>
+            <div style={{ marginBottom: 18 }}>
               <div style={{ fontSize: 13, color: C.red, fontWeight: 700, marginBottom: 10 }}>
                 {t("admin_conf_unknown")} (<Num>{unknown.length.toLocaleString("en")}</Num>)
               </div>
               {unknown.map(renderConf)}
+            </div>
+          )}
+          {declined.length > 0 && (
+            <div>
+              <div style={{ fontSize: 13, color: C.red, fontWeight: 700, marginBottom: 10 }}>
+                {lang === "he" ? "לא יגיעו (התנצלו)" : "لن يحضروا (اعتذروا)"} (<Num>{declined.length.toLocaleString("en")}</Num>)
+              </div>
+              {declined.map(g => (
+                <div key={g.id} style={{
+                  marginBottom: 8, padding: 14, borderRadius: 14,
+                  background: "rgba(212,122,75,.05)", border: "1px solid rgba(212,122,75,.3)",
+                  display: "flex", alignItems: "center", gap: 10,
+                }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, color: C.goldLight, fontWeight: 800 }}>{g.name}</div>
+                    <div style={{ fontSize: 11, color: C.goldDim, direction: "ltr", textAlign: "right" }}>{g.phone}</div>
+                  </div>
+                  <span style={{
+                    fontSize: 10, padding: "3px 10px", borderRadius: 20, fontWeight: 800,
+                    background: "rgba(212,122,75,.15)", color: C.red,
+                  }}>✗ {lang === "he" ? "לא יגיע" : "لن يحضر"}</span>
+                </div>
+              ))}
             </div>
           )}
         </>

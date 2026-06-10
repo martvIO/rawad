@@ -3,7 +3,8 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { usePortal } from "../../../../context/PortalContext.jsx";
-import { addDigitalGuest, subscribeDigitalMedia } from "../../../../services/digitalInvitation.js";
+import { addDigitalGuest, subscribeDigitalMedia, subscribeDigitalGuests } from "../../../../services/digitalInvitation.js";
+import { toIntlPhone } from "../../../../utils/phone.js";
 import { logErr } from "../../../../utils/logger.js";
 import { C } from "../../../../styles/theme.js";
 import { Num } from "../../../../components/Num.jsx";
@@ -19,6 +20,8 @@ export function DigitalAddGuest() {
   const [selectedRanks,  setSelectedRanks]  = useState([]);
   const [availableRanks, setAvailableRanks] = useState([]);
   const [saving,         setSaving]         = useState(false);
+  // The groom's existing digital guests — used to block a duplicate phone.
+  const [existingGuests, setExistingGuests] = useState([]);
   // Tracks unmount so we don't call setSaving on a dead component after the
   // optimistic navigate has fired. Avoids React's "state on unmounted" warning
   // and prevents the spinner state from being reset to stale on a fast remount.
@@ -31,6 +34,13 @@ export function DigitalAddGuest() {
     return subscribeDigitalMedia(currentUid, (d) => setAvailableRanks(d?.guestRanks || []));
   }, [currentUid]);
 
+  // Subscribe to the existing digital guests so we can block a duplicate phone.
+  useEffect(() => {
+    if (!currentUid) return;
+    return subscribeDigitalGuests(currentUid, (list) =>
+      setExistingGuests(Array.isArray(list) ? list : []));
+  }, [currentUid]);
+
   const toggleRank = (r) => {
     setSelectedRanks((prev) =>
       prev.includes(r) ? prev.filter((x) => x !== r) : [...prev, r],
@@ -38,25 +48,31 @@ export function DigitalAddGuest() {
   };
 
   const nameWords  = name.trim().split(/\s+/).filter(Boolean);
-  const phoneDigits = phone.replace(/\D/g, "");
+  const phoneDigits = phone.replace(/\D/g, "").slice(0, 9); // 9 national digits after +972
   const nameOk   = nameWords.length >= 2;
-  const phoneOk  = phoneDigits.length === 10;
+  const phoneOk  = phoneDigits.length === 9;
+  // Duplicate phone within THIS groom's list — compared in canonical intl form.
+  const newIntl = phoneOk ? toIntlPhone("0" + phoneDigits) : "";
+  const isDuplicate = phoneOk && existingGuests.some((g) => toIntlPhone(g.phone) === newIntl);
   // Block submit until auth resolves — otherwise addDigitalGuest 401s,
   // apiClient retries once, then throws "session_expired" — which we'd show
   // as a generic toast and confuse the user.
-  const canSubmit = nameOk && phoneOk && !saving && !!currentUid;
+  const canSubmit = nameOk && phoneOk && !isDuplicate && !saving && !!currentUid;
 
   // Show inline errors only once the user has typed something
   const nameErr  = name.trim()  && !nameOk
     ? (lang === "he" ? "שם חייב להכיל לפחות 2 מילים" : "يجب أن يحتوي الاسم على كلمتين على الأقل")
     : null;
-  const phoneErr = phone.trim() && !phoneOk
-    ? (lang === "he" ? "10 ספרות בדיוק" : "يجب أن يكون الرقم 10 أرقام بالضبط")
-    : null;
+  const phoneErr = phone && !phoneOk
+    ? (lang === "he" ? "9 ספרות בדיוק" : "9 أرقام بالضبط")
+    : isDuplicate
+      ? (lang === "he" ? "המספר כבר קיים ברשימה" : "هذا الرقم مضاف مسبقاً لهذا العريس")
+      : null;
 
   const submit = async () => {
     if (!nameOk)  { showToast(nameErr  || (lang === "he" ? "שם לא תקין" : "الاسم غير صحيح"));  return; }
     if (!phoneOk) { showToast(phoneErr || (lang === "he" ? "טלפון לא תקין" : "الهاتف غير صحيح")); return; }
+    if (isDuplicate) { showToast(lang === "he" ? "המספר כבר קיים ברשימה" : "هذا الرقم مضاف مسبقاً لهذا العريس"); return; }
     if (!currentUid) {
       showToast(lang === "he" ? "אנא התחבר מחדש" : "يرجى إعادة تسجيل الدخول");
       return;
@@ -69,20 +85,27 @@ export function DigitalAddGuest() {
       // master list — protects against a race where the groom removed a rank
       // in another tab between selection and submit.
       const cleanRanks = selectedRanks.filter((r) => availableRanks.includes(r));
+      // Store the canonical local form (0XXXXXXXXX) the rest of the app expects.
+      const localPhone = "0" + phoneDigits;
       const id = await addDigitalGuest(currentUid, {
-        name: trimName, phone: phoneDigits, ranks: cleanRanks,
+        name: trimName, phone: localPhone, ranks: cleanRanks,
       });
       showToast(lang === "he" ? "✓ המוזמן נוסף" : "✓ تم إضافة المدعو");
       setName(""); setPhone(""); setSelectedRanks([]);
       // Pass the new guest via navigation state so the list shows it immediately
       // without waiting for the next subscription tick.
       const optimistic = {
-        id, name: trimName, phone: phoneDigits, status: "pending", createdAt: Date.now(),
+        id, name: trimName, phone: localPhone, status: "pending", createdAt: Date.now(),
       };
       if (cleanRanks.length > 0) optimistic.ranks = cleanRanks;
       navigate("/portal/groom/digital/guests", { state: { newGuest: optimistic } });
     } catch (err) {
       logErr("addDigitalGuest", err);
+      const code = err?.body?.error || "";
+      if (code === "duplicate_phone") {
+        showToast(lang === "he" ? "המספר כבר קיים ברשימה" : "هذا الرقم مضاف مسبقاً لهذا العريس");
+        return;
+      }
       const isTimeout = err?.message === "request_timeout";
       showToast(
         isTimeout
@@ -126,27 +149,37 @@ export function DigitalAddGuest() {
           <div style={{ fontSize: 11, color: C.red, marginBottom: 12, paddingInlineStart: 4 }}>⚠ {nameErr}</div>
         )}
 
-        {/* Phone */}
+        {/* Phone — fixed +972 prefix, exactly 9 national digits */}
         <div style={{ marginBottom: 6, fontSize: 12, color: C.goldDim }}>
-          {lang === "he" ? "מספר טלפון (10 ספרות בדיוק) *" : "رقم الهاتف (10 أرقام بالضبط) *"}
+          {lang === "he" ? "מספר טלפון (+972 — 9 ספרות) *" : "رقم الهاتف (+972 — 9 أرقام) *"}
         </div>
-        <input
-          className="input-field"
-          type="tel"
-          placeholder="0501234567"
-          value={phone}
-          onChange={e => setPhone(e.target.value)}
-          style={{ marginBottom: phoneErr ? 4 : 4, direction: "ltr", textAlign: "right" }}
-        />
+        <div style={{ display: "flex", alignItems: "stretch", direction: "ltr", marginBottom: 4 }}>
+          <span style={{
+            display: "flex", alignItems: "center", padding: "0 14px", flexShrink: 0,
+            background: "rgba(255,255,255,.06)", border: "1px solid rgba(255,255,255,.10)",
+            borderInlineEnd: "none", borderStartStartRadius: 12, borderEndStartRadius: 12,
+            color: C.goldLight, fontWeight: 800, fontSize: 15, letterSpacing: ".5px",
+          }}>+972</span>
+          <input
+            className="input-field"
+            type="tel"
+            inputMode="numeric"
+            placeholder="521234567"
+            maxLength={9}
+            value={phone}
+            onChange={e => setPhone(e.target.value.replace(/\D/g, "").slice(0, 9))}
+            style={{ borderStartStartRadius: 0, borderEndStartRadius: 0, direction: "ltr", textAlign: "left", flex: 1, minWidth: 0 }}
+          />
+        </div>
         {phoneErr && (
           <div style={{ fontSize: 11, color: C.red, marginBottom: 4, paddingInlineStart: 4 }}>⚠ {phoneErr}</div>
         )}
         {/* Digit counter */}
         <div style={{
-          fontSize: 10, marginBottom: 16, direction: "ltr", textAlign: "right",
-          color: phoneOk ? "#4cc97a" : phoneDigits.length > 0 ? C.dim : "transparent",
+          fontSize: 10, marginBottom: 16, direction: "ltr", textAlign: "left",
+          color: phoneOk && !isDuplicate ? "#4cc97a" : phoneDigits.length > 0 ? C.dim : "transparent",
         }}>
-          {phoneDigits.length} / 10
+          {phoneDigits.length} / 9
         </div>
 
         {/* Ranks chip picker — tap each chip to toggle. Multi-select. */}
@@ -221,8 +254,8 @@ export function DigitalAddGuest() {
         fontSize: 12, color: C.dim, lineHeight: 1.8,
       }}>
         {lang === "he"
-          ? "💡 הזן שם מלא (לפחות 2 מילים) ומספר טלפון של 10 ספרות. המוזמן יוסף עם סטטוס 'טרם ענה' — ניתן לעדכן את סטטוסו ישירות מהרשימה."
-          : "💡 أدخل الاسم الكامل (كلمتان على الأقل) ورقم الهاتف (10 أرقام بالضبط). يُضاف المدعو بحالة 'لم يرد' — يمكن تحديث الحالة مباشرة من القائمة."}
+          ? "💡 הזן שם מלא (לפחות 2 מילים) ומספר טלפון (+972 ואז 9 ספרות). אי אפשר להוסיף אותו מספר פעמיים. המוזמן יוסף עם סטטוס 'טרם ענה' — ניתן לעדכן ישירות מהרשימה."
+          : "💡 أدخل الاسم الكامل (كلمتان على الأقل) ورقم الهاتف (+972 ثم 9 أرقام). لا يمكن إضافة نفس الرقم مرتين. يُضاف المدعو بحالة 'لم يرد' — يمكن تحديث الحالة مباشرة من القائمة."}
       </div>
     </div>
   );

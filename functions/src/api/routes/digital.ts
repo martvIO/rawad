@@ -226,6 +226,16 @@ digitalRouter.post(
       return;
     }
     try {
+      // Block a duplicate phone within THIS groom's digital guest list.
+      const newNat = ilNational(sanitized.value.phone);
+      const existing = await guestsCol(req.params.uid).get();
+      const dup = existing.docs.some(
+        (d) => ilNational(((d.data() as { phone?: unknown }).phone ?? "").toString()) === newNat
+      );
+      if (dup) {
+        res.status(409).json({ error: "duplicate_phone", field: "phone" });
+        return;
+      }
       const docRef = await guestsCol(req.params.uid).add({
         ...sanitized.value,
         status: "pending",
@@ -1500,6 +1510,15 @@ function coerceRanks(data: Record<string, unknown>):
   return { ok: true, value: cleaned };
 }
 
+// Israeli national subscriber number = exactly 9 digits (after dropping +972 /
+// the leading 0). Returns the canonical 9-digit string, or null when invalid.
+function ilNational(raw: string): string | null {
+  let d = (raw || "").replace(/\D/g, "");
+  if (d.startsWith("972")) d = d.slice(3);
+  else if (d.startsWith("0")) d = d.slice(1);
+  return d.length === 9 ? d : null;
+}
+
 function sanitizeDigitalGuestCreate(
   body: unknown
 ): Sanitized<DigitalGuestCreate> {
@@ -1512,13 +1531,16 @@ function sanitizeDigitalGuestCreate(
   if (!name || name.length > MAX_GUEST_NAME_LEN) {
     return { ok: false, error: "invalid_name", field: "name" };
   }
-  if (!phone || phone.length > MAX_GUEST_PHONE_LEN) {
+  // Require a valid +972 number — exactly 9 national digits — and store it in
+  // canonical local form (0XXXXXXXXX) so duplicate checks compare cleanly.
+  const nat = ilNational(phone);
+  if (!phone || phone.length > MAX_GUEST_PHONE_LEN || !nat) {
     return { ok: false, error: "invalid_phone", field: "phone" };
   }
   const ranksResult = coerceRanks(data);
   if (!ranksResult.ok) return ranksResult;
 
-  const out: DigitalGuestCreate = { name, phone };
+  const out: DigitalGuestCreate = { name, phone: "0" + nat };
   if (ranksResult.value && ranksResult.value.length > 0) {
     out.ranks = ranksResult.value;
   }
