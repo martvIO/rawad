@@ -545,10 +545,22 @@ export function usePortalState({ onBack, t, lang, setLang }) {
   // Per-guest DIGITAL invite link. Mirrors sendInviteLink but uses the
   // digital token Cloud Function and routes through /invite/digital/{token}.
   // Only the admin's Send tab calls this — grooms can no longer self-send.
-  const sendDigitalInviteLink = async (guest, groomUid) => {
+  //
+  // `customMessage` is the admin's per-groom Send-tab message (already
+  // personalised with the guest name); it wins over the saved digital-settings
+  // message so an empty box never sends a blank invite. `opts.noDesign` is the
+  // "بدون تصميم" option — send the message ONLY, with no invitation link.
+  const sendDigitalInviteLink = async (guest, groomUid, customMessage, opts = {}) => {
     if (!groomUid || !guest?.id) { showToast(t("share_invalid")); return; }
     if (!toIntlPhone(guest.phone)) { showToast(t("share_invalid")); return; }
+    const message = (customMessage || "").trim() || (adminDigitalMessage || "").trim();
     try {
+      // "بدون تصميم" — open WhatsApp with the message and NO link.
+      if (opts.noDesign) {
+        const waUrl = buildWaLink(guest.phone, message, "");
+        if (waUrl) window.open(waUrl, "_blank", "noopener");
+        return;
+      }
       const { token } = await createDigitalGuestInvite({
         groomUid,
         guestId: guest.id,
@@ -557,7 +569,7 @@ export function usePortalState({ onBack, t, lang, setLang }) {
       const baseUrl = (INVITE_BASE_URL || "").replace(/\/+$/, "")
                    || window.location.origin;
       const url = `${baseUrl}/d/${adminSelectedGroom}/${token}`;
-      const waUrl = buildWaLink(guest.phone, (adminMessageBody || "").trim(), url);
+      const waUrl = buildWaLink(guest.phone, message, url);
       if (waUrl) window.open(waUrl, "_blank", "noopener");
     } catch (e) {
       logErr("sendDigitalInviteLink", e);

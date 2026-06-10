@@ -19,6 +19,13 @@ function guestRanks(g) {
   return [];
 }
 
+// Sentinel for the "بدون تصميم" (no design) picker option — send the message
+// with NO invitation link. Client-side only; never persisted onto a guest.
+const NODESIGN = "__nodesign__";
+// Replace {الاسم}/{name}/{שם} placeholders with the guest's name.
+const personalize = (msg, name) =>
+  (msg || "").replace(/\{\s*(?:الاسم|name|שם)\s*\}/g, (name || "").trim());
+
 export function AdminSendTab() {
   const {
     users, guests, adminSelectedGroom, setAdminSelectedGroom,
@@ -32,6 +39,9 @@ export function AdminSendTab() {
   // Optimistic per-guest design selection { [guestId]: designId } for instant
   // dropdown feedback before the guest subscription echoes the persisted value.
   const [designOverrides, setDesignOverrides] = useState({});
+  // Per-groom WhatsApp message for DIGITAL guests, typed on this page. Keyed by
+  // groom username so each groom keeps its own draft while switching around.
+  const [digitalMsgByGroom, setDigitalMsgByGroom] = useState({});
 
   useEffect(() => {
     const groomUser = adminSelectedGroom ? users.find((u) => u.username === adminSelectedGroom) : null;
@@ -45,6 +55,7 @@ export function AdminSendTab() {
 
   const pickDesign = async (groomUid, guestId, designId) => {
     setDesignOverrides((prev) => ({ ...prev, [guestId]: designId }));
+    if (designId === NODESIGN) return; // ephemeral — never persist the sentinel
     try {
       await assignGuestDesign(groomUid, guestId, designId);
     } catch (err) {
@@ -84,6 +95,7 @@ export function AdminSendTab() {
             const selectedGroomUid  = selectedGroomUser?.uid || selectedGroomUser?.id || null;
             const digitalGuests = (digitalGuestsForSelectedGroom || [])
               .filter(g => !g.confirmedAt);
+            const digitalMsg = digitalMsgByGroom[adminSelectedGroom] || "";
             const sections = isDigital
               ? [{ title: (lang === "he" ? "כל המוזמנים" : "كل المدعوين"),
                    list: selectedGroomGuests, color: C.gold, bg: "rgba(201,168,76,.06)" }]
@@ -191,6 +203,34 @@ export function AdminSendTab() {
                           <div style={{ flex: 1, fontWeight: 800, color: sec.color, fontSize: 13 }}>{sec.title}</div>
                           <span style={{ fontSize: 11, color: sec.color, fontWeight: 700 }}><Num>{sec.list.length.toLocaleString("en")}</Num></span>
                         </div>
+                        {sec.digital && (
+                          <div style={{
+                            marginBottom: 10, padding: 12, borderRadius: 12,
+                            background: "rgba(75,159,212,.06)", border: "1px solid rgba(75,159,212,.25)",
+                          }}>
+                            <div style={{ fontSize: 12, fontWeight: 800, color: "#4b9fd4", marginBottom: 6 }}>
+                              ✍️ {lang === "he" ? "הודעת וואטסאפ למוזמנים הדיגיטליים" : "رسالة واتساب للمدعوين الرقميين"}
+                            </div>
+                            <textarea
+                              className="input-field"
+                              value={digitalMsg}
+                              onChange={(e) => {
+                                const v = e.target.value.slice(0, 4000);
+                                setDigitalMsgByGroom((prev) => ({ ...prev, [adminSelectedGroom]: v }));
+                              }}
+                              rows={4}
+                              placeholder={lang === "he"
+                                ? "כתוב את ההודעה שתישלח לכל מוזמן… השתמש ב-{שם} עבור שם המוזמן"
+                                : "اكتب الرسالة التي ستُرسل لكل معزوم… استخدم {الاسم} ليوضع اسمه"}
+                              style={{ resize: "vertical", fontSize: 13, fontFamily: "inherit" }}
+                            />
+                            <div style={{ marginTop: 6, fontSize: 10, color: C.dim, lineHeight: 1.6 }}>
+                              {lang === "he"
+                                ? "{שם} יוחלף בשם המוזמן · נשלח עם קישור ההזמנה (או בלי קישור עם ״ללא עיצוב״)"
+                                : "{الاسم} بتنحطّ مكانها اسم المعزوم · بتنبعث مع رابط الدعوة (أو بدون رابط مع «بدون تصميم»)"}
+                            </div>
+                          </div>
+                        )}
                         {sec.list.map(g => {
                           // Confirmation matching only runs for physical guests
                           // (which live in /guestsByGroom). Digital guests get
@@ -212,6 +252,16 @@ export function AdminSendTab() {
                                             : isMatched ? "rgba(76,201,122,.3)"
                                             : isPending ? "rgba(212,161,75,.25)"
                                             : "rgba(255,255,255,.07)";
+                          // Effective design for a digital guest: explicit pick →
+                          // stored → groom default → first approved → else no-design.
+                          const effDesignId = sec.digital
+                            ? (designOverrides[g.id]
+                                ?? approvedDesigns.find((d) => d.id === g.designId)?.id
+                                ?? approvedDesigns.find((d) => d.isDefault)?.id
+                                ?? approvedDesigns[0]?.id
+                                ?? NODESIGN)
+                            : null;
+                          const noDesign = effDesignId === NODESIGN;
                           return (
                           <div key={g.id} style={{
                             background: cardBg,
@@ -258,39 +308,31 @@ export function AdminSendTab() {
                                   ))}
                                 </div>
                               )}
-                              {/* Per-guest design picker — digital guests only; only approved designs are sendable */}
+                              {/* Per-guest design picker — digital guests only. Includes a
+                                  "بدون تصميم" option that sends the message with no link. */}
                               {sec.digital && (
-                                approvedDesigns.length === 0 ? (
-                                  <div style={{ marginTop: 6, fontSize: 10, color: C.dim }}>
-                                    {lang === "he" ? "אין עיצוב מאושר לשליחה" : "لا يوجد تصميم معتمد للإرسال"}
-                                  </div>
-                                ) : (() => {
-                                  const curId = designOverrides[g.id]
-                                    ?? (approvedDesigns.find((d) => d.id === g.designId)?.id)
-                                    ?? (approvedDesigns.find((d) => d.isDefault)?.id)
-                                    ?? approvedDesigns[0]?.id ?? "";
-                                  return (
-                                    <div style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 6 }}>
-                                      <span style={{ fontSize: 10, color: C.goldDim, whiteSpace: "nowrap" }}>🎨 {lang === "he" ? "עיצוב:" : "التصميم:"}</span>
-                                      <select
-                                        value={curId}
-                                        onChange={(e) => pickDesign(selectedGroomUid, g.id, e.target.value)}
-                                        style={{
-                                          flex: 1, minWidth: 0, fontSize: 11, fontFamily: "inherit",
-                                          padding: "5px 8px", borderRadius: 8,
-                                          background: "rgba(255,255,255,.04)", color: C.goldLight,
-                                          border: "1px solid rgba(201,168,76,.3)", cursor: "pointer",
-                                        }}
-                                      >
-                                        {approvedDesigns.map((d) => (
-                                          <option key={d.id} value={d.id} style={{ background: "#0f0f15" }}>
-                                            {localize(d.title, lang) || (lang === "he" ? "עיצוב" : "تصميم")}{d.isDefault ? " ★" : ""}
-                                          </option>
-                                        ))}
-                                      </select>
-                                    </div>
-                                  );
-                                })()
+                                <div style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 6 }}>
+                                  <span style={{ fontSize: 10, color: C.goldDim, whiteSpace: "nowrap" }}>🎨 {lang === "he" ? "עיצוב:" : "التصميم:"}</span>
+                                  <select
+                                    value={effDesignId}
+                                    onChange={(e) => pickDesign(selectedGroomUid, g.id, e.target.value)}
+                                    style={{
+                                      flex: 1, minWidth: 0, fontSize: 11, fontFamily: "inherit",
+                                      padding: "5px 8px", borderRadius: 8,
+                                      background: "rgba(255,255,255,.04)", color: C.goldLight,
+                                      border: "1px solid rgba(201,168,76,.3)", cursor: "pointer",
+                                    }}
+                                  >
+                                    <option value={NODESIGN} style={{ background: "#0f0f15" }}>
+                                      🚫 {lang === "he" ? "ללא עיצוב (הודעה בלבד)" : "بدون تصميم (رسالة فقط)"}
+                                    </option>
+                                    {approvedDesigns.map((d) => (
+                                      <option key={d.id} value={d.id} style={{ background: "#0f0f15" }}>
+                                        {localize(d.title, lang) || (lang === "he" ? "עיצוב" : "تصميم")}{d.isDefault ? " ★" : ""}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
                               )}
                               {/* Explain what's mismatched — without shouting */}
                               {isMismatch && (
@@ -305,7 +347,7 @@ export function AdminSendTab() {
                               )}
                             </div>
                             <button onClick={() => sec.digital
-                                      ? sendDigitalInviteLink(g, selectedGroomUid)
+                                      ? sendDigitalInviteLink(g, selectedGroomUid, personalize(digitalMsg, g.name), { noDesign })
                                       : sendInviteLink(g)}
                                     title={g.inviteLinkSentAt ? t("guests_invite_sent") : t("admin_send_to_one")}
                                     style={{
