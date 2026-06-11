@@ -1283,15 +1283,23 @@ function Ambience({ theme, fixed }) {
     delay: Math.random() * 18,
     size: 11 + Math.random() * 9,
   })), []);
-  const sparkles = useMemo(() => Array.from({ length: 20 }, () => ({
+  const sparkles = useMemo(() => Array.from({ length: 34 }, () => ({
     top: Math.random() * 100,
     left: Math.random() * 100,
-    dur: 2.5 + Math.random() * 3,
-    delay: Math.random() * 4,
+    dur: 2.4 + Math.random() * 3.2,
+    delay: Math.random() * 5,
+    size: 1.5 + Math.random() * 2.4,
   })), []);
   const pos = fixed ? "fixed" : "absolute";
+  const blob = `radial-gradient(circle, ${theme.accent} 0%, transparent 68%)`;
   return (
     <>
+      {/* Living aurora — slow-drifting soft gold light gives the whole page depth */}
+      <div className="dawa-inv-aurora" style={{ position: pos }} aria-hidden="true">
+        <span className="dawa-inv-aurora-blob a1" style={{ background: blob }} />
+        <span className="dawa-inv-aurora-blob a2" style={{ background: blob }} />
+        <span className="dawa-inv-aurora-blob a3" style={{ background: blob }} />
+      </div>
       <div className="dawa-inv-petals" style={{ position: pos }} aria-hidden="true">
         {petals.map((p, i) => (
           <span key={i} className="dawa-inv-petal" style={{ left: `${p.left}%`, width: p.size, height: p.size, animationDuration: `${p.dur}s`, animationDelay: `${p.delay}s`, background: theme.petal }} />
@@ -1299,7 +1307,7 @@ function Ambience({ theme, fixed }) {
       </div>
       <div className="dawa-inv-sparkles" style={{ position: pos }} aria-hidden="true">
         {sparkles.map((s, i) => (
-          <span key={i} className="dawa-inv-sparkle" style={{ top: `${s.top}%`, left: `${s.left}%`, animationDuration: `${s.dur}s`, animationDelay: `${s.delay}s`, background: theme.sparkle, boxShadow: `0 0 8px ${theme.sparkleGlow}` }} />
+          <span key={i} className="dawa-inv-sparkle" style={{ top: `${s.top}%`, left: `${s.left}%`, width: s.size, height: s.size, animationDuration: `${s.dur}s`, animationDelay: `${s.delay}s`, background: theme.sparkle, boxShadow: `0 0 ${(4 + s.size * 2.5).toFixed(0)}px ${theme.sparkleGlow}` }} />
         ))}
       </div>
     </>
@@ -1519,6 +1527,41 @@ function ViewStyles({ theme, fixed }) {
     .dawa-inv-confetti span { position: absolute; top: 50%; left: 50%; width: 8px; height: 12px; border-radius: 2px; animation: dawa-inv-conf 1.6s cubic-bezier(.2,.7,.2,1) forwards; }
     .dawa-inv .dawa-inv-hearts { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
     .dawa-inv .dawa-inv-hearts span { position: absolute; bottom: 0; font-size: 18px; animation: dawa-inv-heart 3s ease-out forwards; opacity: 0; }
+
+    /* ════════════ LUXE LAYER — depth, glow & gold sheen ════════════ */
+    /* Living aurora: slow-drifting soft gold light behind everything. */
+    .dawa-inv .dawa-inv-aurora { inset: 0; pointer-events: none; z-index: 0; overflow: hidden; }
+    .dawa-inv .dawa-inv-aurora-blob { position: absolute; width: 78vw; height: 78vw; max-width: 760px; max-height: 760px; border-radius: 50%; filter: blur(72px); opacity: .18; will-change: transform; }
+    .dawa-inv .dawa-inv-aurora-blob.a1 { top: -14%; inset-inline-start: -14%; animation: dawa-inv-drift1 24s ease-in-out infinite; }
+    .dawa-inv .dawa-inv-aurora-blob.a2 { bottom: -18%; inset-inline-end: -14%; animation: dawa-inv-drift2 30s ease-in-out infinite; }
+    .dawa-inv .dawa-inv-aurora-blob.a3 { top: 36%; inset-inline-start: 26%; opacity: .12; animation: dawa-inv-drift3 34s ease-in-out infinite; }
+
+    /* Couple names + greeting: a richer, layered gold halo. */
+    .dawa-inv .dawa-inv-couple { text-shadow: 0 0 1px ${theme.accentLine}, 0 0 26px ${theme.accentMuted}, 0 0 72px ${theme.accentMuted}, 0 2px 3px rgba(0,0,0,.22); letter-spacing: .5px; }
+    .dawa-inv .dawa-inv-greet strong { text-shadow: 0 0 24px ${theme.accentMuted}, 0 0 60px ${theme.accentMuted}; }
+
+    /* Section diamond dot gleams. */
+    .dawa-inv .dawa-inv-secrule .dawa-inv-secrule-dot { animation: dawa-inv-gleam 3.2s ease-in-out infinite; }
+
+    /* Detail items → refined glass cards with a soft gold glow. */
+    .dawa-inv .dawa-inv-detail {
+      padding: 20px 18px; border-radius: 16px;
+      background: ${theme.cardBg}; border: 1px solid ${theme.cardBorder};
+      box-shadow: 0 14px 38px -20px ${theme.accentMuted}, inset 0 1px 0 rgba(255,255,255,.05);
+      backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+    }
+    .dawa-inv .dawa-inv-detail:hover { border-color: ${theme.accentLine}; box-shadow: 0 18px 48px -16px ${theme.accentMuted}, inset 0 1px 0 rgba(255,255,255,.08); }
+
+    /* Deeper, glowier framing on the showpiece surfaces. */
+    .dawa-inv .dawa-inv-venue-map { box-shadow: 0 20px 56px -24px ${theme.accentMuted}; }
+    .dawa-inv .dawa-inv-countdown { box-shadow: 0 0 52px -22px ${theme.accentMuted}; }
+    .dawa-inv .dawa-inv-dateline { box-shadow: 0 14px 40px -16px ${theme.accentMuted}, inset 0 0 0 1px ${theme.accentLine}; }
+    .dawa-inv .dawa-inv-hero-frame { box-shadow: 0 0 60px -10px ${theme.accentMuted}, inset 0 0 90px -44px ${theme.accentMuted}; }
+
+    @keyframes dawa-inv-drift1 { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(7vw,5vh) scale(1.2); } }
+    @keyframes dawa-inv-drift2 { 0%,100% { transform: translate(0,0) scale(1.15); } 50% { transform: translate(-6vw,-4vh) scale(1); } }
+    @keyframes dawa-inv-drift3 { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(4vw,-6vh) scale(1.15); } }
+    @keyframes dawa-inv-gleam { 0%,100% { opacity: 1; transform: rotate(45deg) scale(1); } 50% { opacity: .6; transform: rotate(45deg) scale(1.35); } }
 
     @keyframes dawa-inv-rise { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: none; } }
     @keyframes dawa-inv-draw { to { stroke-dashoffset: 0; } }

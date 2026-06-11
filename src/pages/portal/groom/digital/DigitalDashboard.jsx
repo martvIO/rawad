@@ -547,6 +547,33 @@ export function DigitalDashboard() {
           </div>
         </div>
       )}
+
+      {/* RSVP messages to the couple — visible ONLY to the groom here (الرئيسية). */}
+      {guests.some(g => g.note && g.note.trim()) && (
+        <div className="gold-card" style={{ marginTop: 20 }}>
+          <div style={{ fontSize: 13, color: C.goldDim, fontWeight: 700, marginBottom: 12 }}>
+            💌 {tt(lang, "رسائل المعزومين للعروسين", "ברכות המוזמנים לזוג")}
+          </div>
+          <div style={{ display: "grid", gap: 10 }}>
+            {guests.filter(g => g.note && g.note.trim()).map(g => (
+              <div key={g.id} style={{
+                padding: "10px 12px", borderRadius: 10,
+                background: "rgba(255,255,255,.03)", border: "1px solid rgba(201,168,76,.18)",
+              }}>
+                <div style={{ fontSize: 12, fontWeight: 800, color: C.goldLight, marginBottom: 4 }}>
+                  {g.name}
+                  {g.status === "attending" && <span style={{ marginInlineStart: 8, fontSize: 10, color: "#4cc97a" }}>✓ {tt(lang, "سيحضر", "מגיע")}</span>}
+                  {g.status === "absent" && <span style={{ marginInlineStart: 8, fontSize: 10, color: C.red }}>✗ {tt(lang, "اعتذر", "התנצל")}</span>}
+                </div>
+                <div style={{ fontSize: 13, color: C.dim, lineHeight: 1.7, whiteSpace: "pre-wrap" }}>{g.note}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{ fontSize: 10, color: C.dim, marginTop: 8 }}>
+            {tt(lang, "تظهر لك فقط — لا تظهر للمدعوين", "מוצג רק לך — לא למוזמנים")}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
