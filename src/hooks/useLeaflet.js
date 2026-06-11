@@ -11,23 +11,26 @@ export function useLeaflet() {
     if (typeof window === "undefined") return;
     if (window.L) { setReady(true); return; }
 
-    // Inject CSS once
+    // Inject CSS once. `integrity` (SRI) + `crossOrigin` pin the exact bytes,
+    // so a tampered CDN asset is rejected by the browser instead of executing.
     if (!document.querySelector("link[data-dawa-leaflet]")) {
       const link = document.createElement("link");
       link.rel = "stylesheet";
       link.href = LEAFLET.CSS_URL;
       link.setAttribute("data-dawa-leaflet", "");
-      link.crossOrigin = "";
+      if (LEAFLET.CSS_SRI) link.integrity = LEAFLET.CSS_SRI;
+      link.crossOrigin = "anonymous";
       document.head.appendChild(link);
     }
 
-    // Inject JS once
+    // Inject JS once (SRI-pinned, same rationale as the CSS above).
     const existing = document.querySelector("script[data-dawa-leaflet]");
     if (!existing) {
       const script = document.createElement("script");
       script.src = LEAFLET.JS_URL;
       script.setAttribute("data-dawa-leaflet", "");
-      script.crossOrigin = "";
+      if (LEAFLET.JS_SRI) script.integrity = LEAFLET.JS_SRI;
+      script.crossOrigin = "anonymous";
       script.onload = () => setReady(true);
       script.onerror = () => setReady(false);
       document.head.appendChild(script);

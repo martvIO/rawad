@@ -125,10 +125,18 @@ export const MATCHING = {
 
 // ─── External CDN URLs (Leaflet) ─────────────────────────────────────────────
 
+// Subresource Integrity (SRI) hashes pin the EXACT bytes we expect from the
+// CDN, so a compromised/swapped unpkg asset cannot execute attacker JS in our
+// origin. Verified against Leaflet 1.9.4's published sha256 hashes; if VERSION
+// is ever bumped these MUST be recomputed (e.g.
+// `curl -sL <url> | openssl dgst -sha384 -binary | openssl base64 -A`) or the
+// browser will refuse to load the asset.
 export const LEAFLET = {
   VERSION: "1.9.4",
   CSS_URL: "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css",
   JS_URL: "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js",
+  CSS_SRI: "sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H",
+  JS_SRI: "sha384-cxOPjt7s7Iz04uaHJceBmS+qpjv2JkIHNVcuOrM+YHwZOmJGBXI00mdUXEq65HTH",
 };
 
 // ─── Map tile providers (Leaflet TileLayers) ─────────────────────────────────
