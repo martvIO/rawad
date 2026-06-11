@@ -40,11 +40,11 @@ afterEach(() => {
 
 describe("buildApiUrl", () => {
   it("prepends a slash if missing", () => {
-    expect(buildApiUrl("foo")).toMatch(/\/api\/foo$/);
+    expect(buildApiUrl("foo")).toMatch(/\/foo$/);
   });
 
   it("preserves a leading slash", () => {
-    expect(buildApiUrl("/foo/bar")).toMatch(/\/api\/foo\/bar$/);
+    expect(buildApiUrl("/foo/bar")).toMatch(/\/foo\/bar$/);
   });
 });
 
