@@ -4,7 +4,7 @@
 // view stays presentational.
 import { useEffect, useState, lazy, Suspense } from "react";
 import { useParams, Routes, Route, useSearchParams, useNavigate } from "react-router-dom";
-import { subscribeInviteToken } from "../services/invites.js";
+import { subscribeInviteToken, submitDigitalWish, getApprovedWishes } from "../services/invites.js";
 import { getDigitalInvitationPublic, submitDigitalGuestInvite } from "../services/digitalInvitation.js";
 import { logErr } from "../utils/logger.js";
 import { DigitalInvitationView } from "../components/digital/DigitalInvitationView.jsx";
@@ -101,6 +101,7 @@ function DigitalLandingMain({ lang, setLang }) {
       : null,
   );
   const [done, setDone] = useState(false);
+  const [approvedWishes, setApprovedWishes] = useState([]);
 
   useEffect(() => {
     if (isDemo) return;
@@ -109,6 +110,17 @@ function DigitalLandingMain({ lang, setLang }) {
       return;
     }
     return subscribeInviteToken(token, setTokenRec);
+  }, [token, isDemo]);
+
+  // The groom's APPROVED guestbook wishes (live — shows the same approved
+  // messages on every guest's invitation, whatever design they received).
+  useEffect(() => {
+    if (isDemo || !token) return;
+    let active = true;
+    getApprovedWishes(token)
+      .then((r) => { if (active) setApprovedWishes(Array.isArray(r?.wishes) ? r.wishes : []); })
+      .catch(() => {});
+    return () => { active = false; };
   }, [token, isDemo]);
 
   // Prefer the token's embedded designSnapshot so already-distributed links
@@ -146,6 +158,11 @@ function DigitalLandingMain({ lang, setLang }) {
     }
   };
 
+  const handleSubmitWish = async ({ who, what }) => {
+    if (isDemo) { await new Promise((r) => setTimeout(r, 300)); return; }
+    await submitDigitalWish({ token, who, what });
+  };
+
   if (tokenRec === undefined) return <LoadingScreen lang={lang} />;
   if (tokenRec === null) {
     return (
@@ -177,6 +194,8 @@ function DigitalLandingMain({ lang, setLang }) {
       setLang={setLang}
       mode="public"
       onSubmitRsvp={handleSubmitRsvp}
+      approvedWishes={approvedWishes}
+      onSubmitWish={handleSubmitWish}
       onOpenSorek={() => navigate("photos")}
       showEnvelope={true}
       alreadyAnswered={!!tokenRec.usedAt && !done}

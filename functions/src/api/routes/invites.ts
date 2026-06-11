@@ -499,6 +499,61 @@ invitesRouter.post(
   }
 );
 
+// ─── POST /invites/digital/wish ────────────────────────────────────────────────
+// PUBLIC: a guest submits a guestbook wish ("شاركونا"). Stored as PENDING under
+// Firestore digitalInvitations/{groomUid}/wishes; the groom approves it (in the
+// design editor) before it shows publicly.
+invitesRouter.post(
+  "/digital/wish",
+  ipRateLimit("digitalWish", SUBMIT_DIGITAL_MAX_PER_HOUR_IP, HOUR_MS),
+  async (req: Request, res: Response) => {
+    const token = (req.body?.token ?? "").toString();
+    if (!TOKEN_HEX_RE.test(token)) { res.status(400).json({ error: "invalid_token_format" }); return; }
+    const who = clampStr(req.body?.who, 60).trim();
+    const what = clampStr(req.body?.what, MAX_WISH_LEN).trim();
+    if (!who || !what) { res.status(400).json({ error: "missing_required" }); return; }
+    try {
+      const tk = (await getDatabase().ref(`inviteTokens/${token}`).get()).val() as
+        | { groomUid?: string; expiresAt?: number; guestId?: string } | null;
+      if (!tk || !tk.groomUid) { res.status(404).json({ error: "token_not_found" }); return; }
+      if (tk.expiresAt && Date.now() > tk.expiresAt) { res.status(410).json({ error: "token_expired" }); return; }
+      await getFirestore().collection(`digitalInvitations/${tk.groomUid}/wishes`).add({
+        who, what, status: "pending", guestId: tk.guestId ?? null, submittedAt: Date.now(),
+      });
+      res.json({ ok: true });
+    } catch (err) {
+      res.status(500).json({ error: "write_failed", detail: errorMessage(err) });
+    }
+  }
+);
+
+// ─── GET /invites/digital/wishes/:token ────────────────────────────────────────
+// PUBLIC: the APPROVED guestbook wishes for the token's groom — read live, so an
+// approved wish appears on every guest's invitation regardless of their design.
+invitesRouter.get(
+  "/digital/wishes/:token",
+  async (req: Request, res: Response) => {
+    const token = (req.params.token ?? "").toString();
+    if (!TOKEN_HEX_RE.test(token)) { res.status(400).json({ error: "invalid_token_format" }); return; }
+    try {
+      const tk = (await getDatabase().ref(`inviteTokens/${token}`).get()).val() as { groomUid?: string } | null;
+      if (!tk || !tk.groomUid) { res.json({ wishes: [] }); return; }
+      const snap = await getFirestore()
+        .collection(`digitalInvitations/${tk.groomUid}/wishes`)
+        .where("status", "==", "approved")
+        .get();
+      const wishes = snap.docs
+        .map((d) => d.data() as { who?: string; what?: string; submittedAt?: number })
+        .sort((a, b) => (b.submittedAt ?? 0) - (a.submittedAt ?? 0))
+        .map((w) => ({ who: (w.who ?? "").toString(), what: (w.what ?? "").toString() }));
+      res.set("Cache-Control", "public, max-age=30");
+      res.json({ wishes });
+    } catch (err) {
+      res.status(500).json({ error: "read_failed", detail: errorMessage(err) });
+    }
+  }
+);
+
 // ─── Token helpers ────────────────────────────────────────────────────────────
 
 interface TokenRecord {

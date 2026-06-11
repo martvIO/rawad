@@ -48,6 +48,22 @@ export async function submitDigitalGuestInvite(input) {
   return api.post("/invites/digital/submit", input, { skipAuth: true });
 }
 
+/**
+ * Submit a guestbook wish from the digital invitation. Public; no auth.
+ * Body: `{ token, who, what }`. Stored as pending until the groom approves.
+ */
+export async function submitDigitalWish(input) {
+  return api.post("/invites/digital/wish", input, { skipAuth: true });
+}
+
+/**
+ * Read the APPROVED guestbook wishes for a token's groom (live, cross-design).
+ * Public; no auth. Returns `{ wishes: [{ who, what }] }`.
+ */
+export async function getApprovedWishes(token) {
+  return api.get(`/invites/digital/wishes/${token}`, { skipAuth: true });
+}
+
 // ─── Token read ───────────────────────────────────────────────────────────────
 
 /**

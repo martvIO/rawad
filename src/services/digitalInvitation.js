@@ -79,6 +79,25 @@ export function subscribeDigitalGuests(groomUid, cb, onErrCb) {
   return pollList(`/digital/${uid}/guests`, cb, onErrCb);
 }
 
+// ─── Guestbook wishes (groom moderation) ────────────────────────────────────────
+
+export function subscribeDigitalWishes(groomUid, cb, onErrCb) {
+  const uid = resolveUid(groomUid);
+  return pollList(`/digital/${uid}/wishes`, cb, onErrCb);
+}
+
+/** Approve ("approved") or un-publish ("pending") a wish. */
+export async function setWishStatus(groomUid, wishId, status) {
+  const uid = resolveUid(groomUid);
+  return api.patch(`/digital/${uid}/wishes/${wishId}`, { status });
+}
+
+/** Reject / remove a wish. */
+export async function deleteWish(groomUid, wishId) {
+  const uid = resolveUid(groomUid);
+  return api.delete(`/digital/${uid}/wishes/${wishId}`);
+}
+
 /**
  * Add a guest. `ranks` is an array of zero-or-more rank labels (the new
  * multi-rank shape). Legacy single-string `rank` is also accepted and

@@ -14,6 +14,9 @@ import {
   cancelDesignById,
   addDesignMedia,
   removeDesignMedia,
+  subscribeDigitalWishes,
+  setWishStatus,
+  deleteWish,
 } from "../../../../services/digitalInvitation.js";
 import { logErr } from "../../../../utils/logger.js";
 import { ensureDigitalFonts } from "../../../../utils/digitalFonts.js";
@@ -260,6 +263,25 @@ function DesignEditorBody({ groomUid, designId }) {
   // Load the extended Arabic+Hebrew wedding fonts so the font-picker previews
   // (and the live preview) render in the real faces.
   useEffect(() => { ensureDigitalFonts(); }, []);
+
+  // Guestbook wishes submitted by guests — the groom moderates them here.
+  const [wishes, setWishes] = useState([]);
+  useEffect(() => {
+    if (!currentUid) return undefined;
+    return subscribeDigitalWishes(currentUid, (list) => setWishes(Array.isArray(list) ? list : []));
+  }, [currentUid]);
+  const approveWish = async (id) => {
+    setWishes((p) => p.map((w) => (w.id === id ? { ...w, status: "approved" } : w)));
+    try { await setWishStatus(currentUid, id, "approved"); } catch { showToast(tt(lang, "فشل الحفظ", "השמירה נכשלה")); }
+  };
+  const unpublishWish = async (id) => {
+    setWishes((p) => p.map((w) => (w.id === id ? { ...w, status: "pending" } : w)));
+    try { await setWishStatus(currentUid, id, "pending"); } catch { showToast(tt(lang, "فشل الحفظ", "השמירה נכשלה")); }
+  };
+  const rejectWish = async (id) => {
+    setWishes((p) => p.filter((w) => w.id !== id));
+    try { await deleteWish(currentUid, id); } catch { showToast(tt(lang, "فشل الحذف", "המחיקה נכשלה")); }
+  };
 
   // Re-subscribe (and reset the buffer) whenever the selected design changes.
   useEffect(() => {
@@ -599,6 +621,51 @@ function DesignEditorBody({ groomUid, designId }) {
 
       <StatusBanner status={status} doc={doc} lang={lang} onCancel={onCancelSubmission} busy={busy}
         editUnlocked={editUnlocked} onEditApproved={onEditApproved} />
+
+      {/* Guestbook wish moderation — guest "شاركونا" messages; approve to publish to all. */}
+      {wishes.length > 0 && (() => {
+        const pending  = wishes.filter((w) => (w.status || "pending") === "pending");
+        const approved = wishes.filter((w) => w.status === "approved");
+        return (
+          <div className="gold-card" style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 13, fontWeight: 800, color: C.gold, marginBottom: 4 }}>
+              💌 {tt(lang, "تهاني المدعوين", "ברכות המוזמנים")}
+              {pending.length > 0 && (
+                <span style={{ marginInlineStart: 8, fontSize: 11, color: C.red }}>
+                  {tt(lang, "بانتظار موافقتك", "ממתינות לאישורך")} ({pending.length})
+                </span>
+              )}
+            </div>
+            <div style={{ fontSize: 10, color: C.dim, marginBottom: 10, lineHeight: 1.6 }}>
+              {tt(lang, "وافِق لتظهر للجميع داخل الدعوة · يمكنك إلغاء النشر لاحقاً إذا غيّرت رأيك", "אשר כדי שתוצג לכולם בהזמנה · אפשר לבטל פרסום בהמשך")}
+            </div>
+            {pending.map((w) => (
+              <div key={w.id} style={{ padding: "10px 12px", borderRadius: 10, marginBottom: 8, background: "rgba(255,255,255,.03)", border: "1px solid rgba(201,168,76,.18)" }}>
+                <div style={{ fontSize: 12, fontWeight: 800, color: C.goldLight }}>{w.who}</div>
+                <div style={{ fontSize: 12, color: C.dim, lineHeight: 1.7, marginBottom: 8, whiteSpace: "pre-wrap" }}>{w.what}</div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button onClick={() => approveWish(w.id)} style={{ flex: 1, padding: 8, borderRadius: 8, border: "none", background: "linear-gradient(135deg,#4cc97a,#2da85a)", color: "#000", fontWeight: 800, fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>✓ {tt(lang, "موافقة ونشر", "אשר ופרסם")}</button>
+                  <button onClick={() => rejectWish(w.id)} style={{ padding: "8px 14px", borderRadius: 8, background: "rgba(212,80,58,.1)", border: "1px solid rgba(212,80,58,.35)", color: C.red, fontWeight: 800, fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>✕ {tt(lang, "رفض", "דחה")}</button>
+                </div>
+              </div>
+            ))}
+            {approved.length > 0 && (
+              <>
+                <div style={{ fontSize: 11, color: "#4cc97a", fontWeight: 700, margin: "12px 0 8px" }}>✓ {tt(lang, "منشورة للجميع", "מפורסמות לכולם")} ({approved.length})</div>
+                {approved.map((w) => (
+                  <div key={w.id} style={{ padding: "8px 12px", borderRadius: 10, marginBottom: 6, background: "rgba(76,201,122,.05)", border: "1px solid rgba(76,201,122,.25)", display: "flex", alignItems: "center", gap: 8 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 12, fontWeight: 800, color: C.goldLight }}>{w.who}</div>
+                      <div style={{ fontSize: 11, color: C.dim, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{w.what}</div>
+                    </div>
+                    <button onClick={() => unpublishWish(w.id)} style={{ padding: "6px 10px", borderRadius: 8, background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.12)", color: C.goldDim, fontWeight: 700, fontSize: 11, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>{tt(lang, "إلغاء النشر", "בטל פרסום")}</button>
+                  </div>
+                ))}
+              </>
+            )}
+          </div>
+        );
+      })()}
 
       <button
         data-testid="design-fill-sample"
