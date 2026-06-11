@@ -25,7 +25,7 @@ import { isStrongPassword, phoneIndexKey, syntheticEmail } from "../../helpers";
 import { writeAudit } from "../../audit";
 import { AuthRequest, requireAuth } from "../middleware/auth";
 import { ipRateLimit } from "../middleware/rateLimit";
-import { allow } from "../../rateLimit";
+import { allow, failureCount, recordFailure, clearFailures } from "../../rateLimit";
 import { HOUR_MS } from "../../constants/time";
 import { RATE } from "../../constants/rateLimits";
 
@@ -63,11 +63,18 @@ function effectiveApiKey(): string | null {
 
 /** Rate-limit windows. */
 const ONE_HOUR_MS = HOUR_MS;
+/** True under the Firebase emulator suite (e2e tests) — disables the lockout. */
+const IN_EMULATOR = process.env.FUNCTIONS_EMULATOR === "true";
 // 10/hour/IP was too aggressive — a user fumbling their password, or several
 // users behind one NAT/carrier IP, got locked out and (worse) saw a generic
 // "wrong password" message. 50/hour still blocks real brute-force given the
 // non-enumerable synthetic emails + required strong passwords.
 const LOGIN_RATE_PER_HOUR = 50;
+// Failure-only per-account lockout. The per-IP limiter above does NOT stop a
+// distributed attack that targets ONE account from many IPs. Block once this many
+// failed attempts accumulate for an account within ONE_HOUR_MS; only failures
+// count (cleared on success) so legitimate repeated logins are never locked out.
+const LOGIN_MAX_FAILURES_PER_ACCOUNT = 10;
 const REFRESH_RATE_PER_HOUR = 60;
 const OTP_RATE_PER_HOUR = 5;
 const VERIFY_OTP_RATE_PER_HOUR = 5;
@@ -84,6 +91,10 @@ const LOGIN_INVALID_CREDENTIAL_CODES = new Set([
   "INVALID_PASSWORD",
   "EMAIL_NOT_FOUND",
   "INVALID_LOGIN_CREDENTIALS",
+  // USER_DISABLED is included deliberately: returning it distinctly would let a
+  // caller tell "account exists but disabled" apart from "no such account",
+  // re-enabling username enumeration. Collapse it into the same response.
+  "USER_DISABLED",
 ]);
 
 export const authRouter = Router();
@@ -110,13 +121,22 @@ authRouter.post(
       return;
     }
 
+    const acct = username.trim().toLowerCase();
+    const acctKey = `login_acct:${acct}`;
+    // Per-account lockout (see LOGIN_MAX_FAILURES_PER_ACCOUNT). Skipped under the
+    // emulator so e2e suites can hammer login without tripping it.
+    if (!IN_EMULATOR && failureCount(acctKey) >= LOGIN_MAX_FAILURES_PER_ACCOUNT) {
+      res.status(429).json({ error: "too_many_requests", scope: "account" });
+      return;
+    }
+
     const apiKey = effectiveApiKey();
     if (!apiKey) {
       res.status(500).json({ error: "server_misconfigured" });
       return;
     }
 
-    const email = syntheticEmail(username.trim().toLowerCase());
+    const email = syntheticEmail(acct);
     const fbRes = await fetch(
       `${IDENTITY_TOOLKIT_BASE}:signInWithPassword?key=${apiKey}`,
       {
@@ -130,14 +150,22 @@ authRouter.post(
     if (!fbRes.ok) {
       const code = extractFirebaseErrorCode(fbData);
       if (LOGIN_INVALID_CREDENTIAL_CODES.has(code)) {
+        if (!IN_EMULATOR) recordFailure(acctKey, ONE_HOUR_MS);
         res.status(401).json({ error: "invalid_credentials" });
         return;
       }
-      res.status(400).json({ error: code });
+      // Don't echo the raw Firebase code to the client — codes such as
+      // TOO_MANY_ATTEMPTS_TRY_LATER expose internal state. Log it server-side
+      // and return a generic failure. (USER_DISABLED is handled above.)
+      // eslint-disable-next-line no-console
+      console.warn("[auth] login failed (non-credential)", { code });
+      res.status(400).json({ error: "login_failed" });
       return;
     }
 
     const uid = String(fbData.localId ?? "");
+    // Successful credential check — reset this account's failure counter.
+    if (!IN_EMULATOR) clearFailures(acctKey);
     // Enrich the response with the RTDB profile so the client can render
     // the role-appropriate portal without a second round-trip.
     const profile = await loadUserProfile(uid);
@@ -158,13 +186,23 @@ authRouter.post(
 // ─── POST /auth/logout ────────────────────────────────────────────────────────
 
 /**
- * Stateless logout. The frontend already discards its tokens locally; this
- * endpoint exists so we can later add server-side bookkeeping (e.g. revoke
- * refresh tokens) without changing the client contract.
+ * Logout. The frontend discards its tokens locally; this endpoint also revokes
+ * the user's refresh tokens server-side so a captured refresh token cannot keep
+ * minting fresh ID tokens after sign-out. `requireAuth` verifies every token
+ * with `checkRevoked: true`, so outstanding sessions are rejected on their next
+ * call. Revocation is best-effort — a failure never blocks the client sign-out.
  *
  * Returns: `{ ok: true }`
  */
-authRouter.post("/logout", requireAuth, (_req, res) => {
+authRouter.post("/logout", requireAuth, async (req: AuthRequest, res: Response) => {
+  const uid = req.caller!.uid;
+  try {
+    await getAuth().revokeRefreshTokens(uid);
+    await writeAudit(uid, "logout", {});
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.warn("[auth] logout token revoke failed", err);
+  }
   res.json({ ok: true });
 });
 
@@ -277,8 +315,12 @@ authRouter.post(
     const fbData = (await fbRes.json()) as Record<string, unknown>;
 
     if (!fbRes.ok) {
+      // Log the precise code server-side; return a generic one so phone-state
+      // probing (valid vs invalid number, quota) can't read internal codes.
       const code = extractFirebaseErrorCode(fbData);
-      res.status(400).json({ error: code || "otp_failed" });
+      // eslint-disable-next-line no-console
+      console.warn("[auth] send-otp failed", { code });
+      res.status(400).json({ error: "otp_failed" });
       return;
     }
 
@@ -323,8 +365,11 @@ authRouter.post(
     const fbData = (await fbRes.json()) as Record<string, unknown>;
 
     if (!fbRes.ok) {
+      // Log the precise code server-side; return a generic one to the client.
       const errCode = extractFirebaseErrorCode(fbData);
-      res.status(400).json({ error: errCode || "verify_failed" });
+      // eslint-disable-next-line no-console
+      console.warn("[auth] verify-otp failed", { code: errCode });
+      res.status(400).json({ error: "verify_failed" });
       return;
     }
 

@@ -136,10 +136,14 @@ function extractToken(req: Request): string | null {
   if (header.startsWith(BEARER_PREFIX)) {
     return header.slice(BEARER_PREFIX.length).trim() || null;
   }
-  // NOTE: query-token fallback is read-only and used only by SSE GETs.
-  // It is acceptable because TLS encrypts the URL in transit; it must
-  // never be used for state-changing requests (POST/PATCH/DELETE).
-  const q = req.query?.token;
-  if (typeof q === "string" && q.length > 0) return q;
+  // Query-token fallback exists ONLY for EventSource/SSE, which cannot set an
+  // Authorization header. Enforce read-only at RUNTIME (not just by comment):
+  // restrict it to GET so a token leaked in a URL (proxy/CDN access logs, the
+  // Referer header, browser history) cannot be replayed on a state-changing
+  // POST/PATCH/DELETE while still valid.
+  if (req.method === "GET") {
+    const q = req.query?.token;
+    if (typeof q === "string" && q.length > 0) return q;
+  }
   return null;
 }

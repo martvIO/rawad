@@ -77,18 +77,17 @@ export function uidRateLimit(prefix: string, maxPerHour: number, windowMs: numbe
 }
 
 /**
- * Resolve the client IP for rate-limit keying. Cloud Functions are
- * fronted by Google's load balancer, which sets `X-Forwarded-For` —
- * we trust the LEFTMOST entry there (the original client) when present,
- * otherwise fall back to `req.ip` (set by Express after `trust proxy`)
- * and finally to a constant so the limiter still functions.
+ * Resolve the client IP for rate-limit keying.
+ *
+ * We deliberately rely on Express's `req.ip`, which is derived from
+ * `X-Forwarded-For` using the configured `trust proxy` hop count
+ * (see `api/index.ts`). That makes it ignore attacker-prepended XFF
+ * entries. We must NOT hand-parse `X-Forwarded-For` and take the leftmost
+ * value here — that entry is fully client-controlled, so an attacker could
+ * rotate it to land in a fresh rate-limit bucket on every request and bypass
+ * the limiter completely. Fall back to the socket peer, then a constant, so
+ * the limiter still functions if `req.ip` is unavailable.
  */
 function resolveClientIp(req: Request): string {
-  const forwarded = req.headers["x-forwarded-for"];
-  if (typeof forwarded === "string" && forwarded.length > 0) {
-    // X-Forwarded-For format: "client, proxy1, proxy2" — take client.
-    const first = forwarded.split(",")[0]?.trim();
-    if (first) return first;
-  }
-  return req.ip ?? UNKNOWN_IP_KEY;
+  return req.ip || req.socket?.remoteAddress || UNKNOWN_IP_KEY;
 }

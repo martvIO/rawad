@@ -46,11 +46,18 @@ const ALLOWED_ORIGINS_ENV = "ALLOWED_ORIGINS";
 
 export const app = express();
 
-// Trust the single Google Front End proxy that fronts Cloud Functions so
-// `req.ip` resolves to the actual client. Without this, X-Forwarded-For
-// would be ignored and every IP-keyed rate-limit bucket would collapse to
-// the proxy's address.
-app.set("trust proxy", true);
+// Trust a FIXED number of proxy hops (the Google Front End / load balancer
+// that fronts Cloud Functions), NOT `true`. This is security-critical:
+//   - With `trust proxy: true`, Express derives `req.ip` from the LEFTMOST
+//     X-Forwarded-For entry, which is fully client-controlled. An attacker
+//     can then rotate that header to mint a fresh per-IP rate-limit bucket on
+//     every request, defeating the limiter entirely (login/OTP/confirm/wish).
+//   - With a numeric hop count, Express counts trusted proxies from the RIGHT
+//     and ignores any attacker-prepended entries, so `req.ip` reflects the
+//     address our infrastructure actually appended.
+// Override via TRUSTED_PROXY_HOPS only if the deployment topology changes.
+const TRUSTED_PROXY_HOPS = Number(process.env.TRUSTED_PROXY_HOPS) || 1;
+app.set("trust proxy", TRUSTED_PROXY_HOPS);
 
 app.use(cors({
   origin: buildCorsOriginCheck(),
@@ -142,14 +149,32 @@ export function stripApiPrefix(
 type CorsOriginCallback = (err: Error | null, allow?: boolean) => void;
 
 /**
+ * Origins that are ALWAYS allowed regardless of `ALLOWED_ORIGINS`, so a config
+ * gap can never lock out local dev or the project's own Firebase Hosting
+ * domains (which serve the SPA that opens cross-origin SSE to this API):
+ *   - localhost / 127.0.0.1 on any port (Vite dev server)
+ *   - `<anything>.web.app` and `<anything>.firebaseapp.com` (Firebase Hosting)
+ */
+function isAlwaysAllowedOrigin(origin: string): boolean {
+  return (
+    /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin) ||
+    /^https:\/\/[a-z0-9-]+\.(web\.app|firebaseapp\.com)$/i.test(origin)
+  );
+}
+
+/**
  * Build the CORS origin-checker from the `ALLOWED_ORIGINS` env var.
  *
  * Behavior:
- *   - If `ALLOWED_ORIGINS` is unset or empty, all origins are allowed.
- *     This is intentional so local development (Vite on :5173, etc.) works
- *     without configuration; in production set the env var to the prod URL.
- *   - If set, only origins listed (comma-separated, exact match) are allowed.
- *     Server-to-server requests with no Origin header are always allowed.
+ *   - If `ALLOWED_ORIGINS` is set, only the listed origins (comma-separated,
+ *     exact match) PLUS the always-allowed set above are permitted; everything
+ *     else is denied (fail-closed for unknown origins). This is the production
+ *     posture — set the prod domains (dawa.to, *.web.app, …) in functions/.env.
+ *   - If unset/empty, all origins are allowed. This preserves the documented
+ *     dev-friendly default (`npm run dev` hits the cross-origin Cloud Run URL),
+ *     but logs a warning so an unconfigured production deploy is visible.
+ *   - Requests with no Origin header (server-to-server, curl, native WebView)
+ *     are always allowed.
  */
 function buildCorsOriginCheck() {
   const raw = process.env[ALLOWED_ORIGINS_ENV] ?? "";
@@ -159,6 +184,11 @@ function buildCorsOriginCheck() {
     .filter(Boolean);
 
   if (allowList.length === 0) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      "[api] ALLOWED_ORIGINS is not set — CORS allows ANY origin. Set it in " +
+        "functions/.env to the production domains to lock this down."
+    );
     return true; // cors lib: allow any origin
   }
 
@@ -170,7 +200,7 @@ function buildCorsOriginCheck() {
       cb(null, true); // server-to-server, curl, mobile WebView
       return;
     }
-    if (allowList.includes(origin)) {
+    if (isAlwaysAllowedOrigin(origin) || allowList.includes(origin)) {
       cb(null, true);
       return;
     }

@@ -106,6 +106,15 @@ assignmentsRouter.post(
       await db.ref(`driverAssignments/${driverUid}/${groomUid}`).set(true);
       await restampDriverAssignedGroomsClaim(driverUid);
       await writeAudit(driverUid, "assignDriverToGroom", { groomUid });
+      // Self-service assignment grants this driver read access to the groom's full
+      // guest list (names/phones/addresses). Drivers are admin-provisioned and this
+      // is an accepted-risk design, so emit a structured log line a Cloud Logging
+      // metric/alert can watch for assignment bursts or cross-groom sprawl.
+      // eslint-disable-next-line no-console
+      console.info(
+        "[security] driver_self_assignment",
+        JSON.stringify({ driverUid, groomUid, groomUsername })
+      );
 
       res.json({ groomUid, groomUsername });
     } catch (err) {
