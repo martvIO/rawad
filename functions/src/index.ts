@@ -52,3 +52,9 @@ export { digitalInvitePreview } from "./digitalInvitePreview";
 // Dynamic Open Graph image (1200×630 JPEG) for WhatsApp/social link previews —
 // its own hosting rewrite (`/og/**`) and cache strategy.
 export { digitalOgImage } from "./digitalOgImage";
+
+// Firestore trigger: maintains the face-descriptor index over photographer
+// photos (digitalInvitations/{uid}/photoFaces). Separate function so its
+// 2 GiB memory + tfjs runtime never affect the `api` function; the heavy
+// engine is dynamically imported inside the handler.
+export { indexPhotographerFile } from "./faceIndex/trigger";
