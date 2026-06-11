@@ -77,6 +77,38 @@ export function uidRateLimit(prefix: string, maxPerHour: number, windowMs: numbe
 }
 
 /**
+ * Throttle public token-credential endpoints by the TOKEN, with a generous
+ * per-IP backstop. Wedding guests share the venue's NAT IP, so keying these
+ * routes by IP alone would rate-limit the whole party as one client; keying
+ * by token gives each guest their own bucket while the IP backstop still
+ * stops token-rotation floods from a single source. Requests without a
+ * token fall back to a per-IP bucket (the route's format check 400s them
+ * anyway).
+ */
+export function tokenRateLimit(
+  prefix: string,
+  maxPerToken: number,
+  windowMs: number,
+  ipBackstopMax: number,
+) {
+  return function tokenGate(req: Request, res: Response, next: NextFunction): void {
+    if (IN_EMULATOR) { next(); return; }
+    const token = ((req.query?.token ?? req.body?.token) ?? "").toString();
+    const ip = resolveClientIp(req);
+    const tokenKey = token ? `${prefix}:t:${token}` : `${prefix}:noToken:${ip}`;
+    if (!allow(tokenKey, maxPerToken, windowMs)) {
+      res.status(429).json({ error: "too_many_requests", scope: "token" });
+      return;
+    }
+    if (!allow(`${prefix}:ip:${ip}`, ipBackstopMax, windowMs)) {
+      res.status(429).json({ error: "too_many_requests", scope: "ip" });
+      return;
+    }
+    next();
+  };
+}
+
+/**
  * Resolve the client IP for rate-limit keying.
  *
  * We deliberately rely on Express's `req.ip`, which is derived from

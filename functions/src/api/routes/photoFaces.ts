@@ -24,7 +24,7 @@
 import { Router, Request, Response } from "express";
 import { getDatabase } from "firebase-admin/database";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
-import { ipRateLimit } from "../middleware/rateLimit";
+import { tokenRateLimit } from "../middleware/rateLimit";
 import { HOUR_MS } from "../../constants/time";
 import { RATE } from "../../constants/rateLimits";
 import { TOKEN_HEX_RE } from "../../constants/tokens";
@@ -40,8 +40,19 @@ import {
   FaceMatch,
 } from "../../faceIndex/match";
 
-const ENROLL_MAX_PER_HOUR_IP = RATE.PHOTO_ENROLL_PER_IP.limit;
-const MATCHES_MAX_PER_HOUR_IP = RATE.PHOTO_MATCHES_PER_IP.limit;
+// Keyed by TOKEN (guests share the venue's NAT IP) with a per-IP backstop.
+const enrollLimiter = tokenRateLimit(
+  "photoEnroll",
+  RATE.PHOTO_ENROLL_PER_TOKEN.limit,
+  HOUR_MS,
+  RATE.PHOTO_ENROLL_IP_BACKSTOP.limit,
+);
+const matchesLimiter = tokenRateLimit(
+  "photoMatches",
+  RATE.PHOTO_MATCHES_PER_TOKEN.limit,
+  HOUR_MS,
+  RATE.PHOTO_MATCHES_IP_BACKSTOP.limit,
+);
 
 export const photoFacesRouter = Router();
 
@@ -54,7 +65,7 @@ export const photoFacesRouter = Router();
  */
 photoFacesRouter.get(
   "/matches",
-  ipRateLimit("photoMatches", MATCHES_MAX_PER_HOUR_IP, HOUR_MS),
+  matchesLimiter,
   async (req: Request, res: Response) => {
     const token = (req.query?.token ?? "").toString();
     const tk = await loadValidToken(token, res);
@@ -63,7 +74,7 @@ photoFacesRouter.get(
     try {
       const published = await isPhotographerPublished(tk.groomUid);
       if (!published) {
-        res.json({ published: false, enrolled: false, expiresAt: null, matches: [] });
+        res.json({ published: false, enrolled: false, expiresAt: tk.expiresAt, matches: [] });
         return;
       }
 
@@ -71,7 +82,7 @@ photoFacesRouter.get(
       const enrollment = enrollSnap.exists ? enrollSnap.data() : null;
       const descriptor = enrollment?.descriptor;
       if (!validateDescriptor(descriptor) || enrollment?.modelVersion !== MODEL_VERSION) {
-        res.json({ published: true, enrolled: false, expiresAt: null, matches: [] });
+        res.json({ published: true, enrolled: false, expiresAt: tk.expiresAt, matches: [] });
         return;
       }
 
@@ -98,7 +109,7 @@ photoFacesRouter.get(
  */
 photoFacesRouter.post(
   "/enroll",
-  ipRateLimit("photoEnroll", ENROLL_MAX_PER_HOUR_IP, HOUR_MS),
+  enrollLimiter,
   async (req: Request, res: Response) => {
     const token = (req.body?.token ?? "").toString();
     const tk = await loadValidToken(token, res);
@@ -145,7 +156,7 @@ photoFacesRouter.post(
  */
 photoFacesRouter.delete(
   "/enroll",
-  ipRateLimit("photoEnroll", ENROLL_MAX_PER_HOUR_IP, HOUR_MS),
+  enrollLimiter,
   async (req: Request, res: Response) => {
     const token = (req.body?.token ?? "").toString();
     const tk = await loadValidToken(token, res);

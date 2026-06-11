@@ -1,54 +1,59 @@
 // "صورك" — Face-recognition page reached from the digital invitation landing.
 // Route: /d/:groomUsername/:token/photos
 //
-// Strict workflow:
-//   1. Resolve token → groomUid.
-//   2. Read digitalInvitations/{groomUid}.photographerPublished. If false, show
-//      a notice and BLOCK camera + matching entirely.
-//   3. Load face-api.js models from /models (same origin, lazy-loaded).
-//   4. Open the front camera (getUserMedia). NO file upload fallback.
-//   5. Liveness: guest must turn head left AND right (yaw > +15° and < -15°)
-//      within 12s — protects against photo spoofing.
-//   6. Extract a single descriptor from the live stream.
-//   7. Fetch photographer files (public read enforced by Firestore rules).
-//   8. For each photo, detect all faces, compute descriptors, compare to the
-//      guest descriptor (euclideanDistance ≤ 0.5 = match). All client-side.
-//   9. Render matched photos.
+// Server-side face index (replaces the old fully-in-browser matcher, which
+// re-scanned up to 80 photos on the guest's phone on every single visit):
+//   1. Poll GET /digital/photos/matches?token=… (public, token-credential).
+//      - photos not published → lock screen (poll keeps it advancing)
+//      - already enrolled     → INSTANT gallery, no camera; later poll ticks
+//                               pick up newly indexed photos automatically
+//      - not enrolled         → explicit biometric CONSENT screen
+//   2. After consent: load face-api models, open the front camera, liveness
+//      (turn head both ways), extract ONE 128-D descriptor — all in-browser;
+//      the camera image never leaves the device.
+//   3. POST /digital/photos/enroll stores the descriptor server-side (kept
+//      until the invite expires, Firestore-TTL'd) and returns the matches
+//      against the photoFaces index that a Cloud Function maintains over
+//      EVERY photographer photo — no 80-photo cap.
+//   4. Gallery footer: "rescan" (replaces the descriptor) and "delete my
+//      face data" (immediate erasure → back to consent).
 import { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { subscribeInviteToken } from "../services/invites.js";
-import { getDigitalInvitationPublic, fetchPublishedPhotographerFiles } from "../services/digitalInvitation.js";
+import {
+  subscribeFaceMatches,
+  enrollFaceDescriptor,
+  deleteFaceEnrollment,
+} from "../services/digitalPhotos.js";
 import { LangSwitcher } from "../components/LangSwitcher.jsx";
 import { logErr } from "../utils/logger.js";
 import { C } from "../styles/theme.js";
 
-const MATCH_THRESHOLD     = 0.5;     // face-api default; lower = stricter
 const STEP_TIMEOUT_MS     = 20000;   // time budget per turn (resets after the 1st turn)
 const YAW_TRIGGER_DEG     = 13;      // degrees of yaw to register a turn (eased from 15)
 const HOLD_FRAMES         = 2;       // consecutive frames beyond threshold to confirm (debounce)
-const MAX_PHOTOS_TO_SCAN  = 80;      // cap to keep mobile UX bearable
 
 export function DigitalYourPhotos({ lang, setLang }) {
   const { token } = useParams();
   const navigate = useNavigate();
 
   // ── State machine ────────────────────────────────────────────────────────
-  // "loading"           → resolving token + publish flag
-  // "not-published"     → block message
+  // "loading"           → first matches fetch in flight
+  // "invalid"           → token missing/expired — terminal, no retry
+  // "not-published"     → lock screen (poller keeps it advancing)
+  // "consent"           → biometric consent screen, gate before any camera
   // "loading-models"    → fetching face-api models from /models
   // "requesting-camera" → asking for camera permission
   // "liveness"          → user turning head left/right
   // "extracting"        → grabbing the guest descriptor
-  // "matching"          → scanning photographer files
-  // "done"              → results gallery
-  // "error"             → fatal error
+  // "enrolling"         → storing the descriptor + first match round trip
+  // "done"              → results gallery (poller refreshes new photos)
+  // "error"             → camera/enroll error with retry
   const [stage, setStage]    = useState("loading");
   const [error, setError]    = useState("");
-  const [groomUid, setGroomUid] = useState(null);
   const [livenessProgress, setLivenessProgress] = useState({ left: false, right: false });
   const [faceDetected, setFaceDetected] = useState(false);
-  const [matchProgress, setMatchProgress] = useState({ done: 0, total: 0 });
   const [matches, setMatches] = useState([]);
+  const [expiresAt, setExpiresAt] = useState(null);
 
   const videoRef        = useRef(null);
   const canvasRef       = useRef(null);
@@ -57,41 +62,58 @@ export function DigitalYourPhotos({ lang, setLang }) {
   const livenessRafRef  = useRef(0);
   const livenessTimeout = useRef(null);
   const cancelledRef    = useRef(false);
-  // True once we've routed into the camera flow. The token endpoint is POLLED
-  // (fires every few seconds even when unchanged), so without this guard the
-  // callback would keep calling setStage("loading-models") and restart the
-  // whole camera flow in a loop. We decide the stage once; later polls only
-  // refresh groomUid.
-  const routedRef       = useRef(false);
+  // The matches endpoint is POLLED; once the guest is inside the camera flow
+  // the poller must not yank the stage out from under them. The ref mirrors
+  // `stage` so the poll callback can decide without re-subscribing.
+  const stageRef        = useRef("loading");
+  const unsubRef        = useRef(null);
+  useEffect(() => { stageRef.current = stage; }, [stage]);
 
-  // ── Step 1: resolve token + publish flag ────────────────────────────────
+  // ── Step 1: poll enrollment state + matches ──────────────────────────────
   useEffect(() => {
-    if (!token) { setStage("error"); setError(tt(lang, "رابط غير صالح", "קישור לא תקין")); return; }
+    if (!token) { setStage("invalid"); setError(tt(lang, "رابط غير صالح", "קישור לא תקין")); return; }
     cancelledRef.current = false;
-    routedRef.current = false;
-    const unsub = subscribeInviteToken(token, async (rec) => {
-      if (cancelledRef.current) return;
-      if (!rec) {
-        if (!routedRef.current) { setStage("error"); setError(tt(lang, "رابط غير صالح", "קישור לא תקין")); }
-        return;
-      }
-      const uid = rec.groomUid;
-      setGroomUid(uid);
-      if (routedRef.current) return;            // already in the camera flow — don't restart it
-      const doc = await getDigitalInvitationPublic(uid).catch(() => null);
-      if (cancelledRef.current || routedRef.current) return;
-      if (!doc || doc.photographerPublished !== true) {
-        setStage("not-published");              // keep polling — advances once the groom publishes
-      } else {
-        routedRef.current = true;               // lock: the camera flow now owns the stage
-        setStage("loading-models");
-      }
-    });
+    const unsub = subscribeFaceMatches(
+      token,
+      (state) => {
+        if (cancelledRef.current || !state) return;
+        if (state.expiresAt) setExpiresAt(state.expiresAt);
+        const s = stageRef.current;
+        // Passive stages follow the server; the consent screen and the camera
+        // flow own the stage until they finish.
+        const passive = s === "loading" || s === "not-published" || s === "done";
+        if (!passive) return;
+        if (state.published !== true) { setStage("not-published"); return; }
+        if (state.enrolled) {
+          setMatches(state.matches || []);
+          setStage("done");
+        } else if (s !== "done") {
+          // A tick that STARTED before our enroll POST landed can still say
+          // enrolled:false — never bounce an already-shown gallery back to
+          // the consent screen over a stale read.
+          setMatches([]);
+          setStage("consent");
+        }
+      },
+      (err) => {
+        if (cancelledRef.current) return;
+        // Token-level failures are terminal — stop polling, no retry button.
+        if (err?.status === 400 || err?.status === 404 || err?.status === 410) {
+          setStage("invalid");
+          setError(err.status === 410
+            ? tt(lang, "انتهت صلاحية الرابط", "תוקף הקישור פג")
+            : tt(lang, "رابط غير صالح", "קישור לא תקין"));
+          if (unsubRef.current) unsubRef.current();
+        }
+        // Other errors: the poller backs off and retries on its own.
+      },
+    );
+    unsubRef.current = unsub;
     return () => { cancelledRef.current = true; unsub(); cleanupCamera(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
-  // ── Step 2: load face-api models once published is confirmed ────────────
+  // ── Step 2: load face-api models after consent ───────────────────────────
   useEffect(() => {
     if (stage !== "loading-models") return;
     (async () => {
@@ -257,7 +279,7 @@ export function DigitalYourPhotos({ lang, setLang }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stage]);
 
-  // ── Step 5: extract guest descriptor from a single live frame ───────────
+  // ── Step 5: extract descriptor from one live frame, then enroll ──────────
   useEffect(() => {
     if (stage !== "extracting") return;
     const faceapi = faceapiRef.current;
@@ -272,64 +294,44 @@ export function DigitalYourPhotos({ lang, setLang }) {
           throw new Error(tt(lang, "لم نتعرف على وجهك", "לא זוהו פנים"));
         }
         cleanupCamera();
-        // Kick off matching with the descriptor we just extracted.
-        matchAgainstGallery(result.descriptor);
+        setStage("enrolling");
+        // Store the numeric signature server-side; the response carries the
+        // first match results so the gallery shows in the same round trip.
+        const resp = await enrollFaceDescriptor(token, Array.from(result.descriptor));
+        if (cancelledRef.current) return;
+        setMatches(resp?.matches ?? []);
+        if (resp?.expiresAt) setExpiresAt(resp.expiresAt);
+        setStage("done");
       } catch (err) {
-        logErr("extractDescriptor", err);
+        logErr("extractOrEnroll", err);
+        if (cancelledRef.current) return;
         setStage("error");
-        setError(err?.message || tt(lang, "خطأ في الاستخراج", "שגיאה בחילוץ"));
+        setError(
+          err?.status === 409
+            ? tt(lang, "الصور لم تُنشر بعد", "התמונות עוד לא פורסמו")
+            : err?.status
+              ? tt(lang, "فشل حفظ بصمة الوجه — حاول مجدداً", "שמירת חתימת הפנים נכשלה — נסה שוב")
+              : err?.message || tt(lang, "خطأ في الاستخراج", "שגיאה בחילוץ"),
+        );
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stage]);
 
-  // ── Step 6: fetch photographer files + match each one ───────────────────
-  const matchAgainstGallery = async (guestDescriptor) => {
-    setStage("matching");
-    const faceapi = faceapiRef.current;
+  // ── Delete my face data ───────────────────────────────────────────────────
+  const handleDeleteFaceData = async () => {
+    const sure = window.confirm(tt(lang,
+      "سيتم حذف بصمة وجهك المخزّنة نهائياً. متابعة؟",
+      "חתימת הפנים השמורה תימחק לצמיתות. להמשיך?"));
+    if (!sure) return;
     try {
-      const allFiles = await fetchPublishedPhotographerFiles(groomUid);
-      // Only images can be face-matched; skip videos / other.
-      const photos = allFiles
-        .filter(f => (f.type || "").startsWith("image"))
-        .slice(0, MAX_PHOTOS_TO_SCAN);
-
-      setMatchProgress({ done: 0, total: photos.length });
-      if (photos.length === 0) {
-        setStage("done");
-        return;
-      }
-
-      const detectorOpts = new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.5 });
-      const found = [];
-      for (let i = 0; i < photos.length; i++) {
-        if (cancelledRef.current) return;
-        const photo = photos[i];
-        try {
-          const img = await loadImage(photo.url);
-          const results = await faceapi
-            .detectAllFaces(img, detectorOpts)
-            .withFaceLandmarks()
-            .withFaceDescriptors();
-          for (const r of results) {
-            const dist = faceapi.euclideanDistance(guestDescriptor, r.descriptor);
-            if (dist <= MATCH_THRESHOLD) {
-              found.push({ ...photo, distance: dist });
-              break;
-            }
-          }
-        } catch (err) {
-          // photo failed to load or face-detect — skip silently
-        }
-        setMatchProgress({ done: i + 1, total: photos.length });
-      }
-      found.sort((a, b) => a.distance - b.distance);
-      setMatches(found);
-      setStage("done");
+      await deleteFaceEnrollment(token);
+      setMatches([]);
+      setStage("consent");
     } catch (err) {
-      logErr("matchAgainstGallery", err);
+      logErr("deleteFaceEnrollment", err);
       setStage("error");
-      setError(err?.message || tt(lang, "خطأ في البحث", "שגיאה בחיפוש"));
+      setError(tt(lang, "فشل حذف البيانات — حاول مجدداً", "מחיקת הנתונים נכשלה — נסה שוב"));
     }
   };
 
@@ -344,6 +346,11 @@ export function DigitalYourPhotos({ lang, setLang }) {
 
   // ── Render ──────────────────────────────────────────────────────────────
   const cameraActive = stage === "requesting-camera" || stage === "liveness" || stage === "extracting";
+
+  const expiryDateText = expiresAt
+    ? new Date(expiresAt).toLocaleDateString(lang === "he" ? "he-IL" : "ar-EG",
+        { day: "numeric", month: "long", year: "numeric", numberingSystem: "latn" })
+    : null;
 
   // Guidance text that changes with what the guest needs to do right now.
   function guidanceText() {
@@ -396,6 +403,50 @@ export function DigitalYourPhotos({ lang, setLang }) {
           </div>
         )}
 
+        {stage === "consent" && (
+          <div className="gold-card" style={{ padding: 28 }}>
+            <div style={{ fontSize: 44, textAlign: "center", marginBottom: 10 }}>🔍📸</div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: C.gold, textAlign: "center", marginBottom: 14 }}>
+              {tt(lang, "البحث عن صورك بالتعرف على الوجه", "חיפוש התמונות שלך בזיהוי פנים")}
+            </div>
+            <div style={{ fontSize: 13, color: C.dim, lineHeight: 2, marginBottom: 18 }}>
+              <div>
+                {tt(lang,
+                  "📷 سنمسح وجهك بالكاميرا للعثور على كل الصور التي تظهر فيها — صورة الكاميرا تبقى في جهازك ولا تُرفع إطلاقاً.",
+                  "📷 נסרוק את פניך במצלמה כדי למצוא את כל התמונות שאתה מופיע בהן — תמונת המצלמה נשארת במכשיר ולא נשלחת לעולם.")}
+              </div>
+              <div>
+                {tt(lang,
+                  "🔢 يُحفظ على خوادمنا «توقيع رقمي» للوجه فقط (سلسلة أرقام، وليست صورة) لمطابقة صور الحفل.",
+                  "🔢 בשרתים נשמרת רק «חתימה מספרית» של הפנים (סדרת מספרים, לא תמונה) להתאמת תמונות האירוע.")}
+              </div>
+              {expiryDateText && (
+                <div>
+                  {tt(lang,
+                    `🗓 يُحذف هذا التوقيع تلقائياً بتاريخ ${expiryDateText} مع انتهاء صلاحية الدعوة.`,
+                    `🗓 החתימה נמחקת אוטומטית בתאריך ${expiryDateText} עם פקיעת ההזמנה.`)}
+                </div>
+              )}
+              <div>
+                {tt(lang,
+                  "🗑 يمكنك حذف بصمة وجهك في أي وقت بزر الحذف داخل صفحة الصور.",
+                  "🗑 ניתן למחוק את חתימת הפנים בכל עת בכפתור המחיקה בעמוד התמונות.")}
+              </div>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <button className="gold-btn" onClick={() => setStage("loading-models")}>
+                {tt(lang, "أوافق — ابدأ المسح ✓", "אני מסכים — התחל סריקה ✓")}
+              </button>
+              <button onClick={() => navigate("..")} style={{
+                background: "none", border: "1px solid rgba(255,255,255,.15)", color: C.dim,
+                borderRadius: 10, padding: "10px 14px", cursor: "pointer", fontSize: 13,
+              }}>
+                {tt(lang, "رجوع", "חזרה")}
+              </button>
+            </div>
+          </div>
+        )}
+
         {stage === "loading-models" && <Status icon="⏳" text={tt(lang, "جاري تحميل مكتبة التعرف...", "טוען ספריית זיהוי...")} />}
 
         {cameraActive && (
@@ -430,57 +481,61 @@ export function DigitalYourPhotos({ lang, setLang }) {
               </div>
             )}
             <div style={{ fontSize: 11, color: C.dim, marginTop: 14, lineHeight: 1.7 }}>
-              {tt(lang, "كل المعالجة تجري في متصفحك فقط — لا تُرفع صورتك إلى أي مكان",
-                        "כל העיבוד מתבצע בדפדפן שלך בלבד — תמונתך לא נשלחת לשום מקום")}
+              {tt(lang, "صورة الكاميرا لا تغادر جهازك — يُحفظ فقط توقيع رقمي للوجه للعثور على صورك",
+                        "תמונת המצלמה לא עוזבת את המכשיר — נשמרת רק חתימה מספרית של הפנים לאיתור התמונות שלך")}
             </div>
           </div>
         )}
 
-        {stage === "matching" && (
-          <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: 44, marginBottom: 8 }}>🔍</div>
-            <div style={{ fontSize: 14, fontWeight: 800, color: C.goldLight, marginBottom: 14 }}>
-              {tt(lang, "جاري البحث عن صورك...", "מחפש את התמונות שלך...")}
-            </div>
-            <div style={{
-              width: "100%", maxWidth: 360, margin: "0 auto",
-              height: 10, background: "rgba(255,255,255,.06)", borderRadius: 5, overflow: "hidden",
-            }}>
-              <div style={{
-                height: "100%",
-                width: `${matchProgress.total ? Math.round(matchProgress.done / matchProgress.total * 100) : 0}%`,
-                background: "linear-gradient(90deg,#c9a84c,#f0c84c)",
-                transition: "width .3s",
-              }}/>
-            </div>
-            <div style={{ fontSize: 11, color: C.dim, marginTop: 8 }}>
-              {matchProgress.done.toLocaleString("en")} / {matchProgress.total.toLocaleString("en")}
-            </div>
-          </div>
+        {stage === "enrolling" && (
+          <Status icon="🔍" text={tt(lang, "جاري حفظ بصمة الوجه والبحث عن صورك...", "שומר את חתימת הפנים ומחפש את התמונות שלך...")} />
         )}
 
         {stage === "done" && (
-          matches.length === 0 ? (
-            <div className="card" style={{ textAlign: "center", padding: 32, color: C.dim }}>
-              <div style={{ fontSize: 48, marginBottom: 10 }}>🔍</div>
-              {tt(lang, "لم نجد صوراً لك بعد", "לא נמצאו תמונות שלך עדיין")}
+          <>
+            {matches.length === 0 ? (
+              <div className="card" style={{ textAlign: "center", padding: 32, color: C.dim }}>
+                <div style={{ fontSize: 48, marginBottom: 10 }}>🔍</div>
+                {tt(lang, "لم نجد صوراً لك بعد — تُضاف الصور الجديدة تلقائياً", "לא נמצאו תמונות שלך עדיין — תמונות חדשות נוספות אוטומטית")}
+              </div>
+            ) : (
+              <>
+                <div style={{ fontSize: 14, fontWeight: 800, color: C.gold, marginBottom: 14, textAlign: "center" }}>
+                  {tt(lang, `وجدنا ${matches.length} صورة`, `מצאנו ${matches.length} תמונות`)}
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(120px,1fr))", gap: 6 }}>
+                  {matches.map(m => (
+                    <a key={m.fileId} href={m.url} target="_blank" rel="noreferrer">
+                      <img src={m.url} alt=""
+                           style={{ width: "100%", aspectRatio: "1", objectFit: "cover", borderRadius: 10,
+                                    border: "1px solid rgba(201,168,76,.25)" }}/>
+                    </a>
+                  ))}
+                </div>
+              </>
+            )}
+            <div style={{ display: "flex", justifyContent: "center", gap: 10, marginTop: 22, flexWrap: "wrap" }}>
+              <button onClick={() => setStage("loading-models")} style={{
+                background: "none", border: "1px solid rgba(201,168,76,.4)", color: C.goldLight,
+                borderRadius: 10, padding: "9px 14px", cursor: "pointer", fontSize: 12, fontWeight: 700,
+              }}>
+                {tt(lang, "🔄 إعادة مسح وجهي", "🔄 סריקה מחדש")}
+              </button>
+              <button onClick={handleDeleteFaceData} style={{
+                background: "none", border: "1px solid rgba(255,80,80,.35)", color: "#e07070",
+                borderRadius: 10, padding: "9px 14px", cursor: "pointer", fontSize: 12, fontWeight: 700,
+              }}>
+                {tt(lang, "🗑 حذف بصمة وجهي", "🗑 מחק את חתימת הפנים שלי")}
+              </button>
             </div>
-          ) : (
-            <>
-              <div style={{ fontSize: 14, fontWeight: 800, color: C.gold, marginBottom: 14, textAlign: "center" }}>
-                {tt(lang, `وجدنا ${matches.length} صورة`, `מצאנו ${matches.length} תמונות`)}
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(120px,1fr))", gap: 6 }}>
-                {matches.map(m => (
-                  <a key={m.id} href={m.url} target="_blank" rel="noreferrer">
-                    <img src={m.url} alt=""
-                         style={{ width: "100%", aspectRatio: "1", objectFit: "cover", borderRadius: 10,
-                                  border: "1px solid rgba(201,168,76,.25)" }}/>
-                  </a>
-                ))}
-              </div>
-            </>
-          )
+          </>
+        )}
+
+        {stage === "invalid" && (
+          <div className="gold-card" style={{ textAlign: "center" }}>
+            <div style={{ fontSize: 56, marginBottom: 12 }}>⚠️</div>
+            <div style={{ fontSize: 14, color: C.red, fontWeight: 800 }}>{error}</div>
+          </div>
         )}
 
         {stage === "error" && (
@@ -538,14 +593,4 @@ function estimateYaw(landmarks) {
   const dx       = noseTip.x - eyeMid.x;
   // Normalised offset → approximate degrees. Empirically 1.0 ≈ 60°.
   return (dx / eyeDist) * 60;
-}
-
-function loadImage(url) {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.onload  = () => resolve(img);
-    img.onerror = () => reject(new Error("image load failed"));
-    img.src = url;
-  });
 }

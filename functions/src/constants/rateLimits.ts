@@ -30,10 +30,14 @@ export const RATE = Object.freeze({
   CREATE_DIGITAL_INVITE_PER_USER: perHour(60),
   /** Digital-invite submission — anonymous public endpoint. */
   SUBMIT_DIGITAL_INVITE_PER_IP: perHour(10),
-  /** Guest face enrollment / erasure — anonymous public endpoint. */
-  PHOTO_ENROLL_PER_IP: perHour(10),
+  /** Guest face enrollment / erasure — per invite token. */
+  PHOTO_ENROLL_PER_TOKEN: perHour(10),
+  /** IP backstop for enroll/erase (venue NAT shares one IP across guests). */
+  PHOTO_ENROLL_IP_BACKSTOP: perHour(300),
+  /** Guest face-match reads — polled at 15s by the photos page (240/h). */
+  PHOTO_MATCHES_PER_TOKEN: perHour(300),
+  /** IP backstop for match reads — sized for a venue full of pollers. */
+  PHOTO_MATCHES_IP_BACKSTOP: perHour(6000),
   /** Photographer face-index backfill per caller (groom/admin). */
   PHOTO_REINDEX_PER_USER: perHour(10),
-  /** Guest face-match reads — polled by the photos page, so roomier. */
-  PHOTO_MATCHES_PER_IP: perHour(120),
 });
