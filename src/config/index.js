@@ -139,6 +139,20 @@ export const LEAFLET = {
   JS_SRI: "sha384-cxOPjt7s7Iz04uaHJceBmS+qpjv2JkIHNVcuOrM+YHwZOmJGBXI00mdUXEq65HTH",
 };
 
+// ─── External CDN URLs (GSAP) ────────────────────────────────────────────────
+
+// Same SRI pinning rationale as LEAFLET above. Loaded lazily by `useGsap()`
+// only on the surfaces that animate (landing page, digital invitation); the
+// rest of the app never pays for it. If VERSION is bumped, recompute both
+// hashes with `curl -sL <url> | openssl dgst -sha384 -binary | openssl base64 -A`.
+export const GSAP = {
+  VERSION: "3.15.0",
+  CORE_URL: "https://unpkg.com/gsap@3.15.0/dist/gsap.min.js",
+  ST_URL: "https://unpkg.com/gsap@3.15.0/dist/ScrollTrigger.min.js",
+  CORE_SRI: "sha384-XmJ9SoHtVOHoQUcKvFAzVXwdkKo1Ie3bhmSoIAkcdsHGaIrVJIkmozyq0FJeb/Ly",
+  ST_SRI: "sha384-wl5TeDVvOWt30Pbf8aSo2ZrzsOjddu3avOBvHe+p+OhJt9gP6w9YXmDkN5DK2/dF",
+};
+
 // ─── Map tile providers (Leaflet TileLayers) ─────────────────────────────────
 
 export const MAP_TILES = {
