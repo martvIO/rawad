@@ -10,7 +10,7 @@
 //
 // This file is the orchestrator only: field extraction, localization, section
 // flags, and the render tree. The sections themselves live in ./sections/.
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { getDigitalTheme, getDigitalFont } from "../../styles/digitalThemes.js";
 import {
   DEFAULT_EYEBROW,
@@ -18,6 +18,9 @@ import {
 } from "../../data/digitalInviteDefaults.js";
 import { localize, localizeItems, localizeList } from "../../utils/localize.js";
 import { ensureDigitalFonts } from "../../utils/digitalFonts.js";
+import { useGsap } from "../../hooks/useGsap.js";
+import { useInviteMotion } from "../../hooks/useInviteMotion.js";
+import { prefersReducedMotion } from "../../utils/motion.js";
 import { LangToggle, SorekButton } from "./inviteShared.jsx";
 import { ViewStyles } from "./InviteStyles.jsx";
 import { Ambience } from "./InviteAmbience.jsx";
@@ -52,6 +55,8 @@ export function DigitalInvitationView({
   const font = getDigitalFont(design?.fontFamily);
   const isPublic = mode === "public";
   const rootRef = useRef(null);
+  const gsapReady = useGsap();
+  const [envelopeDone, setEnvelopeDone] = useState(false);
 
   // Load the extended Arabic+Hebrew wedding fonts only when an invitation
   // actually renders (lazy — other pages don't pay for them).
@@ -115,7 +120,10 @@ export function DigitalInvitationView({
   const showDock = on(design?.footerDockEnabled);
   const showMusic = on(design?.musicEnabled) && !!musicUrl;
   const showHeroMedia = on(design?.heroMediaEnabled) && heroMedia.length > 0;
-  const showEnvelopeNow = isPublic && showEnvelope && on(design?.envelopeEnabled);
+  // The envelope plays on EVERY visit (no once-per-device gate) but is never
+  // mounted for reduced-motion guests — they go straight to the invitation.
+  const showEnvelopeNow =
+    isPublic && showEnvelope && on(design?.envelopeEnabled) && !prefersReducedMotion();
 
   const rsvpOpts = {
     companions: on(design?.rsvpCompanionsEnabled),
@@ -133,31 +141,11 @@ export function DigitalInvitationView({
     : "";
   const venueLine = [venue, venueCity].filter(Boolean).join(" · ");
 
-  // Scroll-reveal: animate `.dawa-inv-reveal` blocks in as they enter view on
-  // the public page. In preview (or without IntersectionObserver) reveal them
-  // all immediately so nothing is ever stuck hidden behind the editor.
-  useEffect(() => {
-    const root = rootRef.current;
-    if (!root) return undefined;
-    const els = Array.from(root.querySelectorAll(".dawa-inv-reveal"));
-    if (!isPublic || typeof IntersectionObserver === "undefined") {
-      els.forEach((el) => el.classList.add("is-in"));
-      return undefined;
-    }
-    const io = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((e) => {
-          if (e.isIntersecting) {
-            e.target.classList.add("is-in");
-            io.unobserve(e.target);
-          }
-        });
-      },
-      { threshold: 0.08, rootMargin: "0px 0px -40px 0px" },
-    );
-    els.forEach((el) => io.observe(el));
-    return () => io.disconnect();
-  }, [isPublic, design]);
+  // GSAP choreography (public mode only): scroll reveal cascade, story-line
+  // draw, venue route trace, and the hero entrance — which waits for the
+  // envelope to finish (heroGo). Content is fully visible without GSAP.
+  const heroGo = !showEnvelopeNow || envelopeDone;
+  useInviteMotion(rootRef, gsapReady, isPublic, design, lang, heroGo);
 
   return (
     <div
@@ -182,7 +170,18 @@ export function DigitalInvitationView({
         <SorekButton lang={lang} isPublic={isPublic} onClick={onOpenSorek} theme={theme} font={font} />
       )}
 
-      {showEnvelopeNow && <EnvelopeIntro guestName={guestName} font={font} lang={lang} />}
+      {showEnvelopeNow && !envelopeDone && (
+        <EnvelopeIntro
+          guestName={guestName}
+          monogram={monogram}
+          groomName={groomName}
+          brideName={brideName}
+          theme={theme}
+          font={font}
+          lang={lang}
+          onDone={() => setEnvelopeDone(true)}
+        />
+      )}
       <Ambience theme={theme} fixed={isPublic} />
 
       <Hero

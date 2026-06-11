@@ -1,6 +1,13 @@
 // Scoped styles for the digital invitation (all under .dawa-inv so other
-// surfaces are untouched). Theme-driven; `fixed` switches the full-page
-// overlays between fixed (public) and absolute (editor/admin preview box).
+// surfaces are untouched) — "engraved suite" redesign: letterpress headings,
+// hairline double rules, framed-print gallery mats, ruled detail panels.
+//
+// Motion contract: nothing here hides content. Entrances and scroll reveals
+// are GSAP-driven (useInviteMotion, public mode only); without GSAP — or in
+// the editor/admin preview — the invitation is simply static and fully
+// visible. CSS keeps only the infinite ambient loops (cheaper than JS).
+// `fixed` switches full-page overlays between fixed (public) and absolute
+// (editor/admin preview box).
 import { ON_GOLD } from "./inviteShared.jsx";
 
 export function ViewStyles({ theme, fixed }) {
@@ -23,9 +30,6 @@ export function ViewStyles({ theme, fixed }) {
       background-size: 72px 72px;
     }
 
-    .dawa-inv .dawa-inv-reveal { opacity: 0; transform: translateY(40px); transition: opacity .9s cubic-bezier(.2,.7,.2,1), transform .9s cubic-bezier(.2,.7,.2,1); }
-    .dawa-inv .dawa-inv-reveal.is-in { opacity: 1; transform: none; }
-
     /* Headings / names: SOLID high-contrast color, not background-clip:text.
      * The clip trick (gradient bg + transparent fill) renders as an unreadable
      * solid BLOCK on several mobile / in-app browsers (Samsung Internet, older
@@ -40,54 +44,55 @@ export function ViewStyles({ theme, fixed }) {
       color: ${theme.text} !important;
     }
 
-    /* Section shell */
-    .dawa-inv .dawa-inv-section { position: relative; padding: 96px 24px; max-width: 1080px; margin: 0 auto; z-index: 6; }
-    .dawa-inv .dawa-inv-eyebrow { font-size: 11.5px; letter-spacing: 4px; text-transform: uppercase; font-style: italic; display: inline-flex; align-items: center; gap: 14px; margin-bottom: 16px; }
-    .dawa-inv .dawa-inv-title { font-weight: 900; font-size: clamp(30px,5vw,48px); line-height: 1.35; margin-bottom: 16px; padding-block: 6px; }
+    /* Section shell — letterpress head: flourish, italic eyebrow, serif title,
+     * engraved rule with a gleaming diamond. */
+    .dawa-inv .dawa-inv-section { position: relative; padding: 100px 24px; max-width: 1080px; margin: 0 auto; z-index: 6; }
+    .dawa-inv .dawa-inv-eyebrow { font-size: 11.5px; letter-spacing: 4.5px; text-transform: uppercase; font-style: italic; display: inline-flex; align-items: center; gap: 14px; margin-bottom: 16px; }
+    .dawa-inv .dawa-inv-title { font-weight: 700; font-size: clamp(32px,5.2vw,54px); line-height: 1.35; margin-bottom: 16px; padding-block: 6px; }
     .dawa-inv .dawa-inv-sub { font-style: italic; font-size: 14px; max-width: 540px; margin: 0 auto; line-height: 1.85; }
     .dawa-inv .dawa-inv-secflourish { margin-bottom: 14px; opacity: .9; }
-    .dawa-inv .dawa-inv-secrule { display: flex; align-items: center; justify-content: center; gap: 9px; width: 132px; margin: 4px auto 16px; }
+    .dawa-inv .dawa-inv-secrule { display: flex; align-items: center; justify-content: center; gap: 9px; width: 148px; margin: 4px auto 16px; }
     .dawa-inv .dawa-inv-secrule > span { height: 1px; flex: 1; }
     .dawa-inv .dawa-inv-secrule .dawa-inv-secrule-dot { flex: 0 0 auto; width: 5px; height: 5px; transform: rotate(45deg); }
 
-    /* Hero */
+    /* Hero — GSAP owns the entrance (no CSS entry animations: a missing GSAP
+     * must leave everything visible). Only infinite loops live here. */
     .dawa-inv .dawa-inv-hero { position: relative; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 60px 24px; overflow: hidden; z-index: 6; }
     .dawa-inv .dawa-inv-hero-glow { position: absolute; inset: 0; pointer-events: none; }
     /* Gold filigree frame inset on the hero — thin border + heavier corner
      * brackets for an engraved-invitation feel. Perimeter only, never over text. */
-    .dawa-inv .dawa-inv-hero-frame { position: absolute; inset: 16px; border: 1px solid; border-radius: 16px; pointer-events: none; opacity: .4; animation: dawa-inv-frame 1.6s .3s ease both; }
+    .dawa-inv .dawa-inv-hero-frame { position: absolute; inset: 16px; border: 1px solid; border-radius: 16px; pointer-events: none; opacity: .4; }
     .dawa-inv .dawa-inv-corner { position: absolute; width: 28px; height: 28px; border-style: solid; border-width: 0; opacity: .9; }
     .dawa-inv .dawa-inv-corner-tl { top: -1px; inset-inline-start: -1px; border-top-width: 2px; border-inline-start-width: 2px; border-start-start-radius: 16px; }
     .dawa-inv .dawa-inv-corner-tr { top: -1px; inset-inline-end: -1px; border-top-width: 2px; border-inline-end-width: 2px; border-start-end-radius: 16px; }
     .dawa-inv .dawa-inv-corner-bl { bottom: -1px; inset-inline-start: -1px; border-bottom-width: 2px; border-inline-start-width: 2px; border-end-start-radius: 16px; }
     .dawa-inv .dawa-inv-corner-br { bottom: -1px; inset-inline-end: -1px; border-bottom-width: 2px; border-inline-end-width: 2px; border-end-end-radius: 16px; }
-    @keyframes dawa-inv-frame { from { opacity: 0; transform: scale(1.03); } to { opacity: .4; transform: none; } }
-    .dawa-inv .dawa-inv-hero-eyebrow { position: relative; font-size: 13px; letter-spacing: 4px; text-transform: uppercase; font-style: italic; margin-bottom: 24px; display: inline-flex; align-items: center; gap: 14px; animation: dawa-inv-rise .9s ease both; }
-    .dawa-inv .dawa-inv-monogram { width: 170px; height: 170px; margin: 0 auto 28px; position: relative; display: flex; align-items: center; justify-content: center; animation: dawa-inv-rise 1.1s .15s cubic-bezier(.17,.67,.35,1.4) both; }
+    .dawa-inv .dawa-inv-hero-eyebrow { position: relative; font-size: 13px; letter-spacing: 4.5px; text-transform: uppercase; font-style: italic; margin-bottom: 24px; display: inline-flex; align-items: center; gap: 14px; }
+    .dawa-inv .dawa-inv-monogram { width: 170px; height: 170px; margin: 0 auto 28px; position: relative; display: flex; align-items: center; justify-content: center; }
     .dawa-inv .dawa-inv-monogram svg { width: 100%; height: 100%; position: absolute; inset: 0; }
-    .dawa-inv .dawa-inv-crown { animation: dawa-inv-rise 1s .35s cubic-bezier(.2,.7,.2,1) both; }
     .dawa-inv .dawa-inv-crown-gem { animation: dawa-inv-twinkle 2.6s ease-in-out infinite; }
     @keyframes dawa-inv-twinkle { 0%,100% { opacity: 1; } 50% { opacity: .5; } }
     .dawa-inv .dawa-inv-monogram-letters { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 56px; line-height: 1.4; padding-block: 8px; }
-    .dawa-inv .dawa-inv-couple { font-weight: 900; font-size: clamp(48px,9vw,96px); line-height: 1.25; margin: 8px 0; padding-block: 8px; text-shadow: 0 0 80px ${theme.accentMuted}; animation: dawa-inv-rise 1.1s .3s cubic-bezier(.2,.7,.2,1) both; }
-    .dawa-inv .dawa-inv-amp { display: block; font-style: italic; font-size: clamp(28px,6vw,52px); margin: 6px 0; opacity: .8; padding-block: 4px; animation: dawa-inv-rise 1.1s .4s ease both; }
-    .dawa-inv .dawa-inv-dateline { display: inline-flex; align-items: center; gap: 16px; margin-top: 28px; padding: 12px 28px; border-radius: 999px; backdrop-filter: blur(20px); font-size: 16px; letter-spacing: .5px; animation: dawa-inv-rise 1.1s .5s ease both; flex-wrap: wrap; justify-content: center; box-shadow: 0 12px 36px -14px ${theme.accentMuted}, inset 0 0 0 1px ${theme.accentLine}; }
+    .dawa-inv .dawa-inv-couple { font-weight: 900; font-size: clamp(50px,9.5vw,100px); line-height: 1.25; margin: 8px 0; padding-block: 8px; }
+    .dawa-inv .dawa-inv-amp { display: block; font-style: italic; font-size: clamp(28px,6vw,52px); margin: 6px 0; opacity: .8; padding-block: 4px; }
+    .dawa-inv .dawa-inv-dateline { display: inline-flex; align-items: center; gap: 16px; margin-top: 28px; padding: 13px 30px; border-radius: 999px; backdrop-filter: blur(20px); font-size: 16px; letter-spacing: .5px; flex-wrap: wrap; justify-content: center; }
     .dawa-inv .dawa-inv-dot { width: 4px; height: 4px; border-radius: 50%; }
-    .dawa-inv .dawa-inv-greet { margin-top: 26px; font-style: italic; font-size: clamp(19px,3.4vw,28px); letter-spacing: 1px; line-height: 1.5; animation: dawa-inv-rise 1.1s .6s ease both; }
-    .dawa-inv .dawa-inv-greet strong { display: block; margin-top: 12px; font-style: normal; font-weight: 900; font-size: clamp(34px,7.5vw,52px); line-height: 1.2; letter-spacing: .5px; padding-block: 4px; text-shadow: 0 0 60px ${theme.accentMuted}; }
-    .dawa-inv .dawa-inv-hero-media { margin-top: 30px; width: 100%; max-width: 440px; display: grid; gap: 14px; animation: dawa-inv-rise 1.1s .7s ease both; }
-    .dawa-inv .dawa-inv-hero-media-item { border: 1px solid; border-radius: 16px; overflow: hidden; background: ${theme.cardBg}; }
-    .dawa-inv .dawa-inv-hero-media-item img, .dawa-inv .dawa-inv-hero-media-item video { width: 100%; display: block; max-height: 56vh; object-fit: cover; }
+    .dawa-inv .dawa-inv-greet { margin-top: 26px; font-style: italic; font-size: clamp(19px,3.4vw,28px); letter-spacing: 1px; line-height: 1.5; }
+    .dawa-inv .dawa-inv-greet strong { display: block; margin-top: 12px; font-style: normal; font-weight: 900; font-size: clamp(34px,7.5vw,52px); line-height: 1.2; letter-spacing: .5px; padding-block: 4px; }
+    .dawa-inv .dawa-inv-hero-media { margin-top: 30px; width: 100%; max-width: 440px; display: grid; gap: 14px; }
+    .dawa-inv .dawa-inv-hero-media-item { border: 1px solid; border-radius: 6px; overflow: hidden; background: ${theme.cardBg}; padding: 6px; }
+    .dawa-inv .dawa-inv-hero-media-item img, .dawa-inv .dawa-inv-hero-media-item video { width: 100%; display: block; max-height: 56vh; object-fit: cover; border-radius: 3px; }
     .dawa-inv .dawa-inv-cue { position: absolute; bottom: 28px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 10px; font-size: 11px; font-style: italic; letter-spacing: 3px; text-transform: uppercase; opacity: .7; animation: dawa-inv-cue 2.4s ease-in-out infinite; }
     .dawa-inv .dawa-inv-cue-line { width: 1px; height: 34px; }
 
-    /* Story timeline */
+    /* Story timeline — the center rule draws via a GSAP-tweened CSS var
+     * (default 1 so a missing GSAP shows the full rule); nodes are diamonds. */
     .dawa-inv .dawa-inv-timeline { position: relative; padding: 20px 0; }
-    .dawa-inv .dawa-inv-timeline::before { content: ""; position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: linear-gradient(180deg, transparent, var(--line) 15%, var(--line) 85%, transparent); }
+    .dawa-inv .dawa-inv-timeline::before { content: ""; position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: linear-gradient(180deg, transparent, var(--line) 15%, var(--line) 85%, transparent); transform: scaleY(var(--dawa-draw, 1)); transform-origin: top center; }
     .dawa-inv .dawa-inv-story { position: relative; width: calc(50% - 56px); padding: 8px 4px; margin-bottom: 52px; }
     .dawa-inv .dawa-inv-story.is-left { margin-inline-start: auto; padding-inline-start: 32px; }
     .dawa-inv .dawa-inv-story.is-right { margin-inline-end: auto; padding-inline-end: 32px; }
-    .dawa-inv .dawa-inv-story-node { position: absolute; top: 14px; width: 9px; height: 9px; border-radius: 50%; }
+    .dawa-inv .dawa-inv-story-node { position: absolute; top: 14px; width: 9px; height: 9px; border-radius: 1px; transform: rotate(45deg); }
     .dawa-inv .dawa-inv-story.is-left .dawa-inv-story-node { left: -60px; }
     .dawa-inv .dawa-inv-story.is-right .dawa-inv-story-node { right: -60px; }
     .dawa-inv .dawa-inv-story-icon { font-size: 22px; margin-bottom: 12px; opacity: .9; }
@@ -100,13 +105,14 @@ export function ViewStyles({ theme, fixed }) {
       .dawa-inv .dawa-inv-story-node { left: -29px !important; right: auto !important; }
     }
 
-    /* Gallery */
+    /* Gallery — framed prints: each shot sits on a paper mat with a hairline
+     * frame, like proofs pinned in an album. */
     .dawa-inv .dawa-inv-gallery { columns: 3 240px; column-gap: 18px; }
-    .dawa-inv .dawa-inv-gallery-item { position: relative; break-inside: avoid; margin-bottom: 18px; border-radius: 12px; overflow: hidden; cursor: pointer; transition: transform .55s cubic-bezier(.2,.95,.25,1.1); }
-    .dawa-inv .dawa-inv-gallery-item:hover { transform: translateY(-4px); }
-    .dawa-inv .dawa-inv-gallery-item img, .dawa-inv .dawa-inv-gallery-item video { width: 100%; display: block; border-radius: 12px; transition: transform 1s cubic-bezier(.2,.7,.2,1); }
+    .dawa-inv .dawa-inv-gallery-item { position: relative; break-inside: avoid; margin-bottom: 18px; border-radius: 6px; overflow: hidden; cursor: pointer; padding: 7px; background: ${theme.cardBg}; border: 1px solid ${theme.accentLine}; transition: transform .55s cubic-bezier(.2,.95,.25,1.1), box-shadow .4s ease; }
+    .dawa-inv .dawa-inv-gallery-item:hover { transform: translateY(-4px); box-shadow: 0 18px 40px -18px ${theme.accentMuted}; }
+    .dawa-inv .dawa-inv-gallery-item img, .dawa-inv .dawa-inv-gallery-item video { width: 100%; display: block; border-radius: 3px; transition: transform 1s cubic-bezier(.2,.7,.2,1); }
     .dawa-inv .dawa-inv-gallery-item:hover img { transform: scale(1.04); }
-    .dawa-inv .dawa-inv-gallery-cap { position: absolute; bottom: 0; left: 0; right: 0; padding: 14px; font-style: italic; font-size: 12.5px; color: #fbf6e8; background: linear-gradient(180deg, transparent, rgba(7,7,10,.82)); opacity: 0; transform: translateY(6px); transition: opacity .35s, transform .45s; }
+    .dawa-inv .dawa-inv-gallery-cap { position: absolute; bottom: 7px; left: 7px; right: 7px; padding: 14px; font-style: italic; font-size: 12.5px; color: #fbf6e8; background: linear-gradient(180deg, transparent, rgba(7,7,10,.82)); border-radius: 0 0 3px 3px; opacity: 0; transform: translateY(6px); transition: opacity .35s, transform .45s; }
     .dawa-inv .dawa-inv-gallery-item:hover .dawa-inv-gallery-cap { opacity: 1; transform: none; }
     .dawa-inv .dawa-inv-lightbox { position: fixed; inset: 0; z-index: 999; background: rgba(7,7,10,.92); backdrop-filter: blur(20px); display: flex; align-items: center; justify-content: center; padding: 32px; opacity: 0; pointer-events: none; transition: opacity .5s; }
     .dawa-inv .dawa-inv-lightbox.is-open { opacity: 1; pointer-events: all; }
@@ -114,19 +120,27 @@ export function ViewStyles({ theme, fixed }) {
     .dawa-inv .dawa-inv-lightbox-close { position: absolute; top: 20px; inset-inline-end: 20px; width: 44px; height: 44px; border-radius: 50%; background: transparent; border: 1px solid; font-size: 20px; cursor: pointer; transition: transform .3s; }
     .dawa-inv .dawa-inv-lightbox-close:hover { transform: rotate(90deg); }
 
-    /* Details */
-    .dawa-inv .dawa-inv-details { display: grid; gap: 56px 40px; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
-    .dawa-inv .dawa-inv-detail { transition: transform .5s cubic-bezier(.2,.95,.25,1.1); }
-    .dawa-inv .dawa-inv-detail:hover { transform: translateY(-3px); }
-    .dawa-inv .dawa-inv-detail-icon { font-size: 28px; margin-bottom: 16px; opacity: .9; }
+    /* Details — ruled list panels: hairline frame, engraved top rule, no
+     * backdrop blur (blur on many cards is the #1 mobile jank source). */
+    .dawa-inv .dawa-inv-details { display: grid; gap: 32px 28px; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
+    .dawa-inv .dawa-inv-detail {
+      padding: 26px 22px 22px; border-radius: 3px;
+      background: linear-gradient(180deg, ${theme.chipBg}, transparent 70%);
+      border: 1px solid ${theme.cardBorder};
+      border-top: 2px solid ${theme.accentLine};
+      transition: transform .5s cubic-bezier(.2,.95,.25,1.1), border-color .35s ease, box-shadow .4s ease;
+    }
+    .dawa-inv .dawa-inv-detail:hover { transform: translateY(-3px); border-color: ${theme.accentLine}; box-shadow: 0 18px 44px -20px ${theme.accentMuted}; }
+    .dawa-inv .dawa-inv-detail-icon { font-size: 26px; margin-bottom: 14px; opacity: .9; }
     .dawa-inv .dawa-inv-detail-meta { font-size: 10.5px; letter-spacing: 2.8px; text-transform: uppercase; margin-bottom: 12px; font-weight: 700; opacity: .85; }
     .dawa-inv .dawa-inv-detail-title { font-weight: 700; font-size: 22px; margin-bottom: 12px; line-height: 1.45; padding-block: 3px; }
     .dawa-inv .dawa-inv-detail-body { font-size: 14px; line-height: 1.95; max-width: 36ch; }
 
-    /* Venue */
+    /* Venue — the route now draws ONCE via GSAP when scrolled into view; the
+     * static default (dashoffset 0) shows the full route without GSAP. */
     .dawa-inv .dawa-inv-venue { display: grid; grid-template-columns: 1.2fr 1fr; gap: 32px; align-items: stretch; }
-    .dawa-inv .dawa-inv-venue-map { position: relative; border: 1px solid; border-radius: 14px; overflow: hidden; min-height: 360px; background: ${theme.cardBg}; }
-    .dawa-inv .dawa-inv-route { stroke-dashoffset: 200; animation: dawa-inv-route 4s linear infinite; }
+    .dawa-inv .dawa-inv-venue-map { position: relative; border: 1px solid; border-radius: 6px; overflow: hidden; min-height: 360px; background: ${theme.cardBg}; }
+    .dawa-inv .dawa-inv-route { stroke-dashoffset: 0; }
     .dawa-inv .dawa-inv-venue-info { display: flex; flex-direction: column; }
     .dawa-inv .dawa-inv-venue-row { display: flex; align-items: flex-start; gap: 18px; padding: 20px 0; border-bottom: 1px solid; transition: transform .35s; }
     .dawa-inv .dawa-inv-venue-row:hover { transform: translateX(-3px); }
@@ -135,8 +149,8 @@ export function ViewStyles({ theme, fixed }) {
     .dawa-inv .dawa-inv-venue-val { font-size: 16px; line-height: 1.55; }
     @media (max-width: 760px) { .dawa-inv .dawa-inv-venue { grid-template-columns: 1fr; } }
 
-    /* Countdown */
-    .dawa-inv .dawa-inv-countdown { display: grid; grid-template-columns: repeat(4,1fr); max-width: 760px; margin: 0 auto; border-block: 1px solid; padding: 26px 0; }
+    /* Countdown — engraved double band (hairline + inset echo lines). */
+    .dawa-inv .dawa-inv-countdown { display: grid; grid-template-columns: repeat(4,1fr); max-width: 760px; margin: 0 auto; border-block: 1px solid; padding: 30px 0; box-shadow: inset 0 5px 0 -4px ${theme.accentLine}, inset 0 -5px 0 -4px ${theme.accentLine}; }
     .dawa-inv .dawa-inv-cd-cell { position: relative; padding: 8px 12px; text-align: center; }
     .dawa-inv .dawa-inv-cd-cell + .dawa-inv-cd-cell { border-inline-start: 1px solid var(--line); }
     .dawa-inv .dawa-inv-cd-num { font-weight: 900; font-size: clamp(40px,8vw,72px); line-height: 1.35; font-variant-numeric: tabular-nums; margin-bottom: 10px; display: inline-block; padding-block: 6px; }
@@ -167,10 +181,12 @@ export function ViewStyles({ theme, fixed }) {
     .dawa-inv .dawa-inv-rsvp-success h3 { font-weight: 700; font-size: 28px; margin-bottom: 12px; line-height: 1.4; padding-block: 4px; }
     .dawa-inv .dawa-inv-rsvp-success p { font-size: 14px; line-height: 1.9; }
 
-    /* Guestbook list */
+    /* Guestbook — ledger rows with an oversized engraved quote mark. */
     .dawa-inv .dawa-inv-wishes { display: grid; max-width: 640px; margin: 0 auto; }
-    .dawa-inv .dawa-inv-wish { padding: 26px 0; border-bottom: 1px solid; transition: transform .35s; }
+    .dawa-inv .dawa-inv-wish { position: relative; padding: 26px 0 26px; padding-inline-start: 38px; border-bottom: 1px solid; transition: transform .35s; }
+    .dawa-inv .dawa-inv-wish::before { content: "❝"; position: absolute; inset-inline-start: 0; top: 20px; font-size: 26px; line-height: 1; color: ${theme.accent}; opacity: .35; }
     .dawa-inv .dawa-inv-wish:first-child { padding-top: 0; }
+    .dawa-inv .dawa-inv-wish:first-child::before { top: -4px; }
     .dawa-inv .dawa-inv-wish:last-child { border-bottom: none; }
     .dawa-inv .dawa-inv-wish:hover { transform: translateX(-2px); }
     .dawa-inv .dawa-inv-wish-who { font-style: italic; font-size: 11px; letter-spacing: 2.8px; text-transform: uppercase; margin-bottom: 10px; opacity: .85; }
@@ -182,10 +198,10 @@ export function ViewStyles({ theme, fixed }) {
     .dawa-inv .dawa-inv-foot-mark { font-weight: 900; font-size: 38px; margin-bottom: 12px; padding-block: 6px; }
     .dawa-inv .dawa-inv-foot-tag { font-size: 11px; letter-spacing: 3px; text-transform: uppercase; font-style: italic; opacity: .85; }
 
-    /* Brand logo crown + floral flourish */
-    .dawa-inv .dawa-inv-hero-logo { margin-bottom: 10px; animation: dawa-inv-rise .8s ease both, dawa-inv-float 6s ease-in-out 1.4s infinite; }
+    /* Brand logo crown + floral flourish — gentle infinite float only. */
+    .dawa-inv .dawa-inv-hero-logo { margin-bottom: 10px; animation: dawa-inv-float 6s ease-in-out 1.4s infinite; }
     .dawa-inv .dawa-inv-flourish { display: block; }
-    .dawa-inv .dawa-inv-hero-flourish { position: relative; margin-bottom: 16px; animation: dawa-inv-rise .9s .1s ease both; opacity: .92; }
+    .dawa-inv .dawa-inv-hero-flourish { position: relative; margin-bottom: 16px; opacity: .92; }
     @keyframes dawa-inv-float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
 
     /* Floating dock */
@@ -193,16 +209,6 @@ export function ViewStyles({ theme, fixed }) {
     .dawa-inv .dawa-inv-dock-btn { width: 46px; height: 46px; border-radius: 50%; background: rgba(7,7,10,.5); border: 1px solid; font-size: 18px; cursor: pointer; backdrop-filter: blur(20px); display: flex; align-items: center; justify-content: center; position: relative; transition: all .35s cubic-bezier(.2,.95,.25,1.1); }
     .dawa-inv .dawa-inv-dock-btn:hover { transform: scale(1.06); }
     .dawa-inv .dawa-inv-dock-pulse { position: absolute; inset: -2px; border-radius: 50%; border: 1px solid; animation: dawa-inv-dockpulse 1.8s ease-out infinite; }
-
-    /* Envelope */
-    .dawa-inv .dawa-inv-env-overlay { position: fixed; inset: 0; z-index: 1000; background: radial-gradient(ellipse 80% 60% at 50% 35%, ${theme.accentMuted}, transparent 60%), ${theme.bg}; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 32px; transition: opacity 1.2s, transform 1.4s cubic-bezier(.2,.95,.25,1.1); }
-    .dawa-inv .dawa-inv-env-overlay.is-opening { opacity: 0; transform: scale(1.05); pointer-events: none; }
-    .dawa-inv .dawa-inv-env { position: relative; width: 320px; max-width: 80vw; aspect-ratio: 1.5/1; border-radius: 14px; cursor: pointer; background: ${theme.cardBg}; border: 1px solid ${theme.accentLine}; box-shadow: 0 30px 80px -20px rgba(0,0,0,.7), 0 0 60px ${theme.accentMuted}; transition: transform .6s cubic-bezier(.2,.95,.25,1.1); }
-    .dawa-inv .dawa-inv-env:hover { transform: translateY(-6px) scale(1.02); }
-    .dawa-inv .dawa-inv-wax { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); width: 86px; height: 86px; border-radius: 50%; background: radial-gradient(circle at 30% 30%, ${theme.gradientStops[1]} 0%, ${theme.accent} 60%); display: flex; align-items: center; justify-content: center; color: ${ON_GOLD}; font-weight: 900; font-size: 36px; box-shadow: 0 8px 26px ${theme.accentMuted}, 0 0 32px ${theme.accentMuted}; animation: dawa-inv-wax 3s ease-in-out infinite; }
-    .dawa-inv .dawa-inv-env-overlay.is-opening .dawa-inv-wax { animation: dawa-inv-crack 1s cubic-bezier(.2,.95,.25,1.1) forwards; }
-    .dawa-inv .dawa-inv-env-hint { margin-top: 34px; color: ${theme.accent}; font-size: 13px; letter-spacing: 3px; text-transform: uppercase; font-style: italic; animation: dawa-inv-cue 2.6s ease-in-out infinite; }
-    .dawa-inv .dawa-inv-env-name { margin-top: 22px; font-weight: 900; font-size: clamp(28px,5vw,44px); color: ${theme.text}; }
 
     /* Petals + sparkles */
     .dawa-inv .dawa-inv-petals { inset: 0; pointer-events: none; z-index: 5; overflow: hidden; }
@@ -231,20 +237,17 @@ export function ViewStyles({ theme, fixed }) {
     /* Section diamond dot gleams. */
     .dawa-inv .dawa-inv-secrule .dawa-inv-secrule-dot { animation: dawa-inv-gleam 3.2s ease-in-out infinite; }
 
-    /* Detail items → refined glass cards with a soft gold glow. */
-    .dawa-inv .dawa-inv-detail {
-      padding: 20px 18px; border-radius: 16px;
-      background: ${theme.cardBg}; border: 1px solid ${theme.cardBorder};
-      box-shadow: 0 14px 38px -20px ${theme.accentMuted}, inset 0 1px 0 rgba(255,255,255,.05);
-      backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
-    }
-    .dawa-inv .dawa-inv-detail:hover { border-color: ${theme.accentLine}; box-shadow: 0 18px 48px -16px ${theme.accentMuted}, inset 0 1px 0 rgba(255,255,255,.08); }
-
     /* Deeper, glowier framing on the showpiece surfaces. */
     .dawa-inv .dawa-inv-venue-map { box-shadow: 0 20px 56px -24px ${theme.accentMuted}; }
-    .dawa-inv .dawa-inv-countdown { box-shadow: 0 0 52px -22px ${theme.accentMuted}; }
     .dawa-inv .dawa-inv-dateline { box-shadow: 0 14px 40px -16px ${theme.accentMuted}, inset 0 0 0 1px ${theme.accentLine}; }
     .dawa-inv .dawa-inv-hero-frame { box-shadow: 0 0 60px -10px ${theme.accentMuted}, inset 0 0 90px -44px ${theme.accentMuted}; }
+
+    /* Mobile ambience budget — fewer particles, tighter blur, calmer GPU. */
+    @media (max-width: 640px) {
+      .dawa-inv .dawa-inv-petal:nth-child(n+11) { display: none; }
+      .dawa-inv .dawa-inv-sparkle:nth-child(n+19) { display: none; }
+      .dawa-inv .dawa-inv-aurora-blob { filter: blur(48px); }
+    }
 
     @keyframes dawa-inv-drift1 { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(7vw,5vh) scale(1.2); } }
     @keyframes dawa-inv-drift2 { 0%,100% { transform: translate(0,0) scale(1.15); } 50% { transform: translate(-6vw,-4vh) scale(1); } }
@@ -252,13 +255,9 @@ export function ViewStyles({ theme, fixed }) {
     @keyframes dawa-inv-gleam { 0%,100% { opacity: 1; transform: rotate(45deg) scale(1); } 50% { opacity: .6; transform: rotate(45deg) scale(1.35); } }
 
     @keyframes dawa-inv-rise { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: none; } }
-    @keyframes dawa-inv-draw { to { stroke-dashoffset: 0; } }
     @keyframes dawa-inv-cue { 0%,100% { opacity: .55; transform: translate(-50%,0); } 50% { opacity: 1; transform: translate(-50%,6px); } }
-    @keyframes dawa-inv-route { to { stroke-dashoffset: 0; } }
     @keyframes dawa-inv-flip { 0% { transform: translateY(0); } 50% { transform: translateY(-14px); opacity: .4; filter: blur(2px); } 100% { transform: translateY(0); } }
     @keyframes dawa-inv-seal { 0% { transform: scale(0) rotate(-90deg); } 60% { transform: scale(1.15) rotate(8deg); } 100% { transform: scale(1) rotate(0); } }
-    @keyframes dawa-inv-wax { 0%,100% { transform: translate(-50%,-50%) scale(1); } 50% { transform: translate(-50%,-50%) scale(1.05); } }
-    @keyframes dawa-inv-crack { 0% { transform: translate(-50%,-50%) scale(1) rotate(0); } 30% { transform: translate(-50%,-50%) scale(1.25) rotate(-12deg); } 100% { transform: translate(-50%,-50%) scale(0) rotate(180deg); opacity: 0; } }
     @keyframes dawa-inv-dockpulse { 0% { opacity: .9; transform: scale(.95); } 100% { opacity: 0; transform: scale(1.4); } }
     @keyframes dawa-inv-petal { 0% { transform: translateY(0) rotate(0) translateX(0); opacity: 0; } 5% { opacity: .5; } 50% { transform: translateY(45vh) rotate(180deg) translateX(40px); } 95% { opacity: .5; } 100% { transform: translateY(105vh) rotate(420deg) translateX(-30px); opacity: 0; } }
     @keyframes dawa-inv-sparkle { 0%,100% { opacity: 0; transform: scale(.5); } 50% { opacity: 1; transform: scale(1.6); } }
@@ -267,7 +266,6 @@ export function ViewStyles({ theme, fixed }) {
 
     @media (prefers-reduced-motion: reduce) {
       .dawa-inv *, .dawa-inv *::before, .dawa-inv *::after { animation: none !important; transition-duration: .01ms !important; }
-      .dawa-inv .dawa-inv-reveal { opacity: 1; transform: none; }
     }
     `}</style>
   );
