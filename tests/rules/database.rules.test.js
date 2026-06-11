@@ -222,13 +222,36 @@ describe("/liveLocationsByGroom", () => {
     lat: 32.79, lng: 35.00, accuracy: 5,
     timeISO: new Date().toISOString(),
   });
-  test("driver writes their own shard", async () => {
+  // R2 hardening: a driver may write location DATA only to a groom they are
+  // assigned to. Seed the assignment before the positive write cases.
+  const assign = (driver = DRIVER, groom = GROOM) =>
+    seed({ [`driverAssignments/${driver}/${groom}`]: true });
+
+  test("driver writes their own shard when assigned to the groom", async () => {
+    await assign();
     await assertSucceeds(set(
       ref(asDriver(), `liveLocationsByGroom/${GROOM}/${DRIVER}`),
       fix(),
     ));
   });
+  test("driver canNOT write to a groom they are not assigned to", async () => {
+    // No driverAssignments entry seeded → the write must be denied.
+    await assertFails(set(
+      ref(asDriver(), `liveLocationsByGroom/${GROOM}/${DRIVER}`),
+      fix(),
+    ));
+  });
+  test("driver can clear (remove) their own shard even without an assignment", async () => {
+    // Clearing writes null; allowed regardless of assignment so an unassigned
+    // driver can still remove a stale share.
+    await seed({ [`liveLocationsByGroom/${GROOM}/${DRIVER}`]: fix() });
+    await assertSucceeds(set(
+      ref(asDriver(), `liveLocationsByGroom/${GROOM}/${DRIVER}`),
+      null,
+    ));
+  });
   test("driver cannot write another driver's shard", async () => {
+    await assign();
     await assertFails(set(
       ref(asDriver(), `liveLocationsByGroom/${GROOM}/${DRIVER2}`),
       fix(),
@@ -243,12 +266,14 @@ describe("/liveLocationsByGroom", () => {
     await assertFails(get(ref(asGroom(), `liveLocationsByGroom/${GROOM2}`)));
   });
   test("validator rejects out-of-range latitude", async () => {
+    await assign();
     await assertFails(set(
       ref(asDriver(), `liveLocationsByGroom/${GROOM}/${DRIVER}`),
       { ...fix(), lat: 999 },
     ));
   });
   test("validator rejects out-of-range longitude", async () => {
+    await assign();
     await assertFails(set(
       ref(asDriver(), `liveLocationsByGroom/${GROOM}/${DRIVER}`),
       { ...fix(), lng: 999 },

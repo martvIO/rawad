@@ -93,7 +93,13 @@
       "$groomUid": {
         ".read": "auth != null && (auth.token.role === 'admin' || $groomUid === auth.uid)",
         "$driverUid": {
-          ".write": "auth != null && $driverUid === auth.uid",
+          // A driver may only publish their OWN location, and only to a groom
+          // they are actually assigned to (defense-in-depth mirroring the
+          // assignment filter in routes/liveLocations.ts). Clearing (writing
+          // null) is always allowed so an unassigned driver can remove a stale
+          // share. The REST path uses the Admin SDK (bypasses rules); this
+          // guards any direct client RTDB write.
+          ".write": "auth != null && $driverUid === auth.uid && (!newData.exists() || root.child('driverAssignments').child(auth.uid).child($groomUid).val() === true)",
           ".validate": "newData.hasChildren(['lat','lng','timeISO'])",
           "lat":      { ".validate": "newData.isNumber() && newData.val() >= -90  && newData.val() <= 90" },
           "lng":      { ".validate": "newData.isNumber() && newData.val() >= -180 && newData.val() <= 180" },
@@ -141,7 +147,12 @@
 
     "inviteTokens": {
       "$token": {
-        ".read":  true,
+        // No direct client read. The token record holds guest PII (name/phone)
+        // + the full digital designSnapshot; it is served ONLY through the
+        // server GET /invites/token/:token (Admin SDK, which bypasses rules and
+        // projects the response). Setting this to false closes the world-read of
+        // the raw record via the RTDB REST API / any client SDK.
+        ".read":  false,
         ".write": "auth != null && (auth.token.role === 'admin' || (auth.token.role === 'groom' && (!newData.exists() || newData.child('groomUid').val() === auth.uid)))",
         ".validate": "!newData.exists() || newData.hasChildren(['groomUid','groomUsername','guestId','guestName','guestPhone','createdAt','expiresAt'])",
         "groomUid":      { ".validate": "newData.isString() && newData.val().length <= 64" },
