@@ -30,6 +30,7 @@ import { invitesRouter } from "./routes/invites";
 import { assignmentsRouter } from "./routes/assignments";
 import { proofsRouter } from "./routes/proofs";
 import { digitalRouter } from "./routes/digital";
+import { photoFacesRouter } from "./routes/photoFaces";
 // NOTE: additional routers (users, guests, ...) are mounted as their files
 // are created in subsequent migration steps. The import + app.use lines
 // below are added incrementally.
@@ -84,6 +85,9 @@ app.use("/live-locations", liveLocationsRouter);
 app.use("/invites", invitesRouter);
 app.use("/assignments", assignmentsRouter);
 app.use("/proofs", proofsRouter);
+// Mounted BEFORE /digital so the digital router's ":uid" params can never
+// capture the literal "photos" path segment.
+app.use("/digital/photos", photoFacesRouter);
 app.use("/digital", digitalRouter);
 
 // ─── Health probe ─────────────────────────────────────────────────────────────

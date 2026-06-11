@@ -38,7 +38,11 @@ import {
   requireAuth,
   requireAdmin,
 } from "../middleware/auth";
+import { uidRateLimit } from "../middleware/rateLimit";
 import { MAX_BYTES, MAX_LEN } from "../../constants/limits";
+import { HOUR_MS } from "../../constants/time";
+import { RATE } from "../../constants/rateLimits";
+import { touchUnindexedPhotographerFiles } from "../../faceIndex/backfill";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -522,7 +526,25 @@ digitalRouter.patch(
       return;
     }
     try {
+      // Detect a photographerPublished false→true flip BEFORE the merge so
+      // the face-index backfill runs exactly when photos go live for guests.
+      let publishFlippedOn = false;
+      if (patch.photographerPublished === true) {
+        const before = await parentDoc(req.params.uid).get();
+        publishFlippedOn =
+          !before.exists || before.data()?.photographerPublished !== true;
+      }
       await parentDoc(req.params.uid).set(patch, { merge: true });
+      if (publishFlippedOn) {
+        // Best-effort: a backfill hiccup must never fail the settings write.
+        // Awaited (not fire-and-forget) because Cloud Functions may freeze
+        // the instance right after the response is sent.
+        await touchUnindexedPhotographerFiles(req.params.uid)
+          .then((n) => {
+            if (n > 0) console.log(`[digital] publish flip queued ${n} file(s) for face indexing`);
+          })
+          .catch((err) => console.error("[digital] publish-flip backfill failed", err));
+      }
       res.json({ ok: true });
     } catch (err) {
       res.status(500).json({ error: "write_failed", detail: safeDetail(err) });
@@ -911,6 +933,30 @@ digitalRouter.post(
       res.json({ id: docRef.id, url, storagePath: path });
     } catch (err) {
       res.status(500).json({ error: "upload_failed", detail: safeDetail(err) });
+    }
+  }
+);
+
+/**
+ * Queue face-indexing for every photographer image that has no fresh index
+ * row. Backfills uploads that predate the indexing trigger and recovers
+ * failed/stale rows (the trigger's freshness check makes re-touching an
+ * already-indexed file a no-op). Returns `{ queued }`.
+ */
+digitalRouter.post(
+  "/:uid/photographer/reindex",
+  requireAuth,
+  uidRateLimit("photogReindex", RATE.PHOTO_REINDEX_PER_USER.limit, HOUR_MS),
+  async (req: AuthRequest, res: Response) => {
+    if (!canActOnUid(req, req.params.uid)) {
+      res.status(403).json({ error: "forbidden" });
+      return;
+    }
+    try {
+      const queued = await touchUnindexedPhotographerFiles(req.params.uid);
+      res.json({ ok: true, queued });
+    } catch (err) {
+      res.status(500).json({ error: "reindex_failed", detail: safeDetail(err) });
     }
   }
 );
