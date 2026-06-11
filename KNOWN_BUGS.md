@@ -6,17 +6,19 @@ _Track open bugs here. Mark resolved bugs with the fix date. Never delete entrie
 
 ## Open Bugs
 
-### BUG-O004 — Both invitation links untested and likely broken
-
-**Files:** `src/pages/InviteForm.jsx`, `src/pages/DigitalInviteForm.jsx` (routes `/invite/:token`, `/invite/digital/:token`)
-**Severity:** Unknown — neither link has been tested end-to-end; assumed broken until verified
-**Symptom:** Unconfirmed — invitation links sent to guests via WhatsApp have not been exercised in any test run.
-**Root cause:** Not yet investigated.
-**Status:** Needs a Playwright smoke-test covering the full flow: generate link → open in browser → confirm guest details render correctly → submit form.
+_None currently tracked._
 
 ---
 
 ## Resolved Bugs
+
+### BUG-O004 — Both invitation links untested (Resolved 2026-06-11)
+
+**Files:** `src/pages/InviteForm.jsx`, `src/pages/DigitalInviteForm.jsx` (routes `/invite/:token`, `/invite/digital/:token`)
+**Severity:** Was unknown — neither link had been exercised end-to-end.
+**Resolution:** Verified during the 2026-06-11 security audit. (1) The Playwright e2e `invitation.spec.ts` covers the public confirmation form render/submit and the per-guest invite-token invalid-link path (56/57 e2e passing). (2) A scripted API run against the emulator exercised the full physical flow: mint token (`POST /invites`) → `GET /invites/token/:token` pre-fill projection → `POST /invites/submit` (200) → replay (now 409 `already_submitted`). Both forms render the projected token fields and submit correctly. As part of the same audit the physical-invite endpoint gained a one-shot `usedAt` guard (was replayable for 90 days) and the token GET response was trimmed to drop internal `groomUid`/`guestId`/`createdAt`.
+
+---
 
 ### BUG-O003 — Not all uploaded files are visible in the gallery (Resolved 2026-05-26)
 
