@@ -14,6 +14,9 @@
   },
   "dependencies": {
     "@napi-rs/canvas": "^0.1.100",
+    "@tensorflow/tfjs": "^4.22.0",
+    "@tensorflow/tfjs-backend-wasm": "^4.22.0",
+    "@vladmandic/face-api": "^1.7.15",
     "busboy": "^1.6.0",
     "cors": "^2.8.5",
     "express": "^4.19.2",
