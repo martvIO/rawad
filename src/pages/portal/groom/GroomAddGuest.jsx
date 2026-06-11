@@ -23,6 +23,7 @@ export function GroomAddGuest() {
             <div className="gold-card" style={{ padding: 24 }}>
               <div style={{ marginBottom: 6, fontSize: 12, color: C.goldDim }}>{t("field_name")}</div>
               <input data-testid="field-guest-name" className="input-field" type="text" placeholder={t("example_name")}
+                     aria-label={t("field_name")}
                      value={gName} onChange={e => setGName(e.target.value)}
                      style={{ marginBottom: 14 }}/>
 

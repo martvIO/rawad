@@ -32,10 +32,12 @@ export function LoginScreen() {
         <div className="gold-card" style={{ padding: 28 }}>
           <div style={{ marginBottom: 10, fontSize: 13, color: C.goldDim }}>{t("login_user")}</div>
           <input data-testid="field-login-user" className="input-field" type="text" placeholder={t("login_user")}
+                 aria-label={t("login_user")} autoComplete="username"
                  value={loginUser} onChange={e => { setLoginUser(e.target.value); setLoginError(""); }}
                  style={{ marginBottom: 14 }}/>
           <div style={{ marginBottom: 10, fontSize: 13, color: C.goldDim }}>{t("login_pass")}</div>
           <input data-testid="field-login-pass" className="input-field" type="password" placeholder="••••••"
+                 aria-label={t("login_pass")} autoComplete="current-password"
                  value={loginPass} onChange={e => { setLoginPass(e.target.value); setLoginError(""); }}
                  onKeyDown={e => e.key === "Enter" && !loginLoading && handleLogin()}
                  style={{ marginBottom: 12 }}/>

@@ -277,18 +277,25 @@ export function usePortalState({ onBack, t, lang, setLang }) {
   // "delivered". A 15s poll arriving mid-confirm would otherwise flip the row
   // back to pending; this overlay keeps it delivered so there's no flicker.
   const optimisticDeliveredRef = useRef(new Set());
+  // Apply the "just delivered" optimistic overlay to any guest list so a poll
+  // that lands before the server echoes the delivery doesn't flip the card back
+  // to pending. Shared by both the primary `guests` list and the `sharedGuests`
+  // list (Shared-Cities view) so the optimistic flip survives in both.
+  const applyDeliveredOverlay = useCallback((list) => {
+    const set = optimisticDeliveredRef.current;
+    if (!set.size || !Array.isArray(list)) return list;
+    return list.map((g) => {
+      if (!set.has(g.id)) return g;
+      if (g.status === "delivered") { set.delete(g.id); return g; } // server caught up
+      return { ...g, status: "delivered" };
+    });
+  }, []);
   const setGuestsWithOverlay = useCallback((listOrFn) => {
     setGuests((prev) => {
       const list = typeof listOrFn === "function" ? listOrFn(prev) : listOrFn;
-      const set = optimisticDeliveredRef.current;
-      if (!set.size || !Array.isArray(list)) return list;
-      return list.map((g) => {
-        if (!set.has(g.id)) return g;
-        if (g.status === "delivered") { set.delete(g.id); return g; } // server caught up
-        return { ...g, status: "delivered" };
-      });
+      return applyDeliveredOverlay(list);
     });
-  }, []);
+  }, [applyDeliveredOverlay]);
   useEffect(() => {
     if (!authed) { setGuests([]); return; }
     if (isAdmin)                                 return subscribeAllGuests(setGuestsWithOverlay);
@@ -326,7 +333,7 @@ export function usePortalState({ onBack, t, lang, setLang }) {
     // حافظ على كلّ bucket منفصل حتى لا تمسح استجابة عريس نتائج عريس آخر
     const buckets = {};
     const merge = () =>
-      setSharedGuests(Object.values(buckets).flat());
+      setSharedGuests(applyDeliveredOverlay(Object.values(buckets).flat()));
     const unsubscribers = driverAssignedGroomUids.map(groomUid =>
       subscribeGuestsForGroom(groomUid, (list) => {
         buckets[groomUid] = list;
@@ -947,6 +954,11 @@ export function usePortalState({ onBack, t, lang, setLang }) {
     // echoes it. On failure we revert so the driver can retry.
     optimisticDeliveredRef.current.add(id);
     setGuests(prev => prev.map(g => g.id === id ? { ...g, status: "delivered", deliveredAt: time, deliveredBy } : g));
+    // Mirror into sharedGuests too — the Shared-Cities view renders from this
+    // separate list, so without this the delivered card lingered until the next
+    // ~15s poll. The overlay (applyDeliveredOverlay) keeps it delivered across
+    // polls; we revert this list as well on failure.
+    setSharedGuests(prev => prev.map(g => g.id === id ? { ...g, status: "delivered", deliveredAt: time, deliveredBy } : g));
     showToast(t("driver_confirm"));
 
     (async () => {
@@ -967,6 +979,7 @@ export function usePortalState({ onBack, t, lang, setLang }) {
         logErr("markGuestDelivered", e);
         optimisticDeliveredRef.current.delete(id);
         setGuests(prev => prev.map(g => g.id === id ? { ...g, status: priorStatus } : g));
+        setSharedGuests(prev => prev.map(g => g.id === id ? { ...g, status: priorStatus } : g));
         showToast(lang === "he" ? "המסירה נכשלה — נסה שוב" : "فشل تأكيد التسليم — حاول مرة أخرى");
       }
     })();

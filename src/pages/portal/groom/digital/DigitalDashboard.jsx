@@ -614,7 +614,7 @@ function MediaTile({ item, onRemove }) {
         }}>⏳</div>
       )}
       {onRemove && (
-        <button onClick={onRemove} style={{
+        <button onClick={onRemove} aria-label="حذف" title="حذف" style={{
           position: "absolute", top: 4, insetInlineEnd: 4,
           width: 24, height: 24, padding: 0, borderRadius: 12,
           background: "rgba(0,0,0,.65)", border: "none", color: "#fff",

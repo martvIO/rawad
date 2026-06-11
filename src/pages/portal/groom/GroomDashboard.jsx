@@ -103,6 +103,11 @@ export function GroomDashboard() {
             </div>
 
             <div style={{ fontSize: 13, color: C.dim, fontWeight: 700, marginBottom: 12 }}>{t("last_deliveries")}</div>
+            {myGuests.filter(g => g.status === "delivered").length === 0 && (
+              <div className="card" style={{ marginBottom: 10, textAlign: "center", color: C.dim, fontSize: 12, padding: "16px 12px" }}>
+                {lang === "he" ? "אין מסירות עדיין" : "لا توجد تسليمات بعد"}
+              </div>
+            )}
             {myGuests.filter(g => g.status === "delivered").map(g => {
               const isImg = typeof g.proofImg === "string" && g.proofImg.startsWith("data:image");
               return (

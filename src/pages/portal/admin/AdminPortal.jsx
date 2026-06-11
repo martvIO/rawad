@@ -8,7 +8,6 @@ import { LangSwitcher } from "../../../components/LangSwitcher.jsx";
 import { LogoutConfirm } from "../../../components/LogoutConfirm.jsx";
 import { Toast } from "../../../components/Toast.jsx";
 import { EditConfirmationModal } from "../../../components/EditConfirmationModal.jsx";
-import { EditUserModal } from "../../../components/EditUserModal.jsx";
 import { usePortal } from "../../../context/PortalContext.jsx";
 import { AdminUserManager } from "./AdminUserManager.jsx";
 import { AdminSendTab } from "./AdminSendTab.jsx";
@@ -87,7 +86,6 @@ export function AdminPortal() {
       </div>
 
       <EditConfirmationModal />
-      <EditUserModal />
     </div>
   );
 }

@@ -98,13 +98,6 @@ export function AdminSendTab() {
             const digitalMsg = digitalMsgByGroom[adminSelectedGroom] || "";
             // "Send to all" only messages physical guests who haven't confirmed yet.
             const unconfirmedGuests = selectedGroomGuests.filter(g => !g.confirmedAt);
-            const sections = isDigital
-              ? [{ title: (lang === "he" ? "כל המוזמנים" : "كل المدعوين"),
-                   list: selectedGroomGuests, color: C.gold, bg: "rgba(201,168,76,.06)" }]
-              : [
-                  { title: t("guests_without_address"), list: withoutAddr, color: C.red, bg: "rgba(212,122,75,.06)" },
-                  { title: t("guests_with_address"),    list: withAddr,    color: "#4cc97a", bg: "rgba(76,201,122,.06)" },
-                ];
 
             return (
               <div>
