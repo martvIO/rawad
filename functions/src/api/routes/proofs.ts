@@ -20,6 +20,7 @@
 
 import { Router, Request, Response } from "express";
 import { getStorage, getDownloadURL } from "firebase-admin/storage";
+import { getDatabase } from "firebase-admin/database";
 import busboy from "busboy";
 import {
   AuthRequest,
@@ -94,6 +95,26 @@ proofsRouter.post(
     const assignedTo = claims.assignedGrooms?.[groomUid] === true;
     if (!assignedTo) {
       res.status(403).json({ error: "not_assigned_to_groom" });
+      return;
+    }
+    // Constrain the id (it becomes a Storage path segment) and confirm the guest
+    // actually exists under this groom. Without this an assigned driver could
+    // write proof objects under arbitrary guestId folders in the groom's
+    // namespace (storage litter / orphaned objects with no matching guest).
+    if (!/^[A-Za-z0-9_-]{1,64}$/.test(guestId)) {
+      res.status(400).json({ error: "invalid_guest_id" });
+      return;
+    }
+    try {
+      const guestSnap = await getDatabase()
+        .ref(`guestsByGroom/${groomUid}/${guestId}`)
+        .get();
+      if (!guestSnap.exists()) {
+        res.status(404).json({ error: "guest_not_found" });
+        return;
+      }
+    } catch (err) {
+      res.status(500).json({ error: "lookup_failed", detail: errorMessage(err) });
       return;
     }
 

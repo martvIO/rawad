@@ -103,11 +103,21 @@ guestsRouter.get(
       res.status(403).json({ error: "forbidden" });
       return;
     }
+    // Drivers (assigned, but neither admin nor the owning groom) receive the
+    // guest list for delivery, but MUST NOT get each guest's `inviteLinkToken` —
+    // that token is a bearer credential for the guest's invite/RSVP and is not
+    // needed to deliver. Admin and the owning groom still see it (they manage
+    // invites).
+    const claims = req.caller!.claims;
+    const stripToken = claims.role !== "admin" && req.caller!.uid !== groomUid;
     try {
       const snap = await getDatabase().ref(`guestsByGroom/${groomUid}`).get();
       const out: GuestRecord[] = [];
       snap.forEach((g) => {
-        out.push({ id: g.key as string, groomUid, ...(g.val() as Record<string, unknown>) });
+        // Shallow-copy before stripping so we never mutate the snapshot value.
+        const val = { ...(g.val() as Record<string, unknown>) };
+        if (stripToken) delete val.inviteLinkToken;
+        out.push({ id: g.key as string, groomUid, ...val });
       });
       res.json(out);
     } catch (err) {

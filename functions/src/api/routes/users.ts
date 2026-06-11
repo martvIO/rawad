@@ -324,8 +324,39 @@ usersRouter.patch(
       res.status(400).json({ error: "invalid_body" });
       return;
     }
+
+    // Field allowlist. This endpoint is ONLY for non-Auth-synced profile fields
+    // (currently just displayName). Anything that must stay in sync with
+    // Firebase Auth, custom claims, or the username/phone indices — role,
+    // username, phoneE164, createdAt, createdBy — MUST go through
+    // PUT /users/:uid (or admin-claim). Previously the entire body was written
+    // verbatim to RTDB via the Admin SDK, which bypasses the rules' per-field
+    // `.validate`, letting an admin corrupt the profile (bogus role, cleared
+    // username, injected fields downstream code trusts).
+    const body = patch as Record<string, unknown>;
+    const safe: Record<string, unknown> = {};
+    if ("displayName" in body) {
+      const dn = body.displayName;
+      if (dn === null || dn === "") {
+        safe.displayName = null; // explicit clear
+      } else if (typeof dn === "string" && dn.length <= MAX_DISPLAY_NAME_LEN) {
+        safe.displayName = dn;
+      } else {
+        res.status(400).json({ error: "invalid_display_name" });
+        return;
+      }
+    }
+    if (Object.keys(safe).length === 0) {
+      res.status(400).json({ error: "no_allowed_fields" });
+      return;
+    }
+
     try {
-      await getDatabase().ref(`users/${uid}`).update(patch);
+      await getDatabase().ref(`users/${uid}`).update(safe);
+      await writeAudit(req.caller!.uid, "patchPortalUser", {
+        uid,
+        fields: Object.keys(safe),
+      });
       res.json({ ok: true });
     } catch (err) {
       res.status(500).json({ error: "write_failed", detail: errorMessage(err) });
