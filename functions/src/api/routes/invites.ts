@@ -68,6 +68,8 @@ const MAX_COMPANIONS = 20;
 const MAX_MEAL_PREF_LEN = 40;
 const MAX_SONG_REQUEST_LEN = 120;
 const MAX_WISH_LEN = 300;
+/** Cap guestbook wishes per guest so one token can't flood the moderation queue. */
+const MAX_WISHES_PER_GUEST = 5;
 
 export const invitesRouter = Router();
 
@@ -91,7 +93,24 @@ invitesRouter.get("/token/:token", async (req: Request, res: Response) => {
       res.status(404).json({ error: "token_not_found" });
       return;
     }
-    res.json(snap.val());
+    // Project to only the fields the public forms / invitation page consume.
+    // The raw record also holds internal identifiers (groomUid, guestId,
+    // createdAt) that no client reads — there is no reason to expose them on an
+    // unauthenticated endpoint. Pair this with the RTDB rule `inviteTokens.read:
+    // false` so the path can't be read directly either. `res.json` drops any
+    // undefined keys, so physical (no guestType/designSnapshot) and digital
+    // tokens both serialize correctly.
+    const rec = snap.val() as Record<string, unknown>;
+    res.json({
+      guestName: rec.guestName,
+      guestPhone: rec.guestPhone,
+      guestType: rec.guestType,
+      groomUsername: rec.groomUsername,
+      expiresAt: rec.expiresAt,
+      usedAt: rec.usedAt,
+      designId: rec.designId,
+      designSnapshot: rec.designSnapshot,
+    });
   } catch (err) {
     res.status(500).json({ error: "read_failed", detail: errorMessage(err) });
   }
@@ -194,14 +213,26 @@ invitesRouter.post(
 
     try {
       const db = getDatabase();
-      const tokenSnap = await db.ref(`inviteTokens/${submission.token}`).get();
+      const tokenRef = db.ref(`inviteTokens/${submission.token}`);
+      const tokenSnap = await tokenRef.get();
       if (!tokenSnap.exists()) {
         res.status(404).json({ error: "token_not_found" });
         return;
       }
       const tk = tokenSnap.val() as TokenRecord;
-      if (Date.now() > tk.expiresAt) {
+      const now = Date.now();
+      if (now > tk.expiresAt) {
         res.status(410).json({ error: "token_expired" });
+        return;
+      }
+      // One-shot guard: a physical invite may be submitted only once. The
+      // digital handler enforces this; the physical one historically did not,
+      // so a leaked/forwarded token could be replayed for its full 90-day TTL —
+      // each replay pushed a fresh /confirmations row and re-patched the guest
+      // record. Fast-path the obvious replay here; the transaction below is the
+      // authoritative guard against a concurrent double-submit.
+      if (tk.usedAt) {
+        res.status(409).json({ error: "already_submitted" });
         return;
       }
 
@@ -212,45 +243,61 @@ invitesRouter.post(
         return;
       }
 
-      const now = Date.now();
-      const area = joinAddress(
-        submission.submittedCity,
-        submission.submittedStreet,
-        submission.submittedHouse
-      );
-      const guestPatch = buildPhysicalGuestPatch(submission, area, now);
-      // The guest's own submission is authoritative for their location. A pin /
-      // GPS already overwrites lat/lng above. If instead they entered a NEW
-      // address WITHOUT a pin, drop any stale coordinates (e.g. a pin the groom
-      // set earlier) so the map reflects the address the guest actually entered
-      // (geocoded) rather than the old location.
-      if (!submission.hasCoords) {
-        const cur = guestSnap.val() as { area?: string; lat?: unknown } | null;
-        const curArea = (cur?.area ?? "").toString().trim();
-        if (area.trim() && area.trim() !== curArea && typeof cur?.lat === "number") {
-          guestPatch.lat = null;
-          guestPatch.lng = null;
-          guestPatch.locationSource = null;
-          guestPatch.locationAccuracy = null;
-          guestPatch.locationUpdatedAt = now;
-        }
+      // Atomically claim the token so two concurrent submits can't both pass
+      // the check above and double-write. The transaction sets `usedAt` only
+      // while it is still unset; a non-committed result means we lost the race.
+      const claim = await tokenRef
+        .child("usedAt")
+        .transaction((cur) => (cur ? undefined : now));
+      if (!claim.committed) {
+        res.status(409).json({ error: "already_submitted" });
+        return;
       }
-      await guestRef.update(guestPatch);
 
-      const groomUsername = await resolveGroomUsername(
-        tk.groomUsername,
-        tk.groomUid
-      );
-      const confRecord = buildPhysicalConfirmationRecord(
-        tk,
-        groomUsername,
-        submission,
-        now
-      );
-      await db.ref("confirmations").push(confRecord);
-      await db.ref(`inviteTokens/${submission.token}/usedAt`).set(now);
+      try {
+        const area = joinAddress(
+          submission.submittedCity,
+          submission.submittedStreet,
+          submission.submittedHouse
+        );
+        const guestPatch = buildPhysicalGuestPatch(submission, area, now);
+        // The guest's own submission is authoritative for their location. A pin /
+        // GPS already overwrites lat/lng above. If instead they entered a NEW
+        // address WITHOUT a pin, drop any stale coordinates (e.g. a pin the groom
+        // set earlier) so the map reflects the address the guest actually entered
+        // (geocoded) rather than the old location.
+        if (!submission.hasCoords) {
+          const cur = guestSnap.val() as { area?: string; lat?: unknown } | null;
+          const curArea = (cur?.area ?? "").toString().trim();
+          if (area.trim() && area.trim() !== curArea && typeof cur?.lat === "number") {
+            guestPatch.lat = null;
+            guestPatch.lng = null;
+            guestPatch.locationSource = null;
+            guestPatch.locationAccuracy = null;
+            guestPatch.locationUpdatedAt = now;
+          }
+        }
+        await guestRef.update(guestPatch);
 
-      res.json({ ok: true });
+        const groomUsername = await resolveGroomUsername(
+          tk.groomUsername,
+          tk.groomUid
+        );
+        const confRecord = buildPhysicalConfirmationRecord(
+          tk,
+          groomUsername,
+          submission,
+          now
+        );
+        await db.ref("confirmations").push(confRecord);
+
+        res.json({ ok: true });
+      } catch (err) {
+        // Roll back the claim so a transient write failure doesn't permanently
+        // burn the guest's one-shot token.
+        await tokenRef.child("usedAt").set(null).catch(() => undefined);
+        throw err;
+      }
     } catch (err) {
       res.status(500).json({ error: "write_failed", detail: errorMessage(err) });
     }
@@ -517,7 +564,17 @@ invitesRouter.post(
         | { groomUid?: string; expiresAt?: number; guestId?: string } | null;
       if (!tk || !tk.groomUid) { res.status(404).json({ error: "token_not_found" }); return; }
       if (tk.expiresAt && Date.now() > tk.expiresAt) { res.status(410).json({ error: "token_expired" }); return; }
-      await getFirestore().collection(`digitalInvitations/${tk.groomUid}/wishes`).add({
+      const wishesCol = getFirestore().collection(`digitalInvitations/${tk.groomUid}/wishes`);
+      // Cap wishes per guest so a single token can't flood the groom's pending
+      // moderation queue (the per-IP limit alone is weak — see rate-limit notes).
+      if (tk.guestId) {
+        const existing = await wishesCol.where("guestId", "==", tk.guestId).count().get();
+        if (existing.data().count >= MAX_WISHES_PER_GUEST) {
+          res.status(429).json({ error: "wish_limit_reached" });
+          return;
+        }
+      }
+      await wishesCol.add({
         who, what, status: "pending", guestId: tk.guestId ?? null, submittedAt: Date.now(),
       });
       res.json({ ok: true });

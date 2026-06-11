@@ -164,6 +164,20 @@ const DESIGN_FIELDS = new Set([
   "heroMediaEnabled",
 ]);
 
+// Guest-facing field allowlist for the UNAUTHENTICATED public invitation read
+// (`GET /:uid/public`). Fail-closed: only these keys reach a caller with no
+// invite token. Everything else on the design doc — design-workflow metadata
+// (designStatus, designRejectionNote, designApprovedAt, …) and any future
+// internal field — is withheld. Derived from DESIGN_FIELDS (the editable content
+// set) plus the media arrays the guest page renders (see DigitalInvitationView).
+const PUBLIC_DESIGN_FIELDS = new Set<string>([
+  ...DESIGN_FIELDS,
+  "media",
+  "heroMedia",
+  "title",
+  "weddingDate",
+]);
+
 const MAX_INVITE_MEDIA_BYTES = MAX_BYTES.INVITE_MEDIA;
 const MAX_PHOTOG_BYTES = MAX_BYTES.PHOTOGRAPHER;
 // Featured media shown under the hero greeting — a small, separate set kept
@@ -1273,11 +1287,12 @@ digitalRouter.get(
   async (req: Request, res: Response) => {
     try {
       const uid = req.params.uid;
-      // Explicit `/designs/:designId/public` is approved-only (never leaks a
-      // draft). Legacy `/:uid/public` returns the default design (any status) —
-      // it's only a fallback; sent links render from the token's snapshot.
+      // BOTH public paths are approved-only — an unauthenticated caller who
+      // knows (or guesses) a groom uid must never read a draft/pending/rejected
+      // invitation. Sent links render from the token's immutable designSnapshot,
+      // so gating the live fallback to approved status loses no legitimate view
+      // (a not-yet-approved default design returns null instead of leaking).
       const designId = (req.params as { designId?: string }).designId;
-      const requireApproved = !!designId;
       const targetId = designId || (await resolveDefaultDesignId(uid));
       const [dSnap, pSnap] = await Promise.all([
         designDoc(uid, targetId).get(),
@@ -1288,13 +1303,13 @@ digitalRouter.get(
         return;
       }
       const data = dSnap.data();
-      if (requireApproved && data?.designStatus !== "approved") {
+      if (data?.designStatus !== "approved") {
         res.json(null);
         return;
       }
       const p = pSnap.exists ? (pSnap.data() as Record<string, unknown>) : {};
       res.json({
-        ...(projectMediaDoc(data) as Record<string, unknown>),
+        ...(projectPublicDoc(data) ?? {}),
         photographerPublished: p.photographerPublished === true,
       });
     } catch (err) {
@@ -2088,6 +2103,25 @@ function projectMediaDoc(data: FirebaseFirestore.DocumentData | undefined):
     };
   }
   return data;
+}
+
+/**
+ * Project a design doc down to the guest-facing fields for the UNAUTHENTICATED
+ * public read. Folds any legacy single-background into media[] first (via
+ * projectMediaDoc), then keeps only the PUBLIC_DESIGN_FIELDS allowlist so no
+ * design-workflow metadata (e.g. designRejectionNote) or other internal field
+ * is ever served to a tokenless caller.
+ */
+function projectPublicDoc(
+  data: FirebaseFirestore.DocumentData | undefined
+): Record<string, unknown> | null {
+  const full = projectMediaDoc(data) as Record<string, unknown> | null;
+  if (!full) return null;
+  const out: Record<string, unknown> = {};
+  for (const key of Object.keys(full)) {
+    if (PUBLIC_DESIGN_FIELDS.has(key)) out[key] = full[key];
+  }
+  return out;
 }
 
 /**

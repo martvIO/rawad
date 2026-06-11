@@ -17,12 +17,16 @@
 //   accepts the idToken via `?token=` query param because EventSource cannot
 //   set Authorization headers.
 //
-// What this file does NOT do:
-//   - It does not validate that the driver is currently "assigned" to the
-//     groom — drivers can publish to any groomUid they pass. The legacy
-//     `database.rules.json` enforces the same (writes are gated only by
-//     `$driverUid === auth.uid`). Adding an assignment check would tighten
-//     the rules but is out of scope for this migration.
+// Authorization:
+//   - POST /live-locations filters `shareWith` to grooms the driver is
+//     ASSIGNED to (the `assignedGrooms` custom claim), so a driver can only
+//     publish their GPS to grooms they actually serve. `database.rules.json`
+//     is hardened to match (write gated by both `$driverUid === auth.uid` AND
+//     an existing `driverAssignments/$driver/$groom` entry).
+//   - POST /live-locations/clear is intentionally NOT assignment-filtered: it
+//     only nulls the driver's OWN slot, and must keep working after a driver is
+//     unassigned so they can clean up a stale share.
+//   - GET /:groomUid/stream is gated by `canReadGroom` (admin or the groom).
 
 import { Router, Request, Response } from "express";
 import { getDatabase, DataSnapshot } from "firebase-admin/database";
@@ -77,13 +81,22 @@ liveLocationsRouter.post(
       return;
     }
     const { shareWith, fix, driverDisplayName } = parsed.value;
-    if (shareWith.length === 0) {
-      // Legacy code returns silently for empty share lists.
+    const driverUid = req.caller!.uid;
+
+    // Only publish to grooms this driver is actually assigned to. Without this
+    // filter a driver could write their live GPS into ANY groom's bucket by
+    // passing arbitrary groomUids in `shareWith` — leaking their movements to
+    // unrelated grooms and injecting themselves onto those grooms' live maps.
+    // `assignedGrooms` is the same custom claim that proofs.ts / guests.ts gate
+    // on. Unassigned entries are silently dropped (a client may carry a stale
+    // share list); an empty result returns the legacy "written: 0" shape.
+    const assigned = req.caller!.claims.assignedGrooms ?? {};
+    const allowed = shareWith.filter((groomUid) => assigned[groomUid] === true);
+    if (allowed.length === 0) {
       res.json({ ok: true, written: 0 });
       return;
     }
 
-    const driverUid = req.caller!.uid;
     const payload: Record<string, unknown> = {
       lat: fix.lat,
       lng: fix.lng,
@@ -93,12 +106,12 @@ liveLocationsRouter.post(
     if (driverDisplayName) payload.driverDisplayName = driverDisplayName;
 
     const updates: Record<string, unknown> = {};
-    for (const groomUid of shareWith) {
+    for (const groomUid of allowed) {
       updates[`liveLocationsByGroom/${groomUid}/${driverUid}`] = payload;
     }
     try {
       await getDatabase().ref().update(updates);
-      res.json({ ok: true, written: shareWith.length });
+      res.json({ ok: true, written: allowed.length });
     } catch (err) {
       res.status(500).json({ error: "write_failed", detail: errorMessage(err) });
     }

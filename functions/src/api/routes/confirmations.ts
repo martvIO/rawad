@@ -218,6 +218,16 @@ confirmationsRouter.post(
       res.status(400).json({ error: "missing_required" });
       return;
     }
+    // Validate the path-segment IDs before interpolating them into RTDB refs.
+    // RTDB keys forbid `. # $ [ ] /` (the Admin SDK throws on them, surfacing as
+    // a confusing 500), so constrain to the push-key charset and bound the
+    // length to the same 64 chars the PATCH sanitizer enforces for
+    // attachedGuestId. Returns a clean 400 instead of a 500 on bad input.
+    const ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
+    if (!ID_RE.test(confirmationId) || !ID_RE.test(guestId)) {
+      res.status(400).json({ error: "invalid_id" });
+      return;
+    }
 
     try {
       const db = getDatabase();
@@ -311,9 +321,17 @@ function buildConfirmationRecord(
  * a failure here must not fail the confirmation write itself.
  *
  * Side effects on a single match:
- *   - Stamp `confirmedAt` on the guest.
- *   - If submission has coords AND guest had none, copy lat/lng + accuracy
- *     and mark `locationSource: "gps"`.
+ *   - Stamp `confirmedAt` (and `companions`) on the guest.
+ *
+ * Deliberately does NOT write map coordinates onto the guest record. This is
+ * an UNAUTHENTICATED path (the only "secret" is the guest's phone, and the
+ * groomUsername is semi-public), so letting it mutate a guest's GPS pin would
+ * let anyone who guesses a phone drop a location on someone else's guest. The
+ * submitted coords are still preserved on the immutable /confirmations record
+ * for admin review, and the admin can apply them via POST
+ * /confirmations/attach-location. The token-authenticated InviteForm path
+ * (POST /invites/submit) is gated by possession of the per-guest token and
+ * still sets coordinates directly.
  */
 async function tryAutoAttach(
   groomUid: string,
@@ -336,19 +354,9 @@ async function tryAutoAttach(
     if (matches.length !== 1) return null;
 
     const guestId = matches[0];
-    const guestVal = guestsSnap.child(guestId).val() as { lat?: unknown } | null;
     const now = Date.now();
     const guestPatch: Record<string, unknown> = { confirmedAt: now };
     if (s.companions !== null) guestPatch.companions = s.companions;
-    if (s.hasCoords && guestVal && typeof guestVal.lat !== "number") {
-      guestPatch.lat = s.lat;
-      guestPatch.lng = s.lng;
-      guestPatch.locationSource = "gps";
-      guestPatch.locationUpdatedAt = now;
-      if (s.locationAccuracy !== null) {
-        guestPatch.locationAccuracy = s.locationAccuracy;
-      }
-    }
     await db.ref(`guestsByGroom/${groomUid}/${guestId}`).update(guestPatch);
     return guestId;
   } catch (err) {
