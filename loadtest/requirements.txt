@@ -1,0 +1,7 @@
+# Load-testing suite dependencies.
+# Install into a venv:  python -m venv .venv && .venv\Scripts\pip install -r requirements.txt
+locust>=2.24        # load engine: greenlet concurrency, per-endpoint stats, ramp shape, CSV history
+matplotlib>=3.7     # on-screen + saved charts
+pandas>=2.0         # CSV post-processing for the charts/verdict
+numpy>=1.24         # np.arange for the per-endpoint bar chart (also a pandas/matplotlib dep)
+requests>=2.31      # used by the bootstrap (login + mint) and the cleanup helper (locust also depends on it)
