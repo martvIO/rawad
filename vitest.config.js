@@ -19,6 +19,7 @@ export default defineConfig({
             "tests/functions/rateLimit.test.ts",
             "tests/functions/stripApiPrefix.test.ts",
             "tests/functions/invitesAuthz.test.ts",
+            "tests/functions/faceMatch.test.ts",
           ],
           environment: "jsdom",
           testTimeout: 10000,
