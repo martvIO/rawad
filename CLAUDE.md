@@ -308,47 +308,42 @@ Set `VITE_*` vars in `.env` (local) or `.env.production` (prod build). Set `WEB_
 
 ## Project structure
 
+Four main top-level folders (full rules + rationale: `docs/CODEBASE_ORGANIZATION.md`):
+
 ```
-src/
-  config/           Centralized env vars and constants (POLL_MS, TIMING, GEO, etc.)
-  constants/        Role constants, storage key constants, match status constants
-  utils/
-    tokenManager.js Token lifecycle (localStorage-backed, no Firebase SDK)
-    apiClient.js    fetch() wrapper with Bearer auth + 401-retry
-    poller.js       Polling helper replacing RTDB onValue subscriptions
-    matchUtils.js   Fuzzy phone/name/address matching for admin confirmations
-    geo.js          Coordinate parsing, Waze/Maps deep links
-    phone.js        E.164 formatting, validation
-    validation.js   Name validation
-    password.js     Password strength rules
-    storage.js      localStorage wrappers
-    logger.js       Tagged console wrapper (silent in prod)
-  services/         One file per resource — all use apiClient.js
-  hooks/
-    usePortalState.js   Single source of truth for portal state + auth
-    useGeolocation.js   GPS watch + publish/subscribe
-    useLeaflet.js       Lazy Leaflet CDN injection
-  context/
-    PortalContext.jsx   Single hook run once; exposes state to all portal views
-  pages/
-    LandingPage.jsx
-    ConfirmationForm.jsx
-    InviteForm.jsx
-    DigitalInviteForm.jsx
-    DigitalInvitationPage.jsx   Public digital invitation page
-    portal/                     Auth-gated portal (login + role views)
-  components/         Reusable UI: modals, maps, address fields, Toast, Skeleton, …
-  styles/             theme.js (palette tokens C/ROLE/S) + GlobalStyle.jsx
-  i18n/               Arabic + Hebrew strings + makeT() factory
-  data/               status.js, cities.js, inviteContent.js
+frontend/             The Vite + React app — owns its own package.json
+  src/
+    config/           Centralized env vars and constants (POLL_MS, TIMING, GEO, etc.)
+    constants/        Role constants, storage key constants, match status constants
+    utils/            tokenManager, apiClient (Bearer auth + 401-retry), poller,
+                      matchUtils, geo, phone, validation, password, storage, logger
+    services/         One file per resource — all use apiClient.js
+    hooks/            usePortalState (portal state + auth), useGeolocation, useLeaflet
+    context/          PortalContext.jsx — single hook run once, shared by portal views
+    pages/            Route-mounted screens ONLY (incl. pages/portal/<role>/)
+    components/       Anything rendered by 2+ routes (components/digital/ = public
+                      invitation render; pages may import components, never reverse)
+    styles/           theme.js (palette tokens C/ROLE/S) + GlobalStyle.jsx
+    i18n/             Arabic + Hebrew strings + makeT() factory
+    data/             status.js, cities.js, inviteContent.js
+  public/             Static assets (face-api models)
+  e2e/                Playwright CI specs — primary browser testing via Playwright MCP
+  scripts/            build-vite.cjs (hosting predeploy), download-face-models.cjs
 
-functions/src/
-  api/               Express app — 10 REST resource routers
-  index.ts           Cloud Function exports (api + legacy callables)
-  helpers.ts         assertAdmin, validators, phone utils
-  *.ts               Legacy callable Cloud Functions (users, invites, confirmations, …)
+backend/              Everything that runs on Firebase servers
+  functions/          Deployable Cloud Functions package (own package.json)
+    src/api/          Express app — REST resource routers
+    src/index.ts      Cloud Function exports (api + standalone onRequest/triggers)
+    src/helpers.ts    assertAdmin, validators, phone utils
+  tests/              functions unit tests + RTDB rules integration tests
+  scripts/            build-functions.cjs (deploy predeploy), seed-emulator.cjs, migrations
+  vitest.config.js    backend test projects (unit + integration)
 
-e2e/                  (optional) Playwright spec files for CI — primary browser testing via Playwright MCP
+loadtest/             Python/Locust load-testing suite
+app/                  RESERVED — intentionally empty, future use
+
+(root)                firebase.json, .firebaserc, *.rules, netlify.toml, docs/,
+                      thin orchestrator package.json (delegates via --prefix/-c)
 ```
 
 ---
