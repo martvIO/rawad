@@ -33,5 +33,8 @@ Routes under `/digital/*`: guests CRUD, `media` upload/delete + design-field PAT
 - **Groom can no longer self-send** — the groom guest-list "📲 Send Invite" button was removed; **only the admin Send tab** mints/sends WhatsApp invites, in both digital and manual modes. See [[Security Model]].
 - **Number / RTL alignment** — `src/components/Num.jsx` (`<bdi dir="ltr">` isolate) wraps numeric tokens (phones, counts, dates, companion badges, distances/accuracy) that sit inline in Arabic/Hebrew text, across the guest pages and all portals. Complements [[Digit Normalization]] (which guarantees Western digits; `Num` fixes their *placement* in RTL runs).
 
+## Face matching ("صورك") — server-side face index (2026-06-12)
+The guest photos page (`/d/:user/:token/photos`) now runs on a server-side face index: a Cloud Function indexes every photographer photo's faces once at upload; the guest scans once (after a biometric consent screen) and gets an instant, uncapped, auto-refreshing gallery on every revisit, plus rescan and delete-my-face-data buttons. Full design, privacy posture, and the descriptor-compatibility invariant: [[Face Matching]].
+
 ## A persistent source of bugs
 The digital dashboard's upload + gallery flows generated most of the project's bugs because the UI reads from a 15s poller and multiple uploads race on a shared `media[]` array. See [[Optimistic UI Pattern]] and [[Known Bugs]] (BUG-O002, BUG-O003, BUG-R011, BUG-R012). Fixes: Firestore transactions for read-modify-write, optimistic local updates, pending-paths merge against poll results, resumable GCS uploads, and `getDownloadURL` instead of signed URLs.

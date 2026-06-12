@@ -24,6 +24,7 @@ _(ideas, frameworks, patterns, principles — pages that describe a concept)_
 - [[Polling and Realtime]] — REST polling (15–30s) for most data; SSE for live driver GPS
 - [[Security Model]] — three enforced server-side layers + non-authoritative UI guard
 - [[Digital Invitations]] — the Firestore-backed WhatsApp-link invite flow
+- [[Face Matching]] — server-side face index for the guest "your photos" page; biometric consent + TTL erasure
 - [[Optimistic UI Pattern]] — recurring bug class from the polling architecture, and its fix convention
 - [[Inline Styling Convention]] — 100% inline styles + `theme.js` tokens, no CSS framework
 - [[Digit Normalization]] — Western ASCII digits everywhere: `numberingSystem: latn` dates, apiClient input scrubbing, DB migration script
