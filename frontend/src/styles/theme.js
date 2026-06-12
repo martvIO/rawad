@@ -15,19 +15,3 @@ export const C = {
   blueGlow:  "rgba(75,159,212,.15)",
   redGlow:   "rgba(212,80,58,.15)",
 };
-
-// Role accent kit. Use `ROLE[user.role]` to get a consistent color/glow/icon
-// triplet — every place that branches on role today copy-pastes these values.
-export const ROLE = {
-  groom:  { color: C.gold, glow: C.goldGlow, icon: "♥" },          // ♥
-  driver: { color: C.blue, glow: C.blueGlow, icon: "🚗" },    // 🚗
-  admin:  { color: C.red,  glow: C.redGlow,  icon: "🔒" },    // 🔒
-};
-
-// Repeated style fragments. Add only when the same object literal appears in
-// 3+ files — otherwise it's noise.
-export const S = {
-  fieldLabel:   { marginBottom: 6, fontSize: 12, color: C.goldDim },
-  sectionTitle: { fontSize: 21, fontWeight: 900, color: C.goldLight, marginBottom: 4 },
-  sectionSub:   { fontSize: 13, color: C.dim, marginBottom: 20 },
-};

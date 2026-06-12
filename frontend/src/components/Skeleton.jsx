@@ -2,19 +2,8 @@
 // itself lives in GlobalStyle.jsx as `.skeleton`; these components only set
 // shape and layout.
 
-// Big block (used for the dashboard background-media slot)
-export function SkeletonBlock({ height = 280, radius = 16, style }) {
-  return (
-    <div className="skeleton" style={{
-      width: "100%", height, borderRadius: radius,
-      border: `1px solid rgba(255,255,255,.05)`,
-      ...style,
-    }}/>
-  );
-}
-
 // Single photographer-file card placeholder
-export function SkeletonCard({ style }) {
+function SkeletonCard({ style }) {
   return (
     <div style={{
       background: "#0f0f15",

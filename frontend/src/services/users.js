@@ -100,11 +100,3 @@ export async function adminSetPassword(uid, newPassword) {
 export async function setAdminClaim(uid, isAdmin) {
   return api.post(`/users/${uid}/admin-claim`, { isAdmin });
 }
-
-// ─── Password reset (Phone OTP path) ──────────────────────────────────────────
-
-/**
- * Finalize a phone-OTP-authorized password reset. Imports the auth-service
- * helper to keep the call site identical to the legacy export.
- */
-export { callResetPassword } from "./auth.js";

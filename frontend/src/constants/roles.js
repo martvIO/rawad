@@ -9,6 +9,3 @@ export const ROLES = Object.freeze({
   DRIVER: "driver",
   GROOM: "groom",
 });
-
-/** All known role values as an array — useful for `.includes()` checks. */
-export const ROLE_VALUES = Object.freeze([ROLES.ADMIN, ROLES.DRIVER, ROLES.GROOM]);

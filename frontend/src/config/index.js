@@ -41,12 +41,6 @@ export const SSE_BASE_URL =
 export const INVITE_BASE_URL =
   import.meta.env?.VITE_INVITE_BASE_URL ?? "https://invite.dawa.to";
 
-/**
- * Site key for the Phone-Auth invisible reCAPTCHA challenge. Only required
- * when the password-reset flow is exercised.
- */
-export const RECAPTCHA_SITE_KEY = import.meta.env?.VITE_RECAPTCHA_V2_SITE_KEY ?? "";
-
 // ─── Polling intervals ───────────────────────────────────────────────────────
 
 /**

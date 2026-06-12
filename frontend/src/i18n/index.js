@@ -3,7 +3,7 @@
 import { ar } from "./ar.js";
 import { he } from "./he.js";
 
-export const STRINGS = { ar, he };
+const STRINGS = { ar, he };
 
 export const makeT = (lang) => (key) =>
   (STRINGS[lang] && STRINGS[lang][key]) || STRINGS.ar[key] || key;

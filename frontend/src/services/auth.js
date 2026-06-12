@@ -146,16 +146,6 @@ export function subscribeAuth(cb) {
   );
 }
 
-/**
- * Backwards-compat shim. The old SDK exposed `onIdTokenChanged` separately
- * to deliver token-only refreshes (custom-claim updates). With REST, polling
- * /auth/me already includes the freshest claims, so this is now an alias
- * for subscribeAuth.
- */
-export function subscribeIdToken(cb) {
-  return subscribeAuth(cb);
-}
-
 // ─── Password reset (Phone OTP) ───────────────────────────────────────────────
 
 /**

@@ -18,7 +18,7 @@ import { POLL_MS } from "../config/index.js";
  * @returns {Promise<{published:boolean, enrolled:boolean, expiresAt:number|null,
  *                    matches:Array<{fileId,name,url,distance}>}>}
  */
-export async function fetchFaceMatches(token) {
+async function fetchFaceMatches(token) {
   return api.get(`/digital/photos/matches?token=${encodeURIComponent(token)}`, {
     skipAuth: true,
   });

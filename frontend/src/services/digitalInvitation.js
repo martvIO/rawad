@@ -126,14 +126,6 @@ export async function removeDigitalGuest(groomUid, guestId) {
   return api.delete(`/digital/${uid}/guests/${guestId}`);
 }
 
-/**
- * Legacy one-shot fetch — most code uses the subscription. Retained as a
- * no-op stub since the call site was already a placeholder.
- */
-export async function fetchDigitalGuests() {
-  return [];
-}
-
 // ─── Invitation Media doc ─────────────────────────────────────────────────────
 
 /**
@@ -308,36 +300,12 @@ export async function cancelDesignById(groomUid, designId) {
   const uid = resolveUid(groomUid);
   return api.post(`/digital/${uid}/designs/${designId}/design/cancel`, {});
 }
-export async function approveDesignById(groomUid, designId) {
-  return api.post(`/digital/${groomUid}/designs/${designId}/design/approve`, {});
-}
-export async function rejectDesignById(groomUid, designId, note) {
-  return api.post(`/digital/${groomUid}/designs/${designId}/design/reject`, { note: note || "" });
-}
 /** Admin override: set a design to any of "approved" | "draft" | "rejected". */
 export async function setDesignStatus(groomUid, designId, status, note) {
   return api.post(`/digital/${groomUid}/designs/${designId}/design/set-status`, {
     status,
     ...(note ? { note } : {}),
   });
-}
-
-/** Operational settings (guestRanks, photographerPublished) on the parent doc. */
-export function subscribeDigitalSettings(groomUid, cb, onErrCb) {
-  const uid = resolveUid(groomUid);
-  return createPoller(
-    async () => {
-      try {
-        return await api.get(`/digital/${uid}/settings`);
-      } catch (err) {
-        logErr(`subscribeDigitalSettings(${uid})`, err);
-        if (typeof onErrCb === "function") onErrCb(err);
-        return null;
-      }
-    },
-    (value) => cb(value ?? null),
-    { intervalMs: DIGITAL_POLL_INTERVAL_MS },
-  );
 }
 
 /** Assign (or clear) which design a guest receives. */
@@ -364,15 +332,6 @@ export async function approveDigitalDesign(groomUid) {
 
 export async function rejectDigitalDesign(groomUid, note) {
   return api.post(`/digital/${groomUid}/design/reject`, { note: note || "" });
-}
-
-export async function fetchDigitalDesignList() {
-  try {
-    return await api.get("/digital/design-list");
-  } catch (err) {
-    logErr("fetchDigitalDesignList", err);
-    return [];
-  }
 }
 
 /**
@@ -406,11 +365,6 @@ export async function getDigitalInvitationPublic(groomUid) {
   } catch {
     return null;
   }
-}
-
-/** Backwards-compat alias for the prior single-file upload entrypoint. */
-export async function saveDigitalMediaFile(groomUid, file) {
-  return addInvitationMedia(groomUid, file);
 }
 
 /**
@@ -494,8 +448,4 @@ export async function getLatestDigitalMediaFromStorage() {
 
 export async function healPhotographerFiles() {
   return 0;
-}
-
-export async function healDigitalMedia() {
-  return false;
 }
