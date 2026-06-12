@@ -40,7 +40,8 @@ Grooms manage a guest list. Drivers deliver physical invitations and upload proo
 
 ```bash
 npm install
-cd functions && npm install && cd ..
+npm install --prefix frontend
+cd backend/functions && npm install && cd ../..
 ```
 
 ### Start with emulators (recommended)
@@ -75,7 +76,7 @@ npm run emulators:seed
 npm run build
 
 # Build Cloud Functions
-cd functions && npm run build
+cd backend/functions && npm run build
 
 # Deploy everything
 firebase deploy --project dawa-aa793
@@ -189,7 +190,7 @@ firebase use dawa-aa793
 
 ```bash
 npm run build
-cd functions && npm run build && cd ..
+cd backend/functions && npm run build && cd ../..
 ```
 
 ### 3. Run pre-deploy tests

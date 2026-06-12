@@ -163,7 +163,7 @@ async function migrateFirestore(firestore) {
 
 (async () => {
   ({ toWesternDigits } = await import(
-    pathToFileURL(path.join(__dirname, "..", "src", "utils", "digits.js")).href
+    pathToFileURL(path.join(__dirname, "..", "..", "frontend", "src", "utils", "digits.js")).href
   ));
 
   if (PROD) {

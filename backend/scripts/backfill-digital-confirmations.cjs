@@ -10,7 +10,7 @@
 //   node scripts/backfill-digital-confirmations.cjs --apply   # actually write
 const path = require("path");
 const admin = require(path.join(__dirname, "..", "functions", "node_modules", "firebase-admin"));
-const key = require(path.join(__dirname, "..", "dawa-aa793-firebase-adminsdk-fbsvc-e42554a05c.json"));
+const key = require(path.join(__dirname, "..", "..", "dawa-aa793-firebase-adminsdk-fbsvc-e42554a05c.json"));
 
 admin.initializeApp({
   credential: admin.credential.cert(key),

@@ -22,7 +22,7 @@ import {
 } from "firebase/database";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const RULES = readFileSync(resolve(HERE, "../database.rules.json"), "utf8");
+const RULES = readFileSync(resolve(HERE, "../../database.rules.json"), "utf8");
 
 /* ─────────────────────────── fixtures ─────────────────────────── */
 

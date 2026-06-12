@@ -1,3 +1,5 @@
+import { fileURLToPath } from "node:url";
+import { dirname } from "node:path";
 import { defineConfig } from "vitest/config";
 
 // Backend test projects (frontend unit tests live in frontend/vitest.config.js):
@@ -6,7 +8,10 @@ import { defineConfig } from "vitest/config";
 //                 root `npm run test:unit` alias.
 //   integration — security-rule tests against the Firebase emulator. node env.
 //                 Run with `npm test` (wrapped in `firebase emulators:exec`).
+// `root` is pinned to backend/ so include globs resolve correctly when vitest
+// is invoked from the repo root with `-c backend/vitest.config.js`.
 export default defineConfig({
+  root: dirname(fileURLToPath(import.meta.url)),
   test: {
     projects: [
       {

@@ -14,7 +14,7 @@ npm run test:unit || { echo "[session-end] ABORT: unit tests failed — fix befo
 
 echo "[session-end] 2/3 Build (frontend + functions)..."
 npm run build || { echo "[session-end] ABORT: frontend build failed."; exit 1; }
-( cd functions && npm run build ) || { echo "[session-end] ABORT: functions build failed."; exit 1; }
+( cd backend/functions && npm run build ) || { echo "[session-end] ABORT: functions build failed."; exit 1; }
 
 echo "[session-end] 3/3 Deploy to Firebase ($PROJECT)..."
 npx firebase deploy --project "$PROJECT" --non-interactive || { echo "[session-end] ABORT: firebase deploy failed."; exit 1; }
