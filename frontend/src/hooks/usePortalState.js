@@ -3,49 +3,39 @@
 // Firebase; local state is reserved for transient UI (form inputs, modals,
 // tab selection). The shape of the returned object matches the original
 // localStorage-backed version so the role-view slices can stay untouched.
+//
+// Domain logic lives in composed hooks under ./portal/ (admin settings,
+// users, confirmations, send-invites, proofs); this hook owns the tangled
+// center — auth/session, the guests subscription + optimistic delivery
+// overlay, shared-cities, and the transient forms — and re-exposes
+// everything through the same returned object as before.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { load, save, removeKey } from "../utils/storage.js";
-import { buildWaLink, toIntlPhone, validatePhone } from "../utils/phone.js";
+import { validatePhone } from "../utils/phone.js";
 import { validateName } from "../utils/validation.js";
-import { isStrongPassword } from "../utils/password.js";
-import { formatAddress } from "../utils/geo.js";
 import { logErr } from "../utils/logger.js";
-import { INVITE_BASE_URL, TIMING } from "../config/index.js";
+import { TIMING } from "../config/index.js";
 import { ROLES } from "../constants/roles.js";
 import { STORAGE_KEYS } from "../constants/storageKeys.js";
-import { MATCH_STATUS } from "../constants/matchStatuses.js";
 
-import { subscribeAuth, signIn, signOutNow, forceRefreshToken } from "../services/auth.js";
+import { subscribeAuth, signIn, signOutNow } from "../services/auth.js";
 import { setAuthChangeCallback } from "../utils/apiClient.js";
 import {
   subscribeAllGuests, subscribeGuestsForGroom,
   addGuest as addGuestSrv, updateGuest as updateGuestSrv, removeGuest as removeGuestSrv,
 } from "../services/guests.js";
+import { normalizePhoneForMatching } from "../utils/matchUtils.js";
 import {
-  subscribeUsers, subscribeGroomProfiles,
-  createPortalUser, deletePortalUser,
-  updatePortalUser as updatePortalUserSrv,
-  adminSetPassword as adminSetPasswordSrv,
-  patchUserInRTDB,
-  upsertGroomProfile, removeGroomProfile,
-} from "../services/users.js";
-import {
-  subscribeConfirmations,
-  updateConfirmation as updateConfirmationSrv,
-  attachConfirmationLocationToGuest as attachConfLocationSrv,
-} from "../services/confirmations.js";
-import { classifyAll, normalizePhoneForMatching } from "../utils/matchUtils.js";
-import { subscribeSettings, saveSettings } from "../services/adminSettings.js";
-import {
-  uploadProofBlob, dataUrlToBlob, proofDownloadUrl,
+  uploadProofBlob, dataUrlToBlob,
 } from "../services/proofs.js";
 import { assignDriverToGroom } from "../services/assignments.js";
-import { createGuestInvite } from "../services/invites.js";
-import {
-  subscribeDigitalGuests, createDigitalGuestInvite,
-} from "../services/digitalInvitation.js";
 import { useGeolocation } from "./useGeolocation.js";
+import { usePortalAdminSettings } from "./portal/usePortalAdminSettings.js";
+import { usePortalUsers } from "./portal/usePortalUsers.js";
+import { usePortalConfirmations } from "./portal/usePortalConfirmations.js";
+import { usePortalSendInvites } from "./portal/usePortalSendInvites.js";
+import { usePortalProofs } from "./portal/usePortalProofs.js";
 
 export function usePortalState({ onBack, t, lang, setLang }) {
   const navigate = useNavigate();
@@ -116,160 +106,24 @@ export function usePortalState({ onBack, t, lang, setLang }) {
   const [sharedSelectedGrooms, setSharedSelectedGrooms] = useState([]);
   const [sharedSelectedCity, setSharedSelectedCity] = useState(null);
 
-  // ── Admin (UI only + subscriptions) ─────────────────────────────────────────
-  const [adminSelectedGroom, setAdminSelectedGroom] = useState(null);
+  // ── Admin settings (RTDB-backed, subscribed) ────────────────────────────────
+  const {
+    adminMessageBody, setAdminMessageBody,
+    adminFormLink, setAdminFormLink,
+    adminMode, setAdminMode,
+    adminDigitalBaseUrl, setAdminDigitalBaseUrl,
+    adminDigitalMessage, setAdminDigitalMessage,
+  } = usePortalAdminSettings({ authed, showToast });
 
-  // Digital guests for the admin's currently-selected groom. Subscribed only
-  // while an admin is viewing that groom — empties otherwise.
-  const [digitalGuestsForSelectedGroom, setDigitalGuestsForSelectedGroom] = useState([]);
-
-  // Admin settings (RTDB-backed, subscribed)
-  const [adminMessageBody,    setAdminMessageBodyState]    = useState("");
-  const [adminFormLink,       setAdminFormLinkState]       = useState("");
-  const [adminMode,           setAdminModeState]           = useState("manual"); // "manual" | "digital"
-  const [adminDigitalBaseUrl, setAdminDigitalBaseUrlState] = useState("");
-  const [adminDigitalMessage, setAdminDigitalMessageState] = useState("");
-  useEffect(() => {
-    if (!authed) return;
-    return subscribeSettings((s) => {
-      setAdminMessageBodyState   (s.messageBody    ?? "");
-      setAdminFormLinkState      (s.formLink       ?? "");
-      setAdminModeState          (s.mode           === "digital" ? "digital" : "manual");
-      setAdminDigitalBaseUrlState(s.digitalBaseUrl ?? "");
-      setAdminDigitalMessageState(s.digitalMessage ?? "");
-    });
-  }, [authed]);
-  const setAdminMessageBody = (v) => {
-    setAdminMessageBodyState(v);
-    saveSettings({ messageBody: v }).catch((e) => showToast(e?.message || ""));
-  };
-  const setAdminFormLink = (v) => {
-    setAdminFormLinkState(v);
-    saveSettings({ formLink: v }).catch((e) => showToast(e?.message || ""));
-  };
-  const setAdminMode = (v) => {
-    const mode = v === "digital" ? "digital" : "manual";
-    setAdminModeState(mode);
-    saveSettings({ mode }).catch((e) => showToast(e?.message || ""));
-  };
-  const setAdminDigitalBaseUrl = (v) => {
-    setAdminDigitalBaseUrlState(v);
-    saveSettings({ digitalBaseUrl: v }).catch((e) => showToast(e?.message || ""));
-  };
-  const setAdminDigitalMessage = (v) => {
-    setAdminDigitalMessageState(v);
-    saveSettings({ digitalMessage: v }).catch((e) => showToast(e?.message || ""));
-  };
-
-  // Confirmations (admin-only subscription)
-  const [confirmations, setConfirmations] = useState([]);
-  useEffect(() => {
-    if (!isAdmin) { setConfirmations([]); return; }
-    return subscribeConfirmations(setConfirmations);
-  }, [isAdmin]);
-  const [editingConf, setEditingConf] = useState(null);
-
-  // قائمة العرسان العامة — مرئية لجميع المستخدمين (مرسلين + عرسان + أدمن).
-  // تُستخدم في واجهة المرسل لاختيار من يشارك معهم موقعه / البلدات المشتركة.
-  const [groomProfiles, setGroomProfiles] = useState([]);
-  useEffect(() => {
-    if (!authed) { setGroomProfiles([]); return; }
-    return subscribeGroomProfiles(setGroomProfiles);
-  }, [authed]);
-
-  // Users (admin sees full /users; drivers see their assigned groom as a synthetic single entry)
-  const [adminUsers, setAdminUsers] = useState([]);
-  const [usersLoading, setUsersLoading] = useState(false);
-  useEffect(() => {
-    if (!isAdmin) { setAdminUsers([]); return; }
-    setUsersLoading(true);
-    let unsub = () => {};
-    // نجدّد الـ JWT قبل الاشتراك: يضمن أنّ قواعد RTDB ترى الـ claim الصحيحة
-    // (role === 'admin') من أوّل طلب، دون انتظار دورة التحديث التلقائية (ساعة).
-    forceRefreshToken()
-      .catch(() => {/* إذا فشل التجديد نكمل بالتوكن الحالي */})
-      .finally(() => {
-        unsub = subscribeUsers((list) => {
-          setAdminUsers(list);
-          setUsersLoading(false);
-        });
-      });
-    return () => unsub();
-  }, [isAdmin]);
-
-  // ── إضافات تفاؤلية لقائمة الأدمن (مع حفظ في localStorage) ──
-  // عند إنشاء/تعديل حساب نُحدّث هذه القائمة فوراً حتى لا ننتظر subscribeUsers
-  // الحي (الذي قد يكون مرفوضاً من قواعد RTDB إذا لم يُنشر التحديث بعد).
-  // نحفظها في localStorage باسم مفتاح خاص بكلّ أدمن (currentUid)، فتنجو
-  // من إعادة تحميل الصفحة. تبقى مقيّدة بالمتصفّح الواحد — الحلّ النهائي
-  // للقائمة الكاملة هو نشر قواعد RTDB الجديدة.
-  const OPTIMISTIC_KEY = (uid) => `dawa.optimisticUsers.${uid}`;
-  const [optimisticUsers, setOptimisticUsersRaw] = useState([]);
-  // مرجع لمعرفة هل حُمّلت قائمة الـ uid الحالي من localStorage بعد، حتى لا
-  // نطمس البيانات المخزّنة بمصفوفة فارغة قبل أن نقرأ من الـ storage.
-  const optimisticLoadedFor = useRef(null);
-  // حمّل القائمة المخزّنة محلياً عندما يُعرف uid الأدمن.
-  useEffect(() => {
-    if (!isAdmin || !currentUid) return;
-    if (optimisticLoadedFor.current === currentUid) return;
-    optimisticLoadedFor.current = currentUid;
-    try {
-      const raw = localStorage.getItem(OPTIMISTIC_KEY(currentUid));
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) setOptimisticUsersRaw(parsed);
-      }
-    } catch (e) { logErr("loadOptimisticUsers", e); }
-  }, [isAdmin, currentUid]);
-  // أيّ تحديث للقائمة يُحفظ مباشرةً في localStorage (إن كان الـ uid معروفاً).
-  const setOptimisticUsers = (updater) => {
-    setOptimisticUsersRaw(prev => {
-      const next = typeof updater === "function" ? updater(prev) : updater;
-      if (isAdmin && currentUid) {
-        try { localStorage.setItem(OPTIMISTIC_KEY(currentUid), JSON.stringify(next)); }
-        catch (e) { logErr("saveOptimisticUsers", e); }
-      }
-      return next;
-    });
-  };
-  const users = useMemo(() => {
-    if (isAdmin) {
-      // ندمج القائمة الحية مع الإضافات التفاؤلية ونُزيل المكررات بالـ uid:
-      // إذا ظهر السجل الحقيقي في Firebase نُسقط نسخته التفاؤلية.
-      const liveUids = new Set(adminUsers.map(u => u.uid || u.id));
-      const ghosts   = optimisticUsers.filter(o => !liveUids.has(o.uid));
-      return [...adminUsers, ...ghosts];
-    }
-    if (userType === ROLES.DRIVER && driverServingGroom) {
-      return [{
-        uid: driverServingGroom.uid,
-        id:  driverServingGroom.uid,
-        username: driverServingGroom.username,
-        role: ROLES.GROOM,
-      }];
-    }
-    return [];
-  }, [isAdmin, adminUsers, optimisticUsers, userType, driverServingGroom]);
-
-  // Admin Send tab — digital guests for the currently-selected groom. Only
-  // subscribed while admin is viewing a specific groom; we resolve the uid
-  // from the username via the users list.
-  useEffect(() => {
-    if (!isAdmin || !adminSelectedGroom) { setDigitalGuestsForSelectedGroom([]); return; }
-    const groom = users.find(u => u.username === adminSelectedGroom);
-    const groomUid = groom?.uid || groom?.id;
-    if (!groomUid) { setDigitalGuestsForSelectedGroom([]); return; }
-    return subscribeDigitalGuests(groomUid, setDigitalGuestsForSelectedGroom);
-  }, [isAdmin, adminSelectedGroom, users]);
-
-  // Admin user-creation form
-  const [newUserRole,  setNewUserRole]  = useState("groom");
-  const [newUserName,  setNewUserName]  = useState("");
-  const [newUserPass,  setNewUserPass]  = useState("");
-  const [newUserPhone, setNewUserPhone] = useState("");
-
-  // Admin user-edit modal (full row selected; null = modal closed)
-  const [editingUser, setEditingUser] = useState(null);
+  // ── Users domain (admin list + optimistic overlay + edit modal) ─────────────
+  const {
+    groomProfiles,
+    adminUsers, users, usersLoading,
+    addUser, deleteUser,
+    newUserRole, setNewUserRole, newUserName, setNewUserName,
+    newUserPass, setNewUserPass, newUserPhone, setNewUserPhone,
+    editingUser, startEditUser, cancelEditUser, saveUserEdit,
+  } = usePortalUsers({ authed, isAdmin, currentUid, userType, driverServingGroom, t, showToast });
 
   // ── Guests subscription ─────────────────────────────────────────────────────
   const [guests, setGuests] = useState([]);
@@ -355,6 +209,27 @@ export function usePortalState({ onBack, t, lang, setLang }) {
   // For non-admin sessions the subscription already filtered to one groom, so
   // myGuests === guests; for admin it's the whole flattened list.
   const myGuests = guests;
+
+  // ── Confirmations domain (admin-only) ───────────────────────────────────────
+  const {
+    confirmations, editingConf, setEditingConf,
+    matchedGuestFor, matchColor, confirmationReasons,
+    useConfirmationData, saveConfirmationEdit, attachConfirmationToGuest,
+    guestConfirmationStatus,
+  } = usePortalConfirmations({ isAdmin, guests, t, showToast });
+
+  // ── Send-tab domain (WhatsApp + invite links) ───────────────────────────────
+  const {
+    adminSelectedGroom, setAdminSelectedGroom,
+    digitalGuestsForSelectedGroom,
+    sendWaToOne, sendWaToAll,
+    sendInviteLink, sendDigitalInviteLink,
+  } = usePortalSendInvites({
+    isAdmin, users, adminUsers, guests,
+    adminMessageBody, adminFormLink, adminMode,
+    adminDigitalBaseUrl, adminDigitalMessage,
+    t, lang, showToast,
+  });
 
   // ── Groom: add/edit guest form (transient) ──────────────────────────────────
   const [gName, setGName] = useState("");
@@ -480,236 +355,6 @@ export function usePortalState({ onBack, t, lang, setLang }) {
                   : (typeof next === "string" ? { uid: null, username: next } : next),
   );
 
-  // ── WhatsApp link helpers ───────────────────────────────────────────────────
-  const waLinkFor = (phone) =>
-    buildWaLink(phone, (adminMessageBody || "").trim(), (adminFormLink || "").trim()) || "";
-  const sendWaToOne = (phone) => {
-    const url = waLinkFor(phone);
-    if (!url) { showToast(t("share_invalid")); return; }
-    window.open(url, "_blank", "noopener");
-  };
-  const sendWaToAll = (groomUsername) => {
-    if (!adminFormLink.trim()) { showToast(t("admin_form_link")); return; }
-    const groomUid = adminUsers.find(u => u.username === groomUsername)?.uid;
-    const groomGuests = guests.filter(g => g.groomUid === groomUid);
-    if (groomGuests.length === 0) return;
-    showToast(t("admin_bulk_warn"));
-    groomGuests.forEach((g, i) => {
-      const url = waLinkFor(g.phone);
-      if (url) setTimeout(() => window.open(url, "_blank", "noopener"), i * TIMING.WA_STAGGER_MS);
-    });
-  };
-
-  // Per-guest invite link. Behaviour branches on adminMode:
-  //   - manual:   mints the existing /invite/{token} link + adminMessageBody
-  //   - digital:  mints a token via createDigitalGuestInvite + uses the
-  //               adminDigitalBaseUrl + adminDigitalMessage, with the guest's
-  //               groomUsername + token appended so the public landing page
-  //               can personalise the displayed guest name.
-  const sendInviteLink = async (guest) => {
-    if (!guest?.groomUid || !guest?.id) { showToast(t("share_invalid")); return; }
-    if (!toIntlPhone(guest.phone)) { showToast(t("share_invalid")); return; }
-    try {
-      if (adminMode === "digital") {
-        const { token } = await createDigitalGuestInvite({
-          groomUid: guest.groomUid,
-          guestId:  guest.id,
-        });
-        if (!token) { showToast(t("share_invalid")); return; }
-        const base = (adminDigitalBaseUrl || "").trim().replace(/\/+$/, "")
-                  || `${window.location.origin}/d`;
-        const groomUsername = guest.groomUsername || "";
-        const url  = groomUsername ? `${base}/${groomUsername}/${token}` : `${base}/${token}`;
-        const waUrl = buildWaLink(guest.phone, (adminDigitalMessage || "").trim(), url);
-        if (waUrl) window.open(waUrl, "_blank", "noopener");
-        return;
-      }
-
-      // Manual mode — existing physical-invite flow.
-      const { token } = await createGuestInvite({
-        groomUid: guest.groomUid,
-        guestId:  guest.id,
-      });
-      if (!token) { showToast(t("share_invalid")); return; }
-      const baseUrl = (INVITE_BASE_URL || "").replace(/\/+$/, "")
-                   || window.location.origin;
-      const url = `${baseUrl}/invite/${token}`;
-      const waUrl = buildWaLink(guest.phone, (adminMessageBody || "").trim(), url);
-      if (waUrl) window.open(waUrl, "_blank", "noopener");
-    } catch (e) {
-      logErr("sendInviteLink", e);
-      const apiError = e?.body?.error || "";
-      if (apiError === "design_not_approved" || /design_not_approved/.test(e?.message || "")) {
-        showToast(lang === "he"
-          ? "העיצוב טרם אושר"
-          : "لم يتم اعتماد تصميم الدعوة بعد");
-        return;
-      }
-      showToast(e?.message || t("share_invalid"));
-    }
-  };
-
-  // Per-guest DIGITAL invite link. Mirrors sendInviteLink but uses the
-  // digital token Cloud Function and routes through /invite/digital/{token}.
-  // Only the admin's Send tab calls this — grooms can no longer self-send.
-  //
-  // `customMessage` is the admin's per-groom Send-tab message (already
-  // personalised with the guest name); it wins over the saved digital-settings
-  // message so an empty box never sends a blank invite. `opts.noDesign` is the
-  // "بدون تصميم" option — send the message ONLY, with no invitation link.
-  const sendDigitalInviteLink = async (guest, groomUid, customMessage, opts = {}) => {
-    if (!groomUid || !guest?.id) { showToast(t("share_invalid")); return; }
-    if (!toIntlPhone(guest.phone)) { showToast(t("share_invalid")); return; }
-    const message = (customMessage || "").trim() || (adminDigitalMessage || "").trim();
-    try {
-      // "بدون تصميم" — open WhatsApp with the message and NO link.
-      if (opts.noDesign) {
-        const waUrl = buildWaLink(guest.phone, message, "");
-        if (waUrl) window.open(waUrl, "_blank", "noopener");
-        return;
-      }
-      const { token } = await createDigitalGuestInvite({
-        groomUid,
-        guestId: guest.id,
-      });
-      if (!token) { showToast(t("share_invalid")); return; }
-      const baseUrl = (INVITE_BASE_URL || "").replace(/\/+$/, "")
-                   || window.location.origin;
-      const url = `${baseUrl}/d/${adminSelectedGroom}/${token}`;
-      const waUrl = buildWaLink(guest.phone, message, url);
-      if (waUrl) window.open(waUrl, "_blank", "noopener");
-    } catch (e) {
-      logErr("sendDigitalInviteLink", e);
-      // The server returns { error: "design_not_approved" } when the groom
-      // hasn't gotten an admin to approve their design yet. ApiError carries
-      // the parsed body and stamps the message as `api_design_not_approved`.
-      const apiError = e?.body?.error || "";
-      if (apiError === "design_not_approved" || /design_not_approved/.test(e?.message || "")) {
-        showToast(lang === "he"
-          ? "העיצוב טרם אושר"
-          : "لم يتم اعتماد تصميم الدعوة بعد");
-        return;
-      }
-      showToast(e?.message || t("share_invalid"));
-    }
-  };
-
-  // ── Confirmation matching ───────────────────────────────────────────────────
-  // Phone is the primary key. Names/addresses use fuzzy similarity tolerant
-  // of spelling variants, Arabic/Hebrew/English transliteration, and word
-  // reordering (see src/utils/matchUtils.js for details).
-  const classificationMap = useMemo(
-    () => {
-      const map = classifyAll(confirmations, guests);
-      // Digital-invite RSVPs are confirmed through the digital flow and have no
-      // RTDB guest to fuzzy-match against, so classifyAll would mark them
-      // "unknown". They are valid confirmations — show them green with no
-      // mismatch reasons.
-      for (const conf of confirmations) {
-        if (conf?.source === "digital") {
-          map.set(conf.id, { status: MATCH_STATUS.GREEN, guest: null, reasons: [] });
-        }
-      }
-      return map;
-    },
-    [confirmations, guests],
-  );
-
-  const matchedGuestFor = (conf) =>
-    classificationMap.get(conf?.id)?.guest ?? null;
-
-  // matchColor returns "green" | "red" | "unknown" (note: was previously
-  // "red" for unknowns; UI now branches on three states for the Unknown section).
-  const matchColor = (conf) =>
-    classificationMap.get(conf?.id)?.status ?? MATCH_STATUS.UNKNOWN;
-
-  // Translate machine reason codes into the existing i18n strings so
-  // AdminConfirmationsTab can display them as badges.
-  const reasonsLabel = (codes) => (codes || []).map((c) => {
-    if (c === "name_differs")    return t("conf_mismatch_name");
-    if (c === "address_differs") return t("conf_mismatch_city");
-    return c;
-  });
-
-  const confirmationReasons = (conf) =>
-    reasonsLabel(classificationMap.get(conf?.id)?.reasons);
-
-  // Sync the confirmation's submitted data back into the matched guest record.
-  // (Function name kept for compatibility with the AdminConfirmationsTab slice.)
-  const useConfirmationData = async (conf) => {
-    const guest = matchedGuestFor(conf);
-    if (!guest) return;
-    const fullAddr = formatAddress(conf.submittedCity, conf.submittedStreet, conf.submittedHouse);
-    try {
-      await updateGuestSrv(guest.groomUid, guest.id, {
-        name:  conf.submittedName  || guest.name,
-        phone: conf.submittedPhone || guest.phone,
-        area:  fullAddr || guest.area,
-      });
-      showToast(t("edit_success"));
-    } catch (e) { logErr("useConfirmationData", e); showToast(e?.message || ""); }
-  };
-
-  // Admin edits a confirmation record. Updates both /confirmations/{id}
-  // and the matched guest's record (if any) so the two stay in sync.
-  // After save, re-classification runs automatically because confirmations
-  // and guests both re-subscribe and the memo above re-computes.
-  const saveConfirmationEdit = async (confId, patch) => {
-    const conf = confirmations.find(c => c.id === confId);
-    if (!conf) return;
-    const cleanPatch = {
-      submittedName:  (patch.submittedName  ?? conf.submittedName  ?? "").trim(),
-      submittedPhone: (patch.submittedPhone ?? conf.submittedPhone ?? "").trim(),
-      submittedCity:  (patch.submittedCity  ?? conf.submittedCity  ?? "").trim(),
-    };
-    try {
-      await updateConfirmationSrv(confId, cleanPatch);
-      // Propagate to the guest record matched by the *new* phone, if any.
-      const newPhoneDigits = normalizePhoneForMatching(cleanPatch.submittedPhone);
-      const guestMatch = newPhoneDigits
-        ? guests.find(g =>
-            g.groomUid === conf.groomUid &&
-            normalizePhoneForMatching(g.phone) === newPhoneDigits,
-          )
-        : null;
-      if (guestMatch) {
-        await updateGuestSrv(guestMatch.groomUid, guestMatch.id, {
-          name:  cleanPatch.submittedName  || guestMatch.name,
-          phone: cleanPatch.submittedPhone || guestMatch.phone,
-          area:  cleanPatch.submittedCity  || guestMatch.area || "",
-        });
-      }
-      setEditingConf(null);
-      showToast(t("edit_success"));
-    } catch (e) { logErr("saveConfirmationEdit", e); showToast(e?.message || ""); }
-  };
-
-  // Admin-only: copy a confirmation's stored coords onto a specific guest.
-  // Surfaced from EditConfirmationModal when auto-attach couldn't resolve.
-  const attachConfirmationToGuest = async (confirmationId, guestId) => {
-    if (!confirmationId || !guestId) return;
-    try {
-      await attachConfLocationSrv({ confirmationId, guestId });
-      showToast(t("admin_conf_attach_success"));
-    } catch (e) { logErr("attachConfirmationToGuest", e); showToast(e?.message || ""); }
-  };
-
-  // Status badge for a guest based on whether a confirmation arrived. Used
-  // by the Send tab (per-guest "Matched"/"Mismatch" chip).
-  const guestConfirmationStatus = (guest) => {
-    if (!guest) return null;
-    const guestPhone = normalizePhoneForMatching(guest.phone);
-    if (!guestPhone) return null;
-    const conf = confirmations.find(c =>
-      c.groomUid === guest.groomUid &&
-      normalizePhoneForMatching(c.submittedPhone) === guestPhone,
-    );
-    if (!conf) return null;
-    const cls = classificationMap.get(conf.id);
-    if (!cls || cls.status === MATCH_STATUS.GREEN) return { status: "matched", conf };
-    return { status: "mismatch", reasons: reasonsLabel(cls.reasons), conf };
-  };
-
   // ── Guest CRUD ──────────────────────────────────────────────────────────────
   const addGuest = async () => {
     if (!activeGroomUid) { showToast(t("add_required_msg")); return; }
@@ -765,176 +410,6 @@ export function usePortalState({ onBack, t, lang, setLang }) {
       setEditingGuest(null);
       showToast(t("edit_success"));
     } catch (e) { logErr("saveGuestEdit", e); showToast(e?.message || ""); }
-  };
-
-  // ── Admin user management ───────────────────────────────────────────────────
-  // عند نجاح الإنشاء نُضيف الحساب الجديد إلى optimisticUsers فوراً، حتى يظهر
-  // في القائمة قبل أن يلتقطه subscribeUsers الحي. النتيجة المُعادة تُمكّن
-  // الصفحة من القفز للتبويب الموافق للدور.
-  //
-  // ملاحظة: الـ Cloud Function المنشورة حالياً ما زالت تشترط رقم هاتف
-  // E.164 صالحاً (تمرّره إلى Firebase Auth التي تستخدم libphonenumber).
-  // لا يوجد بادئة وهميّة آمنة 100%، فالهاتف مطلوب حتى ينشر الأدمن النسخة
-  // الجديدة من الدالّة.
-  const addUser = async () => {
-    if (!newUserName.trim() || !newUserPass.trim()) { showToast(t("admin_required")); return null; }
-    if (!isStrongPassword(newUserPass)) { showToast(t("pwd_weak")); return null; }
-    const username   = newUserName.trim().toLowerCase();
-    const role       = newUserRole;
-    // الهاتف اختياري في الواجهة. إذا تُرك فارغاً نُولِّد رقماً وهمياً
-    // بنطاق +1202555XXXX (محجوز رسمياً للاستخدام الاختباري في NANP؛
-    // تقبله libphonenumber / Firebase Auth كصيغة E.164 صالحة).
-    // يُحذف هذا التحايل بعد نشر Cloud Function الجديدة التي لا تشترط الهاتف.
-    const typedPhone = newUserPhone.trim();
-    const phoneE164  = typedPhone ||
-      ("+1202555" + (Date.now() % 10000).toString().padStart(4, "0"));
-    try {
-      const result = await createPortalUser({ username, password: newUserPass, role, phoneE164 });
-      const uid = result?.uid;
-      const newRow = { uid, id: uid, username, role, phoneE164 };
-      if (uid) {
-        setOptimisticUsers(prev => [...prev, newRow]);
-        // إذا كان دور الحساب الجديد "عريس" نكتب سجله في /groomProfiles مباشرةً
-        // من الكلايَنت حتى يظهر فوراً في القوائم (بدون انتظار نشر Cloud Function).
-        if (role === ROLES.GROOM) {
-          upsertGroomProfile(uid, { username }).catch(() => {});
-        }
-      }
-      setNewUserName(""); setNewUserPass(""); setNewUserPhone("");
-      showToast(t("admin_added"));
-      return newRow;
-    } catch (e) {
-      logErr("addUser", e);
-      showToast(e?.message || t("admin_taken"));
-      return null;
-    }
-  };
-  // عند الحذف نُزيل السجل من القائمة التفاؤلية أيضاً حتى لو لم يكن قد وصل بعد
-  // من Firebase، لئلا يبقى ظاهراً بعد تأكيد الحذف.
-  const deleteUser = async (uid) => {
-    try {
-      await deletePortalUser(uid);
-      setOptimisticUsers(prev => prev.filter(o => o.uid !== uid));
-      // أزل من groomProfiles إن كان الحساب عريساً (بلا أثر إن لم يكن)
-      removeGroomProfile(uid).catch(() => {});
-      showToast(t("admin_deleted"));
-    } catch (e) { logErr("deleteUser", e); showToast(e?.message || ""); }
-  };
-
-  // Admin user-edit lifecycle. Open the modal with a user row, save patches
-  // through updatePortalUser, and (optionally) set a fresh password via
-  // adminSetPassword. The Cloud Functions are authoritative — these client
-  // helpers just choose what to send.
-  const startEditUser = (u) => setEditingUser(u);
-  const cancelEditUser = () => setEditingUser(null);
-  // ── saveUserEdit ────────────────────────────────────────────────────────────
-  // الحلّ لـ INTERNAL: نُقسِّم التعديل إلى مسارات مستقلّة حسب نوع الحقل:
-  //
-  //  1. displayName   → RTDB مباشرةً (/users/{uid}/displayName).
-  //                    لا يمرّ عبر Cloud Function لأنّ Auth.updateUser(displayName:null)
-  //                    يُسبّب INTERNAL على بعض أنواع الحسابات.
-  //  2. username / phone / role → Cloud Function (updatePortalUser) — تحتاج
-  //                    تحديث Auth email / phoneNumber / custom claims + indices.
-  //  3. password      → Cloud Function (adminSetPassword) — مستقلّة دائماً.
-  //
-  // هذا التقسيم يُعزل كل نقطة فشل ممكنة ويُظهر رسالة خطأ دقيقة للمشخّص.
-  //
-  // يقبل `originalUser` كمرجع للمقارنة (من الكلايَنت) أو يُستخدم hook-level
-  // editingUser إن لم يُمرَّر.
-  const saveUserEdit = async (uid, patch, originalUser) => {
-    if (!uid) return;
-    const orig = originalUser ?? editingUser ?? {};
-
-    const newUsername    = patch?.username?.trim().toLowerCase() ?? "";
-    const newDisplayName = typeof patch?.displayName === "string" ? patch.displayName.trim() : undefined;
-    const newPhoneE164   = patch?.phoneE164?.trim() ?? "";
-    const newRole        = typeof patch?.role === "string" ? patch.role : undefined;
-    const newPassword    = patch?.newPassword?.trim() || null;
-
-    // ─ ما الذي تغيّر فعلاً؟ ──────────────────────────────────────────────
-    const usernameChanged    = newUsername    && newUsername    !== (orig.username ?? "");
-    const displayNameChanged = newDisplayName !== undefined
-                               && newDisplayName !== (orig.displayName ?? "");
-    const phoneChanged       = newPhoneE164   && newPhoneE164   !== (orig.phoneE164 ?? "");
-    const roleChanged        = newRole        && newRole        !== (orig.role    ?? "");
-    const needsFunction      = usernameChanged || phoneChanged || roleChanged;
-    const needsPassword      = !!newPassword;
-    const needsDisplayName   = displayNameChanged;
-    const nothingChanged     = !usernameChanged && !displayNameChanged
-                               && !phoneChanged && !roleChanged && !needsPassword;
-
-    // ─ console.log للتشخيص ──────────────────────────────────────────────
-    console.log("[dawa] saveUserEdit — diff:", {
-      uid,
-      usernameChanged, displayNameChanged, phoneChanged, roleChanged,
-      needsPassword,
-      functionPayload: needsFunction
-        ? { uid, ...(usernameChanged && { username: newUsername }),
-            ...(phoneChanged   && { phoneE164: newPhoneE164 }),
-            ...(roleChanged    && { role: newRole }) }
-        : null,
-    });
-
-    if (nothingChanged) { showToast(t("admin_no_changes")); return; }
-
-    try {
-      // ── 1. displayName: كتابة RTDB مباشرة (لا Cloud Function) ─────────
-      if (needsDisplayName) {
-        console.log("[dawa] patchUserInRTDB displayName:", { uid, displayName: newDisplayName || null });
-        await patchUserInRTDB(uid, { displayName: newDisplayName || null });
-      }
-
-      // ── 2. username / phone / role: Cloud Function updatePortalUser ────
-      if (needsFunction) {
-        const payload = { uid };
-        if (usernameChanged) payload.username  = newUsername;
-        if (phoneChanged)    payload.phoneE164 = newPhoneE164;
-        if (roleChanged)     payload.role      = newRole;
-        console.log("[dawa] updatePortalUser:", payload);
-        await updatePortalUserSrv(payload);
-      }
-
-      // ── 3. password: Cloud Function adminSetPassword ───────────────────
-      if (needsPassword) {
-        console.log("[dawa] adminSetPassword uid:", uid);
-        await adminSetPasswordSrv(uid, newPassword);
-      }
-
-      // ── حدّث الحالة المحلية فوراً ──────────────────────────────────────
-      const localPatch = {
-        ...(usernameChanged    && { username:    newUsername }),
-        ...(displayNameChanged && { displayName: newDisplayName }),
-        ...(phoneChanged       && { phoneE164:   newPhoneE164 }),
-        ...(roleChanged        && { role:        newRole }),
-      };
-      const mergedUser = { ...orig, uid, id: uid, ...localPatch };
-      setOptimisticUsers(prev => {
-        const idx = prev.findIndex(o => o.uid === uid);
-        if (idx >= 0) { const next = [...prev]; next[idx] = mergedUser; return next; }
-        return [...prev, mergedUser];
-      });
-
-      // ── مزامنة /groomProfiles ────────────────────────────────────────
-      const finalRole     = localPatch.role     ?? orig.role;
-      const finalUsername = localPatch.username ?? orig.username ?? "";
-      const finalDN       = localPatch.displayName !== undefined
-                              ? localPatch.displayName
-                              : (orig.displayName ?? undefined);
-      if (finalRole === ROLES.GROOM) {
-        upsertGroomProfile(uid, { username: finalUsername, displayName: finalDN }).catch(() => {});
-      } else if (orig.role === ROLES.GROOM && finalRole && finalRole !== ROLES.GROOM) {
-        removeGroomProfile(uid).catch(() => {});
-      }
-
-      setEditingUser(null);
-      showToast(t("admin_user_edit_saved"));
-
-    } catch (e) {
-      logErr("saveUserEdit", e);
-      const msg = e?.message || e?.details?.message || e?.code || "خطأ غير معروف";
-      console.error("[dawa] saveUserEdit FAILED:", { code: e?.code, message: e?.message, details: e?.details });
-      showToast(msg);
-    }
   };
 
   // ── Mark delivered (with optional photo upload) ─────────────────────────────
@@ -996,38 +471,8 @@ export function usePortalState({ onBack, t, lang, setLang }) {
     }
   };
 
-  // Bridge legacy `guest.proofImg` → resolved storage URL for the proof viewer.
-  // The JSX slices check `g.proofImg` strings; for new records we expose a
-  // matching `proofImg` field populated from `proofPhotoPath`.
-  const [proofUrlCache, setProofUrlCache] = useState({});
-  useEffect(() => {
-    let cancelled = false;
-    const need = guests
-      .filter(g => g.proofPhotoPath && /^proofs\//.test(g.proofPhotoPath))
-      .filter(g => !(g.id in proofUrlCache));
-    if (need.length === 0) return;
-    (async () => {
-      const adds = {};
-      for (const g of need) {
-        try { adds[g.id] = await proofDownloadUrl(g.proofPhotoPath); }
-        catch (err) { logErr("proof.url", err); }
-      }
-      if (!cancelled) setProofUrlCache((prev) => ({ ...prev, ...adds }));
-    })();
-    return () => { cancelled = true; };
-  }, [guests, proofUrlCache]);
-
-  const decoratedGuests = useMemo(
-    () => guests.map((g) => {
-      if (g.proofPhotoPath && /^proofs\//.test(g.proofPhotoPath)) {
-        const url = proofUrlCache[g.id];
-        return { ...g, proofImg: url || g.proofPhotoPath };
-      }
-      if (g.proofPhotoPath && !g.proofImg) return { ...g, proofImg: g.proofPhotoPath };
-      return g;
-    }),
-    [guests, proofUrlCache],
-  );
+  // ── Proof-photo URL bridge ──────────────────────────────────────────────────
+  const { decoratedGuests } = usePortalProofs({ guests });
 
   return {
     // passthrough
