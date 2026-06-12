@@ -86,7 +86,7 @@ function drawCover(
  * @param guestName  the per-link guest name, drawn over the card so the
  *                   WhatsApp preview is personalised to whoever received it.
  */
-export async function renderOgImage(design: DesignLike | null, guestName = ""): Promise<Buffer> {
+async function renderOgImage(design: DesignLike | null, guestName = ""): Promise<Buffer> {
   ensureFonts();
   const lang = "ar";
   const groom = localize(design?.groomDisplayName, lang);

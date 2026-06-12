@@ -30,7 +30,7 @@ const MAX_SIDE_PX = 2048;
  * photographer VIDEOS; a still image this large would decode to an RGBA
  * buffer several times bigger and risk the 2 GiB function limit.
  */
-export const MAX_DECODE_BYTES = 80 * 1024 * 1024;
+const MAX_DECODE_BYTES = 80 * 1024 * 1024;
 
 /** SSD MobileNet minimum confidence — favors recall on crowded shots. */
 const MIN_CONFIDENCE = 0.4;
