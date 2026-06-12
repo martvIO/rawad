@@ -1,4 +1,4 @@
-// Seed helper — thin wrapper over the existing scripts/seed-emulator.cjs.
+// Seed helper — thin wrapper over the existing backend/scripts/seed-emulator.cjs.
 // Creates the three test accounts (admin/groom/driver) plus minimal guest
 // records and a driver→groom assignment. Safe to call repeatedly; the
 // underlying script is idempotent.
@@ -6,7 +6,8 @@
 import { spawn } from "node:child_process";
 import { resolve } from "node:path";
 
-const SCRIPT = resolve(process.cwd(), "scripts/seed-emulator.cjs");
+// Playwright runs with cwd = frontend/; the seed script lives in backend/.
+const SCRIPT = resolve(process.cwd(), "../backend/scripts/seed-emulator.cjs");
 
 export const TEST_USERS = {
   admin:  { username: "admin",  password: "Admin1234"  },
