@@ -22,7 +22,7 @@ const path  = require("path");
 
 const BASE       = "https://justadudewhohacks.github.io/face-api.js/models/";
 const OUT        = path.join(__dirname, "..", "public", "models");
-const SERVER_OUT = path.join(__dirname, "..", "functions", "models");
+const SERVER_OUT = path.join(__dirname, "..", "..", "functions", "models");
 
 const FILES = [
   // tiny face detector

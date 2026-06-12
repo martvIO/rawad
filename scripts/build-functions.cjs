@@ -36,7 +36,7 @@ execSync(`"${tsc}" -p tsconfig.json`, {
 // it at runtime to inject Open Graph tags. Only copy if dist exists — when
 // deploying only functions (without a fresh hosting build), the previously
 // bundled copy stays valid.
-const distHtml = path.join(projectRoot, "dist", "index.html");
+const distHtml = path.join(projectRoot, "frontend", "dist", "index.html");
 const bundledHtmlDir  = path.join(functionsDir, "lib");
 const bundledHtmlPath = path.join(bundledHtmlDir, "index.html");
 if (existsSync(distHtml)) {

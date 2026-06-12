@@ -13,6 +13,8 @@
 #   VITE_FIREBASE_APP_ID
 
 [build]
+  # The Vite app lives in frontend/ — install, build, and publish relative to it.
+  base     = "frontend"
   command  = "npm run build"
   publish  = "dist"
 

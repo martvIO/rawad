@@ -10,7 +10,9 @@ const vitePkg = pathToFileURL(
 
 (async () => {
   const { build } = await import(vitePkg);
-  await build();
+  // firebase-tools invokes this from the repo root — point Vite at frontend/
+  // explicitly instead of relying on process.cwd().
+  await build({ root: path.join(__dirname, "..") });
 })().catch((err) => {
   console.error(err);
   process.exit(1);

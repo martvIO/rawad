@@ -1,0 +1,35 @@
+{
+  "name": "dawa-frontend",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "دعوة — wedding-invitation distribution app (Vite React frontend)",
+  "scripts": {
+    "dev": "vite",
+    "dev:emulator": "cross-env VITE_API_BASE_URL=http://127.0.0.1:5001/dawa-aa793/us-central1/api VITE_USE_EMULATORS=1 vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test:unit": "vitest run --project unit",
+    "test:unit:watch": "vitest --project unit",
+    "test:coverage": "vitest run --project unit --coverage",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:report": "playwright show-report"
+  },
+  "dependencies": {
+    "face-api.js": "^0.22.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^7.15.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.60.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "@vitest/coverage-v8": "^4.1.7",
+    "cross-env": "^10.1.0",
+    "jsdom": "^29.1.1",
+    "vite": "^5.4.11",
+    "vitest": "^4.1.6"
+  }
+}
