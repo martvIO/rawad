@@ -13,6 +13,13 @@ vi.mock("../../utils/tokenManager.js", () => ({
   setAuthClearedCallback: vi.fn(),
 }));
 
+// Pin the API base so assertions don't depend on whatever VITE_API_BASE_URL
+// happens to be in the developer's .env (vitest loads it like Vite does).
+vi.mock("../../config/index.js", async (importOriginal) => {
+  const actual = await importOriginal();
+  return { ...actual, API_BASE_URL: "/api" };
+});
+
 import { api, ApiError, buildApiUrl, setAuthChangeCallback } from "../../utils/apiClient.js";
 import * as tokenMgr from "../../utils/tokenManager.js";
 
