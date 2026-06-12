@@ -524,7 +524,6 @@ export const ar = {
   // ── Digital invitation (cinematic redesign) ────────────────────────
   inv_envelope_seal: "افتح المغلف",
   inv_envelope_hint: "اضغط على الختم لفتح الدعوة",
-  inv_envelope_skip: "تخطّي الافتتاح",
   inv_hero_eyebrow: "بكل فخر ندعوكم",
   inv_hero_join: "لمشاركتنا فرحتنا",
   inv_section_story: "قصتنا",

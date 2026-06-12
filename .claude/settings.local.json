@@ -1,5 +1,4 @@
 {
-  "defaultMode": "plan",
   "permissions": {
     "allow": [
       "PowerShell($bytes = [System.IO.File]::ReadAllBytes\\(\"App \\(1\\).jsx\"\\); \"First 3 bytes: $\\($bytes[0]\\) $\\($bytes[1]\\) $\\($bytes[2]\\)\"; $content = [System.IO.File]::ReadAllText\\(\"App \\(1\\).jsx\"\\); \"Total chars: $\\($content.Length\\)\"; \"Line 9 sample: \" + \\($content -split \"`n\"\\)[8].Substring\\(0,40\\))",
@@ -20,8 +19,6 @@
       "Bash(Select-Object -First 20)",
       "Bash(Format-Table FullName)",
       "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\rwadh\\\\OneDrive\\\\Desktop\\\\DAWA\\\\rawad\\\\src\\\\pages\" -Recurse)",
-      "Bash*",
-      "PowerShell*",
       "Bash(taskkill //F //IM node.exe)",
       "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\rwadh\\\\OneDrive\\\\Desktop\\\\DAWA\\\\rawad\\\\functions\\\\src\" -Recurse -Filter \"*.ts\" -o Name)",
       "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\rwadh\\\\OneDrive\\\\Desktop\\\\DAWA\\\\rawad\\\\src\" -Recurse -Filter \"*.js\" -Exclude \"*node_modules*\")",
@@ -49,14 +46,11 @@
       "Bash(bash \"C:/Users/martv/.claude/skills/wiki-brain/hooks/session-start.sh\")",
       "Bash(python3 -c \"import json; print\\(json.load\\(open\\('/c/Users/martv/.claude/skills/wiki-brain/config.json'\\)\\).get\\('vaultPath',''\\)\\)\")",
       "Bash(python3 -c \"import json; print\\(json.load\\(open\\('C:/Users/martv/.claude/skills/wiki-brain/config.json'\\)\\).get\\('vaultPath',''\\)\\)\")",
-      "Bash(graphify query *)"
+      "Bash(graphify query *)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:api.github.com)",
+      "PowerShell(npm install *)"
     ]
-  },
-  "mcpServers": {
-    "playwright": {
-      "command": "npx",
-      "args": ["@playwright/mcp@latest"]
-    }
   },
   "hooks": {
     "SessionStart": [
@@ -78,11 +72,23 @@
           {
             "type": "command",
             "command": "bash .claude/hooks/session-end.sh",
-            "statusMessage": "Building + deploying to Firebase...",
-            "timeout": 600
+            "timeout": 600,
+            "statusMessage": "Building + deploying to Firebase..."
           }
         ]
       }
     ]
+  },
+  "defaultMode": "plan",
+  "mcpServers": {
+    "playwright": {
+      "command": "npx",
+      "args": [
+        "@playwright/mcp@latest"
+      ]
+    }
+  },
+  "enabledPlugins": {
+    "ui-ux-pro-max@ui-ux-pro-max-skill": true
   }
 }

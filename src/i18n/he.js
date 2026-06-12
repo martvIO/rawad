@@ -514,7 +514,6 @@ export const he = {
   // ── Digital invitation (cinematic redesign) ────────────────────────
   inv_envelope_seal: "פתח את המעטפה",
   inv_envelope_hint: "לחץ על החותם לפתיחה",
-  inv_envelope_skip: "דלג על הפתיחה",
   inv_hero_eyebrow: "בגאווה מזמינים אתכם",
   inv_hero_join: "לחגוג איתנו",
   inv_section_story: "הסיפור שלנו",
