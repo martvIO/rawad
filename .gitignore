@@ -24,3 +24,9 @@ serviceAccountKey.json
 /functions/tsconfig.tsbuildinfo
 /postman
 /.playwright-mcp/*
+
+# Test artifacts
+playwright-report/
+e2e-results/
+test-results/
+/*.png
