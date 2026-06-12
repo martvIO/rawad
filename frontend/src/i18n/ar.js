@@ -556,4 +556,39 @@ export const ar = {
   inv_loading: "جاري التحميل...",
   inv_invalid: "رابط غير صالح",
   inv_expired: "انتهت صلاحية الرابط",
+
+  // ── List search + filter (SearchBar / FilterChips on every list view) ──
+  search_placeholder: "بحث…",
+  search_no_results: "لا توجد نتائج مطابقة",
+  filter_all: "الكل",
+  search_guests_placeholder: "ابحث بالاسم أو الهاتف أو المنطقة…",
+  search_users_placeholder: "ابحث باسم المستخدم أو الهاتف…",
+  search_confirmations_placeholder: "ابحث بالاسم أو الهاتف أو البلدة…",
+  search_designs_placeholder: "ابحث بالعنوان أو العريس أو القاعة…",
+  search_files_placeholder: "ابحث باسم الملف…",
+  search_messages_placeholder: "ابحث بالاسم أو الرسالة…",
+  // chip labels — delivery status
+  chip_pending: "بانتظار",
+  chip_enroute: "في الطريق",
+  chip_delivered: "تم التسليم",
+  // chip labels — RSVP / digital guests
+  chip_attending: "سيحضر",
+  chip_absent: "لن يحضر",
+  // chip labels — confirmation match
+  chip_matched: "متطابق",
+  chip_mismatch: "مختلف",
+  chip_unknown: "مجهول",
+  // chip labels — design status
+  chip_design_pending: "بانتظار الموافقة",
+  chip_design_approved: "معتمد",
+  chip_design_rejected: "مرفوض",
+  chip_design_draft: "مسودة",
+  // chip labels — file type
+  chip_files_images: "صور",
+  chip_files_videos: "فيديو",
+  chip_files_other: "أخرى",
+  // chip labels — user role
+  chip_role_groom: "العرسان",
+  chip_role_driver: "المرسلين",
+  chip_role_admin: "الأدمن",
 };

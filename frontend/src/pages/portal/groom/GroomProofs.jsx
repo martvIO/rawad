@@ -2,13 +2,31 @@
 import { usePortal } from "../../../context/PortalContext.jsx";
 import { C } from "../../../styles/theme.js";
 import { Num } from "../../../components/Num.jsx";
+import { useListFilter } from "../../../utils/searchFilter.js";
+import { SearchBar } from "../../../components/SearchBar.jsx";
+
+// Module-level field specs so useListFilter's memoization holds (stable identity).
+const PROOFS_FIELDS = ["name", "area"];
+const PROOFS_PHONE = [];
 
 export function GroomProofs() {
-  const { t, myGuests, setViewingPhoto } = usePortal();
+  const { t, lang, myGuests, setViewingPhoto } = usePortal();
+  const withProof = myGuests.filter(g => g.proofImg);
+  const { query, setQuery, filtered } = useListFilter(withProof, {
+    fields: PROOFS_FIELDS,
+    phoneFields: PROOFS_PHONE,
+    lang,
+  });
   return (
           <div style={{ animation: "fadeUp .3s ease" }}>
             <div style={{ marginBottom: 14, fontSize: 15, fontWeight: 800, color: C.goldLight }}>{t("proofs_title")}</div>
-            {myGuests.filter(g => g.proofImg).map(g => {
+            <SearchBar value={query} onChange={setQuery} lang={lang}
+                       placeholder={t("search_guests_placeholder")}
+                       resultCount={filtered.length} totalCount={withProof.length} />
+            {query.trim() && filtered.length === 0 && (
+              <div className="card" style={{ textAlign: "center", padding: 24, color: C.dim }}>{t("search_no_results")}</div>
+            )}
+            {filtered.map(g => {
               const isImageData = typeof g.proofImg === "string"
                 && (g.proofImg.startsWith("data:image") || /^https?:\/\//.test(g.proofImg));
               return (

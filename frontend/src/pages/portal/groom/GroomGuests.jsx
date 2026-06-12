@@ -4,6 +4,14 @@ import { STATUS, REPLY_STATUS, replyStateOf } from "../../../data/status.js";
 import { usePortal } from "../../../context/PortalContext.jsx";
 import { C } from "../../../styles/theme.js";
 import { Num } from "../../../components/Num.jsx";
+import { useListFilter } from "../../../utils/searchFilter.js";
+import { SearchBar } from "../../../components/SearchBar.jsx";
+import { FilterChips } from "../../../components/FilterChips.jsx";
+
+// Stable identities for the search/filter hook's memoization (module level).
+const GUESTS_FIELDS = ["name", "area"];
+const GUESTS_PHONE = ["phone"];
+const guestsStatusOf = (g) => g.status;
 
 export function GroomGuests() {
   const navigate = useNavigate();
@@ -11,6 +19,19 @@ export function GroomGuests() {
     t, lang, myGuests,
     revealedId, setRevealedId, swipeStartRef, removeGuest, startEdit,
   } = usePortal();
+
+  // Search + delivery-status filter (delivery status: pending | enroute | delivered).
+  const guestsStatuses = [
+    { key: "pending",   label: t("chip_pending") },
+    { key: "enroute",   label: t("chip_enroute") },
+    { key: "delivered", label: t("chip_delivered") },
+  ];
+  const { query, setQuery, activeStatus, setActiveStatus, filtered, chips } =
+    useListFilter(myGuests, {
+      fields: GUESTS_FIELDS, phoneFields: GUESTS_PHONE, lang,
+      statusOf: guestsStatusOf, statuses: guestsStatuses, allLabel: t("filter_all"),
+    });
+
   return (
           <div style={{ animation: "fadeUp .3s ease" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
@@ -30,10 +51,29 @@ export function GroomGuests() {
               {lang === "he" ? "💡 החלק את הכרטיס ימינה או לחץ על «←» כדי להסיר מוזמן" : "💡 اسحب البطاقة لليمين أو اضغط «←» لإزالة المعزوم"}
             </div>
 
+            {myGuests.length > 0 && (
+              <>
+                <SearchBar
+                  value={query} onChange={setQuery} lang={lang}
+                  placeholder={t("search_guests_placeholder")}
+                  resultCount={filtered.length} totalCount={myGuests.length}
+                />
+                {chips.length > 0 && (
+                  <FilterChips options={chips} value={activeStatus} onChange={setActiveStatus} lang={lang} />
+                )}
+              </>
+            )}
+
+            {query.trim() && filtered.length === 0 && (
+              <div className="card" style={{ textAlign: "center", padding: 24, color: C.dim }}>
+                {t("search_no_results")}
+              </div>
+            )}
+
             {(() => {
-              // Split myGuests into "without address" and "with address" groups
-              const withoutAddr = myGuests.filter(g => !g.area || !g.area.trim());
-              const withAddr    = myGuests.filter(g =>  g.area &&  g.area.trim());
+              // Split the filtered guests into "without address" and "with address" groups
+              const withoutAddr = filtered.filter(g => !g.area || !g.area.trim());
+              const withAddr    = filtered.filter(g =>  g.area &&  g.area.trim());
 
               // Shared card renderer (DRY — same card used in both sections)
               const renderCard = (g) => {

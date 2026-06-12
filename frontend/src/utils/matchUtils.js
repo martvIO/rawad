@@ -46,7 +46,9 @@ export function phonesEqual(a, b) {
 // Lowercase, strip diacritics (Arabic tashkeel + Latin accents), collapse
 // whitespace, and remove punctuation. Conservative — preserves Arabic/Hebrew
 // letters, only cleans the noise that causes false negatives.
-function normalizeText(s) {
+// Exported so the list-search helper (utils/searchFilter.js) folds query and
+// data identically to the confirmation-matching engine — one source of truth.
+export function normalizeText(s) {
   if (!s) return "";
   let out = String(s).toLowerCase().trim();
   // Strip Latin combining marks (é → e)

@@ -4,6 +4,11 @@ import { LiveMap } from "../../../components/LiveMap.jsx";
 import { usePortal } from "../../../context/PortalContext.jsx";
 import { C } from "../../../styles/theme.js";
 import { Num } from "../../../components/Num.jsx";
+import { useListFilter } from "../../../utils/searchFilter.js";
+import { SearchBar } from "../../../components/SearchBar.jsx";
+
+// Stable module-level field spec for the recent-deliveries search (see useListFilter).
+const DELIVERIES_FIELDS = ["name", "area"];
 
 export function GroomDashboard() {
   const navigate = useNavigate();
@@ -11,6 +16,14 @@ export function GroomDashboard() {
     t, lang, stats, myGuests, setViewingPhoto,
     groomCoords, groomMapMarkers, driversSharingWithMe,
   } = usePortal();
+
+  // Recent-deliveries list = the already-delivered subset of myGuests. Stats
+  // tiles + progress stay on the FULL myGuests; only this list is searchable.
+  const deliveredGuests = myGuests.filter(g => g.status === "delivered");
+  const { query, setQuery, filtered } = useListFilter(deliveredGuests, {
+    fields: DELIVERIES_FIELDS, lang,
+  });
+
   return (
           <div style={{ animation: "fadeUp .3s ease" }}>
             <div style={{ marginBottom: 20 }}>
@@ -103,12 +116,27 @@ export function GroomDashboard() {
             </div>
 
             <div style={{ fontSize: 13, color: C.dim, fontWeight: 700, marginBottom: 12 }}>{t("last_deliveries")}</div>
-            {myGuests.filter(g => g.status === "delivered").length === 0 && (
+            {deliveredGuests.length > 0 && (
+              <SearchBar
+                value={query}
+                onChange={setQuery}
+                lang={lang}
+                placeholder={t("search_guests_placeholder")}
+                resultCount={filtered.length}
+                totalCount={deliveredGuests.length}
+              />
+            )}
+            {deliveredGuests.length === 0 && (
               <div className="card" style={{ marginBottom: 10, textAlign: "center", color: C.dim, fontSize: 12, padding: "16px 12px" }}>
                 {lang === "he" ? "אין מסירות עדיין" : "لا توجد تسليمات بعد"}
               </div>
             )}
-            {myGuests.filter(g => g.status === "delivered").map(g => {
+            {deliveredGuests.length > 0 && query.trim() && filtered.length === 0 && (
+              <div className="card" style={{ textAlign: "center", padding: 24, color: C.dim }}>
+                {t("search_no_results")}
+              </div>
+            )}
+            {filtered.map(g => {
               const isImg = typeof g.proofImg === "string" && g.proofImg.startsWith("data:image");
               return (
                 <div key={g.id} className="card" style={{ marginBottom: 10, display: "flex", gap: 12, alignItems: "center" }}>

@@ -10,6 +10,9 @@ import {
 import { logErr } from "../../../../utils/logger.js";
 import { C } from "../../../../styles/theme.js";
 import { Num } from "../../../../components/Num.jsx";
+import { useListFilter } from "../../../../utils/searchFilter.js";
+import { SearchBar } from "../../../../components/SearchBar.jsx";
+import { FilterChips } from "../../../../components/FilterChips.jsx";
 
 // Groom-facing design label (localized { ar, he } or plain string).
 function designTitle(d, lang) {
@@ -35,8 +38,13 @@ const STATUS_CFG = {
 };
 const CYCLE = ["pending", "attending", "absent"];
 
+// ── Search/filter specs (module-level for stable identity — see useListFilter) ──
+const GUEST_FIELDS = ["name", (g) => g.ranks, (g) => g.rank];
+const GUEST_PHONE  = ["phone"];
+const guestStatusOf = (g) => g.status;
+
 export function DigitalGuests() {
-  const { lang, currentUid, showToast } = usePortal();
+  const { t, lang, currentUid, showToast } = usePortal();
   const navigate  = useNavigate();
   const location  = useLocation();
   const [guests,         setGuests]         = useState([]);
@@ -164,6 +172,18 @@ export function DigitalGuests() {
     }
   };
 
+  // ── Search + RSVP-status filter ───────────────────────────────────────────────
+  const guestStatuses = [
+    { key: "pending",   label: t("chip_pending")   },
+    { key: "attending", label: t("chip_attending") },
+    { key: "absent",    label: t("chip_absent")    },
+  ];
+  const { query, setQuery, activeStatus, setActiveStatus, filtered, chips } =
+    useListFilter(guests, {
+      fields: GUEST_FIELDS, phoneFields: GUEST_PHONE, lang,
+      statusOf: guestStatusOf, statuses: guestStatuses, allLabel: t("filter_all"),
+    });
+
   // ── Render ────────────────────────────────────────────────────────────────────
   return (
     <div style={{ animation: "fadeUp .3s ease" }}>
@@ -186,13 +206,32 @@ export function DigitalGuests() {
           : "💡 انقر على الحالة لتغييرها · اضغط «←» للحذف"}
       </div>
 
+      {/* Search + RSVP-status filter — only meaningful once there are guests */}
+      {guests.length > 0 && (
+        <>
+          <SearchBar value={query} onChange={setQuery} lang={lang}
+                     placeholder={t("search_guests_placeholder")}
+                     resultCount={filtered.length} totalCount={guests.length} />
+          {chips.length > 0 && (
+            <FilterChips options={chips} value={activeStatus} onChange={setActiveStatus} lang={lang} />
+          )}
+        </>
+      )}
+
       {guests.length === 0 && (
         <div className="card" style={{ textAlign: "center", padding: 32, color: C.dim }}>
           {lang === "he" ? "אין מוזמנים עדיין — הוסף מוזמן ראשון" : "لا يوجد مدعوون بعد — أضف أول مدعو"}
         </div>
       )}
 
-      {guests.map(g => {
+      {/* No-results notice — guests exist but the search/filter excluded them all */}
+      {guests.length > 0 && filtered.length === 0 && (
+        <div className="card" style={{ textAlign: "center", padding: 24, color: C.dim }}>
+          {t("search_no_results")}
+        </div>
+      )}
+
+      {filtered.map(g => {
         const sc        = STATUS_CFG[g.status] || STATUS_CFG.pending;
         const isEditing  = editingId  === g.id;
         const isRevealed = revealedId === g.id;

@@ -13,8 +13,19 @@ import { C } from "../../../../styles/theme.js";
 import { Num } from "../../../../components/Num.jsx";
 import { getStoredUid } from "../../../../utils/tokenManager.js";
 import { SkeletonList } from "../../../../components/Skeleton.jsx";
+import { useListFilter } from "../../../../utils/searchFilter.js";
+import { SearchBar } from "../../../../components/SearchBar.jsx";
+import { FilterChips } from "../../../../components/FilterChips.jsx";
 
 const cacheKey = (uid) => `dawa_photographer_${uid}`;
+
+// Search + file-type chip config — module-level so the hook's memos hold.
+const FILES_FIELDS = ["name"];
+const FILES_PHONE = [];
+const filesStatusOf = (f) => {
+  const ty = String(f.type || "");
+  return ty.startsWith("image/") ? "images" : ty.startsWith("video/") ? "videos" : "other";
+};
 
 // Mirror of MAX_PHOTOG_BYTES on the server (functions/src/constants/limits.ts).
 // 200 MB ceiling matches the multipart parser limit.
@@ -38,7 +49,7 @@ const fmtDate = (ts, lang) => {
 };
 
 export function DigitalPhotographer() {
-  const { lang, currentUid, showToast } = usePortal();
+  const { t, lang, currentUid, showToast } = usePortal();
   const [files,      setFiles]      = useState([]);
   // Storage-listed files (authoritative for "what exists"). Firestore docs are
   // an optional metadata layer joined to these via storagePath.
@@ -307,6 +318,19 @@ export function DigitalPhotographer() {
     ...pendingFiles.filter(p => !realNames.has(p.name)),
   ];
 
+  // ── Search + file-type filter (runs on the full displayList; the rendered
+  // list maps over `filtered`, the file-count line keeps the full total). ──
+  const filesStatuses = [
+    { key: "images", label: t("chip_files_images") },
+    { key: "videos", label: t("chip_files_videos") },
+    { key: "other",  label: t("chip_files_other") },
+  ];
+  const { query, setQuery, activeStatus, setActiveStatus, filtered, chips } =
+    useListFilter(displayList, {
+      fields: FILES_FIELDS, phoneFields: FILES_PHONE, lang,
+      statusOf: filesStatusOf, statuses: filesStatuses, allLabel: t("filter_all"),
+    });
+
   return (
     <div style={{ animation: "fadeUp .3s ease" }}>
 
@@ -411,6 +435,20 @@ export function DigitalPhotographer() {
         {lang === "he" ? "קבצים שהועלו" : "الملفات المرفوعة"} (<Num>{displayList.length.toLocaleString("en")}</Num>)
       </div>
 
+      {/* ── Search + file-type filter ──────────────────────────────────── */}
+      {displayList.length > 0 && (
+        <>
+          <SearchBar
+            value={query} onChange={setQuery} lang={lang}
+            placeholder={t("search_files_placeholder")}
+            resultCount={filtered.length} totalCount={displayList.length}
+          />
+          {chips.length > 0 && (
+            <FilterChips options={chips} value={activeStatus} onChange={setActiveStatus} lang={lang} />
+          )}
+        </>
+      )}
+
       {displayList.length === 0 ? (
         loadingStorage ? (
           <SkeletonList count={3}/>
@@ -421,8 +459,12 @@ export function DigitalPhotographer() {
               : "لا يوجد ملفات بعد — ارفع صور وفيديوهات من الحفل"}
           </div>
         )
+      ) : filtered.length === 0 ? (
+        <div className="card" style={{ textAlign: "center", padding: 24, color: C.dim }}>
+          {t("search_no_results")}
+        </div>
       ) : (
-        displayList.map(f => {
+        filtered.map(f => {
           const isDeleting = deletingId === f.id;
           const isPending  = !!f.pending;
           const isImage    = f.type?.startsWith("image");

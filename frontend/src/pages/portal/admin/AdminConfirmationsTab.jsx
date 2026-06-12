@@ -7,6 +7,16 @@ import { C } from "../../../styles/theme.js";
 import { Num } from "../../../components/Num.jsx";
 import { formatAddress, googleMapsLinkCoords } from "../../../utils/geo.js";
 import { MATCH_STATUS } from "../../../constants/matchStatuses.js";
+import { useListFilter } from "../../../utils/searchFilter.js";
+import { SearchBar } from "../../../components/SearchBar.jsx";
+import { FilterChips } from "../../../components/FilterChips.jsx";
+
+// Search field specs + chip status mapping — MODULE LEVEL for stable identity so
+// useListFilter's memos hold. statusOf reads a `_matchKey` we stamp onto each
+// scoped confirmation (matchColor lives in render scope, so we can't call it here).
+const CONF_FIELDS = ["submittedName", "submittedCity"];
+const CONF_PHONE = ["submittedPhone"];
+const confStatusOf = (c) => c?._matchKey ?? null;
 
 export function AdminConfirmationsTab() {
   const {
@@ -25,9 +35,33 @@ export function AdminConfirmationsTab() {
   // Every confirmation — matched, mismatch, AND unknown — is scoped to the groom
   // whose confirmation form was used (each record carries groomUid). So an
   // unknown reply submitted to one groom never shows under another groom.
-  const matched  = confirmations.filter(c => matchColor(c) === MATCH_STATUS.GREEN && forGroom(c));
-  const mismatch = confirmations.filter(c => matchColor(c) === MATCH_STATUS.RED && forGroom(c));
-  const unknown  = confirmations.filter(c => matchColor(c) === MATCH_STATUS.UNKNOWN && forGroom(c));
+  // Stamp each scoped record with its match key so the module-level confStatusOf
+  // (and the chip filter) can read it without calling the render-scoped matchColor.
+  const MATCH_KEY = {
+    [MATCH_STATUS.GREEN]: "matched",
+    [MATCH_STATUS.RED]: "mismatch",
+    [MATCH_STATUS.UNKNOWN]: "unknown",
+  };
+  const groomConfirmations = confirmations
+    .filter(forGroom)
+    .map(c => ({ ...c, _matchKey: MATCH_KEY[matchColor(c)] ?? null }));
+
+  // Search + match-status chips run on the groom-scoped array (composes with the
+  // groom selector). `filtered` then feeds the three section splits below.
+  const confStatuses = [
+    { key: "matched",  label: t("chip_matched") },
+    { key: "mismatch", label: t("chip_mismatch") },
+    { key: "unknown",  label: t("chip_unknown") },
+  ];
+  const { query, setQuery, activeStatus, setActiveStatus, filtered, chips } =
+    useListFilter(groomConfirmations, {
+      fields: CONF_FIELDS, phoneFields: CONF_PHONE, lang,
+      statusOf: confStatusOf, statuses: confStatuses, allLabel: t("filter_all"),
+    });
+
+  const matched  = filtered.filter(c => c._matchKey === "matched");
+  const mismatch = filtered.filter(c => c._matchKey === "mismatch");
+  const unknown  = filtered.filter(c => c._matchKey === "unknown");
   // Declined / "can't come" — digital guests of the selected groom marked absent.
   const declined = adminSelectedGroom
     ? (digitalGuestsForSelectedGroom || []).filter(g => g.status === "absent")
@@ -221,12 +255,30 @@ export function AdminConfirmationsTab() {
         <div className="card" style={{ textAlign: "center", padding: 32, color: C.dim }}>
           {lang === "he" ? "בחר חתן כדי להציג את אישוריו" : "اختر عريساً لعرض تأكيداته"}
         </div>
-      ) : (matched.length + mismatch.length + unknown.length + declined.length === 0) ? (
+      ) : (groomConfirmations.length + declined.length === 0) ? (
         <div className="card" style={{ textAlign: "center", padding: 32, color: C.dim }}>
           {t("admin_conf_empty")}
         </div>
       ) : (
         <>
+          {/* Search + match-status chips run on this groom's confirmations only. */}
+          {groomConfirmations.length > 0 && (
+            <>
+              <SearchBar
+                value={query} onChange={setQuery} lang={lang}
+                placeholder={t("search_confirmations_placeholder")}
+                resultCount={filtered.length} totalCount={groomConfirmations.length}
+              />
+              {chips.length > 0 && (
+                <FilterChips options={chips} value={activeStatus} onChange={setActiveStatus} lang={lang} />
+              )}
+            </>
+          )}
+          {query.trim() && filtered.length === 0 && (
+            <div className="card" style={{ textAlign: "center", padding: 24, color: C.dim }}>
+              {t("search_no_results")}
+            </div>
+          )}
           {matched.length > 0 && (
             <div style={{ marginBottom: 18 }}>
               <div style={{ fontSize: 13, color: "#4cc97a", fontWeight: 700, marginBottom: 10 }}>

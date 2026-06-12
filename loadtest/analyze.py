@@ -23,6 +23,7 @@ Charts produced (saved to <out-dir>/*.png):
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sys
 
@@ -218,34 +219,60 @@ def chart_endpoint_latency(stats: pd.DataFrame, out_dir: str, plt):
 #  Verdict
 # ════════════════════════════════════════════════════════════════════════════
 def verdict(stages: pd.DataFrame, stats: pd.DataFrame, breakdown: pd.DataFrame | None,
-            ttfb: pd.DataFrame | None):
+            ttfb: pd.DataFrame | None, p95_ms: float = P95_MS,
+            error_rate_max: float = ERROR_RATE_MAX) -> dict:
+    """Build the machine-readable verdict dict, print the human report, return the dict.
+
+    The returned dict matches verdict.json's shape exactly (see analyze.py's CLI
+    --json flag and the dashboard's shared interface).
+    """
+    out = {
+        "slo": {"p95_ms": p95_ms, "error_rate_max": error_rate_max},
+        "slo_pass": False,
+        "stages": [],
+        "healthy_max_users": None,
+        "degrade_at": None,
+        "slowest_endpoints": [],
+        "genuine_failures": [],
+        "rate_limited_429": {"count": 0, "pct": 0.0},
+    }
+
     print("\n" + "=" * 72)
     print("  VERDICT - how well dawa.to held up")
     print("=" * 72)
     if stages.empty:
         print("  No aggregated history rows found - cannot judge. Did the run complete?")
-        return
+        return out
 
     has_p95 = "p95" in stages.columns
-    healthy = stages[(stages.get("p95", 0) <= P95_MS) & (stages["error_rate"] <= ERROR_RATE_MAX)] \
-        if has_p95 else stages[stages["error_rate"] <= ERROR_RATE_MAX]
 
-    print(f"\n  SLO: p95 < {int(P95_MS)} ms AND genuine error rate < {ERROR_RATE_MAX*100:.1f}% "
+    print(f"\n  SLO: p95 < {int(p95_ms)} ms AND genuine error rate < {error_rate_max*100:.1f}% "
           f"(intentional 429 rate-limits excluded).\n")
-    # Per-stage one-liners.
+    # Per-stage one-liners (and build the JSON stages list).
     print(f"  {'users':>6} {'req/s':>8} {'p95 ms':>8} {'err %':>7}   status")
     degrade_at = None
     for _, r in stages.iterrows():
         p95 = r.get("p95", float("nan"))
-        ok = (not has_p95 or p95 <= P95_MS) and r["error_rate"] <= ERROR_RATE_MAX
+        ok = (not has_p95 or p95 <= p95_ms) and r["error_rate"] <= error_rate_max
         if not ok and degrade_at is None:
             degrade_at = int(r["users"])
+        out["stages"].append({
+            "users": int(r["users"]),
+            "rps": float(r["rps"]),
+            "p95": float(p95) if p95 == p95 else None,
+            "error_rate": float(r["error_rate"]),
+            "healthy": bool(ok),
+        })
         print(f"  {int(r['users']):>6} {r['rps']:>8.1f} "
               f"{(p95 if p95 == p95 else 0):>8.0f} {r['error_rate']*100:>6.2f}%   "
               f"{'healthy' if ok else 'DEGRADED'}")
 
-    if not healthy.empty:
-        hmax = int(healthy["users"].max())
+    healthy_users = [s["users"] for s in out["stages"] if s["healthy"]]
+    out["degrade_at"] = degrade_at
+    out["slo_pass"] = bool(healthy_users) and degrade_at is None
+    if healthy_users:
+        hmax = max(healthy_users)
+        out["healthy_max_users"] = hmax
         print(f"\n  [OK] Stays healthy up to ~{hmax} concurrent users.")
     else:
         print("\n  [FAIL] Did not meet the SLO even at the lowest tested level.")
@@ -259,6 +286,7 @@ def verdict(stages: pd.DataFrame, stats: pd.DataFrame, breakdown: pd.DataFrame |
     if not df.empty and "95%" in df.columns:
         df["p95"] = _num(df["95%"])
         worst = df.sort_values("p95", ascending=False).head(3)
+        out["slowest_endpoints"] = [[str(r["Name"]), float(r["p95"])] for _, r in worst.iterrows()]
         print("\n  Slowest endpoints (p95):")
         for _, r in worst.iterrows():
             print(f"    - {r['Name']:<28} {r['p95']:>7.0f} ms")
@@ -273,6 +301,11 @@ def verdict(stages: pd.DataFrame, stats: pd.DataFrame, breakdown: pd.DataFrame |
                 offenders.append((r["Name"], bad, total, bad / total))
         if offenders:
             offenders.sort(key=lambda x: x[3], reverse=True)
+            out["genuine_failures"] = [
+                {"name": str(name), "failures": int(bad), "total": int(total),
+                 "rate": float(rate)}
+                for name, bad, total, rate in offenders[:5]
+            ]
             print("\n  Endpoints with GENUINE failures (5xx / timeout):")
             for name, bad, total, rate in offenders[:5]:
                 print(f"    - {name:<28} {bad}/{total} ({rate*100:.1f}%)")
@@ -281,6 +314,7 @@ def verdict(stages: pd.DataFrame, stats: pd.DataFrame, breakdown: pd.DataFrame |
         # Surface how much of the load the limiter rejected.
         tot_429 = int(_num(breakdown.get("429", pd.Series([0]))).sum())
         tot = int(_num(breakdown.get("Total", pd.Series([0]))).sum()) or 1
+        out["rate_limited_429"] = {"count": tot_429, "pct": float(tot_429 / tot * 100)}
         if tot_429:
             print(f"\n  Rate limiter: {tot_429} responses ({tot_429/tot*100:.1f}% of all) were 429 "
                   f"(expected on the write endpoints from a single IP).")
@@ -291,14 +325,26 @@ def verdict(stages: pd.DataFrame, stats: pd.DataFrame, breakdown: pd.DataFrame |
             print(f"    - {r['Name']:<28} {float(r['P95_ms']):>7.0f} ms  (n={int(r['Samples'])})")
 
     print("\n" + "=" * 72)
+    return out
 
 
 def main():
+    global P95_MS, ERROR_RATE_MAX
     ap = argparse.ArgumentParser(description="Chart + judge the Dawa load test results.")
     ap.add_argument("--prefix", default="out/dawa", help="Locust --csv prefix (default out/dawa)")
     ap.add_argument("--out-dir", default="out", help="where the breakdown CSVs live and PNGs go")
     ap.add_argument("--no-show", action="store_true", help="save PNGs but don't open windows")
+    ap.add_argument("--json", default=None, help="also write the machine-readable verdict to this path")
+    ap.add_argument("--p95-ms", type=float, default=P95_MS,
+                    help=f"p95 latency SLO in ms (default {P95_MS:g})")
+    ap.add_argument("--error-rate-max", type=float, default=ERROR_RATE_MAX,
+                    help=f"max genuine error rate SLO (default {ERROR_RATE_MAX:g})")
     args = ap.parse_args()
+
+    # Charts read the module-level SLO constants; align them with the CLI flags
+    # so the SLO lines on the charts match the verdict.
+    P95_MS = args.p95_ms
+    ERROR_RATE_MAX = args.error_rate_max
 
     # Pick a non-interactive backend when we won't display, so it works headless.
     import matplotlib
@@ -326,7 +372,14 @@ def main():
     chart_errors(history, breakdown, args.out_dir, plt)
     chart_endpoint_latency(stats, args.out_dir, plt)
 
-    verdict(stages, stats, breakdown, ttfb)
+    result = verdict(stages, stats, breakdown, ttfb,
+                     p95_ms=args.p95_ms, error_rate_max=args.error_rate_max)
+
+    if args.json:
+        os.makedirs(os.path.dirname(os.path.abspath(args.json)), exist_ok=True)
+        with open(args.json, "w", encoding="utf-8") as f:
+            json.dump(result, f, indent=2)
+        print(f"\n  wrote verdict JSON -> {args.json}")
 
     if not args.no_show:
         print("\nShowing charts (close the windows to exit) ...")

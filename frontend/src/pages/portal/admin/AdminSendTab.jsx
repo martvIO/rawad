@@ -11,6 +11,9 @@ import { REPLY_STATUS, replyStateOf } from "../../../data/status.js";
 import { subscribeDesigns, assignGuestDesign } from "../../../services/digitalInvitation.js";
 import { localize } from "../../../utils/localize.js";
 import { logErr } from "../../../utils/logger.js";
+import { useListFilter, filterList } from "../../../utils/searchFilter.js";
+import { SearchBar } from "../../../components/SearchBar.jsx";
+import { FilterChips } from "../../../components/FilterChips.jsx";
 
 // Guest ranks may be the new `ranks: string[]` or a legacy single `rank: string`.
 function guestRanks(g) {
@@ -18,6 +21,13 @@ function guestRanks(g) {
   if (g?.rank) return [g.rank];
   return [];
 }
+
+// Search field specs (module-level → stable identity for useListFilter memos).
+// name + area as plain keys; ranks/rank via accessors (string[] handled by the hook).
+const GUEST_FIELDS = ["name", "area", (g) => g.ranks, (g) => g.rank];
+const GUEST_PHONE = ["phone"];
+// Digital guests carry a clean RSVP status — drives the FilterChips.
+const digitalStatusOf = (g) => g.status || "pending";
 
 // Sentinel for the "بدون تصميم" (no design) picker option — send the message
 // with NO invitation link. Client-side only; never persisted onto a guest.
@@ -87,8 +97,6 @@ export function AdminSendTab() {
             // Manual mode splits the list by address; Digital mode shows a single
             // unified list (address is irrelevant for a digital invite link).
             const isDigital = adminMode === "digital";
-            const withoutAddr = selectedGroomGuests.filter(g => !g.area || !g.area.trim());
-            const withAddr    = selectedGroomGuests.filter(g =>  g.area &&  g.area.trim());
             // Digital guests for the selected groom (Firestore-backed, subscribed
             // in usePortalState). Show ALL — confirmed + not — like the physical list.
             const selectedGroomUser = adminSelectedGroom
@@ -96,8 +104,36 @@ export function AdminSendTab() {
             const selectedGroomUid  = selectedGroomUser?.uid || selectedGroomUser?.id || null;
             const digitalGuests = digitalGuestsForSelectedGroom || [];
             const digitalMsg = digitalMsgByGroom[adminSelectedGroom] || "";
+
+            // ── Search + RSVP filter ──────────────────────────────────────────
+            // Digital guests have a clean RSVP status → SearchBar + FilterChips.
+            // Physical guests have no clean status → search-only (filterList),
+            // sharing the SAME query so one box drives both lists.
+            const digitalStatuses = [
+              { key: "pending",   label: t("chip_pending") },
+              { key: "attending", label: t("chip_attending") },
+              { key: "absent",    label: t("chip_absent") },
+            ];
+            const {
+              query, setQuery, activeStatus, setActiveStatus,
+              filtered: filteredDigital, chips,
+            } = useListFilter(digitalGuests, {
+              fields: GUEST_FIELDS, phoneFields: GUEST_PHONE, lang,
+              statusOf: digitalStatusOf, statuses: digitalStatuses, allLabel: t("filter_all"),
+            });
+            // Physical list: same query, search-only (no chips).
+            const filteredPhysical = filterList(selectedGroomGuests, query, {
+              fields: GUEST_FIELDS, phoneFields: GUEST_PHONE, lang,
+            });
+            // Filter BEFORE splitting/grouping so section headers + counts recompute.
+            const withoutAddr = filteredPhysical.filter(g => !g.area || !g.area.trim());
+            const withAddr    = filteredPhysical.filter(g =>  g.area &&  g.area.trim());
+            // True when a search/chip filter is active but nothing in either list matched.
+            const hasFilter   = !!query.trim() || activeStatus !== "all";
+            const noMatches   = hasFilter && filteredPhysical.length === 0 && filteredDigital.length === 0;
             // "Send to all" only messages physical guests who haven't confirmed yet.
-            const unconfirmedGuests = selectedGroomGuests.filter(g => !g.confirmedAt);
+            // Target what's currently shown (the filtered set) so the count + action agree.
+            const unconfirmedGuests = filteredPhysical.filter(g => !g.confirmedAt);
 
             return (
               <div>
@@ -159,6 +195,22 @@ export function AdminSendTab() {
                 {/* Guests of selected groom + send buttons */}
                 {adminSelectedGroom && (
                   <>
+                    {/* Search box (drives both physical + digital lists) + RSVP chips (digital). */}
+                    <SearchBar
+                      value={query}
+                      onChange={setQuery}
+                      lang={lang}
+                      placeholder={t("search_guests_placeholder")}
+                      resultCount={filteredPhysical.length + filteredDigital.length}
+                      totalCount={selectedGroomGuests.length + digitalGuests.length}
+                    />
+                    {/* RSVP chips only make sense for digital guests — hide them in
+                        manual mode (no digital list) so they don't show 0/0/0 above
+                        physical guests. */}
+                    {digitalGuests.length > 0 && chips.length > 0 && (
+                      <FilterChips options={chips} value={activeStatus} onChange={setActiveStatus} lang={lang} />
+                    )}
+
                     {unconfirmedGuests.length > 0 && (
                       <button onClick={() => sendAll(unconfirmedGuests)}
                               style={{
@@ -171,9 +223,16 @@ export function AdminSendTab() {
                       </button>
                     )}
 
-                    {selectedGroomGuests.length === 0 && (
+                    {selectedGroomGuests.length === 0 && digitalGuests.length === 0 && (
                       <div className="card" style={{ textAlign: "center", padding: 24, color: C.dim }}>
                         {t("guests_empty")}
+                      </div>
+                    )}
+
+                    {/* Filter active but nothing matched — distinct from an empty groom. */}
+                    {noMatches && (
+                      <div className="card" style={{ textAlign: "center", padding: 24, color: C.dim }}>
+                        {t("search_no_results")}
                       </div>
                     )}
 
@@ -181,9 +240,9 @@ export function AdminSendTab() {
                       { title: t("guests_without_address"), list: withoutAddr, color: C.red, bg: "rgba(212,122,75,.06)" },
                       { title: t("guests_with_address"),    list: withAddr,    color: "#4cc97a", bg: "rgba(76,201,122,.06)" },
                     ].filter(s => s.list.length > 0).concat(
-                      digitalGuests.length > 0 ? [{
+                      filteredDigital.length > 0 ? [{
                         title: "📱 " + t("admin_digital_guests"),
-                        list: digitalGuests,
+                        list: filteredDigital,
                         color: "#4b9fd4",
                         bg: "rgba(75,159,212,.06)",
                         digital: true,

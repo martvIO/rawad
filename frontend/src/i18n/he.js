@@ -546,4 +546,39 @@ export const he = {
   inv_loading: "טוען...",
   inv_invalid: "קישור לא תקין",
   inv_expired: "הקישור פג תוקף",
+
+  // ── List search + filter (SearchBar / FilterChips on every list view) ──
+  search_placeholder: "חיפוש…",
+  search_no_results: "לא נמצאו תוצאות תואמות",
+  filter_all: "הכל",
+  search_guests_placeholder: "חפש לפי שם, טלפון או אזור…",
+  search_users_placeholder: "חפש לפי שם משתמש או טלפון…",
+  search_confirmations_placeholder: "חפש לפי שם, טלפון או עיר…",
+  search_designs_placeholder: "חפש לפי כותרת, חתן או אולם…",
+  search_files_placeholder: "חפש לפי שם קובץ…",
+  search_messages_placeholder: "חפש לפי שם או הודעה…",
+  // chip labels — delivery status
+  chip_pending: "ממתין",
+  chip_enroute: "בדרך",
+  chip_delivered: "נמסר",
+  // chip labels — RSVP / digital guests
+  chip_attending: "מגיע",
+  chip_absent: "לא מגיע",
+  // chip labels — confirmation match
+  chip_matched: "תואם",
+  chip_mismatch: "שונה",
+  chip_unknown: "לא ידוע",
+  // chip labels — design status
+  chip_design_pending: "ממתין לאישור",
+  chip_design_approved: "מאושר",
+  chip_design_rejected: "נדחה",
+  chip_design_draft: "טיוטה",
+  // chip labels — file type
+  chip_files_images: "תמונות",
+  chip_files_videos: "וידאו",
+  chip_files_other: "אחר",
+  // chip labels — user role
+  chip_role_groom: "חתנים",
+  chip_role_driver: "שליחים",
+  chip_role_admin: "מנהלים",
 };

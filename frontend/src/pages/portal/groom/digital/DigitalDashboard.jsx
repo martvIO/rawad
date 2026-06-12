@@ -41,8 +41,17 @@ import { logErr } from "../../../../utils/logger.js";
 import { C } from "../../../../styles/theme.js";
 import { Num } from "../../../../components/Num.jsx";
 import { getStoredUid } from "../../../../utils/tokenManager.js";
+import { useListFilter } from "../../../../utils/searchFilter.js";
+import { SearchBar } from "../../../../components/SearchBar.jsx";
+import { FilterChips } from "../../../../components/FilterChips.jsx";
 
 const tt = (lang, ar, he) => (lang === "he" ? he : ar);
+
+// Search/filter wiring for the guest-messages list (module-level for stable
+// identity, so useListFilter's memoization holds across renders).
+const MSG_FIELDS = ["name", (g) => g.note];
+const MSG_PHONE = [];
+const msgStatusOf = (g) => g.status;
 
 // Mirror of MAX_INVITE_MEDIA_BYTES on the server (functions/src/constants/limits.ts).
 // Kept in sync manually — keeping a single number out of @dawa/shared isn't worth
@@ -372,6 +381,27 @@ export function DigitalDashboard() {
   // ── Render ───────────────────────────────────────────────────────────────────
   const galleryItems = [...media, ...pendingMedia];
 
+  // ── Guest-messages search + RSVP filter ───────────────────────────────────────
+  // Only guests who actually left a note are in the messages list; run the
+  // shared list-filter over that subset so the SearchBar/FilterChips counts and
+  // the rendered messages stay in sync. (The stats cards above keep using the
+  // full `guests`/`stats` — only this list is filtered.)
+  const messageGuests = guests.filter(g => g.note && g.note.trim());
+  const msgStatuses = [
+    { key: "attending", label: tt(lang, "سيحضر", "מגיע") },
+    { key: "absent",    label: tt(lang, "اعتذر", "התנצל") },
+    { key: "pending",   label: tt(lang, "لم يرد", "טרם ענה") },
+  ];
+  const {
+    query: msgQuery, setQuery: setMsgQuery,
+    activeStatus: msgStatus, setActiveStatus: setMsgStatus,
+    filtered: filteredMessages, chips: msgChips,
+  } = useListFilter(messageGuests, {
+    fields: MSG_FIELDS, phoneFields: MSG_PHONE, lang,
+    statusOf: msgStatusOf, statuses: msgStatuses,
+    allLabel: tt(lang, "الكل", "הכל"),
+  });
+
   return (
     <div style={{ animation: "fadeUp .3s ease" }}>
 
@@ -554,8 +584,21 @@ export function DigitalDashboard() {
           <div style={{ fontSize: 13, color: C.goldDim, fontWeight: 700, marginBottom: 12 }}>
             💌 {tt(lang, "رسائل المعزومين للعروسين", "ברכות המוזמנים לזוג")}
           </div>
+
+          <SearchBar value={msgQuery} onChange={setMsgQuery} lang={lang}
+                     placeholder={tt(lang, "ابحث في الرسائل…", "חיפוש בברכות…")}
+                     resultCount={filteredMessages.length} totalCount={messageGuests.length} />
+          {msgChips.length > 0 && (
+            <FilterChips options={msgChips} value={msgStatus} onChange={setMsgStatus} lang={lang} />
+          )}
+
+          {msgQuery.trim() && filteredMessages.length === 0 ? (
+            <div className="card" style={{ textAlign: "center", padding: 24, color: C.dim }}>
+              {tt(lang, "لا توجد نتائج", "אין תוצאות")}
+            </div>
+          ) : (
           <div style={{ display: "grid", gap: 10 }}>
-            {guests.filter(g => g.note && g.note.trim()).map(g => (
+            {filteredMessages.map(g => (
               <div key={g.id} style={{
                 padding: "10px 12px", borderRadius: 10,
                 background: "rgba(255,255,255,.03)", border: "1px solid rgba(201,168,76,.18)",
@@ -569,6 +612,7 @@ export function DigitalDashboard() {
               </div>
             ))}
           </div>
+          )}
           <div style={{ fontSize: 10, color: C.dim, marginTop: 8 }}>
             {tt(lang, "تظهر لك فقط — لا تظهر للمدعوين", "מוצג רק לך — לא למוזמנים")}
           </div>

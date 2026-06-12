@@ -31,6 +31,7 @@ import { assignmentsRouter } from "./routes/assignments";
 import { proofsRouter } from "./routes/proofs";
 import { digitalRouter } from "./routes/digital";
 import { photoFacesRouter } from "./routes/photoFaces";
+import { adminRouter } from "./routes/admin";
 // NOTE: additional routers (users, guests, ...) are mounted as their files
 // are created in subsequent migration steps. The import + app.use lines
 // below are added incrementally.
@@ -89,6 +90,7 @@ app.use("/proofs", proofsRouter);
 // capture the literal "photos" path segment.
 app.use("/digital/photos", photoFacesRouter);
 app.use("/digital", digitalRouter);
+app.use("/admin", adminRouter);
 
 // ─── Health probe ─────────────────────────────────────────────────────────────
 

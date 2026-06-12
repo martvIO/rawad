@@ -50,6 +50,7 @@ except (AttributeError, ValueError):
     pass
 
 import csv
+import json
 import logging
 import os
 import random
@@ -61,6 +62,17 @@ from typing import Optional
 import requests
 from locust import HttpUser, LoadTestShape, between, events, task
 
+# --- Optional run config file (the dashboard's single source of run params) --
+# When LOADTEST_CONFIG_FILE points at a run_config.json, its values become the
+# fallback for every CONFIG constant below. Precedence stays: explicit env var
+# wins, then this _CFG, then the hardcoded literal default. Credentials are NEVER
+# read from here — they only come from env vars. A bad/missing path fails loudly.
+_CFG = {}
+_cfg_path = os.environ.get("LOADTEST_CONFIG_FILE")
+if _cfg_path:
+    with open(_cfg_path, encoding="utf-8") as _f:
+        _CFG = json.load(_f)
+
 # ════════════════════════════════════════════════════════════════════════════
 #  CONFIG  —  edit anything in this block; the logic below reads from here.
 # ════════════════════════════════════════════════════════════════════════════
@@ -69,7 +81,7 @@ from locust import HttpUser, LoadTestShape, between, events, task
 # Production custom domain. The REST API is SAME-ORIGIN under /api (Firebase
 # Hosting rewrites /api/** to the `api` Cloud Function). Page routes (/, /d/...)
 # are served by Hosting/the preview function.
-BASE_URL = os.environ.get("LOADTEST_BASE_URL", "https://dawa.to")
+BASE_URL = os.environ.get("LOADTEST_BASE_URL") or _CFG.get("base_url", "https://dawa.to")
 API_BASE = "/api"
 
 # --- Credentials (used ONLY by the one-time bootstrap to mint a real token) --
@@ -88,23 +100,27 @@ CREDENTIALS = {
 # These are per-IP rate limited (5-10/hr), so from one machine they 429 quickly —
 # that is EXPECTED and is itself a useful measurement of the limiter. Successful
 # writes create real records tagged "LOADTEST" (clean up with: python run.py --cleanup).
-ENABLE_WRITES = os.environ.get("LOADTEST_NO_WRITES") != "1"
+ENABLE_WRITES = (os.environ.get("LOADTEST_NO_WRITES") != "1") if "LOADTEST_NO_WRITES" in os.environ \
+    else bool(_CFG.get("enable_writes", True))
 
 # When True, the bootstrap may force the groom's default design to "approved"
 # (admin override) so the minted digital token carries a full design snapshot and
 # /digital/:uid/public returns a real payload. When False, an unapproved design
 # just makes those reads return null (HTTP 200) — still a valid round trip.
-ALLOW_APPROVE_DESIGN = os.environ.get("LOADTEST_NO_APPROVE") != "1"
+ALLOW_APPROVE_DESIGN = (os.environ.get("LOADTEST_NO_APPROVE") != "1") if "LOADTEST_NO_APPROVE" in os.environ \
+    else bool(_CFG.get("allow_approve_design", True))
 
 # A syntactically-valid (32 hex) token used if the bootstrap can't mint one.
 # It will not exist in the DB, so reads exercise the 404 path instead of the
 # real-payload path. Replace with a known good test token if you have one.
-FALLBACK_TOKEN = os.environ.get("LOADTEST_FALLBACK_TOKEN", "00000000000000000000000000000000")
-FALLBACK_GROOM_USERNAME = os.environ.get("LOADTEST_FALLBACK_GROOM", "groom")
+FALLBACK_TOKEN = os.environ.get("LOADTEST_FALLBACK_TOKEN") \
+    or _CFG.get("fallback_token", "00000000000000000000000000000000")
+FALLBACK_GROOM_USERNAME = os.environ.get("LOADTEST_FALLBACK_GROOM") \
+    or _CFG.get("fallback_groom_username", "groom")
 
 # --- Human think time (seconds) between a user's actions ---------------------
-THINK_MIN = 1.0
-THINK_MAX = 5.0
+THINK_MIN = float(_CFG.get("think_min", 1.0))
+THINK_MAX = float(_CFG.get("think_max", 5.0))
 
 # --- Persona mix (relative weights; need not sum to 100) ---------------------
 # GuestBrowser  : opens a digital invite and reads it (the dominant real traffic)
@@ -112,30 +128,33 @@ THINK_MAX = 5.0
 # RsvpBuyer     : submits an RSVP + a guestbook wish (writes; mostly 409/429)
 # LandingConfirmer: hits the landing page, health probe and public confirm form
 PERSONA_WEIGHTS = {
-    "GuestBrowser": 60,
-    "InvitePoller": 20,
-    "RsvpBuyer": 15,
-    "LandingConfirmer": 5,
+    **{
+        "GuestBrowser": 60,
+        "InvitePoller": 20,
+        "RsvpBuyer": 15,
+        "LandingConfirmer": 5,
+    },
+    **_CFG.get("persona_weights", {}),
 }
 
 # --- Ramp schedule: list of (target_users, hold_seconds, spawn_rate_per_sec) --
 # Each stage ramps to target_users at spawn_rate, then holds for hold_seconds so
 # the percentiles stabilise before the next step. This is where the breaking
 # point shows up. Total run time = sum of hold_seconds (+ ramp time).
-RAMP_STAGES = [
+RAMP_STAGES = [tuple(s) for s in _CFG.get("ramp_stages", [
     (10,   60, 10),
     (50,   60, 25),
     (100,  60, 50),
     (250,  60, 50),
     (500,  90, 75),
     (1000, 120, 100),
-]
+])]
 # Tiny shake-out used by `run.py --smoke` (selected via the LOADTEST_SMOKE env var).
 SMOKE_STAGES = [(5, 15, 5)]
 
 # --- Health thresholds (drive the plain-language verdict) --------------------
-P95_MS = 1000.0          # a stage is "healthy" only if aggregate p95 latency is under this
-ERROR_RATE_MAX = 0.01    # ...and the GENUINE error rate (excludes intentional 429s) is under this
+P95_MS = float(_CFG.get("p95_ms", 1000.0))          # a stage is "healthy" only if aggregate p95 latency is under this
+ERROR_RATE_MAX = float(_CFG.get("error_rate_max", 0.01))    # ...and the GENUINE error rate (excludes intentional 429s) is under this
 
 # --- Output ------------------------------------------------------------------
 OUT_DIR = os.environ.get("LOADTEST_OUT_DIR", "out")

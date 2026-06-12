@@ -14,7 +14,16 @@ import { wazeLink, extractCity as extractCityRaw } from "../../../utils/geo.js";
 import { usePortal } from "../../../context/PortalContext.jsx";
 import { GroomMultiSelect } from "../../../components/GroomMultiSelect.jsx";
 import { Num } from "../../../components/Num.jsx";
+import { SearchBar } from "../../../components/SearchBar.jsx";
+import { FilterChips } from "../../../components/FilterChips.jsx";
+import { useListFilter } from "../../../utils/searchFilter.js";
 import { C } from "../../../styles/theme.js";
+
+// Search field specs + delivery-status chip mapping for the in-route guest list.
+// Module-level so useListFilter's memoization holds (stable identity across renders).
+const SHARED_FIELDS = ["name", "area"];
+const SHARED_PHONE = ["phone"];
+const sharedStatusOf = (g) => g.status;
 
 export function SharedCities() {
   const {
@@ -73,6 +82,22 @@ export function SharedCities() {
       )
       .sort((a, b) => (a.area || "").localeCompare(b.area || ""));
   }, [sharedGuests, sharedSelectedGrooms, sharedSelectedCity, lang]);
+
+  // ── بحث + فلترة بحسب حالة التسليم على معازيم البلدة ──────────────────────
+  const sharedStatuses = [
+    { key: "pending", label: t("chip_pending") },
+    { key: "enroute", label: t("chip_enroute") },
+    { key: "delivered", label: t("chip_delivered") },
+  ];
+  const { query, setQuery, activeStatus, setActiveStatus, filtered, chips } =
+    useListFilter(cityGuests, {
+      fields: SHARED_FIELDS,
+      phoneFields: SHARED_PHONE,
+      lang,
+      statusOf: sharedStatusOf,
+      statuses: sharedStatuses,
+      allLabel: t("filter_all"),
+    });
 
   // ── label العريس من groomProfiles ────────────────────────────────────────
   const groomLabel = (uid) => {
@@ -244,10 +269,30 @@ export function SharedCities() {
             </div>
           </div>
 
+          {/* بحث + فلترة بحسب الحالة */}
+          <SearchBar
+            value={query}
+            onChange={setQuery}
+            lang={lang}
+            placeholder={t("search_guests_placeholder")}
+            resultCount={filtered.length}
+            totalCount={cityGuests.length}
+          />
+          {chips.length > 0 && (
+            <FilterChips options={chips} value={activeStatus} onChange={setActiveStatus} lang={lang} />
+          )}
+
+          {/* لا نتائج */}
+          {filtered.length === 0 && (query.trim() || activeStatus !== "all") && (
+            <div className="card" style={{ textAlign: "center", padding: 24, color: C.dim }}>
+              {t("search_no_results")}
+            </div>
+          )}
+
           {/* بطاقات المدعوّين مُجمَّعة بالعريس */}
           {(() => {
             const byGroom = {};
-            for (const g of cityGuests) {
+            for (const g of filtered) {
               if (!byGroom[g.groomUid]) byGroom[g.groomUid] = [];
               byGroom[g.groomUid].push(g);
             }

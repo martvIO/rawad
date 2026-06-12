@@ -6,6 +6,14 @@ import { compressImageToDataUrl } from "../../../utils/imageCompress.js";
 import { usePortal } from "../../../context/PortalContext.jsx";
 import { Num } from "../../../components/Num.jsx";
 import { C } from "../../../styles/theme.js";
+import { useListFilter } from "../../../utils/searchFilter.js";
+import { SearchBar } from "../../../components/SearchBar.jsx";
+import { FilterChips } from "../../../components/FilterChips.jsx";
+
+// Module-level constants so useListFilter's memoization holds (stable identity).
+const GUEST_FIELDS = ["name", "area"];
+const GUEST_PHONE = ["phone"];
+const guestStatusOf = (g) => g.status;
 
 export function DriverDeliveryList() {
   const {
@@ -16,9 +24,24 @@ export function DriverDeliveryList() {
     deliveryNote, setDeliveryNote, markDelivered,
   } = usePortal();
 
-  const pending = myGuests.filter(g => g.status !== "delivered");
-  const done    = myGuests.filter(g => g.status === "delivered");
-  const pct = myGuests.length ? Math.round(done.length / myGuests.length * 100) : 0;
+  // Search + delivery-status chips over the driver's guest list.
+  const guestStatuses = [
+    { key: "pending",   label: t("chip_pending") },
+    { key: "enroute",   label: t("chip_enroute") },
+    { key: "delivered", label: t("chip_delivered") },
+  ];
+  const { query, setQuery, activeStatus, setActiveStatus, filtered, chips } =
+    useListFilter(myGuests, {
+      fields: GUEST_FIELDS, phoneFields: GUEST_PHONE, lang,
+      statusOf: guestStatusOf, statuses: guestStatuses, allLabel: t("filter_all"),
+    });
+
+  // Derive pending/done from the FILTERED set so city grouping + ordinals recompute.
+  const pending = filtered.filter(g => g.status !== "delivered");
+  const done    = filtered.filter(g => g.status === "delivered");
+  // Progress metrics stay on the FULL guest list (unchanged by search/filter).
+  const fullDone = myGuests.filter(g => g.status === "delivered");
+  const pct = myGuests.length ? Math.round(fullDone.length / myGuests.length * 100) : 0;
 
   // Extract city/town from area string (text before first "-" or first comma)
   const extractCity = (area) => extractCityRaw(area, lang);
@@ -57,9 +80,9 @@ export function DriverDeliveryList() {
               }}/>
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6, fontSize: 11, color: C.dim }}>
-              <span>{t("driver_remaining")} <Num>{pending.length.toLocaleString("en")}</Num></span>
+              <span>{t("driver_remaining")} <Num>{(myGuests.length - fullDone.length).toLocaleString("en")}</Num></span>
               <span style={{ color: C.gold, fontWeight: 700 }}><Num>{pct}%</Num></span>
-              <span>{t("driver_done")} <Num>{done.length.toLocaleString("en")}</Num></span>
+              <span>{t("driver_done")} <Num>{fullDone.length.toLocaleString("en")}</Num></span>
             </div>
           </div>
 
@@ -200,6 +223,26 @@ export function DriverDeliveryList() {
               </div>
             );
           })()}
+
+          {/* Search + delivery-status filter */}
+          <SearchBar
+            value={query}
+            onChange={setQuery}
+            lang={lang}
+            placeholder={t("search_guests_placeholder")}
+            resultCount={filtered.length}
+            totalCount={myGuests.length}
+          />
+          {chips.length > 0 && (
+            <FilterChips options={chips} value={activeStatus} onChange={setActiveStatus} lang={lang} />
+          )}
+
+          {/* No-results notice (active search/filter yields nothing) */}
+          {filtered.length === 0 && (query.trim() || activeStatus !== "all") && (
+            <div className="card" style={{ textAlign: "center", padding: 24, color: C.dim }}>
+              {t("search_no_results")}
+            </div>
+          )}
 
           {/* Pending — grouped by city */}
           {pending.length > 0 && (
@@ -394,7 +437,7 @@ export function DriverDeliveryList() {
             </>
           )}
 
-          {pending.length === 0 && myGuests.length > 0 && (
+          {fullDone.length === myGuests.length && myGuests.length > 0 && (
             <div style={{ textAlign: "center", padding: "44px 0" }}>
               <div style={{ fontSize: 60, marginBottom: 12 }}>🎉</div>
               <div style={{ fontSize: 18, fontWeight: 900, color: "#4cc97a" }}>{t("driver_all_done_title")}</div>

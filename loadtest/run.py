@@ -6,6 +6,7 @@ Orchestrator for the Dawa load test.
     python run.py --yes           # skip the production-safety confirmation
     python run.py --no-writes     # reads only (no POSTs to the public submit endpoints)
     python run.py --no-show       # generate charts but don't pop windows
+    python run.py --config c.json # load run params from a run_config.json
     python run.py --cleanup       # delete the LOADTEST guest + its pending wishes, then exit
 
 Steps:
@@ -22,6 +23,7 @@ import argparse
 import os
 import subprocess
 import sys
+from urllib.parse import urlparse
 
 # Windows consoles default to cp1252 and crash on non-ASCII output. Force UTF-8.
 try:
@@ -35,6 +37,18 @@ OUT_DIR = os.path.join(HERE, "out")
 CSV_PREFIX = os.path.join(OUT_DIR, "dawa")
 
 
+_LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1", "[::1]", "0.0.0.0"}
+
+
+def _is_local(base_url: str) -> bool:
+    """True if base_url targets the loopback / local machine (no prod prompt needed)."""
+    try:
+        host = (urlparse(base_url).hostname or "").lower()
+    except Exception:  # noqa: BLE001
+        host = ""
+    return host in _LOCAL_HOSTS
+
+
 def _import_config():
     """Pull the target + ramp out of locustfile so we can show them in the prompt."""
     sys.path.insert(0, HERE)
@@ -46,16 +60,21 @@ def confirm(lf, smoke: bool, writes: bool, assume_yes: bool) -> bool:
     stages = lf.SMOKE_STAGES if smoke else lf.RAMP_STAGES
     max_users = max(u for u, _, _ in stages)
     total_s = sum(h for _, h, _ in stages)
+    local = _is_local(lf.BASE_URL)
+    target_note = "(LOCAL target)" if local else "(PRODUCTION - project dawa-aa793)"
     print("=" * 72)
     print("  Dawa LOAD TEST - pre-flight")
     print("=" * 72)
-    print(f"  Target          : {lf.BASE_URL}  (PRODUCTION - project dawa-aa793)")
+    print(f"  Target          : {lf.BASE_URL}  {target_note}")
     print(f"  Ramp            : {' -> '.join(str(u) for u, _, _ in stages)} users")
     print(f"  Max concurrency : {max_users}")
     print(f"  Hold time total : ~{total_s}s (+ ramp)")
     print(f"  Writes          : {'ON - creates LOADTEST records (mostly 429 by design)' if writes else 'OFF (reads only)'}")
     print("  Cost note       : real Cloud Function invocations + RTDB/Firestore reads will be billed.")
     print("=" * 72)
+    if local:
+        print("  Local target; skipping the production confirmation prompt.\n")
+        return True
     if assume_yes:
         print("  --yes supplied; proceeding.\n")
         return True
@@ -99,42 +118,48 @@ def run_analyze(no_show: bool) -> int:
 
 
 def cleanup(lf) -> int:
-    """Best-effort removal of LOADTEST data created by the test (admin token)."""
-    import requests
-    print("Cleanup: logging in and removing LOADTEST data ...")
-    admin = lf._login("admin")
-    groom = lf._login("groom")
+    """Best-effort removal of LOADTEST data created by the test.
+
+    Delegates to cleanup_core: per-guest/per-wish deletes (groom token) PLUS the
+    admin bulk-purge endpoint (confirmations + inviteTokens + guests + wishes).
+    """
+    import cleanup_core
+
+    base_url = lf.BASE_URL
+    print(f"Cleanup: logging in and removing LOADTEST data on {base_url} ...")
+    admin = cleanup_core.login(base_url, *_creds(lf, "admin"))
+    groom = cleanup_core.login(base_url, *_creds(lf, "groom"))
     if not admin or not groom:
         print("  ! could not log in - nothing cleaned.")
         return 1
-    uid = groom.get("uid", "")
-    admin_token = admin.get("idToken", "")
-    groom_token = groom.get("idToken", "")
-    removed = 0
 
-    def headers(tok):
-        return {"Authorization": f"Bearer {tok}", "Content-Type": "application/json"}
+    # 1. Per-guest / per-wish deletes (idempotent; tagged "LOADTEST").
+    gw = cleanup_core.cleanup_guests_and_wishes(base_url, admin, groom)
+    print(f"  guests removed : {gw['guests']}")
+    print(f"  wishes removed : {gw['wishes']}")
+    for err in gw["errors"]:
+        print(f"  ! {err}")
 
-    try:
-        gr = requests.get(lf.api(f"/digital/{uid}/guests"), headers=headers(groom_token), timeout=30)
-        if gr.status_code == 200:
-            for g in gr.json():
-                if str(g.get("name", "")).startswith("LOADTEST"):
-                    d = requests.delete(lf.api(f"/digital/{uid}/guests/{g['id']}"),
-                                        headers=headers(groom_token), timeout=30)
-                    removed += 1 if d.status_code == 200 else 0
-        wr = requests.get(lf.api(f"/digital/{uid}/wishes"), headers=headers(groom_token), timeout=30)
-        if wr.status_code == 200:
-            for w in wr.json():
-                if str(w.get("who", "")).startswith("LOADTEST") or str(w.get("what", "")).startswith("LOADTEST"):
-                    d = requests.delete(lf.api(f"/digital/{uid}/wishes/{w['id']}"),
-                                        headers=headers(groom_token), timeout=30)
-                    removed += 1 if d.status_code == 200 else 0
-    except Exception as e:  # noqa: BLE001
-        print(f"  ! cleanup error: {e}")
-    print(f"  removed {removed} LOADTEST record(s).")
-    print("  NOTE: mirrored LOADTEST confirmations may remain - remove them from the admin Confirmations tab.")
+    # 2. Admin bulk purge (also clears mirrored confirmations + invite tokens).
+    purge = cleanup_core.purge_server_data(base_url, admin.get("idToken", ""), groom.get("uid", ""))
+    if purge["ok"]:
+        d = purge["deleted"]
+        print("  server purge   : ok"
+              f" (confirmations={d.get('confirmations', 0)},"
+              f" inviteTokens={d.get('inviteTokens', 0)},"
+              f" guests={d.get('guests', 0)}, wishes={d.get('wishes', 0)})")
+    else:
+        print(f"  server purge   : skipped/failed - {purge['error']}")
+
+    ok = not gw["errors"] and purge["ok"]
+    print("  cleanup complete." if ok else "  cleanup finished with warnings (see above).")
     return 0
+
+
+def _creds(lf, role: str) -> tuple[str, str]:
+    """Pull (username, password) for a role from locustfile's CREDENTIALS block."""
+    c = lf.CREDENTIALS.get(role, {})
+    return c.get("username", ""), c.get("password", "")
 
 
 def main():
@@ -144,8 +169,14 @@ def main():
     ap.add_argument("--no-writes", action="store_true", help="reads only; no POSTs")
     ap.add_argument("--no-show", action="store_true", help="don't open chart windows")
     ap.add_argument("--host", default=None, help="override target base URL")
+    ap.add_argument("--config", default=None, help="path to a run_config.json (sets run params)")
     ap.add_argument("--cleanup", action="store_true", help="delete LOADTEST data and exit")
     args = ap.parse_args()
+
+    # Set the config-file env var BEFORE importing locustfile, so the pre-flight
+    # prompt shows the overridden values and the locust subprocess inherits it.
+    if args.config:
+        os.environ["LOADTEST_CONFIG_FILE"] = os.path.abspath(args.config)
 
     lf = _import_config()
     if args.host:

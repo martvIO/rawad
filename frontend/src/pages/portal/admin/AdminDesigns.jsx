@@ -12,8 +12,23 @@ import { Num } from "../../../components/Num.jsx";
 import { DigitalInvitationPreviewModal } from "../../../components/digital/DigitalInvitationPreviewModal.jsx";
 import { getDigitalTheme } from "../../../styles/digitalThemes.js";
 import { localize } from "../../../utils/localize.js";
+import { useListFilter } from "../../../utils/searchFilter.js";
+import { SearchBar } from "../../../components/SearchBar.jsx";
+import { FilterChips } from "../../../components/FilterChips.jsx";
 
 const tt = (lang, ar, he) => (lang === "he" ? he : ar);
+
+// Module-level field/status specs so useListFilter's memoization holds (inline
+// arrays each render would defeat its useMemo deps).
+const DESIGN_FIELDS = [
+  "groomUsername",
+  "brideName",
+  "groomDisplayName",
+  "venue",
+  (r, lang) => localize(r.title, lang),
+];
+const DESIGN_PHONE = [];
+const designStatusOf = (r) => r.designStatus || "draft";
 
 // A groom may have several designs, so cards key on groomUid + designId.
 const cidOf = (r) => `${r.groomUid}:${r.designId || ""}`;
@@ -31,7 +46,7 @@ const STATUS_META = {
 };
 
 export function AdminDesigns() {
-  const { lang, showToast, users } = usePortal();
+  const { t, lang, showToast, users } = usePortal();
   const [rows, setRows] = useState([]);
   const [previewDesign, setPreviewDesign] = useState(null);
   const [rejecting, setRejecting] = useState(null); // the row being rejected
@@ -46,12 +61,30 @@ export function AdminDesigns() {
     return rows.map((r) => ({ ...r, groomUsername: byUid.get(r.groomUid) || r.groomUid.slice(0, 6) }));
   }, [rows, users]);
 
+  // Search + status-chip filter runs on the enriched rows; grouping below reads
+  // `filtered` so the section headers + counts recompute as the user searches.
+  const designStatuses = [
+    { key: "pending_approval", label: t("chip_design_pending") },
+    { key: "approved", label: t("chip_design_approved") },
+    { key: "rejected", label: t("chip_design_rejected") },
+    { key: "draft", label: t("chip_design_draft") },
+  ];
+  const { query, setQuery, activeStatus, setActiveStatus, filtered, chips } =
+    useListFilter(withUsernames, {
+      fields: DESIGN_FIELDS,
+      phoneFields: DESIGN_PHONE,
+      lang,
+      statusOf: designStatusOf,
+      statuses: designStatuses,
+      allLabel: t("filter_all"),
+    });
+
   const groups = useMemo(() => ({
-    pending: withUsernames.filter((r) => r.designStatus === "pending_approval"),
-    approved: withUsernames.filter((r) => r.designStatus === "approved"),
-    rejected: withUsernames.filter((r) => r.designStatus === "rejected"),
-    other: withUsernames.filter((r) => r.designStatus === "draft" || !r.designStatus),
-  }), [withUsernames]);
+    pending: filtered.filter((r) => r.designStatus === "pending_approval"),
+    approved: filtered.filter((r) => r.designStatus === "approved"),
+    rejected: filtered.filter((r) => r.designStatus === "rejected"),
+    other: filtered.filter((r) => r.designStatus === "draft" || !r.designStatus),
+  }), [filtered]);
 
   // Admin can move a design to ANY of the 3 states. "rejected" opens the note
   // modal first (the actual set happens in onConfirmReject); the others apply
@@ -128,6 +161,28 @@ export function AdminDesigns() {
       {withUsernames.length === 0 && (
         <div className="card" style={{ textAlign: "center", padding: 32, color: C.dim }}>
           {tt(lang, "لا توجد طلبات حالياً", "אין בקשות כרגע")}
+        </div>
+      )}
+
+      {withUsernames.length > 0 && (
+        <>
+          <SearchBar
+            value={query}
+            onChange={setQuery}
+            lang={lang}
+            placeholder={t("search_designs_placeholder")}
+            resultCount={filtered.length}
+            totalCount={withUsernames.length}
+          />
+          {chips.length > 0 && (
+            <FilterChips options={chips} value={activeStatus} onChange={setActiveStatus} lang={lang} />
+          )}
+        </>
+      )}
+
+      {withUsernames.length > 0 && query.trim() && filtered.length === 0 && (
+        <div className="card" style={{ textAlign: "center", padding: 24, color: C.dim }}>
+          {t("search_no_results")}
         </div>
       )}
 

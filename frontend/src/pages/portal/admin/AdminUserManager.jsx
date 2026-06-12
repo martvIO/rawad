@@ -15,6 +15,12 @@ import { PhoneInput } from "../../../components/PhoneInput.jsx";
 import { isStrongPassword } from "../../../utils/password.js";
 import { isPlaceholderPhone } from "../../../utils/phone.js";
 import { C } from "../../../styles/theme.js";
+import { useListFilter } from "../../../utils/searchFilter.js";
+import { SearchBar } from "../../../components/SearchBar.jsx";
+
+// ── حقول البحث النصّي + حقول الهاتف (ثابتة على مستوى الوحدة) ──────────
+const USERS_FIELDS = ["username", "displayName", (u) => u.role];
+const USERS_PHONE  = ["phoneE164"];
 
 // ── ألوان وأيقونات لكل دور ───────────────────────────────────────────
 const ROLE_META = {
@@ -202,8 +208,19 @@ function UserManagerInner() {
     { val: "admin",  label: t("admin_user_filter_admins")  },
   ];
 
-  // القائمة المُصفَّاة
+  // القائمة المُصفَّاة حسب الدور (تبويبات التصفية)
   const filtered = filter === "all" ? users : users.filter(u => u.role === filter);
+
+  // بحث نصّي فوق القائمة المُصفَّاة بالدور — يُركَّب فوق تبويبات الدور
+  // (لا توجد رقائق حالة هنا؛ التبويبات نفسها هي مرشّح الحالة)
+  const {
+    query, setQuery,
+    filtered: visibleUsers,
+  } = useListFilter(filtered, {
+    fields: USERS_FIELDS,
+    phoneFields: USERS_PHONE,
+    lang,
+  });
 
   // ── الإنشاء ──────────────────────────────────────────────────────────
   const handleCreate = async () => {
@@ -310,6 +327,16 @@ function UserManagerInner() {
         ))}
       </div>
 
+      {/* ── بحث نصّي داخل القائمة المُصفَّاة بالدور ─────────────────── */}
+      <SearchBar
+        value={query}
+        onChange={setQuery}
+        lang={lang}
+        placeholder={t("search_users_placeholder")}
+        resultCount={visibleUsers.length}
+        totalCount={filtered.length}
+      />
+
       {/* عداد + حالة التحميل */}
       <div style={{ fontSize: 13, color: C.dim, fontWeight: 700, marginBottom: 10, display: "flex", alignItems: "center", gap: 10 }}>
         <span>{t("admin_existing")} (<Num>{filtered.length.toLocaleString("en")}</Num>)</span>
@@ -325,8 +352,12 @@ function UserManagerInner() {
         <div className="card" style={{ textAlign: "center", padding: 32, color: C.dim }}>
           {t("admin_no_users")}
         </div>
+      ) : query.trim() && visibleUsers.length === 0 ? (
+        <div className="card" style={{ textAlign: "center", padding: 24, color: C.dim }}>
+          {t("search_no_results")}
+        </div>
       ) : (
-        filtered.map(u => {
+        visibleUsers.map(u => {
           const m         = ROLE_META[u.role] || ROLE_META.groom;
           const uid       = u.uid ?? u.id;
           const isConfirm = confirmDelete === uid;
