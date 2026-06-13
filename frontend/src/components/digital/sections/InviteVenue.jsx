@@ -3,7 +3,10 @@ import { ON_GOLD, SectionHead } from "../inviteShared.jsx";
 
 // ── Venue + faux map + hotels ────────────────────────────────────────────────────
 function VenueSection({ venue, venueCity, venueAddress, accessNote, hotels, theme, font, lang }) {
-  const mapsHref = `https://maps.google.com/?q=${encodeURIComponent([venue, venueAddress, venueCity].filter(Boolean).join(" "))}`;
+  const venueQuery = [venue, venueAddress, venueCity].filter(Boolean).join(" ");
+  const mapsHref = `https://maps.google.com/?q=${encodeURIComponent(venueQuery)}`;
+  // Waze is the dominant navigation app in Israel — offer it alongside Google Maps.
+  const wazeHref = `https://waze.com/ul?q=${encodeURIComponent(venueQuery)}`;
   return (
     <section className="dawa-inv-section">
       <SectionHead
@@ -78,6 +81,15 @@ function VenueSection({ venue, venueCity, venueAddress, accessNote, hotels, them
               <div className="dawa-inv-venue-label" style={{ color: theme.accent }}>{lang === "he" ? "ניווט" : "التوجيه"}</div>
               <div style={{ color: theme.accent, fontSize: 15, fontFamily: font.family }}>
                 {lang === "he" ? "פתח ב‑Google Maps ←" : "افتح في خرائط جوجل ←"}
+              </div>
+            </div>
+          </a>
+          <a className="dawa-inv-venue-row" href={wazeHref} target="_blank" rel="noreferrer" style={{ borderColor: theme.accentLine, textDecoration: "none" }}>
+            <span className="dawa-inv-venue-ic" style={{ color: theme.accent }}>🚗</span>
+            <div style={{ flex: 1 }}>
+              <div className="dawa-inv-venue-label" style={{ color: theme.accent }}>Waze</div>
+              <div style={{ color: theme.accent, fontSize: 15, fontFamily: font.family }}>
+                {lang === "he" ? "פתח ב‑Waze ←" : "افتح في Waze ←"}
               </div>
             </div>
           </a>

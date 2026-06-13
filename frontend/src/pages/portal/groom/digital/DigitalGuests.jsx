@@ -13,6 +13,7 @@ import { C } from "../../../../styles/theme.js";
 import { Num } from "../../../../components/Num.jsx";
 import { useListFilter } from "../../../../utils/searchFilter.js";
 import { SearchBar } from "../../../../components/SearchBar.jsx";
+import { toCsv, downloadCsv } from "../../../../utils/csv.js";
 import { FilterChips } from "../../../../components/FilterChips.jsx";
 
 // Groom-facing design label (localized { ar, he } or plain string).
@@ -185,19 +186,43 @@ export function DigitalGuests() {
       statusOf: guestStatusOf, statuses: guestStatuses, allLabel: t("filter_all"),
     });
 
+  // Export the guest list (name / phone / RSVP status / ranks) as a CSV the
+  // groom can hand to a caterer or hall.
+  const exportCsv = () => {
+    const statusLabel = (s) =>
+      s === "attending" ? (lang === "he" ? "מגיע" : "سيحضر")
+        : s === "absent" ? (lang === "he" ? "לא מגיע" : "لن يحضر")
+          : (lang === "he" ? "ממתין" : "بانتظار");
+    const headers = lang === "he"
+      ? ["שם", "טלפון", "סטטוס", "דירוגים"]
+      : ["الاسم", "الهاتف", "الحالة", "الرتب"];
+    const rows = guests.map((g) => [
+      g.name || "", g.phone || "", statusLabel(g.status),
+      Array.isArray(g.ranks) ? g.ranks.join(" | ") : "",
+    ]);
+    downloadCsv("dawa-guests.csv", toCsv(headers, rows));
+  };
+
   // ── Render ────────────────────────────────────────────────────────────────────
   return (
     <div style={{ animation: "fadeUp .3s ease" }}>
 
       {/* Header */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, gap: 8 }}>
         <div style={{ fontSize: 15, fontWeight: 800, color: C.goldLight }}>
           {lang === "he" ? "רשימת מוזמנים" : "قائمة المدعوين"} (<Num>{guests.length.toLocaleString("en")}</Num>)
         </div>
-        <button className="gold-btn" style={{ padding: "8px 16px", fontSize: 12 }}
-                onClick={() => navigate("/portal/groom/digital/add")}>
-          {lang === "he" ? "➕ הוסף" : "➕ إضافة"}
-        </button>
+        <div style={{ display: "flex", gap: 8 }}>
+          {guests.length > 0 && (
+            <button className="ghost-btn" style={{ padding: "8px 12px", fontSize: 12 }} onClick={exportCsv}>
+              {lang === "he" ? "⬇ CSV" : "⬇ CSV"}
+            </button>
+          )}
+          <button className="gold-btn" style={{ padding: "8px 16px", fontSize: 12 }}
+                  onClick={() => navigate("/portal/groom/digital/add")}>
+            {lang === "he" ? "➕ הוסף" : "➕ إضافة"}
+          </button>
+        </div>
       </div>
 
       {/* Hint */}
