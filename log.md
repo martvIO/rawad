@@ -157,3 +157,6 @@ Committed audit Phases 1-3 only (9a2a12d) — password-encryption work left unst
 
 ## [2026-06-13 23:25] session | Audit Phase 4a — WhatsApp Cloud API core
 Added whatsapp.ts (sendWhatsAppText + verifyWebhookChallenge, env-gated) and a standalone whatsappWebhook onRequest (GET verify / POST receipts), exported from index.ts. Converted backend unit test include to a glob (explicit list was silently dropping my Phase 3 paymentsWebhook test). 419 FE / 139 BE tests green. Committed 50c53ed; not yet deployed (deploys with next functions deploy). Needs WHATSAPP_TOKEN/PHONE_ID/VERIFY_TOKEN to go live.
+
+## [2026-06-14 00:05] session | Audit Phases 4b-13 built + deployed
+Autonomous run through the rest of the roadmap, each phase verified (build+tests) then committed + deployed: 4b reminder scheduler (onSchedule), 5 groom onboarding checklist, 6 driver non-delivery outcomes, 7 bulk guest import, 8 audit-log reader, 9 dashboard reply rollup, 10 "made with Dawa" growth loop, 11 PII consent links, 12 global Hebrew fonts + mixed-language fix, 13 CSV export + Waze. 431 FE / 147 BE tests green. functions+rules+hosting deployed to dawa-aa793. Deferred (needs owner sign-off): 30-day PII auto-deletion (policy rewrite vs destructive cron); server-side invite-open analytics. WhatsApp Business + Stripe live once their credentials are set.
