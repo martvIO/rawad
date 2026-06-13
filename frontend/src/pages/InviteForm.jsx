@@ -15,6 +15,7 @@ import { LangSwitcher } from "../components/LangSwitcher.jsx";
 import { CityField } from "../components/CityField.jsx";
 import { PhoneInput } from "../components/PhoneInput.jsx";
 import { localizeApiError } from "../utils/apiError.js";
+import { ConsentNotice } from "../components/ConsentNotice.jsx";
 import { MapPickerInline } from "../components/MapPickerInline.jsx";
 import { subscribeInviteToken, submitGuestInvite } from "../services/invites.js";
 import { getCurrentFix } from "../utils/geo.js";
@@ -268,6 +269,7 @@ export function InviteForm({ t, lang, setLang }) {
                   disabled={busy || !name.trim() || !phone.trim() || !city.trim()}>
             {busy ? "…" : t("invite_submit")}
           </button>
+          <ConsentNotice lang={lang} />
         </div>
       </div>
     </div>

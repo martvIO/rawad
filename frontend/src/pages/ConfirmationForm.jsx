@@ -14,6 +14,7 @@ import { submitConfirmation } from "../services/confirmations.js";
 import { getCurrentFix } from "../utils/geo.js";
 import { logErr } from "../utils/logger.js";
 import { localizeApiError } from "../utils/apiError.js";
+import { ConsentNotice } from "../components/ConsentNotice.jsx";
 import { C } from "../styles/theme.js";
 
 export function ConfirmationForm({ t, lang, setLang }) {
@@ -184,6 +185,7 @@ export function ConfirmationForm({ t, lang, setLang }) {
                   disabled={busy || !name.trim() || !phone.trim() || !city.trim()}>
             {t("conf_form_submit")}
           </button>
+          <ConsentNotice lang={lang} />
         </div>
       </div>
     </div>
