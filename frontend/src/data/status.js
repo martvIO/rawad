@@ -4,7 +4,16 @@ export const STATUS = {
   pending:   { label:"لم يبدأ",    color:C.dim, bg:"rgba(122,106,74,.15)",  icon:"⌛" },
   enroute:   { label:"في الطريق",  color:C.blue, bg:"rgba(75,159,212,.15)",  icon:"🚗" },
   delivered: { label:"تم التسليم", color:"#4cc97a", bg:"rgba(76,201,122,.15)",  icon:"✓" },
+  // Non-delivery outcomes a driver can record instead of faking a delivery, so
+  // the groom can tell a real delivery from an attempt that couldn't complete.
+  no_answer:     { label:"لا يوجد رد",   color:"#d4a14b", bg:"rgba(212,161,75,.15)", icon:"🔕" },
+  wrong_address: { label:"عنوان خاطئ",   color:C.red,     bg:"rgba(212,80,58,.15)",  icon:"📍" },
+  refused:       { label:"رفض الاستلام", color:C.red,     bg:"rgba(212,80,58,.15)",  icon:"✋" },
 };
+
+// Statuses a driver can set as a "couldn't deliver" outcome (drives the
+// driver-side outcome buttons; kept here so the set has one source of truth).
+export const DRIVER_OUTCOME_STATUSES = ["no_answer", "wrong_address", "refused"];
 
 // Reply lifecycle for the per-guest invite link:
 //   notSent   — admin hasn't sent the WhatsApp invite yet (no inviteLinkSentAt)

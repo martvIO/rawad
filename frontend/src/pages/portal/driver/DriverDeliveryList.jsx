@@ -21,7 +21,7 @@ export function DriverDeliveryList() {
     liveShareWith, setLiveShareWith, driverIsSharing, driverGeoPermission,
     driverGeoError, driverCoords, myLiveLocation, saveLiveLocation, stopLiveLocation,
     activeId, setActiveId, photoTaken, setPhotoTaken, photoData, setPhotoData,
-    deliveryNote, setDeliveryNote, markDelivered,
+    deliveryNote, setDeliveryNote, markDelivered, markOutcome,
   } = usePortal();
 
   // Search + delivery-status chips over the driver's guest list.
@@ -403,6 +403,22 @@ export function DriverDeliveryList() {
                             color: "#000", fontWeight: 900, fontSize: 14, fontFamily: "inherit",
                             cursor: "pointer", transition: "all .2s",
                           }}>{t("driver_confirm")}</button>
+
+                          {/* Non-delivery outcomes — record a reason instead of faking a delivery */}
+                          <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid rgba(255,255,255,.08)" }}>
+                            <div style={{ fontSize: 11, color: C.dim, marginBottom: 8, lineHeight: 1.6 }}>
+                              {t("driver_cant_deliver")}
+                            </div>
+                            <div style={{ display: "flex", gap: 6 }}>
+                              {[["no_answer", "driver_no_answer"], ["wrong_address", "driver_wrong_address"], ["refused", "driver_refused"]].map(([st, key]) => (
+                                <button key={st} onClick={() => markOutcome(g.id, st)} style={{
+                                  flex: 1, padding: "9px 4px", borderRadius: 9, cursor: "pointer",
+                                  background: "rgba(212,80,58,.08)", border: "1px solid rgba(212,80,58,.3)",
+                                  color: "#d4775a", fontSize: 10.5, fontWeight: 700, fontFamily: "inherit",
+                                }}>{t(key)}</button>
+                              ))}
+                            </div>
+                          </div>
                         </div>
                       )}
                     </div>

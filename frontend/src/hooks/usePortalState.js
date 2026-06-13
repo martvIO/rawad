@@ -473,6 +473,38 @@ export function usePortalState({ onBack, t, lang, setLang }) {
     }
   };
 
+  // Driver records a NON-delivery outcome (no_answer / wrong_address / refused)
+  // with an optional reason note — so the groom can tell a real delivery from an
+  // attempt that couldn't complete. Server-first (pessimistic): these are
+  // infrequent and must not run through the delivered-only optimistic overlay.
+  const markGuestOutcome = async (id, status, note) => {
+    const guest = guests.find(g => g.id === id) || sharedGuests.find(g => g.id === id);
+    if (!guest) return false;
+    try {
+      const patch = { status };
+      const reason = (note ?? "").trim();
+      if (reason) patch.deliveryNote = reason;
+      await updateGuestSrv(guest.groomUid, id, patch);
+      setGuests(prev => prev.map(g => g.id === id ? { ...g, ...patch } : g));
+      setSharedGuests(prev => prev.map(g => g.id === id ? { ...g, ...patch } : g));
+      showToast(lang === "he" ? "הסטטוס נרשם והחתן עודכן" : "تم تسجيل الحالة وإشعار العريس");
+      return true;
+    } catch (e) {
+      logErr("markGuestOutcome", e);
+      showToast(localizeApiError(e, t));
+      return false;
+    }
+  };
+
+  // List-view wrapper — uses the shared delivery-note field as the reason and
+  // clears the form on success.
+  const markOutcome = async (id, status) => {
+    const ok = await markGuestOutcome(id, status, deliveryNote);
+    if (ok) {
+      setActiveId(null); setPhotoTaken(false); setPhotoData(null); setDeliveryNote("");
+    }
+  };
+
   // ── Proof-photo URL bridge ──────────────────────────────────────────────────
   const { decoratedGuests } = usePortalProofs({ guests });
 
@@ -507,7 +539,7 @@ export function usePortalState({ onBack, t, lang, setLang }) {
     // delivery
     activeId, setActiveId, photoTaken, setPhotoTaken,
     deliveryNote, setDeliveryNote, photoData, setPhotoData,
-    markDelivered, markGuestDelivered,
+    markDelivered, markGuestDelivered, markOutcome, markGuestOutcome,
 
     // photo viewer
     viewingPhoto, setViewingPhoto,

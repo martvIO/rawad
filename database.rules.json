@@ -76,7 +76,7 @@
           "name":           { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 120" },
           "phone":          { ".validate": "newData.isString() && newData.val().length <= 30" },
           "area":           { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 240)" },
-          "status":         { ".validate": "newData.val() === 'pending' || newData.val() === 'enroute' || newData.val() === 'delivered'" },
+          "status":         { ".validate": "newData.val() === 'pending' || newData.val() === 'enroute' || newData.val() === 'delivered' || newData.val() === 'no_answer' || newData.val() === 'wrong_address' || newData.val() === 'refused'" },
           "inviteType":     { ".validate": "newData.val() === 'premium' || newData.val() === 'vip'" },
           "proofPhotoPath": { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 240)" },
           "deliveredAt":    { ".validate": "!newData.exists() || newData.isString()" },

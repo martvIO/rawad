@@ -29,7 +29,11 @@ const MAX_PROOF_PATH_LEN = MAX_LEN.PATH;
 const MAX_INVITE_TOKEN_LEN = 64;
 const MAX_DELIVERED_BY_LEN = MAX_LEN.NAME;
 
-const ALLOWED_STATUS = new Set(["pending", "enroute", "delivered"]);
+const ALLOWED_STATUS = new Set([
+  "pending", "enroute", "delivered",
+  // Non-delivery outcomes a driver can record (Phase 6).
+  "no_answer", "wrong_address", "refused",
+]);
 const ALLOWED_INVITE_TYPE = new Set(["premium", "vip"]);
 const ALLOWED_LOCATION_SOURCE = new Set(["gps", "manual"]);
 
