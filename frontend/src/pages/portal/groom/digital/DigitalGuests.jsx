@@ -207,6 +207,17 @@ export function DigitalGuests() {
           : "💡 انقر على الحالة لتغييرها · اضغط «←» للحذف"}
       </div>
 
+      {/* Who-sends note — grooms don't send invites themselves; the team does. */}
+      <div style={{
+        fontSize: 11.5, color: C.dim, marginBottom: 12, lineHeight: 1.7,
+        padding: "8px 12px", borderRadius: 10,
+        background: "rgba(201,168,76,.05)", border: "1px solid rgba(201,168,76,.15)",
+      }}>
+        {lang === "he"
+          ? "📨 אין צורך לשלוח בעצמך — לאחר אישור העיצוב, צוות דעוה שולח את ההזמנות למוזמנים בוואטסאפ."
+          : "📨 لا حاجة للإرسال بنفسك — بعد اعتماد التصميم، يتولّى فريق دعوة إرسال الدعوات للمدعوين عبر واتساب."}
+      </div>
+
       {/* Search + RSVP-status filter — only meaningful once there are guests */}
       {guests.length > 0 && (
         <>

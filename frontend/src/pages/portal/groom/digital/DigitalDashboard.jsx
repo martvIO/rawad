@@ -45,6 +45,7 @@ import { getStoredUid } from "../../../../utils/tokenManager.js";
 import { useListFilter } from "../../../../utils/searchFilter.js";
 import { SearchBar } from "../../../../components/SearchBar.jsx";
 import { FilterChips } from "../../../../components/FilterChips.jsx";
+import { OnboardingChecklist } from "../../../../components/OnboardingChecklist.jsx";
 
 const tt = (lang, ar, he) => (lang === "he" ? he : ar);
 
@@ -405,6 +406,21 @@ export function DigitalDashboard() {
 
   return (
     <div style={{ animation: "fadeUp .3s ease" }}>
+
+      {/* ── First-run onboarding — shown until the basics are in place ─── */}
+      {(guests.length === 0 || media.length === 0) && (
+        <OnboardingChecklist
+          title={tt(lang, "ابدأ بثلاث خطوات", "מתחילים ב-3 צעדים")}
+          steps={[
+            { label: tt(lang, "أضف قائمة المدعوين", "הוסיפו את רשימת המוזמנים"), done: guests.length > 0 },
+            { label: tt(lang, "أضف صور وفيديو لدعوتك", "הוסיפו תמונות ווידאו להזמנה"), done: media.length > 0 },
+            { label: tt(lang, "صمّم دعوتك من تبويب «التصميم» وأرسلها للاعتماد", "עצבו את ההזמנה בלשונית העיצוב ושלחו לאישור"), done: false },
+          ]}
+          note={tt(lang,
+            "بعد اعتماد التصميم، يتولّى فريق دعوة إرسال الدعوات للمدعوين عبر واتساب — لا حاجة لإرسالها بنفسك.",
+            "לאחר אישור העיצוב, צוות דעוה שולח את ההזמנות למוזמנים בוואטסאפ — אין צורך לשלוח בעצמכם.")}
+        />
+      )}
 
       {/* ── معرض الوسائط ─────────────────────────────────────────── */}
       <div style={{ marginBottom: 22 }}>
