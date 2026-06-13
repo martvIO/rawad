@@ -2,9 +2,10 @@
 Framework-free cleanup helpers for the Dawa load test.
 
 This module is the shared source of truth for tearing down the LOADTEST data the
-suite creates. It imports ONLY the `requests` library — never locust / gevent /
-locustfile — so it is safe to import from the FastAPI dashboard, from run.py, or
-from a plain script without triggering gevent's monkey-patch.
+suite creates. It imports only `requests` (plus the local `passwordcrypto`, which
+itself imports only requests + cryptography) — never locust / gevent / locustfile
+— so it is safe to import from the FastAPI dashboard, from run.py, or from a plain
+script without triggering gevent's monkey-patch.
 
 Public API:
     login(base_url, username, password) -> dict | None
@@ -20,6 +21,8 @@ from __future__ import annotations
 from typing import Optional
 
 import requests
+
+from passwordcrypto import encrypt_password
 
 API_BASE = "/api"
 _TIMEOUT = 30
@@ -43,7 +46,7 @@ def login(base_url: str, username: str, password: str) -> Optional[dict]:
     try:
         r = requests.post(
             _api(base_url, "/auth/login"),
-            json={"username": username, "password": password},
+            json={"username": username, "password": encrypt_password(base_url, password)},
             headers={"Content-Type": "application/json"},
             timeout=_TIMEOUT,
         )

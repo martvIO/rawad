@@ -27,6 +27,16 @@ make us hand-build:
 
 `analyze.py` then turns the CSV history into the required matplotlib charts and verdict.
 
+## Password encryption
+
+The bootstrap login (and the cleanup login) RSA-encrypt the password before sending,
+matching the browser client: `passwordcrypto.py` fetches the server's public key from
+`GET /api/auth/pubkey` and wraps the password as an `enc:v1:<base64>` envelope (the
+backend decrypts it transparently). If the target serves no key, it transparently
+falls back to plaintext, so the suite works against any deploy. This adds the
+`cryptography` dependency (in `requirements.txt`). Round-trip tested by
+`python test_passwordcrypto.py`.
+
 ## Install
 
 ```powershell

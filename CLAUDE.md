@@ -301,8 +301,12 @@ The server is pre-configured. If it is not running, start it separately before a
 | `VITE_USE_EMULATORS` | Dev | Set `1` to connect Firebase SDK to emulators. |
 | `WEB_API_KEY` | Cloud Functions | Firebase Web API key. Set in Functions environment, never in `VITE_*`. |
 | `ALLOWED_ORIGINS` | Cloud Functions | Comma-separated CORS allowed origins. Empty = allow all (dev-friendly). |
+| `PASSWORD_ENC_PRIVATE_KEY` | Optional (prod) | RSA-2048 PKCS8 PEM private key for the password-encryption layer. Generate with `node backend/scripts/gen-password-keypair.cjs`; set as a secret like `WEB_API_KEY`. Unset in prod → layer disabled (clients send plaintext over TLS); the emulator auto-generates an ephemeral key. The public key is served at `GET /api/auth/pubkey`. |
+| `REQUIRE_ENCRYPTED_PASSWORDS` | Optional | Set `true` to make the server reject *plaintext* password fields on `/auth` and `/users` (encrypted-only). Default off for backward-compatible rollout; flip to `true` once all clients encrypt. |
 
-Set `VITE_*` vars in `.env` (local) or `.env.production` (prod build). Set `WEB_API_KEY` via `firebase functions:config:set` or Google Cloud Secret Manager.
+Set `VITE_*` vars in `.env` (local) or `.env.production` (prod build). Set `WEB_API_KEY` and `PASSWORD_ENC_PRIVATE_KEY` via `firebase functions:config:set` or Google Cloud Secret Manager.
+
+**Password-encryption layer (defense-in-depth):** clients (browser + load test) RSA-encrypt password fields as `enc:v1:<base64>` envelopes before sending; a backend middleware decrypts them in place ahead of `/auth` and `/users`. This keeps plaintext passwords out of access logs / DevTools — it is **on top of** HTTPS, not a replacement, and does not defend against an active body-modifying adversary (who could swap the public key). `/api/health` reports `encryption: true|false` so monitoring can catch a deploy that forgot the secret.
 
 ---
 

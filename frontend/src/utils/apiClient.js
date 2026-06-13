@@ -24,6 +24,7 @@ import {
 } from "./tokenManager.js";
 import { logErr, log } from "./logger.js";
 import { westernizeDeep } from "./digits.js";
+import { encryptPasswordFields, resetPublicKeyCache } from "./passwordCrypto.js";
 import { API_BASE_URL, API_TIMEOUT_MS } from "../config/index.js";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -129,6 +130,20 @@ async function request(method, path, body, opts) {
   // so the database only stores ASCII digits. Password fields are preserved.
   const safeBody = body === undefined ? undefined : westernizeDeep(body);
 
+  // Encrypt password fields (RSA-OAEP) so a plaintext password never appears in
+  // server/proxy access logs or a DevTools-visible body. Best-effort: a missing
+  // server key OR any crypto failure must never break the request, so fall back
+  // to the (already TLS-protected) plaintext body.
+  let sendBody = safeBody;
+  if (safeBody !== undefined) {
+    try {
+      sendBody = await encryptPasswordFields(safeBody);
+    } catch (err) {
+      logErr("apiClient.encrypt", err);
+      sendBody = safeBody;
+    }
+  }
+
   if (!skipAuth) {
     const tok = await getIdToken().catch(() => null);
     if (tok) headers[HEADER_AUTH] = `${BEARER_PREFIX}${tok}`;
@@ -137,18 +152,44 @@ async function request(method, path, body, opts) {
   const res = await fetchWithTimeout(url, {
     method,
     headers,
-    body: safeBody === undefined ? undefined : JSON.stringify(safeBody),
+    body: sendBody === undefined ? undefined : JSON.stringify(sendBody),
   }, timeoutMs, `${method} ${path}`);
 
   if (res.status === HTTP_UNAUTHORIZED && !skipAuth) {
-    return handleUnauthorized(method, url, headers, safeBody, path, timeoutMs);
+    return handleUnauthorized(method, url, headers, sendBody, path, timeoutMs);
   }
-  return parseResponse(res, method, path);
+  try {
+    return await parseResponse(res, method, path);
+  } catch (err) {
+    // The server rejected our password encryption — either our ciphertext was
+    // undecryptable (`bad_encrypted_field`, e.g. a dev key rotation left a stale
+    // public key) or the server requires encryption and we sent plaintext
+    // (`encryption_required`, e.g. a transient pubkey outage). Both are emitted
+    // only by the decrypt middleware. Drop the cached key and retry ONCE with a
+    // fresh fetch (re-encrypting the original body from the top).
+    const encErr =
+      err instanceof ApiError &&
+      (err.body?.error === "bad_encrypted_field" ||
+        err.body?.error === "encryption_required");
+    if (encErr && !opts?._retriedEnc) {
+      resetPublicKeyCache();
+      return request(method, path, body, { ...opts, _retriedEnc: true });
+    }
+    throw err;
+  }
 }
 
 /**
  * On a 401: attempt one refresh + retry. If the retry still fails, fire the
  * auth-change callback so the UI can route to login.
+ *
+ * `body` here is the already-encrypted payload; the retry replays the SAME
+ * ciphertext (RSA-OAEP output stays valid for the same server key) — it does NOT
+ * re-encrypt. This path deliberately skips the bad_encrypted_field self-heal:
+ * the decrypt middleware runs BEFORE requireAuth, so a stale-key envelope yields
+ * 400 bad_encrypted_field (handled by request()'s catch) rather than a 401, and a
+ * 401 only happens when decryption already succeeded — so the replayed ciphertext
+ * cannot newly fail to decrypt within the same in-flight request.
  */
 async function handleUnauthorized(method, url, headers, body, path, timeoutMs) {
   log(`apiClient: 401 on ${method} ${path}; attempting refresh`);

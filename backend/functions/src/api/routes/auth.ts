@@ -28,6 +28,7 @@ import { ipRateLimit } from "../middleware/rateLimit";
 import { allow, failureCount, recordFailure, clearFailures } from "../../rateLimit";
 import { HOUR_MS } from "../../constants/time";
 import { RATE } from "../../constants/rateLimits";
+import { getPublicKeyMeta, isEphemeralKey } from "../passwordCrypto";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -98,6 +99,32 @@ const LOGIN_INVALID_CREDENTIAL_CODES = new Set([
 ]);
 
 export const authRouter = Router();
+
+// ─── GET /auth/pubkey ─────────────────────────────────────────────────────────
+
+/**
+ * Publish the RSA public key clients use to encrypt password fields before
+ * sending them (see api/passwordCrypto.ts + middleware/decryptPasswordFields).
+ *
+ * Public + unauthenticated — the key is non-secret. Returns
+ * `{ alg, kid, key }` where `key` is the SPKI DER as base64, or 503
+ * `encryption_unavailable` when no key is configured (clients then fall back to
+ * sending plaintext over TLS, which the backward-compatible middleware accepts).
+ */
+authRouter.get("/pubkey", (_req, res) => {
+  const meta = getPublicKeyMeta();
+  if (!meta) {
+    res.status(503).json({ error: "encryption_unavailable" });
+    return;
+  }
+  // A configured key is stable per deploy → let browsers/proxies cache it briefly
+  // so a login doesn't pay an extra uncached round-trip. An EPHEMERAL dev key
+  // rotates on every cold start, so it must NOT be cached — otherwise a client
+  // would keep encrypting to a dead key and its stale-key retry could never
+  // recover within the cache window.
+  res.set("Cache-Control", isEphemeralKey() ? "no-store" : "public, max-age=300");
+  res.json(meta);
+});
 
 // ─── POST /auth/login ─────────────────────────────────────────────────────────
 

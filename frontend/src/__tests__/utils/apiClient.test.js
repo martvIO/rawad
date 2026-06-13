@@ -2,6 +2,7 @@
 // mock both global fetch and tokenManager so the request loop runs without
 // touching localStorage or the network.
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { webcrypto } from "node:crypto";
 
 // Mock tokenManager BEFORE importing apiClient so the apiClient picks up the
 // mocked exports. The mock returns a fresh object that the tests reach into
@@ -22,6 +23,7 @@ vi.mock("../../config/index.js", async (importOriginal) => {
 
 import { api, ApiError, buildApiUrl, setAuthChangeCallback } from "../../utils/apiClient.js";
 import * as tokenMgr from "../../utils/tokenManager.js";
+import { resetPublicKeyCache } from "../../utils/passwordCrypto.js";
 
 function jsonResponse(status, body) {
   return {
@@ -43,6 +45,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
   setAuthChangeCallback(null);
+  resetPublicKeyCache(); // drop any memoized pubkey between tests
 });
 
 describe("buildApiUrl", () => {
@@ -242,6 +245,133 @@ describe("api.upload", () => {
     const out = await api.upload("/p", fd);
     expect(out).toEqual({ ok: true });
     expect(fetch).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("password field encryption", () => {
+  let keyPair;
+  let spkiB64;
+
+  beforeEach(async () => {
+    vi.stubGlobal("crypto", webcrypto); // give the util crypto.subtle in jsdom
+    keyPair = await webcrypto.subtle.generateKey(
+      {
+        name: "RSA-OAEP",
+        modulusLength: 2048,
+        publicExponent: new Uint8Array([1, 0, 1]),
+        hash: "SHA-256",
+      },
+      true,
+      ["encrypt", "decrypt"],
+    );
+    const spki = await webcrypto.subtle.exportKey("spki", keyPair.publicKey);
+    spkiB64 = Buffer.from(new Uint8Array(spki)).toString("base64");
+  });
+
+  async function decryptEnvelope(env) {
+    const bytes = Uint8Array.from(Buffer.from(env.replace(/^enc:v1:/, ""), "base64"));
+    const pt = await webcrypto.subtle.decrypt({ name: "RSA-OAEP" }, keyPair.privateKey, bytes);
+    return new TextDecoder().decode(pt);
+  }
+
+  it("encrypts the password before POSTing /auth/login (pubkey first, login second)", async () => {
+    fetch
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ alg: "RSA-OAEP-256", kid: "v1", key: spkiB64 }),
+      })
+      .mockResolvedValueOnce(jsonResponse(200, { idToken: "t" }));
+
+    await api.post("/auth/login", { username: "admin", password: "Secret123" }, { skipAuth: true });
+
+    expect(fetch).toHaveBeenCalledTimes(2);
+    const sent = JSON.parse(fetch.mock.calls[1][1].body);
+    expect(sent.username).toBe("admin"); // untouched
+    expect(sent.password.startsWith("enc:v1:")).toBe(true);
+    expect(await decryptEnvelope(sent.password)).toBe("Secret123");
+  });
+
+  it("sends plaintext when the pubkey endpoint is unavailable (503)", async () => {
+    fetch
+      .mockResolvedValueOnce({ ok: false, status: 503, json: async () => ({ error: "encryption_unavailable" }) })
+      .mockResolvedValueOnce(jsonResponse(200, { idToken: "t" }));
+
+    await api.post("/auth/login", { username: "admin", password: "Secret123" }, { skipAuth: true });
+
+    const sent = JSON.parse(fetch.mock.calls[1][1].body);
+    expect(sent.password).toBe("Secret123");
+  });
+
+  it("does not fetch the pubkey for bodies without a password field", async () => {
+    fetch.mockResolvedValueOnce(jsonResponse(200, { ok: true }));
+    await api.post("/guests", { name: "x" });
+    expect(fetch).toHaveBeenCalledTimes(1); // no extra pubkey round-trip
+  });
+
+  // Fresh pubkey response object per call (json() is consumed once per fetch).
+  function pubkey() {
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({ alg: "RSA-OAEP-256", kid: "v1", key: spkiB64 }),
+    };
+  }
+
+  it("retries once with a fresh pubkey on bad_encrypted_field, then succeeds", async () => {
+    fetch
+      .mockResolvedValueOnce(pubkey()) // attempt 1: pubkey
+      .mockResolvedValueOnce(jsonResponse(400, { error: "bad_encrypted_field" })) // login rejected
+      .mockResolvedValueOnce(pubkey()) // attempt 2: fresh pubkey (cache reset)
+      .mockResolvedValueOnce(jsonResponse(200, { idToken: "t" })); // login ok
+
+    const out = await api.post("/auth/login", { username: "a", password: "Secret123" }, { skipAuth: true });
+    expect(out).toEqual({ idToken: "t" });
+    expect(fetch).toHaveBeenCalledTimes(4); // pubkey, login(400), pubkey, login(200)
+  });
+
+  it("gives up after exactly one retry if the server keeps rejecting", async () => {
+    fetch
+      .mockResolvedValueOnce(pubkey())
+      .mockResolvedValueOnce(jsonResponse(400, { error: "bad_encrypted_field" }))
+      .mockResolvedValueOnce(pubkey())
+      .mockResolvedValueOnce(jsonResponse(400, { error: "bad_encrypted_field" }));
+
+    await expect(
+      api.post("/auth/login", { username: "a", password: "Secret123" }, { skipAuth: true }),
+    ).rejects.toMatchObject({ status: 400, body: { error: "bad_encrypted_field" } });
+    expect(fetch).toHaveBeenCalledTimes(4); // no infinite loop: bounded at one retry
+  });
+
+  it("retries on encryption_required: plaintext fallback, then key recovers and it encrypts", async () => {
+    fetch
+      .mockResolvedValueOnce({ ok: false, status: 503, json: async () => ({ error: "encryption_unavailable" }) }) // pubkey down → plaintext
+      .mockResolvedValueOnce(jsonResponse(400, { error: "encryption_required" })) // server demands encryption
+      .mockResolvedValueOnce(pubkey()) // retry: pubkey now available
+      .mockResolvedValueOnce(jsonResponse(200, { idToken: "t" }));
+
+    const out = await api.post("/auth/login", { username: "a", password: "Secret123" }, { skipAuth: true });
+    expect(out).toEqual({ idToken: "t" });
+    const retried = JSON.parse(fetch.mock.calls[3][1].body);
+    expect(retried.password.startsWith("enc:v1:")).toBe(true); // now encrypted
+    expect(fetch).toHaveBeenCalledTimes(4);
+  });
+
+  it("on a 401 replays the SAME encrypted envelope without re-fetching the pubkey", async () => {
+    tokenMgr.refreshIdToken.mockResolvedValueOnce("fresh.token");
+    fetch
+      .mockResolvedValueOnce(pubkey()) // pubkey
+      .mockResolvedValueOnce(jsonResponse(401, { error: "expired" })) // first attempt 401
+      .mockResolvedValueOnce(jsonResponse(200, { ok: true })); // refreshed retry
+
+    await api.put("/users/u1/password", { newPassword: "Secret123" }); // authenticated (not skipAuth)
+
+    expect(fetch).toHaveBeenCalledTimes(3); // pubkey once; NOT re-fetched on the 401 retry
+    const first = JSON.parse(fetch.mock.calls[1][1].body);
+    const retry = JSON.parse(fetch.mock.calls[2][1].body);
+    expect(first.newPassword.startsWith("enc:v1:")).toBe(true);
+    expect(retry.newPassword).toBe(first.newPassword); // same ciphertext, not re-encrypted/double-wrapped
+    expect(await decryptEnvelope(retry.newPassword)).toBe("Secret123");
   });
 });
 

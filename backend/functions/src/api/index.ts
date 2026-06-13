@@ -32,6 +32,8 @@ import { proofsRouter } from "./routes/proofs";
 import { digitalRouter } from "./routes/digital";
 import { photoFacesRouter } from "./routes/photoFaces";
 import { adminRouter } from "./routes/admin";
+import { decryptPasswordFields } from "./middleware/decryptPasswordFields";
+import { isEncryptionAvailable } from "./passwordCrypto";
 // NOTE: additional routers (users, guests, ...) are mounted as their files
 // are created in subsequent migration steps. The import + app.use lines
 // below are added incrementally.
@@ -77,9 +79,13 @@ app.use(stripApiPrefix);
 
 // ─── Routers ──────────────────────────────────────────────────────────────────
 
-app.use("/auth", authRouter);
+// decryptPasswordFields runs ahead of the two routers that receive passwords,
+// turning any `enc:v1:` envelope back into plaintext in `req.body` before the
+// handlers (and isStrongPassword / Firebase Auth) read it. Plaintext bodies
+// pass through untouched (backward-compatible).
+app.use("/auth", decryptPasswordFields, authRouter);
 app.use("/settings", settingsRouter);
-app.use("/users", usersRouter);
+app.use("/users", decryptPasswordFields, usersRouter);
 app.use("/guests", guestsRouter);
 app.use("/confirmations", confirmationsRouter);
 app.use("/live-locations", liveLocationsRouter);
@@ -100,7 +106,15 @@ app.use("/admin", adminRouter);
  * so a flapping/restarting function is visible.
  */
 app.get("/health", (_req, res) => {
-  res.json({ ok: true, uptimeSeconds: Math.floor(process.uptime()) });
+  // `encryption` surfaces whether the password-encryption layer has a usable key.
+  // It is `false` when PASSWORD_ENC_PRIVATE_KEY is unset in production (the layer
+  // silently falls back to plaintext-over-TLS) — so monitoring can alert when a
+  // deploy forgot to provision the secret.
+  res.json({
+    ok: true,
+    uptimeSeconds: Math.floor(process.uptime()),
+    encryption: isEncryptionAvailable(),
+  });
 });
 
 // ─── 404 handler ──────────────────────────────────────────────────────────────

@@ -62,6 +62,10 @@ from typing import Optional
 import requests
 from locust import HttpUser, LoadTestShape, between, events, task
 
+# RSA password-encryption for the bootstrap login (matches the browser client).
+# Imports only requests + cryptography, so it is gevent-safe after the patch above.
+from passwordcrypto import encrypt_credentials
+
 # --- Optional run config file (the dashboard's single source of run params) --
 # When LOADTEST_CONFIG_FILE points at a run_config.json, its values become the
 # fallback for every CONFIG constant below. Precedence stays: explicit env var
@@ -245,7 +249,9 @@ def _login(role: str) -> Optional[dict]:
     if not creds:
         return None
     try:
-        r = _post_json("/auth/login", creds)
+        # Encrypt the password (RSA-OAEP) before sending, exactly like the
+        # browser. Degrades to plaintext if the server publishes no key.
+        r = _post_json("/auth/login", encrypt_credentials(BASE_URL, creds))
         if r.status_code == 200:
             return r.json()
         log.warning("bootstrap: login(%s) -> HTTP %s %s", role, r.status_code, r.text[:200])
