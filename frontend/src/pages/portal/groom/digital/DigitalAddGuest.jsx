@@ -1,9 +1,10 @@
 // Digital invitation — Add guest form.
 // Validation: name must be 2+ words, phone must be exactly 10 digits.
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { usePortal } from "../../../../context/PortalContext.jsx";
 import { addDigitalGuest, subscribeDigitalMedia, subscribeDigitalGuests } from "../../../../services/digitalInvitation.js";
+import { parseGuestLines, toLocalIL } from "../../../../utils/bulkGuests.js";
 import { toIntlPhone } from "../../../../utils/phone.js";
 import { logErr } from "../../../../utils/logger.js";
 import { localizeApiError } from "../../../../utils/apiError.js";
@@ -23,6 +24,11 @@ export function DigitalAddGuest() {
   const [saving,         setSaving]         = useState(false);
   // The groom's existing digital guests — used to block a duplicate phone.
   const [existingGuests, setExistingGuests] = useState([]);
+  // Bulk-import (paste many "Name, Phone" lines at once).
+  const [bulkOpen,     setBulkOpen]     = useState(false);
+  const [bulkText,     setBulkText]     = useState("");
+  const [bulkBusy,     setBulkBusy]     = useState(false);
+  const [bulkProgress, setBulkProgress] = useState({ done: 0, total: 0 });
   // Tracks unmount so we don't call setSaving on a dead component after the
   // optimistic navigate has fired. Avoids React's "state on unmounted" warning
   // and prevents the spinner state from being reset to stale on a fast remount.
@@ -116,6 +122,37 @@ export function DigitalAddGuest() {
     }
   };
 
+  // Live preview of the pasted list, deduped against the existing guests.
+  const bulkParsed = useMemo(() => {
+    const existingLocals = new Set(existingGuests.map(g => toLocalIL(g.phone)).filter(Boolean));
+    return parseGuestLines(bulkText, existingLocals);
+  }, [bulkText, existingGuests]);
+
+  const runBulkAdd = async () => {
+    if (!currentUid) { showToast(lang === "he" ? "אנא התחבר מחדש" : "يرجى إعادة تسجيل الدخول"); return; }
+    const valids = bulkParsed.rows.filter(r => r.valid);
+    if (!valids.length) { showToast(lang === "he" ? "אין שורות תקינות להוספה" : "لا توجد صفوف صالحة للإضافة"); return; }
+    const cleanRanks = selectedRanks.filter(r => availableRanks.includes(r));
+    setBulkBusy(true);
+    let added = 0, failed = 0;
+    for (const r of valids) {
+      try {
+        await addDigitalGuest(currentUid, { name: r.name, phone: r.phone, ranks: cleanRanks });
+        added++;
+      } catch {
+        failed++;
+      }
+      if (mountedRef.current) setBulkProgress({ done: added + failed, total: valids.length });
+    }
+    if (mountedRef.current) setBulkBusy(false);
+    showToast(
+      lang === "he"
+        ? `✓ נוספו ${added}${failed ? ` · ${failed} נכשלו` : ""}`
+        : `✓ تمت إضافة ${added}${failed ? ` · فشل ${failed}` : ""}`,
+    );
+    if (added > 0) navigate("/portal/groom/digital/guests");
+  };
+
   return (
     <div style={{ animation: "fadeUp .3s ease" }}>
       <div style={{ marginBottom: 18 }}>
@@ -125,6 +162,58 @@ export function DigitalAddGuest() {
         <div style={{ fontSize: 12, color: C.dim }}>
           {lang === "he" ? "כל השדות חובה" : "جميع الحقول إجبارية"}
         </div>
+      </div>
+
+      {/* ── Bulk import (paste many guests at once) ─────────────────────── */}
+      <div className="gold-card" style={{ padding: 16, marginBottom: 14 }}>
+        <button
+          onClick={() => setBulkOpen(o => !o)}
+          style={{
+            width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center",
+            background: "transparent", border: "none", cursor: "pointer", fontFamily: "inherit",
+            color: C.goldLight, fontSize: 13, fontWeight: 800, padding: 0,
+          }}>
+          <span>📋 {lang === "he" ? "הוספה מרובה (הדבקת רשימה)" : "إضافة جماعية (لصق قائمة)"}</span>
+          <span style={{ color: C.dim }}>{bulkOpen ? "▲" : "▼"}</span>
+        </button>
+        {bulkOpen && (
+          <div style={{ marginTop: 12 }}>
+            <div style={{ fontSize: 11, color: C.dim, marginBottom: 8, lineHeight: 1.7 }}>
+              {lang === "he"
+                ? "הדביקו שורה לכל מוזמן בפורמט: שם מלא, טלפון"
+                : "الصق سطراً لكل مدعو بالصيغة: الاسم الكامل، رقم الهاتف"}
+            </div>
+            <textarea
+              className="input-field"
+              rows={6}
+              value={bulkText}
+              onChange={e => setBulkText(e.target.value)}
+              placeholder={lang === "he" ? "מוחמד אחמד, 0524264094\nשרה עלי, 0501112233" : "محمد أحمد، 0524264094\nسارة علي، 0501112233"}
+              style={{ fontSize: 13, resize: "vertical", fontFamily: "inherit", marginBottom: 8 }}
+            />
+            {bulkText.trim() && (
+              <div style={{ fontSize: 11.5, color: C.dim, marginBottom: 10, display: "flex", gap: 12, flexWrap: "wrap" }}>
+                <span style={{ color: "#4cc97a", fontWeight: 700 }}>✓ {bulkParsed.stats.valid} {lang === "he" ? "תקינים" : "صالح"}</span>
+                {bulkParsed.stats.invalid > 0 && <span style={{ color: C.red }}>⚠ {bulkParsed.stats.invalid} {lang === "he" ? "שגויים" : "خطأ"}</span>}
+                {bulkParsed.stats.duplicate > 0 && <span style={{ color: "#d4a14b" }}>⧉ {bulkParsed.stats.duplicate} {lang === "he" ? "כפולים" : "مكرر"}</span>}
+              </div>
+            )}
+            <button
+              className="gold-btn"
+              style={{ width: "100%" }}
+              disabled={bulkBusy || bulkParsed.stats.valid === 0}
+              onClick={runBulkAdd}>
+              {bulkBusy
+                ? `${bulkProgress.done} / ${bulkProgress.total}…`
+                : (lang === "he" ? `הוסף ${bulkParsed.stats.valid} מוזמנים` : `إضافة ${bulkParsed.stats.valid} مدعو`)}
+            </button>
+            <div style={{ fontSize: 10.5, color: C.dim, marginTop: 8, lineHeight: 1.6 }}>
+              {lang === "he"
+                ? "💡 רמות שנבחרו למטה יחולו על כל המוזמנים שיתווספו."
+                : "💡 الرتب المحددة بالأسفل ستُطبَّق على كل المدعوين المُضافين."}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="gold-card" style={{ padding: 24 }}>
