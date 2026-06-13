@@ -268,7 +268,8 @@ class RunManager:
                 "name": nm,
                 "method": row.get("method") or "",
                 "rps": _num(row.get("current_rps")),
-                "p95": _num(row.get("ninety_fifth_response_time")
+                "p95": _num(row.get("response_time_percentile_0.95")
+                            or row.get("ninety_fifth_response_time")
                             or row.get("ninetieth_response_time")
                             or row.get("median_response_time")),
                 "failures": int(_num(row.get("num_failures"))),

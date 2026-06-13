@@ -114,34 +114,47 @@ def _history_csv(run_id: str) -> str:
 
 
 def timeseries(run_id: str, max_points: int = 500) -> List[Dict[str, Any]]:
-    """Parse the Aggregated rows of a run's dawa_stats_history.csv."""
+    """Parse a run's dawa_stats_history.csv into a per-interval series.
+
+    rps + percentiles come from the "Aggregated" row at each timestamp; the user
+    count comes from the MAX "User Count" across all rows at that timestamp
+    (locust + LoadTestShape records 0 on the Aggregated row but the real count on
+    the per-endpoint rows).
+    """
     path = _history_csv(run_id)
     if not os.path.exists(path):
         return []
-    rows: List[Dict[str, Any]] = []
+    users_by_ts: Dict[float, int] = {}
+    agg_by_ts: Dict[float, Dict[str, Any]] = {}
     try:
         with open(path, newline="", encoding="utf-8") as f:
             reader = csv.DictReader(f)
             for r in reader:
+                ts = _f(r.get("Timestamp"))
+                uc = int(_f(r.get("User Count")))
+                if uc > users_by_ts.get(ts, 0):
+                    users_by_ts[ts] = uc
                 name = (r.get("Name") or "").strip()
-                if name not in ("Aggregated", "Total", ""):
-                    continue
-                rps = _f(r.get("Requests/s"))
-                fps = _f(r.get("Failures/s"))
-                rows.append({
-                    "t": _f(r.get("Timestamp")),
-                    "users": int(_f(r.get("User Count"))),
-                    "rps": rps,
-                    "fail_rate": (fps / rps) if rps > 0 else 0.0,
-                    "p50": _f(r.get("50%")),
-                    "p95": _f(r.get("95%")),
-                    "p99": _f(r.get("99%")),
-                })
+                if name in ("Aggregated", "Total", ""):
+                    agg_by_ts[ts] = r
     except (OSError, ValueError):
         return []
 
-    # keep only one aggregated row per timestamp (DictReader may include the
-    # final cumulative block too); de-dupe by timestamp keeping the last.
+    rows: List[Dict[str, Any]] = []
+    for ts in sorted(agg_by_ts.keys()):
+        r = agg_by_ts[ts]
+        rps = _f(r.get("Requests/s"))
+        fps = _f(r.get("Failures/s"))
+        rows.append({
+            "t": ts,
+            "users": users_by_ts.get(ts, 0),
+            "rps": rps,
+            "fail_rate": (fps / rps) if rps > 0 else 0.0,
+            "p50": _f(r.get("50%")),
+            "p95": _f(r.get("95%")),
+            "p99": _f(r.get("99%")),
+        })
+
     if len(rows) > max_points:
         stride = len(rows) // max_points + 1
         rows = rows[::stride]

@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { C, SP, chip, FONT } from "./theme.js";
-import { useEventSource, getRunStatus, getLatestResults } from "./api.js";
+import { useEventSource, getRunStatus, getLatestResults, getConfig } from "./api.js";
 import ConfigForm from "./components/ConfigForm.jsx";
 import RunControls from "./components/RunControls.jsx";
 import LiveCharts from "./components/LiveCharts.jsx";
@@ -28,8 +28,12 @@ export default function App() {
   const [status, setStatus] = useState(null); // last /api/run/status snapshot
   const [results, setResults] = useState(null); // last /api/results/latest
 
-  // Seed status once on mount (covers a run already in progress / just finished).
+  // Seed config + status once on mount. Loading config here (not only in
+  // ConfigForm, which mounts on the Configure tab) means the Run tab knows the
+  // target host immediately — so the Start button shows the right localhost vs
+  // production styling even before the user visits Configure.
   useEffect(() => {
+    getConfig().then(setConfig).catch(() => {});
     getRunStatus().then(setStatus).catch(() => {});
     getLatestResults().then(setResults).catch(() => {});
   }, []);
