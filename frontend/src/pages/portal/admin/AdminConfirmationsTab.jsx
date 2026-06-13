@@ -210,7 +210,7 @@ export function AdminConfirmationsTab() {
 
   return (
     <div>
-      <div style={{ fontSize: 19, fontWeight: 900, color: C.gold, fontFamily: "'Amiri',serif", marginBottom: 4 }}>
+      <div style={{ fontSize: 19, fontWeight: 900, color: C.gold, fontFamily: "'Amiri','Frank Ruhl Libre',serif", marginBottom: 4 }}>
         ✓ {t("admin_conf_title")}
       </div>
       <div style={{ fontSize: 12, color: C.dim, marginBottom: 16 }}>

@@ -23,7 +23,7 @@ export function DriverPickGroom() {
             </div>
             <div style={{ textAlign: "center", marginBottom: 22 }}>
               <div style={{ fontSize: 44, marginBottom: 10 }}>🚗</div>
-              <h1 style={{ fontFamily: "'Amiri',serif", color: C.blue, fontSize: 24, marginBottom: 6 }}>
+              <h1 style={{ fontFamily: "'Amiri','Frank Ruhl Libre',serif", color: C.blue, fontSize: 24, marginBottom: 6 }}>
                 {t("driver_pick_groom_title")}
               </h1>
               <p style={{ color: C.dim, fontSize: 13, lineHeight: 1.7, maxWidth: 360, margin: "0 auto" }}>

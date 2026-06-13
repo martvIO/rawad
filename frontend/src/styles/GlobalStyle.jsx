@@ -4,14 +4,14 @@
 
 export const GlobalStyle = () => (
   <style>{`
-    @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&family=Amiri:wght@400;700&family=Noto+Naskh+Arabic:wght@400;500;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&family=Amiri:wght@400;700&family=Noto+Naskh+Arabic:wght@400;500;700&family=Heebo:wght@300;400;600;700;900&family=Frank+Ruhl+Libre:wght@400;700;900&display=swap');
 
     /* ── Reset + base ──────────────────────────────────────────────────── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html { scroll-behavior: smooth; }
     body {
       background: #07070a; color: #f5e6b8;
-      font-family: 'Cairo', 'Amiri', sans-serif; direction: rtl;
+      font-family: 'Cairo', 'Heebo', 'Amiri', sans-serif; direction: rtl;
       -webkit-font-smoothing: antialiased;
       -moz-osx-font-smoothing: grayscale;
       text-rendering: optimizeLegibility;

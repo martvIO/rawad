@@ -119,7 +119,7 @@ export function InviteForm({ t, lang, setLang }) {
     return (
       <CenteredMessage>
         <div style={{ fontSize: 56, marginBottom: 12 }}>⚠️</div>
-        <h1 data-testid="conf-invalid-title" style={{ fontFamily: "'Amiri',serif", color: C.red, fontSize: 24, marginBottom: 8 }}>
+        <h1 data-testid="conf-invalid-title" style={{ fontFamily: "'Amiri','Frank Ruhl Libre',serif", color: C.red, fontSize: 24, marginBottom: 8 }}>
           {t("invite_invalid")}
         </h1>
       </CenteredMessage>
@@ -129,7 +129,7 @@ export function InviteForm({ t, lang, setLang }) {
     return (
       <CenteredMessage>
         <div style={{ fontSize: 56, marginBottom: 12 }}>⏰</div>
-        <h1 data-testid="conf-expired-title" style={{ fontFamily: "'Amiri',serif", color: C.red, fontSize: 24, marginBottom: 8 }}>
+        <h1 data-testid="conf-expired-title" style={{ fontFamily: "'Amiri','Frank Ruhl Libre',serif", color: C.red, fontSize: 24, marginBottom: 8 }}>
           {t("invite_expired")}
         </h1>
       </CenteredMessage>
@@ -139,7 +139,7 @@ export function InviteForm({ t, lang, setLang }) {
     return (
       <CenteredMessage>
         <div style={{ fontSize: 56, marginBottom: 12 }}>✅</div>
-        <h1 data-testid="conf-used-title" style={{ fontFamily: "'Amiri',serif", color: "#4cc97a", fontSize: 24, marginBottom: 8 }}>
+        <h1 data-testid="conf-used-title" style={{ fontFamily: "'Amiri','Frank Ruhl Libre',serif", color: "#4cc97a", fontSize: 24, marginBottom: 8 }}>
           {t("invite_used")}
         </h1>
       </CenteredMessage>
@@ -149,7 +149,7 @@ export function InviteForm({ t, lang, setLang }) {
     return (
       <CenteredMessage>
         <div style={{ fontSize: 64, marginBottom: 16 }}>🎉</div>
-        <h1 data-testid="conf-thanks-title" style={{ fontFamily: "'Amiri',serif", color: "#4cc97a", fontSize: 28, marginBottom: 12 }}>
+        <h1 data-testid="conf-thanks-title" style={{ fontFamily: "'Amiri','Frank Ruhl Libre',serif", color: "#4cc97a", fontSize: 28, marginBottom: 12 }}>
           {t("invite_done_title")}
         </h1>
         <p style={{ color: "rgba(245,230,184,.8)", fontSize: 14, lineHeight: 1.9 }}>
@@ -171,7 +171,7 @@ export function InviteForm({ t, lang, setLang }) {
           <div style={{ display: "flex", justifyContent: "center", marginBottom: 14 }}>
             <BrandLogo size={68} />
           </div>
-          <h1 style={{ fontFamily: "'Amiri',serif", color: C.gold, fontSize: 26, marginBottom: 10 }}>
+          <h1 style={{ fontFamily: "'Amiri','Frank Ruhl Libre',serif", color: C.gold, fontSize: 26, marginBottom: 10 }}>
             {t("invite_title")}
           </h1>
           <p style={{ color: "rgba(245,230,184,.78)", fontSize: 13, lineHeight: 1.9, maxWidth: 400, margin: "0 auto" }}>

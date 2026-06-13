@@ -45,7 +45,7 @@ export function CompanionsStepper({ value, onChange }) {
       </button>
       <span
         data-testid="companions-value"
-        style={{ fontFamily: "'Amiri',serif", fontWeight: 800, color: C.goldLight, fontSize: 22, minWidth: 28, textAlign: "center" }}
+        style={{ fontFamily: "'Amiri','Frank Ruhl Libre',serif", fontWeight: 800, color: C.goldLight, fontSize: 22, minWidth: 28, textAlign: "center" }}
       >
         <Num>{v}</Num>
       </span>

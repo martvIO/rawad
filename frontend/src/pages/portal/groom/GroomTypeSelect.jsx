@@ -29,7 +29,7 @@ export function GroomTypeSelect() {
         background: "rgba(7,7,10,.95)", backdropFilter: "blur(12px)",
       }}>
         <button onClick={onBack} style={{ background: "none", border: "none", color: C.dim, cursor: "pointer", fontSize: 18 }}>←</button>
-        <span style={{ fontFamily: "'Amiri',serif", color: C.gold, fontWeight: 900, fontSize: 22 }}>
+        <span style={{ fontFamily: "'Amiri','Frank Ruhl Libre',serif", color: C.gold, fontWeight: 900, fontSize: 22 }}>
           {lang === "he" ? "דעוה" : "دعوة"}
         </span>
       </div>

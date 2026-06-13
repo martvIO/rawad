@@ -69,7 +69,7 @@ export function EditConfirmationModal() {
         maxHeight: "92vh", overflowY: "auto",
       }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
-          <div style={{ color: C.gold, fontWeight: 900, fontSize: 18, fontFamily: "'Amiri',serif" }}>
+          <div style={{ color: C.gold, fontWeight: 900, fontSize: 18, fontFamily: "'Amiri','Frank Ruhl Libre',serif" }}>
             {t("admin_conf_edit")}
           </div>
           <button onClick={close} style={{

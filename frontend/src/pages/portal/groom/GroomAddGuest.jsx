@@ -12,7 +12,7 @@ export function GroomAddGuest() {
   return (
           <div style={{ animation: "fadeUp .3s ease" }}>
             <div style={{ marginBottom: 18 }}>
-              <div style={{ fontSize: 19, fontWeight: 900, color: C.gold, fontFamily: "'Amiri',serif", marginBottom: 4 }}>
+              <div style={{ fontSize: 19, fontWeight: 900, color: C.gold, fontFamily: "'Amiri','Frank Ruhl Libre',serif", marginBottom: 4 }}>
                 {t("add_title")}
               </div>
               <div style={{ fontSize: 12, color: C.dim }}>

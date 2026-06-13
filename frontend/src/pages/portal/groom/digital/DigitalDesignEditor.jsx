@@ -590,7 +590,7 @@ function DesignEditorBody({ groomUid, designId }) {
     <div style={{ animation: "fadeUp .3s ease" }}>
       {/* ── Title ──────────────────────────────────────────────────────────── */}
       <div style={{ marginBottom: 14 }}>
-        <div style={{ fontSize: 19, fontWeight: 900, color: C.gold, fontFamily: "'Amiri',serif", marginBottom: 4 }}>
+        <div style={{ fontSize: 19, fontWeight: 900, color: C.gold, fontFamily: "'Amiri','Frank Ruhl Libre',serif", marginBottom: 4 }}>
           🎨 {tt(lang, "تصميم الدعوة", "עיצוב ההזמנה")}
         </div>
         <div style={{ fontSize: 12, color: C.dim, lineHeight: 1.7 }}>

@@ -11,7 +11,7 @@ export function OnboardingChecklist({ title, steps = [], note }) {
       background: "linear-gradient(180deg, rgba(201,168,76,.08), rgba(201,168,76,.02))",
       border: "1px solid rgba(201,168,76,.25)",
     }}>
-      <div style={{ fontSize: 14, fontWeight: 900, color: C.gold, marginBottom: 12, fontFamily: "'Amiri',serif" }}>
+      <div style={{ fontSize: 14, fontWeight: 900, color: C.gold, marginBottom: 12, fontFamily: "'Amiri','Frank Ruhl Libre',serif" }}>
         ✦ {title}
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>

@@ -61,7 +61,7 @@ export function DigitalInviteForm({ t, lang, setLang }) {
     return (
       <CenteredMessage>
         <div style={{ fontSize: 56, marginBottom: 12 }}>⚠️</div>
-        <h1 style={{ fontFamily: "'Amiri',serif", color: C.red, fontSize: 24, marginBottom: 8 }}>
+        <h1 style={{ fontFamily: "'Amiri','Frank Ruhl Libre',serif", color: C.red, fontSize: 24, marginBottom: 8 }}>
           {lang === "he" ? "קישור לא תקין" : "رابط غير صالح"}
         </h1>
       </CenteredMessage>
@@ -71,7 +71,7 @@ export function DigitalInviteForm({ t, lang, setLang }) {
     return (
       <CenteredMessage>
         <div style={{ fontSize: 56, marginBottom: 12 }}>⚠️</div>
-        <h1 style={{ fontFamily: "'Amiri',serif", color: C.red, fontSize: 22, marginBottom: 8 }}>
+        <h1 style={{ fontFamily: "'Amiri','Frank Ruhl Libre',serif", color: C.red, fontSize: 22, marginBottom: 8 }}>
           {lang === "he" ? "סוג הזמנה לא נכון" : "نوع الدعوة غير صحيح"}
         </h1>
       </CenteredMessage>
@@ -81,7 +81,7 @@ export function DigitalInviteForm({ t, lang, setLang }) {
     return (
       <CenteredMessage>
         <div style={{ fontSize: 56, marginBottom: 12 }}>⏰</div>
-        <h1 style={{ fontFamily: "'Amiri',serif", color: C.red, fontSize: 24, marginBottom: 8 }}>
+        <h1 style={{ fontFamily: "'Amiri','Frank Ruhl Libre',serif", color: C.red, fontSize: 24, marginBottom: 8 }}>
           {lang === "he" ? "הקישור פג תוקף" : "انتهت صلاحية الرابط"}
         </h1>
       </CenteredMessage>
@@ -91,7 +91,7 @@ export function DigitalInviteForm({ t, lang, setLang }) {
     return (
       <CenteredMessage>
         <div style={{ fontSize: 56, marginBottom: 12 }}>✅</div>
-        <h1 style={{ fontFamily: "'Amiri',serif", color: "#4cc97a", fontSize: 24, marginBottom: 8 }}>
+        <h1 style={{ fontFamily: "'Amiri','Frank Ruhl Libre',serif", color: "#4cc97a", fontSize: 24, marginBottom: 8 }}>
           {lang === "he" ? "כבר השבת — תודה!" : "تم الرد مسبقاً — شكراً!"}
         </h1>
       </CenteredMessage>
@@ -101,7 +101,7 @@ export function DigitalInviteForm({ t, lang, setLang }) {
     return (
       <CenteredMessage>
         <div style={{ fontSize: 64, marginBottom: 16 }}>🎉</div>
-        <h1 style={{ fontFamily: "'Amiri',serif", color: "#4cc97a", fontSize: 28, marginBottom: 12 }}>
+        <h1 style={{ fontFamily: "'Amiri','Frank Ruhl Libre',serif", color: "#4cc97a", fontSize: 28, marginBottom: 12 }}>
           {lang === "he" ? "תודה!" : "شكراً جزيلاً!"}
         </h1>
         <p style={{ color: "rgba(245,230,184,.8)", fontSize: 14, lineHeight: 1.9 }}>
@@ -125,7 +125,7 @@ export function DigitalInviteForm({ t, lang, setLang }) {
           <div style={{ display: "flex", justifyContent: "center", marginBottom: 14 }}>
             <BrandLogo size={68} />
           </div>
-          <h1 style={{ fontFamily: "'Amiri',serif", color: C.gold, fontSize: 26, marginBottom: 10 }}>
+          <h1 style={{ fontFamily: "'Amiri','Frank Ruhl Libre',serif", color: C.gold, fontSize: 26, marginBottom: 10 }}>
             {lang === "he" ? "אישור הגעה" : "تأكيد الحضور"}
           </h1>
           <p style={{ color: "rgba(245,230,184,.78)", fontSize: 13, lineHeight: 1.9, maxWidth: 400, margin: "0 auto" }}>

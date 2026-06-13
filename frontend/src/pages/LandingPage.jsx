@@ -67,7 +67,7 @@ function TopNav({ t, lang, setLang, onEnterPortal, scrolled }) {
         <a href="#hero" onClick={(e) => handleScroll(e, "hero")} style={{
           display: "inline-flex", alignItems: "center", gap: 10,
           color: "#fff3c0", textDecoration: "none",
-          fontFamily: "'Amiri',serif", fontWeight: 900, fontSize: 22,
+          fontFamily: "'Amiri','Frank Ruhl Libre',serif", fontWeight: 900, fontSize: 22,
           flexShrink: 0,
         }}>
           <BrandLogo size={34} />
@@ -312,7 +312,7 @@ function HeroSection({ t, lang, onEnterPortal, scrollY }) {
 
         <h1 style={{
           fontSize: "clamp(58px,11vw,128px)", fontWeight: 900,
-          fontFamily: "'Amiri',serif", lineHeight: 1.25,
+          fontFamily: "'Amiri','Frank Ruhl Libre',serif", lineHeight: 1.25,
           background: "linear-gradient(135deg,#fff3c0 0%,#f0c84c 35%,#c9a84c 70%,#a0832c 100%)",
           WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
           backgroundClip: "text", marginBottom: 32,
@@ -377,7 +377,7 @@ function HeroSection({ t, lang, onEnterPortal, scrollY }) {
         animation: "dawa-hero-shimmer 2.4s ease-in-out infinite",
       }}>
         <span style={{
-          fontFamily: "'Amiri',serif", fontStyle: "italic",
+          fontFamily: "'Amiri','Frank Ruhl Libre',serif", fontStyle: "italic",
           fontSize: 11, color: "#c9a84c", letterSpacing: 3, textTransform: "uppercase",
         }}>{t("scroll_cue")}</span>
         <span style={{
@@ -404,7 +404,7 @@ function SectionHead({ eyebrow, title, sub }) {
         <span style={{ width: 28, height: 1, background: "linear-gradient(90deg, #c9a84c, transparent)" }} />
       </div>
       <h2 style={{
-        fontFamily: "'Amiri',serif", fontWeight: 900,
+        fontFamily: "'Amiri','Frank Ruhl Libre',serif", fontWeight: 900,
         fontSize: "clamp(34px,5vw,56px)", lineHeight: 1.3,
         background: "linear-gradient(135deg,#fff3c0,#f0c84c,#c9a84c)",
         WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
@@ -413,7 +413,7 @@ function SectionHead({ eyebrow, title, sub }) {
       {sub && (
         <p style={{
           color: "#d8c9a6", fontSize: 15,
-          fontFamily: "'Amiri',serif", fontStyle: "italic",
+          fontFamily: "'Amiri','Frank Ruhl Libre',serif", fontStyle: "italic",
           lineHeight: 1.85, paddingTop: 4,
         }}>{sub}</p>
       )}
@@ -432,7 +432,7 @@ function AboutSection({ t, lang }) {
             letterSpacing: 4, textTransform: "uppercase", marginBottom: 18, opacity: 0.9,
           }}>{t("about_eyebrow")}</div>
           <h2 style={{
-            fontFamily: "'Amiri',serif", fontWeight: 900,
+            fontFamily: "'Amiri','Frank Ruhl Libre',serif", fontWeight: 900,
             fontSize: "clamp(34px,4vw,52px)", lineHeight: 1.35,
             color: "#ffffff", marginBottom: 24,
             letterSpacing: 0, paddingBlock: 6,
@@ -504,7 +504,7 @@ function FeaturesSection({ t }) {
               marginBottom: 10, opacity: 0.85,
             }}>{String(i + 1).padStart(2, "0")}</div>
             <h3 style={{
-              fontFamily: "'Amiri',serif", fontWeight: 700,
+              fontFamily: "'Amiri','Frank Ruhl Libre',serif", fontWeight: 700,
               fontSize: 22, color: "#ffffff", marginBottom: 14, lineHeight: 1.5,
             }}>{f.title}</h3>
             <p style={{
@@ -544,7 +544,7 @@ function PersonalizationSection({ t, onEnterPortal }) {
         textAlign: "center",
       }}>
         <h2 style={{
-          fontFamily: "'Amiri',serif", fontWeight: 900,
+          fontFamily: "'Amiri','Frank Ruhl Libre',serif", fontWeight: 900,
           fontSize: "clamp(30px,4.6vw,50px)", lineHeight: 1.3,
           background: "linear-gradient(135deg,#fff3c0,#f0c84c,#c9a84c)",
           WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
@@ -606,7 +606,7 @@ function ServicesSection({ t, onEnterPortal }) {
             {t("delivery_subtitle")}
           </div>
           <h3 style={{
-            fontFamily: "'Amiri',serif", color: "#fff3c0", fontWeight: 900,
+            fontFamily: "'Amiri','Frank Ruhl Libre',serif", color: "#fff3c0", fontWeight: 900,
             fontSize: 24, marginBottom: 14, lineHeight: 1.45,
           }}>{t("services_tab1_label")}</h3>
           <div style={{ color: "#d8c9a6", fontSize: 14, lineHeight: 1.9, marginBottom: 20 }}>
@@ -637,7 +637,7 @@ function ServicesSection({ t, onEnterPortal }) {
             DIGITAL
           </div>
           <h3 style={{
-            fontFamily: "'Amiri',serif", color: "#fff3c0", fontWeight: 900,
+            fontFamily: "'Amiri','Frank Ruhl Libre',serif", color: "#fff3c0", fontWeight: 900,
             fontSize: 24, marginBottom: 14, lineHeight: 1.45,
           }}>{t("services_tab2_label")}</h3>
           <div style={{ color: "#d8c9a6", fontSize: 14, lineHeight: 1.9, marginBottom: 12, fontWeight: 700 }}>
@@ -681,13 +681,13 @@ function ProcessSection({ t }) {
               background: "#07070a",
               border: "1px solid rgba(201,168,76,.40)",
               display: "flex", alignItems: "center", justifyContent: "center",
-              fontFamily: "'Amiri',serif", fontWeight: 900,
+              fontFamily: "'Amiri','Frank Ruhl Libre',serif", fontWeight: 900,
               color: "#f0c84c", fontSize: 17,
               boxShadow: "0 0 0 4px #07070a, 0 0 24px rgba(240,200,76,.18)",
             }}>{i + 1}</div>
             <div style={{ fontSize: 26, color: "#c9a84c", marginBottom: 8, opacity: 0.85 }}>{s.ic}</div>
             <h3 style={{
-              fontFamily: "'Amiri',serif", fontWeight: 700,
+              fontFamily: "'Amiri','Frank Ruhl Libre',serif", fontWeight: 700,
               fontSize: 24, color: "#ffffff", marginBottom: 12, lineHeight: 1.4,
             }}>{s.title}</h3>
             <p style={{
@@ -747,7 +747,7 @@ function ShowcaseSection({ t, onEnterPortal }) {
                 <div style={{ fontSize: 9, color: "#7a6a4a", letterSpacing: 1.5, textTransform: "uppercase", fontWeight: 800, marginBottom: 6 }}>
                   {t("dash_welcome")}
                 </div>
-                <div style={{ fontFamily: "'Amiri',serif", fontWeight: 900, color: "#f0c84c", fontSize: 18 }}>
+                <div style={{ fontFamily: "'Amiri','Frank Ruhl Libre',serif", fontWeight: 900, color: "#f0c84c", fontSize: 18 }}>
                   {t("dash_subtitle")}
                 </div>
               </div>
@@ -760,7 +760,7 @@ function ShowcaseSection({ t, onEnterPortal }) {
                     background: "rgba(255,255,255,.03)", border: "1px solid rgba(255,255,255,.07)",
                     borderRadius: 10, padding: "10px 12px",
                   }}>
-                    <div style={{ fontFamily: "'Amiri',serif", color: s.c, fontSize: 22, fontWeight: 900, lineHeight: 1 }}>{s.v}</div>
+                    <div style={{ fontFamily: "'Amiri','Frank Ruhl Libre',serif", color: s.c, fontSize: 22, fontWeight: 900, lineHeight: 1 }}>{s.v}</div>
                     <div style={{ fontSize: 9, color: "#7a6a4a", marginTop: 4, letterSpacing: 1, textTransform: "uppercase" }}>{s.l}</div>
                   </div>
                 ))}
@@ -826,7 +826,7 @@ function ShowcaseSection({ t, onEnterPortal }) {
             marginBottom: 18, opacity: 0.9,
           }}>{t("showcase_eyebrow")}</div>
           <h2 style={{
-            fontFamily: "'Amiri',serif", fontWeight: 900,
+            fontFamily: "'Amiri','Frank Ruhl Libre',serif", fontWeight: 900,
             fontSize: "clamp(34px,4vw,52px)", lineHeight: 1.35,
             color: "#ffffff", marginBottom: 24, letterSpacing: 0, paddingBlock: 6,
           }}>{t("showcase_title")}</h2>
@@ -839,7 +839,7 @@ function ShowcaseSection({ t, onEnterPortal }) {
                 display: "flex", alignItems: "center", gap: 12,
                 padding: "10px 0",
                 borderBottom: i < bullets.length - 1 ? "1px solid rgba(201,168,76,.10)" : "none",
-                color: "#fff3c0", fontSize: 15, fontFamily: "'Amiri',serif",
+                color: "#fff3c0", fontSize: 15, fontFamily: "'Amiri','Frank Ruhl Libre',serif",
               }}>
                 <span style={{
                   width: 6, height: 6, borderRadius: "50%",
@@ -880,7 +880,7 @@ function PricingSection({ t, onContact }) {
         >
           <div style={{ fontSize: 44, marginBottom: 16 }}>✉</div>
           <div style={{ fontSize: 11, color: "#e8c485", letterSpacing: 3, textTransform: "uppercase", fontWeight: 800, marginBottom: 10 }}>LUXURY PRINT</div>
-          <h3 style={{ fontFamily: "'Amiri',serif", color: "#ffe8c4", fontWeight: 900, fontSize: 26, marginBottom: 18, lineHeight: 1.4 }}>{t("price_phys1_label")}</h3>
+          <h3 style={{ fontFamily: "'Amiri','Frank Ruhl Libre',serif", color: "#ffe8c4", fontWeight: 900, fontSize: 26, marginBottom: 18, lineHeight: 1.4 }}>{t("price_phys1_label")}</h3>
           <div style={{ color: "#e0c8a0", fontSize: 14, lineHeight: 1.85, marginBottom: 20 }}>
             {t("price_phys1_sub")}
           </div>
@@ -910,7 +910,7 @@ function PricingSection({ t, onContact }) {
         >
           <div style={{ fontSize: 44, marginBottom: 16 }}>✦</div>
           <div style={{ fontSize: 11, color: "#d4c89a", letterSpacing: 3, textTransform: "uppercase", fontWeight: 800, marginBottom: 10 }}>SIGNATURE PRINT</div>
-          <h3 style={{ fontFamily: "'Amiri',serif", color: "#f5edc4", fontWeight: 900, fontSize: 26, marginBottom: 12, lineHeight: 1.4 }}>{t("price_phys2_label")}</h3>
+          <h3 style={{ fontFamily: "'Amiri','Frank Ruhl Libre',serif", color: "#f5edc4", fontWeight: 900, fontSize: 26, marginBottom: 12, lineHeight: 1.4 }}>{t("price_phys2_label")}</h3>
           <div style={{
             display: "inline-block",
             background: "linear-gradient(135deg, #c9b87a, #f0e4b8)",
@@ -948,9 +948,9 @@ function PricingSection({ t, onContact }) {
         >
           <div style={{ fontSize: 44, marginBottom: 16 }}>✦</div>
           <div style={{ fontSize: 11, color: "#f0c84c", letterSpacing: 3, textTransform: "uppercase", fontWeight: 800, marginBottom: 10 }}>PREMIUM</div>
-          <h3 style={{ fontFamily: "'Amiri',serif", color: "#fff3c0", fontWeight: 900, fontSize: 26, marginBottom: 18, lineHeight: 1.4 }}>{t("price_pkg1_label")}</h3>
+          <h3 style={{ fontFamily: "'Amiri','Frank Ruhl Libre',serif", color: "#fff3c0", fontWeight: 900, fontSize: 26, marginBottom: 18, lineHeight: 1.4 }}>{t("price_pkg1_label")}</h3>
           <div style={{
-            fontFamily: "'Amiri',serif", fontWeight: 900,
+            fontFamily: "'Amiri','Frank Ruhl Libre',serif", fontWeight: 900,
             fontSize: 44, lineHeight: 1.25, marginBottom: 18,
             background: "linear-gradient(135deg,#fff3c0,#f0c84c,#c9a84c)",
             WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
@@ -991,13 +991,13 @@ function PricingSection({ t, onContact }) {
           }}>{t("price_vip_badge")}</div>
           <div style={{ fontSize: 44, marginBottom: 16 }}>♛</div>
           <div style={{ fontSize: 11, color: "#c084fc", letterSpacing: 3, textTransform: "uppercase", fontWeight: 800, marginBottom: 10 }}>VIP ROYAL</div>
-          <h3 style={{ fontFamily: "'Amiri',serif", color: "#fff3c0", fontWeight: 900, fontSize: 26, marginBottom: 14, lineHeight: 1.4 }}>{t("price_vip_title")}</h3>
+          <h3 style={{ fontFamily: "'Amiri','Frank Ruhl Libre',serif", color: "#fff3c0", fontWeight: 900, fontSize: 26, marginBottom: 14, lineHeight: 1.4 }}>{t("price_vip_title")}</h3>
           <div style={{ color: "#d8c9a6", fontSize: 14, lineHeight: 1.85, marginBottom: 22 }}>
             {t("price_vip_body")}
           </div>
           <div style={{ marginBottom: 18, paddingTop: 16, borderTop: "1px solid rgba(192,132,252,.25)" }}>
             <div style={{
-              fontFamily: "'Amiri',serif", fontWeight: 900,
+              fontFamily: "'Amiri','Frank Ruhl Libre',serif", fontWeight: 900,
               fontSize: 44, lineHeight: 1.2,
               background: "linear-gradient(135deg,#fff,#c084fc,#9b4bd4)",
               WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
@@ -1045,7 +1045,7 @@ function FaqSection({ t }) {
                   cursor: "pointer", display: "flex", alignItems: "center",
                   justifyContent: "space-between", gap: 18,
                   color: "#fff3c0",
-                  fontFamily: "'Amiri',serif", fontWeight: 700, fontSize: 18,
+                  fontFamily: "'Amiri','Frank Ruhl Libre',serif", fontWeight: 700, fontSize: 18,
                   lineHeight: 1.5,
                   transition: "color .25s ease",
                 }}
@@ -1096,14 +1096,14 @@ function CtaSection({ t, onEnterPortal, onContact }) {
       <div className="dawa-reveal" style={{ position: "relative" }}>
         <span style={{ fontSize: 48, color: "#c9a84c", display: "block", marginBottom: 18, opacity: 0.7 }}>✦</span>
         <h2 style={{
-          fontFamily: "'Amiri',serif", fontWeight: 900,
+          fontFamily: "'Amiri','Frank Ruhl Libre',serif", fontWeight: 900,
           fontSize: "clamp(38px,5.5vw,68px)", lineHeight: 1.25,
           background: "linear-gradient(135deg,#fff3c0,#f0c84c,#c9a84c)",
           WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
           marginBottom: 28, letterSpacing: 0, paddingBlock: 6,
         }}>{t("cta_title")}</h2>
         <p style={{
-          fontFamily: "'Amiri',serif", fontStyle: "italic",
+          fontFamily: "'Amiri','Frank Ruhl Libre',serif", fontStyle: "italic",
           color: "#d8c9a6", fontSize: 17, lineHeight: 1.8,
           maxWidth: 600, marginInline: "auto", marginBottom: 38,
         }}>{t("cta_sub")}</p>
@@ -1165,7 +1165,7 @@ function FooterSection({ t, lang, onEnterPortal, contact }) {
             <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
               <BrandLogo size={36} />
               <span style={{
-                fontFamily: "'Amiri',serif", fontSize: 26, fontWeight: 900,
+                fontFamily: "'Amiri','Frank Ruhl Libre',serif", fontSize: 26, fontWeight: 900,
                 background: "linear-gradient(135deg,#fff3c0,#f0c84c,#c9a84c)",
                 WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
               }}>{lang === "he" ? "דעוה" : "دعوة"}</span>

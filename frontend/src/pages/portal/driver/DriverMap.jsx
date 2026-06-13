@@ -92,7 +92,7 @@ export function DriverMap() {
   return (
     <div style={{ animation: "fadeUp .3s ease" }}>
       <div style={{ marginBottom: 12 }}>
-        <div style={{ fontSize: 19, fontWeight: 900, color: C.blue, fontFamily: "'Amiri',serif", marginBottom: 4 }}>
+        <div style={{ fontSize: 19, fontWeight: 900, color: C.blue, fontFamily: "'Amiri','Frank Ruhl Libre',serif", marginBottom: 4 }}>
           {t("driver_map_title")}
         </div>
         <div style={{ fontSize: 12, color: C.dim }}>

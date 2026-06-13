@@ -147,7 +147,7 @@ export function AdminDesigns() {
   return (
     <div style={{ animation: "fadeUp .3s ease" }}>
       <div style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 19, fontWeight: 900, color: C.gold, fontFamily: "'Amiri',serif", marginBottom: 4 }}>
+        <div style={{ fontSize: 19, fontWeight: 900, color: C.gold, fontFamily: "'Amiri','Frank Ruhl Libre',serif", marginBottom: 4 }}>
           🎨 {tt(lang, "اعتماد التصاميم الرقمية", "אישור עיצובים דיגיטליים")}
         </div>
         <div style={{ fontSize: 12, color: C.dim }}>
