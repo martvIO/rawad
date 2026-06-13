@@ -14,6 +14,7 @@ import { BrandLogo } from "../components/BrandLogo.jsx";
 import { LangSwitcher } from "../components/LangSwitcher.jsx";
 import { CityField } from "../components/CityField.jsx";
 import { PhoneInput } from "../components/PhoneInput.jsx";
+import { localizeApiError } from "../utils/apiError.js";
 import { MapPickerInline } from "../components/MapPickerInline.jsx";
 import { subscribeInviteToken, submitGuestInvite } from "../services/invites.js";
 import { getCurrentFix } from "../utils/geo.js";
@@ -99,7 +100,7 @@ export function InviteForm({ t, lang, setLang }) {
       const code = err?.code || "";
       if (code.includes("deadline-exceeded")) setError(t("invite_expired"));
       else if (code.includes("not-found"))    setError(t("invite_invalid"));
-      else setError(err?.message || t("conf_form_invalid"));
+      else setError(localizeApiError(err, t, t("conf_form_invalid")));
     } finally {
       setBusy(false);
     }

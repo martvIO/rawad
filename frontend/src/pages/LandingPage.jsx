@@ -6,6 +6,8 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { BrandLogo } from "../components/BrandLogo.jsx";
 import { C } from "../styles/theme.js";
+import { fetchPublicSettings } from "../services/publicSettings.js";
+import { resolveContact, buildWhatsAppUrl, mailtoUrl } from "../utils/contact.js";
 
 // ── Scroll position hook ────────────────────────────────────────────────────
 function useScrollPos() {
@@ -190,6 +192,27 @@ export function LandingPage({ onEnterPortal, t, lang, setLang }) {
   const scrollY = useScrollPos();
   useReveal([lang]);
 
+  // Contact channels (admin-managed via /settings/public, with config fallback).
+  // Drives the "contact us to book" CTAs — they open WhatsApp instead of
+  // dead-ending at the login screen.
+  const [contact, setContact] = useState(() => resolveContact(null));
+  useEffect(() => {
+    let alive = true;
+    fetchPublicSettings().then((s) => { if (alive) setContact(resolveContact(s)); });
+    return () => { alive = false; };
+  }, []);
+
+  const bookText = lang === "he"
+    ? "שלום, אשמח להזמין את שירותי דעוה 🌿"
+    : "مرحباً، أرغب بحجز خدمات دعوة 🌿";
+  const bookWaUrl = buildWhatsAppUrl(contact.whatsapp, bookText);
+  // Booking CTA: open WhatsApp when a business number is configured, otherwise
+  // fall back to the portal login (previous behaviour).
+  const onContact = () => {
+    if (bookWaUrl) window.open(bookWaUrl, "_blank", "noopener");
+    else onEnterPortal();
+  };
+
   return (
     <div style={{ background: C.bg, color: "#fff3c0", overflowX: "hidden", position: "relative" }}>
       <PageStyles />
@@ -205,10 +228,10 @@ export function LandingPage({ onEnterPortal, t, lang, setLang }) {
       <ServicesSection   t={t} onEnterPortal={onEnterPortal} />
       <ProcessSection    t={t} />
       <ShowcaseSection   t={t} onEnterPortal={onEnterPortal} />
-      <PricingSection    t={t} onEnterPortal={onEnterPortal} />
+      <PricingSection    t={t} onContact={onContact} />
       <FaqSection        t={t} />
-      <CtaSection        t={t} onEnterPortal={onEnterPortal} />
-      <FooterSection     t={t} lang={lang} onEnterPortal={onEnterPortal} />
+      <CtaSection        t={t} onEnterPortal={onEnterPortal} onContact={onContact} />
+      <FooterSection     t={t} lang={lang} onEnterPortal={onEnterPortal} contact={contact} />
     </div>
   );
 }
@@ -827,7 +850,7 @@ function ShowcaseSection({ t, onEnterPortal }) {
 }
 
 // ── PRICING — Physical (top row: 2 cards) + Digital (bottom row: 2 cards) ──
-function PricingSection({ t, onEnterPortal }) {
+function PricingSection({ t, onContact }) {
   return (
     <section id="pricing" style={{ padding: "140px 24px", maxWidth: 1000, margin: "0 auto" }}>
       <SectionHead eyebrow={t("pricing_label")} title={t("pricing_title")} sub={t("pricing_subtitle")} />
@@ -862,7 +885,7 @@ function PricingSection({ t, onEnterPortal }) {
               </li>
             ))}
           </ul>
-          <button className="ghost-btn" style={{ width: "100%" }} onClick={onEnterPortal}>{t("price_contact")}</button>
+          <button className="ghost-btn" style={{ width: "100%" }} onClick={onContact}>{t("price_contact")}</button>
         </div>
 
         {/* ── Card 2: المكاتيب المميزة (Physical mid-tier — champagne gold) ── */}
@@ -900,7 +923,7 @@ function PricingSection({ t, onEnterPortal }) {
               </li>
             ))}
           </ul>
-          <button className="ghost-btn" style={{ width: "100%" }} onClick={onEnterPortal}>{t("price_contact")}</button>
+          <button className="ghost-btn" style={{ width: "100%" }} onClick={onContact}>{t("price_contact")}</button>
         </div>
 
         {/* ── Card 3: PREMIUM digital (existing, no discount) ── */}
@@ -937,7 +960,7 @@ function PricingSection({ t, onEnterPortal }) {
               </li>
             ))}
           </ul>
-          <button className="ghost-btn" style={{ width: "100%" }} onClick={onEnterPortal}>{t("price_contact")}</button>
+          <button className="ghost-btn" style={{ width: "100%" }} onClick={onContact}>{t("price_contact")}</button>
         </div>
 
         <div style={{
@@ -985,7 +1008,7 @@ function PricingSection({ t, onEnterPortal }) {
               ))}
             </ul>
           </div>
-          <button className="gold-btn" style={{ width: "100%", marginTop: 8 }} onClick={onEnterPortal}>{t("price_contact")}</button>
+          <button className="gold-btn" style={{ width: "100%", marginTop: 8 }} onClick={onContact}>{t("price_contact")}</button>
         </div>
       </div>
     </section>
@@ -1053,7 +1076,7 @@ function FaqSection({ t }) {
 }
 
 // ── CTA — final conversion block ───────────────────────────────────────────
-function CtaSection({ t, onEnterPortal }) {
+function CtaSection({ t, onEnterPortal, onContact }) {
   return (
     <section id="contact" style={{ padding: "140px 24px", maxWidth: 880, margin: "0 auto", textAlign: "center", position: "relative" }}>
       <div aria-hidden="true" style={{
@@ -1079,7 +1102,7 @@ function CtaSection({ t, onEnterPortal }) {
           <button className="gold-btn" style={{ fontSize: 16, padding: "16px 38px" }} onClick={onEnterPortal}>
             {t("hero_cta_start")}
           </button>
-          <button className="ghost-btn" onClick={onEnterPortal}>{t("price_contact")}</button>
+          <button className="ghost-btn" onClick={onContact}>{t("price_contact")}</button>
         </div>
       </div>
     </section>
@@ -1096,7 +1119,7 @@ const FOOTER_ACTIONS = {
   legal:     [{ type: "route",  target: "/terms" }],
 };
 
-function FooterSection({ t, lang, onEnterPortal }) {
+function FooterSection({ t, lang, onEnterPortal, contact }) {
   const cols = t("footer_cols") || {};
   const navigate = useNavigate();
 
@@ -1142,19 +1165,28 @@ function FooterSection({ t, lang, onEnterPortal }) {
               {t("footer_tagline")}
             </p>
             <div style={{ display: "flex", gap: 8 }}>
-              {["✉", "📱", "♥", "✦"].map((g, i) => (
-                <button key={i} onClick={scrollToHero} aria-label="back to top" style={{
+              {[
+                { g: "✉", href: contact?.email ? mailtoUrl(contact.email) : "" },
+                { g: "📱", href: contact?.whatsapp ? buildWhatsAppUrl(contact.whatsapp) : "" },
+                { g: "♥", href: "" },
+                { g: "✦", href: "" },
+              ].map(({ g, href }, i) => {
+                const circleStyle = {
                   width: 36, height: 36, borderRadius: "50%",
                   border: "1px solid rgba(201,168,76,.22)",
                   display: "inline-flex", alignItems: "center", justifyContent: "center",
                   color: "#c9a84c", fontSize: 14, background: "transparent",
-                  cursor: "pointer", padding: 0, fontFamily: "inherit",
+                  cursor: "pointer", padding: 0, fontFamily: "inherit", textDecoration: "none",
                   transition: "all .3s cubic-bezier(.2,.95,.25,1.1)",
-                }}
-                  onMouseEnter={e => { e.currentTarget.style.borderColor = "#c9a84c"; e.currentTarget.style.color = "#fff3c0"; e.currentTarget.style.transform = "translateY(-3px)"; }}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(201,168,76,.22)"; e.currentTarget.style.color = "#c9a84c"; e.currentTarget.style.transform = "translateY(0)"; }}
-                >{g}</button>
-              ))}
+                };
+                const onEnter = e => { e.currentTarget.style.borderColor = "#c9a84c"; e.currentTarget.style.color = "#fff3c0"; e.currentTarget.style.transform = "translateY(-3px)"; };
+                const onLeave = e => { e.currentTarget.style.borderColor = "rgba(201,168,76,.22)"; e.currentTarget.style.color = "#c9a84c"; e.currentTarget.style.transform = "translateY(0)"; };
+                return href
+                  ? <a key={i} href={href} target="_blank" rel="noopener noreferrer" aria-label={g}
+                       style={circleStyle} onMouseEnter={onEnter} onMouseLeave={onLeave}>{g}</a>
+                  : <button key={i} onClick={scrollToHero} aria-label="back to top"
+                            style={circleStyle} onMouseEnter={onEnter} onMouseLeave={onLeave}>{g}</button>;
+              })}
             </div>
           </div>
           {Object.entries(cols).map(([k, col]) => (

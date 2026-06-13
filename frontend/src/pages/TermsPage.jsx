@@ -1,7 +1,10 @@
 // Public Terms & Conditions + Privacy page — reads sections from i18n.
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { C } from "../styles/theme.js";
 import { BrandLogo } from "../components/BrandLogo.jsx";
+import { fetchPublicSettings } from "../services/publicSettings.js";
+import { resolveContact, buildWhatsAppUrl, mailtoUrl } from "../utils/contact.js";
 
 function SectionCard({ title, body }) {
   return (
@@ -53,6 +56,27 @@ export function TermsPage({ t, lang }) {
   const navigate = useNavigate();
   const sections = t("terms_sections") || [];
   const privacySections = t("terms_privacy_sections") || [];
+
+  // The Terms reference "contact us via WhatsApp" — surface a real, reachable
+  // channel here (admin-managed, config fallback) so data-deletion / privacy
+  // requests aren't a dead end.
+  const [contact, setContact] = useState(() => resolveContact(null));
+  useEffect(() => {
+    let alive = true;
+    fetchPublicSettings().then((s) => { if (alive) setContact(resolveContact(s)); });
+    return () => { alive = false; };
+  }, []);
+  const waUrl = buildWhatsAppUrl(
+    contact.whatsapp,
+    lang === "he" ? "שלום, יש לי שאלה לגבי דעוה" : "مرحباً، لديّ استفسار بخصوص دعوة",
+  );
+  const mUrl = mailtoUrl(contact.email);
+  const linkStyle = {
+    display: "inline-flex", alignItems: "center", gap: 8,
+    padding: "10px 18px", borderRadius: 999, textDecoration: "none",
+    border: "1px solid rgba(201,168,76,.35)", color: "#fff3c0",
+    fontSize: 14, fontWeight: 700, background: "rgba(201,168,76,.08)",
+  };
 
   return (
     <div style={{
@@ -108,12 +132,35 @@ export function TermsPage({ t, lang }) {
           </>
         )}
 
+        {(waUrl || mUrl) && (
+          <div style={{
+            marginTop: 40, padding: "24px 28px", borderRadius: 16,
+            background: "linear-gradient(180deg, rgba(201,168,76,.06), rgba(201,168,76,.02))",
+            border: "1px solid rgba(201,168,76,.22)", textAlign: "center",
+          }}>
+            <div style={{
+              fontFamily: "'Amiri',serif", fontWeight: 800, fontSize: 18,
+              color: "#fff3c0", marginBottom: 16,
+            }}>{t("terms_contact_heading")}</div>
+            <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
+              {waUrl && (
+                <a href={waUrl} target="_blank" rel="noopener noreferrer" style={linkStyle}>
+                  💬 WhatsApp
+                </a>
+              )}
+              {mUrl && (
+                <a href={mUrl} style={linkStyle}>✉ {contact.email}</a>
+              )}
+            </div>
+          </div>
+        )}
+
         <div style={{
           marginTop: 48, paddingTop: 24,
           borderTop: "1px solid rgba(201,168,76,.14)",
           color: "#7a6a4a", fontSize: 12, textAlign: "center",
         }}>
-          © {new Date().getFullYear()} {lang === "he" ? "דעוה" : "دعوة"}
+          © {new Date().getFullYear()} {lang === "he" ? "דעוה" : "دعוة"}
         </div>
       </div>
     </div>

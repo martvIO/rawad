@@ -4,6 +4,7 @@
 // approval. Section toggles let the groom hide any part of the design.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { usePortal } from "../../../../context/PortalContext.jsx";
+import { localizeApiError } from "../../../../utils/apiError.js";
 import {
   subscribeDesigns,
   createDesign,
@@ -136,7 +137,7 @@ export function DigitalDesignEditor() {
       const code = err?.body?.error;
       showToast(code === "too_many_designs"
         ? tt(lang, "بلغت الحد الأقصى للتصاميم", "הגעת למספר העיצובים המרבי")
-        : (err?.message || tt(lang, "فشل الإنشاء", "היצירה נכשלה")));
+        : localizeApiError(err, lang, tt(lang, "فشل الإنشاء", "היצירה נכשלה")));
     } finally { setBusy(false); }
   };
 
@@ -152,7 +153,7 @@ export function DigitalDesignEditor() {
       const code = err?.body?.error;
       showToast(code === "last_design"
         ? tt(lang, "لا يمكن حذف التصميم الوحيد", "אי אפשר למחוק את העיצוב היחיד")
-        : (err?.message || tt(lang, "فشل الحذف", "המחיקה נכשלה")));
+        : localizeApiError(err, lang, tt(lang, "فشل الحذف", "המחיקה נכשלה")));
     } finally { setBusy(false); }
   };
 
@@ -358,7 +359,7 @@ function DesignEditorBody({ groomUid, designId }) {
       return true;
     } catch (err) {
       logErr("patchDesignFields", err);
-      showToast(err?.message || tt(lang, "فشل الحفظ", "השמירה נכשלה"));
+      showToast(localizeApiError(err, lang, tt(lang, "فشل الحفظ", "השמירה נכשלה")));
       return false;
     }
   };
@@ -463,7 +464,7 @@ function DesignEditorBody({ groomUid, designId }) {
       showToast(tt(lang, "✓ تم رفع الصورة", "✓ התמונה הועלתה"));
     } catch (err) {
       logErr("addInvitationMedia", err);
-      showToast(err?.message || tt(lang, "فشل الرفع", "ההעלאה נכשלה"));
+      showToast(localizeApiError(err, lang, tt(lang, "فشل الرفع", "ההעלאה נכשלה")));
     } finally {
       setBusy(false);
       setProgress(0);
@@ -479,7 +480,7 @@ function DesignEditorBody({ groomUid, designId }) {
       showToast(tt(lang, "✓ تم الحذف", "✓ נמחק"));
     } catch (err) {
       logErr("removeInvitationMedia", err);
-      showToast(err?.message || tt(lang, "فشل الحذف", "המחיקה נכשלה"));
+      showToast(localizeApiError(err, lang, tt(lang, "فشل الحذف", "המחיקה נכשלה")));
     }
   };
 
@@ -501,7 +502,7 @@ function DesignEditorBody({ groomUid, designId }) {
       showToast(tt(lang, "✓ تم رفع الوسائط", "✓ המדיה הועלתה"));
     } catch (err) {
       logErr("addInvitationMedia.hero", err);
-      showToast(err?.message || tt(lang, "فشل الرفع", "ההעלאה נכשלה"));
+      showToast(localizeApiError(err, lang, tt(lang, "فشل الرفع", "ההעלאה נכשלה")));
     } finally {
       setHeroBusy(false);
       setHeroProgress(0);
@@ -517,7 +518,7 @@ function DesignEditorBody({ groomUid, designId }) {
       showToast(tt(lang, "✓ تم الحذف", "✓ נמחק"));
     } catch (err) {
       logErr("removeInvitationMedia.hero", err);
-      showToast(err?.message || tt(lang, "فشل الحذف", "המחיקה נכשלה"));
+      showToast(localizeApiError(err, lang, tt(lang, "فشل الحذف", "המחיקה נכשלה")));
     }
   };
 
@@ -536,7 +537,7 @@ function DesignEditorBody({ groomUid, designId }) {
       showToast(tt(lang, "✓ تم الإرسال للموافقة", "✓ נשלח לאישור"));
     } catch (err) {
       logErr("submitDesignForApproval", err);
-      showToast(err?.message || tt(lang, "فشل الإرسال", "השליחה נכשלה"));
+      showToast(localizeApiError(err, lang, tt(lang, "فشل الإرسال", "השליחה נכשלה")));
     } finally {
       setBusy(false);
     }
@@ -549,7 +550,7 @@ function DesignEditorBody({ groomUid, designId }) {
       showToast(tt(lang, "↶ تم الإلغاء، يمكنك التعديل", "↶ בוטל, ניתן לערוך"));
     } catch (err) {
       logErr("cancelDesignSubmission", err);
-      showToast(err?.message || tt(lang, "فشل الإلغاء", "הביטול נכשל"));
+      showToast(localizeApiError(err, lang, tt(lang, "فشل الإلغاء", "הביטول נכשל")));
     } finally {
       setBusy(false);
     }

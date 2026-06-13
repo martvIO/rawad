@@ -14,6 +14,7 @@ export function AdminSettingsTab() {
     adminMode, setAdminMode,
     adminDigitalBaseUrl, setAdminDigitalBaseUrl,
     adminDigitalMessage, setAdminDigitalMessage,
+    contact, setContactField,
   } = usePortal();
 
   const inviteLinkPattern = `${typeof window !== "undefined" ? window.location.origin : ""}/invite/{token}`;
@@ -124,6 +125,60 @@ export function AdminSettingsTab() {
           </button>
         </div>
       )}
+
+      {/* ── Communication channels (shown on the public marketing site) ──── */}
+      <div style={{ fontSize: 17, fontWeight: 900, color: C.gold, fontFamily: "'Amiri',serif", margin: "26px 0 4px" }}>
+        💬 {t("admin_comms_title")}
+      </div>
+      <div style={{ fontSize: 12, color: C.dim, marginBottom: 14 }}>
+        {t("admin_comms_subtitle")}
+      </div>
+      <div className="gold-card">
+        <ChannelRow t={t} label={t("admin_comms_whatsapp")} hint={t("admin_comms_whatsapp_hint")}
+                    valueKey="contactWhatsapp" ltr contact={contact} setContactField={setContactField} />
+        <ChannelRow t={t} label={t("admin_comms_phone")}
+                    valueKey="contactPhone" ltr contact={contact} setContactField={setContactField} />
+        <ChannelRow t={t} label={t("admin_comms_email")}
+                    valueKey="contactEmail" ltr contact={contact} setContactField={setContactField} />
+        <ChannelRow t={t} label={t("admin_comms_facebook")}
+                    valueKey="socialFacebook" ltr contact={contact} setContactField={setContactField} />
+        <ChannelRow t={t} label={t("admin_comms_instagram")}
+                    valueKey="socialInstagram" ltr contact={contact} setContactField={setContactField} />
+        <ChannelRow t={t} label={t("admin_comms_tiktok")}
+                    valueKey="socialTiktok" ltr contact={contact} setContactField={setContactField} />
+      </div>
+    </div>
+  );
+}
+
+// One contact-channel row: label + enable/disable toggle + text input. The
+// value writes through `contactWhatsapp` etc.; the toggle writes the matching
+// `…Enabled` boolean. Both persist immediately (optimistic, like the rest of
+// the settings tab).
+function ChannelRow({ t, label, hint, valueKey, ltr, contact, setContactField }) {
+  const value = contact?.[valueKey] ?? "";
+  const enabled = contact?.[`${valueKey}Enabled`] === true;
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+        <span style={{ fontSize: 12, color: C.goldDim }}>{label}</span>
+        <button
+          onClick={() => setContactField(`${valueKey}Enabled`, !enabled)}
+          style={{
+            fontSize: 11, fontWeight: 800, padding: "4px 12px", borderRadius: 999, cursor: "pointer",
+            fontFamily: "inherit",
+            background: enabled ? "rgba(201,168,76,.18)" : "rgba(255,255,255,.04)",
+            border: `1px solid ${enabled ? "rgba(201,168,76,.5)" : "rgba(255,255,255,.12)"}`,
+            color: enabled ? C.gold : C.dim,
+          }}>
+          {enabled ? t("admin_comms_on") : t("admin_comms_off")}
+        </button>
+      </div>
+      <input className="input-field" type="text"
+             value={value}
+             onChange={(e) => setContactField(valueKey, e.target.value)}
+             style={{ fontSize: 13, ...(ltr ? { direction: "ltr", textAlign: "left" } : {}) }} />
+      {hint && <div style={{ marginTop: 4, fontSize: 11, color: C.dim, lineHeight: 1.6 }}>{hint}</div>}
     </div>
   );
 }

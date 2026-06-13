@@ -5,6 +5,7 @@
 import { useEffect, useState } from "react";
 import { buildWaLink, toIntlPhone } from "../../utils/phone.js";
 import { logErr } from "../../utils/logger.js";
+import { localizeApiError } from "../../utils/apiError.js";
 import { INVITE_BASE_URL, TIMING } from "../../config/index.js";
 import { createGuestInvite } from "../../services/invites.js";
 import {
@@ -39,7 +40,7 @@ export function usePortalSendInvites({
     buildWaLink(phone, (adminMessageBody || "").trim(), (adminFormLink || "").trim()) || "";
   const sendWaToOne = (phone) => {
     const url = waLinkFor(phone);
-    if (!url) { showToast(t("share_invalid")); return; }
+    if (!url) { showToast(t("send_failed")); return; }
     window.open(url, "_blank", "noopener");
   };
   const sendWaToAll = (groomUsername) => {
@@ -61,15 +62,15 @@ export function usePortalSendInvites({
   //               groomUsername + token appended so the public landing page
   //               can personalise the displayed guest name.
   const sendInviteLink = async (guest) => {
-    if (!guest?.groomUid || !guest?.id) { showToast(t("share_invalid")); return; }
-    if (!toIntlPhone(guest.phone)) { showToast(t("share_invalid")); return; }
+    if (!guest?.groomUid || !guest?.id) { showToast(t("send_failed")); return; }
+    if (!toIntlPhone(guest.phone)) { showToast(t("send_invalid_phone")); return; }
     try {
       if (adminMode === "digital") {
         const { token } = await createDigitalGuestInvite({
           groomUid: guest.groomUid,
           guestId:  guest.id,
         });
-        if (!token) { showToast(t("share_invalid")); return; }
+        if (!token) { showToast(t("send_failed")); return; }
         const base = (adminDigitalBaseUrl || "").trim().replace(/\/+$/, "")
                   || `${window.location.origin}/d`;
         const groomUsername = guest.groomUsername || "";
@@ -84,7 +85,7 @@ export function usePortalSendInvites({
         groomUid: guest.groomUid,
         guestId:  guest.id,
       });
-      if (!token) { showToast(t("share_invalid")); return; }
+      if (!token) { showToast(t("send_failed")); return; }
       const baseUrl = (INVITE_BASE_URL || "").replace(/\/+$/, "")
                    || window.location.origin;
       const url = `${baseUrl}/invite/${token}`;
@@ -99,7 +100,7 @@ export function usePortalSendInvites({
           : "لم يتم اعتماد تصميم الدعوة بعد");
         return;
       }
-      showToast(e?.message || t("share_invalid"));
+      showToast(localizeApiError(e, t, t("send_failed")));
     }
   };
 
@@ -112,8 +113,8 @@ export function usePortalSendInvites({
   // message so an empty box never sends a blank invite. `opts.noDesign` is the
   // "بدون تصميم" option — send the message ONLY, with no invitation link.
   const sendDigitalInviteLink = async (guest, groomUid, customMessage, opts = {}) => {
-    if (!groomUid || !guest?.id) { showToast(t("share_invalid")); return; }
-    if (!toIntlPhone(guest.phone)) { showToast(t("share_invalid")); return; }
+    if (!groomUid || !guest?.id) { showToast(t("send_failed")); return; }
+    if (!toIntlPhone(guest.phone)) { showToast(t("send_invalid_phone")); return; }
     const message = (customMessage || "").trim() || (adminDigitalMessage || "").trim();
     try {
       // "بدون تصميم" — open WhatsApp with the message and NO link.
@@ -126,7 +127,7 @@ export function usePortalSendInvites({
         groomUid,
         guestId: guest.id,
       });
-      if (!token) { showToast(t("share_invalid")); return; }
+      if (!token) { showToast(t("send_failed")); return; }
       const baseUrl = (INVITE_BASE_URL || "").replace(/\/+$/, "")
                    || window.location.origin;
       const url = `${baseUrl}/d/${adminSelectedGroom}/${token}`;
@@ -144,7 +145,7 @@ export function usePortalSendInvites({
           : "لم يتم اعتماد تصميم الدعوة بعد");
         return;
       }
-      showToast(e?.message || t("share_invalid"));
+      showToast(localizeApiError(e, t, t("send_failed")));
     }
   };
 

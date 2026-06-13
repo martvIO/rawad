@@ -1,6 +1,7 @@
 import { useEffect,useState } from "react";
 import { Num } from "../../Num.jsx";
 import { ON_GOLD, SectionHead } from "../inviteShared.jsx";
+import { localizeApiError } from "../../../utils/apiError.js";
 
 // ── RSVP ────────────────────────────────────────────────────────────────────────
 function confettiBurst(palette) {
@@ -87,7 +88,7 @@ function RSVPSection({ theme, font, lang, opts, mealOptions, guestPhone, onSubmi
         setTimeout(() => setHearts([]), 3500);
       }
     } catch (e) {
-      setError(e?.message || (lang === "he" ? "שגיאה" : "خطأ"));
+      setError(localizeApiError(e, lang));
     } finally {
       setBusy(false);
     }
@@ -97,8 +98,8 @@ function RSVPSection({ theme, font, lang, opts, mealOptions, guestPhone, onSubmi
   const successText = status === "absent"
     ? (lang === "he" ? "תודה שהודעת. נתראה בהזדמנות אחרת." : "نشكر إعلامكم، ونلتقي في مناسبة أخرى قريبة.")
     : (lang === "he"
-      ? `שמחים לארח אתכם${opts.companions && partySize > 1 ? ` (${partySize} אורחים)` : ""}. תזכורת תישלח שבוע לפני.`
-      : `سعداء بحضوركم${opts.companions && partySize > 1 ? ` (${partySize} أشخاص)` : ""}. سيصلكم تذكير قبل الموعد بأسبوع.`);
+      ? `שמחים לארח אתכם${opts.companions && partySize > 1 ? ` (${partySize} אורחים)` : ""}. נתראה באירוע!`
+      : `سعداء بحضوركم${opts.companions && partySize > 1 ? ` (${partySize} أشخاص)` : ""}. ننتظركم في الحفل!`);
 
   return (
     <section className="dawa-inv-section" id="rsvp">

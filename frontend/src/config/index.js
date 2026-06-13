@@ -41,6 +41,21 @@ export const SSE_BASE_URL =
 export const INVITE_BASE_URL =
   import.meta.env?.VITE_INVITE_BASE_URL ?? "https://invite.dawa.to";
 
+/**
+ * Contact-channel BUILD-TIME fallbacks for the marketing site's "talk to us"
+ * CTAs. The admin overrides/disables these in the Communication settings page
+ * (stored in /adminSettings, served via GET /settings/public); these values are
+ * only used until the admin fills them in. The WhatsApp business number is added
+ * later — leave blank here and set it in the admin Communication tab (or via
+ * VITE_CONTACT_WHATSAPP). Numbers are in international format, digits only or
+ * with a leading "+", e.g. "972500000000".
+ */
+export const CONTACT = {
+  WHATSAPP: import.meta.env?.VITE_CONTACT_WHATSAPP ?? "",
+  PHONE:    import.meta.env?.VITE_CONTACT_PHONE ?? "",
+  EMAIL:    import.meta.env?.VITE_CONTACT_EMAIL ?? "",
+};
+
 // ─── Polling intervals ───────────────────────────────────────────────────────
 
 /**

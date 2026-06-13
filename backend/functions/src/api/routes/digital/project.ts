@@ -88,7 +88,9 @@ function errorMessage(err: unknown): string {
 // internal function identifiers. Dev/emulator builds keep the detail so
 // engineers can debug failed uploads without trawling Cloud Logging.
 function safeDetail(err: unknown): string | undefined {
-  if (process.env.NODE_ENV === "production") return undefined;
+  // Suppressed by default so prod never echoes raw error text. Opt in locally
+  // with DAWA_DEBUG_ERRORS=1 (e.g. functions/.env.local) to debug.
+  if (process.env.DAWA_DEBUG_ERRORS !== "1") return undefined;
   return errorMessage(err);
 }
 

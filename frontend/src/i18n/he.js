@@ -26,7 +26,7 @@ export const he = {
     "ספירה לאחור ליום הגדול",
     "מיקום האולם בצורה ברורה ונגישה",
     "אישור הגעה מיידי ופשוט",
-    "הודעת חירום אוטומטית בכל שינוי",
+    "אפשרות להתריע למוזמנים על כל שינוי בפרטי האירוע",
     "בינה מלאכותית ששולחת לכל מוזמן את תמונותיו האישיות מהחגיגה"
   ],
   feat3_title: "חסוך זמן לדברים החשובים באמת",
@@ -41,7 +41,7 @@ export const he = {
     "עם דעוה, כל מה שתצטרך הוא רשימת שמות וכתובות — ואנחנו דואגים לכל השאר:",
     "• הזמנות נייר יוקרתיות בחלוקה מקצועית המשקפת את רמת אירועך",
     "• הזמנות דיגיטליות אלגנטיות עם שם כל מוזמן בגופן גדול וברור",
-    "• הודעת חירום אוטומטית שנשלחת מיד בכל שינוי או מצב חירום",
+    "• אפשרות לשלוח התראה למוזמנים על כל שינוי או מצב חירום",
     "שקט נפשי אמיתי — הזמנות חתונתך אצלנו, ואתה מתמקד בחתונתך."
   ],
   pers_cta: "הזמן עכשיו ←",
@@ -57,7 +57,7 @@ export const he = {
     "ספירה לאחור ליום הגדול",
     "מיקום האולם ברור ונגיש",
     "אישור הגעה מיידי ופשוט",
-    "הודעת חירום אוטומטית בכל שינוי",
+    "אפשרות להתריע למוזמנים על כל שינוי בפרטי האירוע",
     "בינה מלאכותית ששולחת לכל מוזמן את תמונותיו האישיות מהחגיגה"
   ],
   feature_section: "מה מיוחד בסוג הזה",
@@ -117,7 +117,7 @@ export const he = {
   price_pkg2_bullets: [
     "כל מאפייני החבילה הראשונה",
     "טופס אישור הגעה אינטראקטיבי עם מספר הנוכחים",
-    "הודעת חירום אוטומטית — דחייה, שינוי אולם או כל מצב חירום",
+    "התראה למוזמנים על כל שינוי — דחייה, שינוי אולם או מצב חירום",
     "בינה מלאכותית ששולחת לכל מוזמן את תמונותיו האישיות מהחגיגה",
     "עיצוב כרטיס עלייה למטוס יוקרתי בנייד — מגע יוקרה בלתי נשכח"
   ],
@@ -169,7 +169,7 @@ export const he = {
   share_save: "שמור ושתף מיקום", share_stop: "הפסק שיתוף",
   share_active: "✓ המיקום שלך מוצג כעת בלוח החתן",
   share_hint: "📡 שיטת טלגרם (8 שעות מעקב אוטומטי):\n1) פתח ערוץ טלגרם ציבורי\n2) שלח את המיקום החי שלך (Live Location) שם\n3) לחץ ארוכות על ההודעה ← Copy Post Link\n4) הדבק את הקישור כאן — כל 8 שעות שתף מחדש בקישור חדש",
-  share_invalid: "אנא הדבק קישור טלגרם תקין (https://t.me/...)",
+  share_invalid: "הקישור או המספר אינם תקינים — אנא בדוק",
   share_saved: "✓ המיקום שותף עם החתן",
   share_stopped: "שיתוף המיקום הופסק",
   open_in_telegram: "פתח את ההודעה בטלגרם",
@@ -284,6 +284,34 @@ export const he = {
   admin_form_link_placeholder: "https://example.com/confirm",
   admin_save_settings: "💾 שמור הגדרות",
   admin_settings_saved: "✓ ההגדרות נשמרו",
+  // Admin communication channels (Communication settings section)
+  admin_comms_title: "ערוצי תקשורת",
+  admin_comms_subtitle: "אמצעי הקשר שמוצגים למבקרים באתר — הפעל או בטל כל ערוץ",
+  admin_comms_whatsapp: "וואטסאפ (מספר העסק)",
+  admin_comms_whatsapp_hint: "בפורמט בינלאומי, ספרות בלבד — לדוגמה: 972500000000",
+  admin_comms_phone: "מספר טלפון",
+  admin_comms_email: "אימייל",
+  admin_comms_facebook: "פייסבוק (קישור)",
+  admin_comms_instagram: "אינסטגרם (קישור)",
+  admin_comms_tiktok: "טיקטוק (קישור)",
+  admin_comms_on: "✓ מוצג",
+  admin_comms_off: "מוסתר",
+  // Admin payments (Stripe payment link per groom — sent via WhatsApp)
+  admin_payment_title: "תשלום (Stripe)",
+  admin_payment_plan: "חבילה",
+  admin_payment_create: "💳 צור קישור תשלום",
+  admin_payment_copy: "העתק קישור",
+  admin_payment_send_wa: "📲 שלח בוואטסאפ",
+  admin_payment_status_none: "ללא תשלום",
+  admin_payment_status_pending: "ממתין לתשלום",
+  admin_payment_status_paid: "שולם ✓",
+  admin_payment_status_failed: "התשלום נכשל",
+  admin_payment_not_configured: "תשלומי Stripe עדיין לא הוגדרו — הוסף מפתחות בדיקה",
+  admin_payment_created: "✓ קישור התשלום נוצר",
+  admin_payment_copied: "✓ הקישור הועתק",
+  admin_payment_wa_msg: "שלום, הנה קישור התשלום לחבילה שלך בדעוה:",
+  admin_pay_premium: "Premium — ₪2,500",
+  admin_pay_vip: "VIP Royal — ₪3,500",
   admin_bulk_warn: "⚠ תיפתח חלון WhatsApp לכל מוזמן בנפרד — נדרשת הרשאה לחלונות קופצים",
   admin_send_hint: "💡 לחיצה על «שלח» פותחת חלון WhatsApp עם ההודעה מוכנה לשליחה למוזמן",
   admin_conf_title: "אישורי מוזמנים",
@@ -403,6 +431,23 @@ export const he = {
   reply_pending:   "⌛ ממתין לתשובה",
   reply_confirmed: "✓ אישר הגעה",
 
+  // ── API / network error messages (localizeApiError) ─────────────────
+  err_generic: "אירעה שגיאה — נסה שוב",
+  err_network: "אין חיבור לאינטרנט — בדוק את הרשת ונסה שוב",
+  err_timeout: "החיבור איטי — נסה שוב",
+  err_too_many: "יותר מדי ניסיונות — המתן רגע ונסה שוב",
+  err_session_expired: "פג תוקף ההתחברות — התחבר מחדש",
+  err_server: "אירעה שגיאת שרת — נסה מאוחר יותר",
+  err_design_not_approved: "עיצוב ההזמנה טרם אושר",
+  err_cannot_self_delete: "אי אפשר למחוק או לשנות את חשבונך שלך",
+  err_duplicate_phone: "מספר הטלפון כבר קיים",
+  err_unknown_groom: "שם המשתמש של החתן לא נמצא",
+  err_token_expired: "תוקף הקישור פג",
+  err_token_used: "הקישור כבר נוצל",
+  // Admin invite-send failures (replaces the stale Telegram share_invalid copy)
+  send_invalid_phone: "מספר הטלפון של המוזמן אינו תקין — בדוק את המספר",
+  send_failed: "יצירת קישור ההזמנה נכשלה — נסה שוב",
+
   // ── Landing page (redesigned luxury edition) ───────────────────────
   nav_home: "ראשי",
   nav_services: "השירותים",
@@ -451,6 +496,7 @@ export const he = {
   // ── Terms page ─────────────────────────────────────────────────────
   terms_title: "תקנון ותנאי שימוש באתר",
   terms_back: "← חזרה לדף הבית",
+  terms_contact_heading: "ליצירת קשר או לבקשת מחיקת הנתונים שלך",
   terms_intro: "מרחב הזמנות דיגיטליות ומכתבים פיזיים - ברוכים הבאים לאתרנו. שימושכם באתר מהווה הסכמה מלאה לתנאים הבאים:",
   terms_sections: [
     {

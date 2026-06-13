@@ -13,6 +13,7 @@ import { CompanionsStepper } from "../components/CompanionsStepper.jsx";
 import { submitConfirmation } from "../services/confirmations.js";
 import { getCurrentFix } from "../utils/geo.js";
 import { logErr } from "../utils/logger.js";
+import { localizeApiError } from "../utils/apiError.js";
 import { C } from "../styles/theme.js";
 
 export function ConfirmationForm({ t, lang, setLang }) {
@@ -68,7 +69,7 @@ export function ConfirmationForm({ t, lang, setLang }) {
       setDone(true);
     } catch (err) {
       logErr("submitConfirmation", err);
-      setError(err?.message || t("conf_form_invalid"));
+      setError(localizeApiError(err, t, t("conf_form_invalid")));
     } finally {
       setBusy(false);
     }

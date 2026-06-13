@@ -7,6 +7,7 @@ import {
   setDesignStatus,
 } from "../../../services/digitalInvitation.js";
 import { logErr } from "../../../utils/logger.js";
+import { localizeApiError } from "../../../utils/apiError.js";
 import { C } from "../../../styles/theme.js";
 import { Num } from "../../../components/Num.jsx";
 import { DigitalInvitationPreviewModal } from "../../../components/digital/DigitalInvitationPreviewModal.jsx";
@@ -112,7 +113,7 @@ export function AdminDesigns() {
         : tt(lang, "↩ أُعيد التصميم لمسوّدة", "↩ הוחזר לטיוטה"));
     } catch (err) {
       logErr("setDesignStatus", err);
-      showToast(err?.message || tt(lang, "فشل تغيير الحالة", "שינוי הסטטוס נכשל"));
+      showToast(localizeApiError(err, lang, tt(lang, "فشل تغيير الحالة", "שינוי הסטטוס נכשל")));
     } finally {
       setBusy(null);
     }
@@ -137,7 +138,7 @@ export function AdminDesigns() {
       setRejectNote("");
     } catch (err) {
       logErr("setDesignStatus.rejected", err);
-      showToast(err?.message || tt(lang, "فشل الرفض", "הדחייה נכשלה"));
+      showToast(localizeApiError(err, lang, tt(lang, "فشل الرفض", "הדחייה נכשלה")));
     } finally {
       setBusy(null);
     }

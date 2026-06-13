@@ -5,6 +5,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { formatAddress } from "../../utils/geo.js";
 import { logErr } from "../../utils/logger.js";
+import { localizeApiError } from "../../utils/apiError.js";
 import { MATCH_STATUS } from "../../constants/matchStatuses.js";
 import {
   subscribeConfirmations,
@@ -76,7 +77,7 @@ export function usePortalConfirmations({ isAdmin, guests, t, showToast }) {
         area:  fullAddr || guest.area,
       });
       showToast(t("edit_success"));
-    } catch (e) { logErr("useConfirmationData", e); showToast(e?.message || ""); }
+    } catch (e) { logErr("useConfirmationData", e); showToast(localizeApiError(e, t)); }
   };
 
   // Admin edits a confirmation record. Updates both /confirmations/{id}
@@ -110,7 +111,7 @@ export function usePortalConfirmations({ isAdmin, guests, t, showToast }) {
       }
       setEditingConf(null);
       showToast(t("edit_success"));
-    } catch (e) { logErr("saveConfirmationEdit", e); showToast(e?.message || ""); }
+    } catch (e) { logErr("saveConfirmationEdit", e); showToast(localizeApiError(e, t)); }
   };
 
   // Admin-only: copy a confirmation's stored coords onto a specific guest.
@@ -120,7 +121,7 @@ export function usePortalConfirmations({ isAdmin, guests, t, showToast }) {
     try {
       await attachConfLocationSrv({ confirmationId, guestId });
       showToast(t("admin_conf_attach_success"));
-    } catch (e) { logErr("attachConfirmationToGuest", e); showToast(e?.message || ""); }
+    } catch (e) { logErr("attachConfirmationToGuest", e); showToast(localizeApiError(e, t)); }
   };
 
   // Status badge for a guest based on whether a confirmation arrived. Used

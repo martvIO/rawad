@@ -26,7 +26,7 @@ export const ar = {
     "عداد تنازلي لليوم الكبير",
     "موقع القاعة بشكل واضح وسهل الوصول",
     "تأكيد حضور فوري وسهل",
-    "رسالة طوارئ تلقائية عند أي تغيير",
+    "إمكانية تنبيه المدعوين عند أي تغيير في تفاصيل المناسبة",
     "ذكاء اصطناعي يرسل لكل مدعو صوره الخاصة من الحفل"
   ],
   feat3_title: "وفّر وقتك لما هو أهم",
@@ -41,7 +41,7 @@ export const ar = {
     "مع دعوة، كل ما تحتاجه هو قائمة الأسماء والعناوين — ونحن نتولى الباقي بالكامل:",
     "• دعوات ورقية فاخرة بتوزيع احترافي يعكس مستوى مناسبتك",
     "• دعوات رقمية أنيقة باسم كل مدعو بخط كبير وواضح",
-    "• رسالة طوارئ تلقائية تُرسل فوراً عند أي تغيير أو ظرف طارئ",
+    "• إمكانية إرسال تنبيه للمدعوين عند أي تغيير أو ظرف طارئ",
     "راحة بال حقيقية — دعوات فرحك بين أيدينا، وأنت تركز على فرحك."
   ],
   pers_cta: "احجز الآن ←",
@@ -57,7 +57,7 @@ export const ar = {
     "عداد تنازلي لليوم الكبير",
     "موقع القاعة واضح وسهل الوصول",
     "تأكيد حضور فوري وسهل",
-    "رسالة طوارئ تلقائية عند أي تغيير",
+    "إمكانية تنبيه المدعوين عند أي تغيير في تفاصيل المناسبة",
     "ذكاء اصطناعي يرسل لكل مدعو صوره الخاصة من الحفل"
   ],
   feature_section: "ما يميز هذا النوع",
@@ -117,7 +117,7 @@ export const ar = {
   price_pkg2_bullets: [
     "كل مميزات الباقة الأولى",
     "نموذج تأكيد حضور تفاعلي مع عدد الأشخاص الحاضرين",
-    "رسالة طوارئ تلقائية — تأجيل، تغيير قاعة، أو أي ظرف طارئ",
+    "تنبيه المدعوين عند أي تغيير — تأجيل، تغيير قاعة، أو ظرف طارئ",
     "ذكاء اصطناعي يرسل لكل مدعو صوره الخاصة من الحفل",
     "تصميم بوردينج باس فاخر على الجوال — لمسة فخامة لا تُنسى"
   ],
@@ -169,7 +169,7 @@ export const ar = {
   share_save: "حفظ ومشاركة الموقع", share_stop: "إيقاف المشاركة",
   share_active: "✓ موقعك يُعرض الآن في لوحة العريس",
   share_hint: "📡 طريقة Telegram (8 ساعات تتبع تلقائي):\n1) افتح قناة Telegram عامة\n2) أرسل موقعك الحي (Live Location) فيها\n3) اضغط مطوّلاً على الرسالة → Copy Post Link\n4) الصق الرابط هنا — كل 8 ساعات أعد المشاركة برابط جديد",
-  share_invalid: "يرجى لصق رابط Telegram صالح (https://t.me/...)",
+  share_invalid: "الرابط أو الرقم غير صالح — يرجى التحقق",
   share_saved: "✓ تمت مشاركة الموقع مع العريس",
   share_stopped: "تم إيقاف مشاركة الموقع",
   open_in_telegram: "افتح الرسالة في Telegram",
@@ -292,6 +292,34 @@ export const ar = {
   admin_form_link_placeholder: "https://example.com/confirm",
   admin_save_settings: "💾 حفظ الإعدادات",
   admin_settings_saved: "✓ تم حفظ الإعدادات",
+  // Admin communication channels (Communication settings section)
+  admin_comms_title: "قنوات التواصل",
+  admin_comms_subtitle: "وسائل التواصل التي تظهر للزوار في الموقع — فعّل أو عطّل كل قناة",
+  admin_comms_whatsapp: "واتساب (رقم العمل)",
+  admin_comms_whatsapp_hint: "بصيغة دولية بأرقام فقط — مثال: 972500000000",
+  admin_comms_phone: "رقم الهاتف",
+  admin_comms_email: "البريد الإلكتروني",
+  admin_comms_facebook: "فيسبوك (رابط)",
+  admin_comms_instagram: "إنستغرام (رابط)",
+  admin_comms_tiktok: "تيك توك (رابط)",
+  admin_comms_on: "✓ ظاهر",
+  admin_comms_off: "مخفي",
+  // Admin payments (Stripe payment link per groom — sent via WhatsApp)
+  admin_payment_title: "الدفع (Stripe)",
+  admin_payment_plan: "الباقة",
+  admin_payment_create: "💳 إنشاء رابط دفع",
+  admin_payment_copy: "نسخ الرابط",
+  admin_payment_send_wa: "📲 إرسال عبر واتساب",
+  admin_payment_status_none: "بدون دفع",
+  admin_payment_status_pending: "بانتظار الدفع",
+  admin_payment_status_paid: "مدفوع ✓",
+  admin_payment_status_failed: "فشل الدفع",
+  admin_payment_not_configured: "الدفع عبر Stripe غير مُهيّأ بعد — أضف مفاتيح الاختبار",
+  admin_payment_created: "✓ تم إنشاء رابط الدفع",
+  admin_payment_copied: "✓ تم نسخ الرابط",
+  admin_payment_wa_msg: "مرحباً، هذا رابط الدفع لباقتك في دعوة:",
+  admin_pay_premium: "Premium — ₪2,500",
+  admin_pay_vip: "VIP Royal — ₪3,500",
   admin_bulk_warn: "⚠ ستفتح نافذة WhatsApp لكل معزوم بشكل منفصل — السماح بالنوافذ المنبثقة مطلوب",
   admin_send_hint: "💡 ضغطة على «إرسال» تفتح نافذة WhatsApp مع الرسالة جاهزة لإرسالها للمعزوم",
   // Admin Confirmations
@@ -413,6 +441,23 @@ export const ar = {
   reply_pending:   "⌛ بانتظار الرد",
   reply_confirmed: "✓ أكّد الحضور",
 
+  // ── API / network error messages (localizeApiError) ─────────────────
+  err_generic: "حدث خطأ ما — يرجى المحاولة مرة أخرى",
+  err_network: "لا يوجد اتصال بالإنترنت — تحقّق من الشبكة وحاول مجدداً",
+  err_timeout: "الاتصال بطيء — يرجى المحاولة مرة أخرى",
+  err_too_many: "محاولات كثيرة — يرجى الانتظار قليلاً ثم المحاولة",
+  err_session_expired: "انتهت الجلسة — يرجى تسجيل الدخول من جديد",
+  err_server: "حدث خطأ في الخادم — يرجى المحاولة لاحقاً",
+  err_design_not_approved: "لم يتم اعتماد تصميم الدعوة بعد",
+  err_cannot_self_delete: "لا يمكنك حذف أو تعديل حسابك الخاص",
+  err_duplicate_phone: "رقم الهاتف مُستخدم مسبقاً",
+  err_unknown_groom: "اسم مستخدم العريس غير موجود",
+  err_token_expired: "انتهت صلاحية هذا الرابط",
+  err_token_used: "تم استخدام هذا الرابط مسبقاً",
+  // Admin invite-send failures (replaces the stale Telegram share_invalid copy)
+  send_invalid_phone: "رقم هاتف هذا المعزوم غير صالح — تحقّق من الرقم",
+  send_failed: "تعذّر إنشاء رابط الدعوة — يرجى المحاولة مرة أخرى",
+
   // ── Landing page (redesigned luxury edition) ───────────────────────
   nav_home: "الرئيسية",
   nav_services: "خدماتنا",
@@ -461,6 +506,7 @@ export const ar = {
   // ── Terms page ─────────────────────────────────────────────────────
   terms_title: "شروط وأحكام استخدام الموقع",
   terms_back: "← رجوع للصفحة الرئيسية",
+  terms_contact_heading: "للتواصل معنا أو لطلب حذف بياناتك",
   terms_intro: "مرحباً بكم في موقعنا المخصص لخدمات تصميم وإرسال الدعوات الرقمية للمناسبات عبر الواتساب وتوزيع المكاتيب والبطاقات الورقية يدوياً. باستخدامكم للموقع، فإنكم توافقون على الشروط التالية بالكامل:",
   terms_sections: [
     {

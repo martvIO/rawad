@@ -6,6 +6,7 @@ import { usePortal } from "../../../../context/PortalContext.jsx";
 import { addDigitalGuest, subscribeDigitalMedia, subscribeDigitalGuests } from "../../../../services/digitalInvitation.js";
 import { toIntlPhone } from "../../../../utils/phone.js";
 import { logErr } from "../../../../utils/logger.js";
+import { localizeApiError } from "../../../../utils/apiError.js";
 import { C } from "../../../../styles/theme.js";
 import { Num } from "../../../../components/Num.jsx";
 
@@ -106,12 +107,7 @@ export function DigitalAddGuest() {
         showToast(lang === "he" ? "המספר כבר קיים ברשימה" : "هذا الرقم مضاف مسبقاً لهذا العريس");
         return;
       }
-      const isTimeout = err?.message === "request_timeout";
-      showToast(
-        isTimeout
-          ? (lang === "he" ? "פג זמן הבקשה — נסה שוב" : "انتهت مهلة الطلب — حاول مرة أخرى")
-          : err?.message || (lang === "he" ? "שגיאה" : "خطأ"),
-      );
+      showToast(localizeApiError(err, lang));
     } finally {
       // Only flip the local spinner off if we're still mounted. After a
       // successful submit, the optimistic navigate unmounts this view; React

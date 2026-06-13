@@ -4,6 +4,7 @@ import { C } from "../../../styles/theme.js";
 import { Num } from "../../../components/Num.jsx";
 import { useListFilter } from "../../../utils/searchFilter.js";
 import { SearchBar } from "../../../components/SearchBar.jsx";
+import { isProofImage } from "../../../utils/mediaUtils.js";
 
 // Module-level field specs so useListFilter's memoization holds (stable identity).
 const PROOFS_FIELDS = ["name", "area"];
@@ -27,8 +28,7 @@ export function GroomProofs() {
               <div className="card" style={{ textAlign: "center", padding: 24, color: C.dim }}>{t("search_no_results")}</div>
             )}
             {filtered.map(g => {
-              const isImageData = typeof g.proofImg === "string"
-                && (g.proofImg.startsWith("data:image") || /^https?:\/\//.test(g.proofImg));
+              const isImageData = isProofImage(g.proofImg);
               return (
                 <div key={g.id} className="card" style={{ marginBottom: 12 }}>
                   <div style={{ display: "flex", gap: 12, alignItems: "center" }}>

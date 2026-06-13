@@ -6,6 +6,7 @@ import { C } from "../../../styles/theme.js";
 import { Num } from "../../../components/Num.jsx";
 import { useListFilter } from "../../../utils/searchFilter.js";
 import { SearchBar } from "../../../components/SearchBar.jsx";
+import { isProofImage } from "../../../utils/mediaUtils.js";
 
 // Stable module-level field spec for the recent-deliveries search (see useListFilter).
 const DELIVERIES_FIELDS = ["name", "area"];
@@ -137,7 +138,7 @@ export function GroomDashboard() {
               </div>
             )}
             {filtered.map(g => {
-              const isImg = typeof g.proofImg === "string" && g.proofImg.startsWith("data:image");
+              const isImg = isProofImage(g.proofImg);
               return (
                 <div key={g.id} className="card" style={{ marginBottom: 10, display: "flex", gap: 12, alignItems: "center" }}>
                   <div

@@ -38,6 +38,7 @@ import {
   setGuestRanks,
 } from "../../../../services/digitalInvitation.js";
 import { logErr } from "../../../../utils/logger.js";
+import { localizeApiError } from "../../../../utils/apiError.js";
 import { C } from "../../../../styles/theme.js";
 import { Num } from "../../../../components/Num.jsx";
 import { getStoredUid } from "../../../../utils/tokenManager.js";
@@ -282,7 +283,7 @@ export function DigitalDashboard() {
       });
     } catch (err) {
       logErr("removeInvitationMedia", err);
-      showToast(err?.message || tt(lang, "خطأ", "שגיאה"));
+      showToast(localizeApiError(err, lang, tt(lang, "خطأ", "שגיאה")));
     }
   };
 
@@ -328,7 +329,7 @@ export function DigitalDashboard() {
       setNewRank("");
     } catch (err) {
       logErr("setGuestRanks", err);
-      showToast(err?.message || tt(lang, "خطأ", "שגיאה"));
+      showToast(localizeApiError(err, lang, tt(lang, "خطأ", "שגיאה")));
     }
   };
 
@@ -342,7 +343,7 @@ export function DigitalDashboard() {
       setDoc(prev => ({ ...(prev || {}), guestRanks: next }));
     } catch (err) {
       logErr("setGuestRanks", err);
-      showToast(err?.message || tt(lang, "خطأ", "שגיאה"));
+      showToast(localizeApiError(err, lang, tt(lang, "خطأ", "שגיאה")));
     }
   };
 
@@ -372,7 +373,7 @@ export function DigitalDashboard() {
       showToast(tt(lang, "✓ تم حفظ التاريخ", "✓ התאריך נשמר"));
     } catch (err) {
       logErr("setWeddingDate", err);
-      showToast(err?.message || tt(lang, "خطأ", "שגיאה"));
+      showToast(localizeApiError(err, lang, tt(lang, "خطأ", "שגיאה")));
       // Intentionally do NOT update setDoc on failure — the input will fall
       // back to the prior server value, which is the correct UX.
     }

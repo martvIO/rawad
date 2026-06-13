@@ -6,6 +6,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { isStrongPassword } from "../../utils/password.js";
 import { logErr } from "../../utils/logger.js";
+import { localizeApiError } from "../../utils/apiError.js";
 import { ROLES } from "../../constants/roles.js";
 import { forceRefreshToken } from "../../services/auth.js";
 import {
@@ -147,7 +148,7 @@ export function usePortalUsers({ authed, isAdmin, currentUid, userType, driverSe
       return newRow;
     } catch (e) {
       logErr("addUser", e);
-      showToast(e?.message || t("admin_taken"));
+      showToast(localizeApiError(e, t, t("admin_taken")));
       return null;
     }
   };
@@ -160,7 +161,7 @@ export function usePortalUsers({ authed, isAdmin, currentUid, userType, driverSe
       // أزل من groomProfiles إن كان الحساب عريساً (بلا أثر إن لم يكن)
       removeGroomProfile(uid).catch(() => {});
       showToast(t("admin_deleted"));
-    } catch (e) { logErr("deleteUser", e); showToast(e?.message || ""); }
+    } catch (e) { logErr("deleteUser", e); showToast(localizeApiError(e, t)); }
   };
 
   // Admin user-edit lifecycle. Open the modal with a user row, save patches
@@ -273,9 +274,8 @@ export function usePortalUsers({ authed, isAdmin, currentUid, userType, driverSe
 
     } catch (e) {
       logErr("saveUserEdit", e);
-      const msg = e?.message || e?.details?.message || e?.code || "خطأ غير معروف";
       console.error("[dawa] saveUserEdit FAILED:", { code: e?.code, message: e?.message, details: e?.details });
-      showToast(msg);
+      showToast(localizeApiError(e, t, t("admin_taken")));
     }
   };
 

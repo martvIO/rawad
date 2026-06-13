@@ -13,6 +13,7 @@ import { LangSwitcher } from "../components/LangSwitcher.jsx";
 import { subscribeInviteToken } from "../services/invites.js";
 import { submitDigitalGuestInvite } from "../services/digitalInvitation.js";
 import { logErr } from "../utils/logger.js";
+import { localizeApiError } from "../utils/apiError.js";
 import { C } from "../styles/theme.js";
 
 export function DigitalInviteForm({ t, lang, setLang }) {
@@ -46,7 +47,7 @@ export function DigitalInviteForm({ t, lang, setLang }) {
       if (code.includes("deadline-exceeded")) setError(lang === "he" ? "הקישור פג תוקף" : "انتهت صلاحية الرابط");
       else if (code.includes("not-found"))    setError(lang === "he" ? "קישור לא תקין" : "رابط غير صالح");
       else if (code.includes("already-exists")) setError(lang === "he" ? "כבר השבת" : "تم الرد مسبقاً");
-      else setError(err?.message || (lang === "he" ? "שגיאה" : "خطأ"));
+      else setError(localizeApiError(err, lang));
     } finally {
       setBusy(false);
     }

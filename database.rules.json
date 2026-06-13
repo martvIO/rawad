@@ -22,6 +22,14 @@
         "displayName": { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 120)" },
         "createdAt":   { ".validate": "newData.isNumber()" },
         "createdBy":   { ".validate": "!newData.exists() || newData.isString()" },
+        "paymentPlan":      { ".validate": "!newData.exists() || newData.val() === 'premium' || newData.val() === 'vip'" },
+        "paymentStatus":    { ".validate": "!newData.exists() || newData.val() === 'none' || newData.val() === 'pending' || newData.val() === 'paid' || newData.val() === 'failed'" },
+        "paymentAmountIls": { ".validate": "!newData.exists() || newData.isNumber()" },
+        "paymentLinkUrl":   { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 500)" },
+        "paymentLinkId":    { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 200)" },
+        "paymentCreatedAt": { ".validate": "!newData.exists() || newData.isNumber()" },
+        "paymentPaidAt":    { ".validate": "!newData.exists() || newData.isNumber()" },
+        "paymentMode":      { ".validate": "!newData.exists() || newData.val() === 'test' || newData.val() === 'live'" },
         "$other":      { ".validate": false }
       }
     },
@@ -140,9 +148,24 @@
     "adminSettings": {
       ".read":  "auth != null",
       ".write": "auth != null && auth.token.role === 'admin'",
-      "messageBody": { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 4000)" },
-      "formLink":    { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 1000 && newData.val().matches(/^https:\\/\\//))" },
-      "$other":      { ".validate": false }
+      "messageBody":    { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 4000)" },
+      "formLink":       { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 1000 && (newData.val().length === 0 || newData.val().matches(/^https:\\/\\//)))" },
+      "mode":           { ".validate": "!newData.exists() || (newData.isString() && (newData.val() === 'manual' || newData.val() === 'digital'))" },
+      "digitalBaseUrl": { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 1000 && (newData.val().length === 0 || newData.val().matches(/^https:\\/\\//)))" },
+      "digitalMessage": { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 4000)" },
+      "contactWhatsapp":  { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 32)" },
+      "contactPhone":     { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 32)" },
+      "contactEmail":     { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 200)" },
+      "socialFacebook":   { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 500 && (newData.val().length === 0 || newData.val().matches(/^https:\\/\\//)))" },
+      "socialInstagram":  { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 500 && (newData.val().length === 0 || newData.val().matches(/^https:\\/\\//)))" },
+      "socialTiktok":     { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 500 && (newData.val().length === 0 || newData.val().matches(/^https:\\/\\//)))" },
+      "contactWhatsappEnabled":  { ".validate": "!newData.exists() || newData.isBoolean()" },
+      "contactPhoneEnabled":     { ".validate": "!newData.exists() || newData.isBoolean()" },
+      "contactEmailEnabled":     { ".validate": "!newData.exists() || newData.isBoolean()" },
+      "socialFacebookEnabled":   { ".validate": "!newData.exists() || newData.isBoolean()" },
+      "socialInstagramEnabled":  { ".validate": "!newData.exists() || newData.isBoolean()" },
+      "socialTiktokEnabled":     { ".validate": "!newData.exists() || newData.isBoolean()" },
+      "$other":         { ".validate": false }
     },
 
     "inviteTokens": {

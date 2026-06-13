@@ -263,6 +263,9 @@ async function matchesForGroom(
   return computeMatches(guestDescriptor, faceRows, fileRows, MATCH_THRESHOLD);
 }
 
-function errorMessage(err: unknown): string {
+function errorMessage(err: unknown): string | undefined {
+  // Suppressed by default so prod never echoes raw error text; set
+  // DAWA_DEBUG_ERRORS=1 (functions/.env.local) to debug locally.
+  if (process.env.DAWA_DEBUG_ERRORS !== "1") return undefined;
   return err instanceof Error ? err.message : String(err);
 }

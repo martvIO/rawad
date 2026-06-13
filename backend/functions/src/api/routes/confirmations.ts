@@ -618,7 +618,11 @@ interface ConfirmationRecord extends Record<string, unknown> {
  * Best-effort error-to-string conversion for JSON error responses.
  * Never returns a stack trace; we only surface the human-readable text.
  */
-function errorMessage(err: unknown): string {
+function errorMessage(err: unknown): string | undefined {
+  // Public/admin 5xx responses must not echo raw error text in production — it
+  // can leak Firestore paths / GCS bucket names. Suppressed by default; set
+  // DAWA_DEBUG_ERRORS=1 (e.g. functions/.env.local) to see detail locally.
+  if (process.env.DAWA_DEBUG_ERRORS !== "1") return undefined;
   if (err instanceof Error) return err.message;
   if (typeof err === "string") return err;
   return "unknown";

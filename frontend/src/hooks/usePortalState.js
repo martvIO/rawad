@@ -26,6 +26,7 @@ import {
   addGuest as addGuestSrv, updateGuest as updateGuestSrv, removeGuest as removeGuestSrv,
 } from "../services/guests.js";
 import { normalizePhoneForMatching } from "../utils/matchUtils.js";
+import { localizeApiError } from "../utils/apiError.js";
 import {
   uploadProofBlob, dataUrlToBlob,
 } from "../services/proofs.js";
@@ -113,7 +114,8 @@ export function usePortalState({ onBack, t, lang, setLang }) {
     adminMode, setAdminMode,
     adminDigitalBaseUrl, setAdminDigitalBaseUrl,
     adminDigitalMessage, setAdminDigitalMessage,
-  } = usePortalAdminSettings({ authed, showToast });
+    contact, setContactField,
+  } = usePortalAdminSettings({ authed, showToast, t });
 
   // ── Users domain (admin list + optimistic overlay + edit modal) ─────────────
   const {
@@ -380,14 +382,14 @@ export function usePortalState({ onBack, t, lang, setLang }) {
       });
       setGName(""); setGPhone(""); setGArea(""); setGType("premium");
       showToast(t("add_success"));
-    } catch (e) { logErr("addGuest", e); showToast(e?.message || ""); }
+    } catch (e) { logErr("addGuest", e); showToast(localizeApiError(e, t)); }
   };
 
   const removeGuest = async (id) => {
     const guest = myGuests.find(g => g.id === id);
     if (!guest) return;
     try { await removeGuestSrv(guest.groomUid, id); showToast(t("delete_success")); }
-    catch (e) { logErr("removeGuest", e); showToast(e?.message || ""); }
+    catch (e) { logErr("removeGuest", e); showToast(localizeApiError(e, t)); }
   };
 
   const startEdit = (g) => {
@@ -409,7 +411,7 @@ export function usePortalState({ onBack, t, lang, setLang }) {
       });
       setEditingGuest(null);
       showToast(t("edit_success"));
-    } catch (e) { logErr("saveGuestEdit", e); showToast(e?.message || ""); }
+    } catch (e) { logErr("saveGuestEdit", e); showToast(localizeApiError(e, t)); }
   };
 
   // ── Mark delivered (with optional photo upload) ─────────────────────────────
@@ -522,6 +524,7 @@ export function usePortalState({ onBack, t, lang, setLang }) {
     adminMode, setAdminMode,
     adminDigitalBaseUrl, setAdminDigitalBaseUrl,
     adminDigitalMessage, setAdminDigitalMessage,
+    contact, setContactField,
     confirmations, editingConf, setEditingConf,
     sendWaToOne, sendWaToAll,
     matchedGuestFor, matchColor, useConfirmationData, guestConfirmationStatus,

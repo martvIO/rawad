@@ -8,6 +8,7 @@ import {
   subscribeDigitalMedia, setPhotographerPublished,
 } from "../../../../services/digitalInvitation.js";
 import { logErr } from "../../../../utils/logger.js";
+import { localizeApiError } from "../../../../utils/apiError.js";
 import { load, save, removeKey } from "../../../../utils/storage.js";
 import { C } from "../../../../styles/theme.js";
 import { Num } from "../../../../components/Num.jsx";
@@ -127,7 +128,7 @@ export function DigitalPhotographer() {
         : (lang === "he" ? "הצילומים נמחקו מהפרסום" : "تم إلغاء نشر الصور"));
     } catch (err) {
       logErr("setPhotographerPublished", err);
-      showToast(err?.message || (lang === "he" ? "שגיאה" : "خطأ"));
+      showToast(localizeApiError(err, lang));
     } finally {
       setPublishBusy(false);
     }
@@ -274,7 +275,7 @@ export function DigitalPhotographer() {
       setDeletingId(null);
     } catch (err) {
       logErr("deletePhotographerFile", err);
-      showToast(err?.message || "خطأ");
+      showToast(localizeApiError(err, lang, "خطأ"));
     }
   };
 
@@ -297,7 +298,7 @@ export function DigitalPhotographer() {
       setEditingId(null);
     } catch (err) {
       logErr("renamePhotographerFile", err);
-      showToast(err?.message || "خطأ");
+      showToast(localizeApiError(err, lang, "خطأ"));
     }
   };
 

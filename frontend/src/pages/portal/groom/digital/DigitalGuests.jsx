@@ -8,6 +8,7 @@ import {
   subscribeDigitalMedia, subscribeDesigns,
 } from "../../../../services/digitalInvitation.js";
 import { logErr } from "../../../../utils/logger.js";
+import { localizeApiError } from "../../../../utils/apiError.js";
 import { C } from "../../../../styles/theme.js";
 import { Num } from "../../../../components/Num.jsx";
 import { useListFilter } from "../../../../utils/searchFilter.js";
@@ -140,7 +141,7 @@ export function DigitalGuests() {
       setEditingId(null);
     } catch (err) {
       logErr("saveDigitalEdit", err);
-      showToast(err?.message || "خطأ");
+      showToast(localizeApiError(err, lang, "خطأ"));
     }
   };
 
@@ -153,7 +154,7 @@ export function DigitalGuests() {
       setRevealedId(null);
     } catch (err) {
       logErr("deleteDigitalGuest", err);
-      showToast(err?.message || "خطأ");
+      showToast(localizeApiError(err, lang, "خطأ"));
     }
   };
 
