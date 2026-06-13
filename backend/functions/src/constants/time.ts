@@ -7,7 +7,7 @@
 export const HOUR_MS = 60 * 60 * 1000;
 
 /** One day. */
-const DAY_MS = 24 * HOUR_MS;
+export const DAY_MS = 24 * HOUR_MS;
 
 /**
  * Invite token lifetime. After this many ms the token is rejected even

@@ -62,3 +62,7 @@ export { indexPhotographerFile } from "./faceIndex/trigger";
 // Meta WhatsApp Cloud API webhook (subscription verification + delivery/read
 // receipts). Standalone so it never shares middleware with the REST `api` app.
 export { whatsappWebhook } from "./whatsappWebhook";
+
+// Daily Cloud Scheduler job that nudges unanswered digital-invite guests a week
+// before the wedding (via the WhatsApp Cloud API; a no-op until configured).
+export { sendRsvpReminders } from "./reminders";
