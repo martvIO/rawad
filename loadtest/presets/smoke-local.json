@@ -1,0 +1,11 @@
+{
+  "base_url": "http://localhost:5000",
+  "ramp_stages": [[5, 15, 5]],
+  "persona_weights": { "GuestBrowser": 60, "InvitePoller": 20, "RsvpBuyer": 15, "LandingConfirmer": 5 },
+  "think_min": 1.0,
+  "think_max": 5.0,
+  "enable_writes": true,
+  "allow_approve_design": true,
+  "p95_ms": 1000,
+  "error_rate_max": 0.01
+}
