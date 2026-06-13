@@ -32,6 +32,7 @@ import { proofsRouter } from "./routes/proofs";
 import { digitalRouter } from "./routes/digital";
 import { photoFacesRouter } from "./routes/photoFaces";
 import { adminRouter } from "./routes/admin";
+import { paymentsRouter } from "./routes/payments";
 import { decryptPasswordFields } from "./middleware/decryptPasswordFields";
 import { isEncryptionAvailable } from "./passwordCrypto";
 // NOTE: additional routers (users, guests, ...) are mounted as their files
@@ -97,6 +98,7 @@ app.use("/proofs", proofsRouter);
 app.use("/digital/photos", photoFacesRouter);
 app.use("/digital", digitalRouter);
 app.use("/admin", adminRouter);
+app.use("/payments", paymentsRouter);
 
 // ─── Health probe ─────────────────────────────────────────────────────────────
 

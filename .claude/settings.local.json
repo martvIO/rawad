@@ -71,9 +71,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash .claude/hooks/session-end.sh",
+            "command": "echo '[session-end] AUTO-DEPLOY DISABLED 2026-06-13 per hold-deploy decision (unreviewed parallel payments/contact + database.rules change in the working tree). To re-enable, restore this command to: bash .claude/hooks/session-end.sh'",
             "timeout": 600,
-            "statusMessage": "Building + deploying to Firebase..."
+            "statusMessage": "Auto-deploy disabled (hold deploy)"
           }
         ]
       }
