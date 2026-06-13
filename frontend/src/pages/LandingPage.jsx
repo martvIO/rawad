@@ -202,9 +202,18 @@ export function LandingPage({ onEnterPortal, t, lang, setLang }) {
     return () => { alive = false; };
   }, []);
 
-  const bookText = lang === "he"
+  // Referral source (e.g. ?ref=invite from a "made with Dawa" credit) — folded
+  // into the WhatsApp booking message so the operator sees where the lead came from.
+  const ref = (() => {
+    try { return new URLSearchParams(window.location.search).get("ref") || ""; }
+    catch { return ""; }
+  })();
+  const refSuffix = ref
+    ? (lang === "he" ? ` (הגעתי דרך: ${ref})` : ` (وصلت عبر: ${ref})`)
+    : "";
+  const bookText = (lang === "he"
     ? "שלום, אשמח להזמין את שירותי דעוה 🌿"
-    : "مرحباً، أرغب بحجز خدمات دعوة 🌿";
+    : "مرحباً، أرغب بحجز خدمات دعوة 🌿") + refSuffix;
   const bookWaUrl = buildWhatsAppUrl(contact.whatsapp, bookText);
   // Booking CTA: open WhatsApp when a business number is configured, otherwise
   // fall back to the portal login (previous behaviour).

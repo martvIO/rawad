@@ -227,6 +227,19 @@ export function DigitalInvitationView({
       {showGuestbook && <GuestbookSection wishes={wishes} approvedWishes={approvedWishes} onSubmitWish={onSubmitWish} theme={theme} font={font} lang={lang} disabled={!isPublic} />}
 
       <InviteFooter theme={theme} font={font} lang={lang} />
+
+      {/* Growth loop — subtle "made with Dawa" credit on the PUBLIC invitation
+          only (every wedding reaches 100-600 in-market guests). Links back to
+          the marketing site with a referral param. Hidden in the editor preview. */}
+      {isPublic && (
+        <div style={{ textAlign: "center", padding: "16px 16px 96px" }}>
+          <a href="/?ref=invite" target="_blank" rel="noopener noreferrer"
+             style={{ color: theme.accent, textDecoration: "none", opacity: 0.7, fontSize: 12, fontWeight: 700 }}>
+            {lang === "he" ? "נוצר עם דעוה — צרו את ההזמנה שלכם ←" : "صُنعت بواسطة دعوة — اصنع دعوتك ←"}
+          </a>
+        </div>
+      )}
+
       {showDock && (
         <FloatingDock
           theme={theme}
