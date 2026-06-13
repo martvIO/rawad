@@ -2,11 +2,14 @@
 // groom over WhatsApp after a conversation); a webhook marks the groom "paid"
 // when checkout completes.
 //
+//   POST /payments/webhook  — Stripe calls this (no auth; verified by signature).
+//                             On checkout.session.completed → paymentStatus=paid.
 //   POST /payments/:uid     — admin only. Body { plan: "premium" | "vip" }.
 //                             Creates a Stripe Payment Link, persists it on the
 //                             groom's user record, returns { url, ... }.
-//   POST /payments/webhook  — Stripe calls this (no auth; verified by signature).
-//                             On checkout.session.completed → paymentStatus=paid.
+//
+// NOTE: /webhook is registered BEFORE /:uid — otherwise Express's ":uid" param
+// route would capture the literal "webhook" segment and 401 Stripe's callbacks.
 //
 // CONFIG (test mode now, real payout later — no code change to go live):
 //   STRIPE_SECRET_KEY      sk_test_… (later sk_live_…)
@@ -56,6 +59,63 @@ async function stripePost(path: string, params: Record<string, string>, key: str
   const data = (await res.json()) as Record<string, unknown>;
   return { ok: res.ok, data };
 }
+
+// ─── POST /payments/webhook — Stripe → mark paid (no auth, signature-verified) ──
+// MUST be registered before the "/:uid" route below.
+
+paymentsRouter.post("/webhook", async (req: Request, res: Response) => {
+  const secret = webhookSecret();
+  if (!secret) {
+    res.status(503).json({ error: "stripe_not_configured" });
+    return;
+  }
+  // Firebase populates req.rawBody (the original bytes) even though express.json
+  // already parsed the body; signature verification REQUIRES the raw bytes.
+  const raw = (req as unknown as { rawBody?: Buffer }).rawBody;
+  const sig = req.header("stripe-signature") || "";
+  if (!raw || !sig) {
+    res.status(400).json({ error: "bad_signature" });
+    return;
+  }
+  if (!verifyStripeSignature(raw, sig, secret)) {
+    res.status(400).json({ error: "bad_signature" });
+    return;
+  }
+
+  let event: { type?: string; data?: { object?: Record<string, unknown> } };
+  try {
+    event = JSON.parse(raw.toString("utf8"));
+  } catch {
+    res.status(400).json({ error: "bad_payload" });
+    return;
+  }
+
+  try {
+    if (event.type === "checkout.session.completed" ||
+        event.type === "checkout.session.async_payment_succeeded") {
+      const session = event.data?.object ?? {};
+      const linkId = typeof session.payment_link === "string" ? session.payment_link : "";
+      const paid = session.payment_status === "paid" || session.payment_status === "no_payment_required";
+      if (linkId && paid) {
+        const db = getDatabase();
+        const uidSnap = await db.ref(`stripePaymentLinks/${linkId}`).get();
+        const uid = uidSnap.val();
+        if (typeof uid === "string" && uid) {
+          await db.ref(`users/${uid}`).update({
+            paymentStatus: "paid",
+            paymentPaidAt: Date.now(),
+          });
+          await writeAudit("stripe", "payment_paid", { uid, linkId });
+        }
+      }
+    }
+  } catch (err) {
+    // Acknowledge anyway — Stripe retries on non-2xx, but a DB hiccup shouldn't
+    // make it retry forever; the event is logged for manual reconciliation.
+    console.error("[payments] webhook handling error", err);
+  }
+  res.json({ received: true });
+});
 
 // ─── POST /payments/:uid — create a payment link (admin) ────────────────────────
 
@@ -143,62 +203,6 @@ paymentsRouter.post(
     }
   },
 );
-
-// ─── POST /payments/webhook — Stripe → mark paid (no auth, signature-verified) ──
-
-paymentsRouter.post("/webhook", async (req: Request, res: Response) => {
-  const secret = webhookSecret();
-  if (!secret) {
-    res.status(503).json({ error: "stripe_not_configured" });
-    return;
-  }
-  // Firebase populates req.rawBody (the original bytes) even though express.json
-  // already parsed the body; signature verification REQUIRES the raw bytes.
-  const raw = (req as unknown as { rawBody?: Buffer }).rawBody;
-  const sig = req.header("stripe-signature") || "";
-  if (!raw || !sig) {
-    res.status(400).json({ error: "bad_signature" });
-    return;
-  }
-  if (!verifyStripeSignature(raw, sig, secret)) {
-    res.status(400).json({ error: "bad_signature" });
-    return;
-  }
-
-  let event: { type?: string; data?: { object?: Record<string, unknown> } };
-  try {
-    event = JSON.parse(raw.toString("utf8"));
-  } catch {
-    res.status(400).json({ error: "bad_payload" });
-    return;
-  }
-
-  try {
-    if (event.type === "checkout.session.completed" ||
-        event.type === "checkout.session.async_payment_succeeded") {
-      const session = event.data?.object ?? {};
-      const linkId = typeof session.payment_link === "string" ? session.payment_link : "";
-      const paid = session.payment_status === "paid" || session.payment_status === "no_payment_required";
-      if (linkId && paid) {
-        const db = getDatabase();
-        const uidSnap = await db.ref(`stripePaymentLinks/${linkId}`).get();
-        const uid = uidSnap.val();
-        if (typeof uid === "string" && uid) {
-          await db.ref(`users/${uid}`).update({
-            paymentStatus: "paid",
-            paymentPaidAt: Date.now(),
-          });
-          await writeAudit("stripe", "payment_paid", { uid, linkId });
-        }
-      }
-    }
-  } catch (err) {
-    // Acknowledge anyway — Stripe retries on non-2xx, but a DB hiccup shouldn't
-    // make it retry forever; the event is logged for manual reconciliation.
-    console.error("[payments] webhook handling error", err);
-  }
-  res.json({ received: true });
-});
 
 // ─── Stripe webhook signature verification (no SDK) ─────────────────────────────
 
