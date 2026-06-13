@@ -58,3 +58,7 @@ export { digitalOgImage } from "./digitalOgImage";
 // 2 GiB memory + tfjs runtime never affect the `api` function; the heavy
 // engine is dynamically imported inside the handler.
 export { indexPhotographerFile } from "./faceIndex/trigger";
+
+// Meta WhatsApp Cloud API webhook (subscription verification + delivery/read
+// receipts). Standalone so it never shares middleware with the REST `api` app.
+export { whatsappWebhook } from "./whatsappWebhook";

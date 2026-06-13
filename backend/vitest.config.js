@@ -17,18 +17,10 @@ export default defineConfig({
       {
         test: {
           name: "unit",
-          include: [
-            "tests/functions/helpers.test.ts",
-            "tests/functions/rateLimit.test.ts",
-            "tests/functions/stripApiPrefix.test.ts",
-            "tests/functions/invitesAuthz.test.ts",
-            "tests/functions/faceMatch.test.ts",
-            "tests/functions/passwordCrypto.test.ts",
-            "tests/functions/decryptPasswordFields.test.ts",
-            "tests/functions/authPubkey.test.ts",
-            "tests/functions/authPubkeyUnavailable.test.ts",
-            "tests/functions/passwordEncryptionRoutes.test.ts",
-          ],
+          // Glob (not an explicit list) so new pure-logic tests under
+          // tests/functions/ are picked up automatically — an explicit list
+          // silently dropped newly-added tests.
+          include: ["tests/functions/**/*.test.{ts,js}"],
           environment: "node",
           testTimeout: 10000,
         },
