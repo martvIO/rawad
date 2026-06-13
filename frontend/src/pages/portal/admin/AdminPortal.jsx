@@ -14,6 +14,7 @@ import { AdminSendTab } from "./AdminSendTab.jsx";
 import { AdminSettingsTab } from "./AdminSettingsTab.jsx";
 import { AdminConfirmationsTab } from "./AdminConfirmationsTab.jsx";
 import { AdminDesigns } from "./AdminDesigns.jsx";
+import { AdminAuditTab } from "./AdminAuditTab.jsx";
 import { Num } from "../../../components/Num.jsx";
 import { C } from "../../../styles/theme.js";
 
@@ -72,6 +73,7 @@ export function AdminPortal() {
           <NavLink data-testid="nav-admin-confirmations" to="/portal/admin/confirmations" style={tabStyle}>✓ {t("admin_tab_confirmations")}{confirmations.length ? <> (<Num>{confirmations.length}</Num>)</> : ""}</NavLink>
           <NavLink data-testid="nav-admin-designs"       to="/portal/admin/designs"       style={tabStyle}>🎨 {lang === "he" ? "עיצובים" : "التصاميم"}</NavLink>
           <NavLink data-testid="nav-admin-settings"      to="/portal/admin/settings"      style={tabStyle}>⚙ {t("admin_tab_settings")}</NavLink>
+          <NavLink data-testid="nav-admin-audit"         to="/portal/admin/audit"         style={tabStyle}>📜 {lang === "he" ? "יומן" : "السجل"}</NavLink>
         </div>
 
         <Routes>
@@ -81,6 +83,7 @@ export function AdminPortal() {
           <Route path="confirmations"   element={<AdminConfirmationsTab />} />
           <Route path="designs"         element={<AdminDesigns />} />
           <Route path="settings"        element={<AdminSettingsTab />} />
+          <Route path="audit"           element={<AdminAuditTab />} />
           <Route path="*"               element={<Navigate to="users" replace />} />
         </Routes>
       </div>

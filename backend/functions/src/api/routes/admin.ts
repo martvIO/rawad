@@ -47,7 +47,44 @@ const FIRESTORE_BATCH_LIMIT = 450;
 /** Per-admin cap for the purge endpoint (matches other admin maintenance ops). */
 const PURGE_MAX_PER_HOUR = 30;
 
+/** Audit-log read paging. */
+const AUDIT_DEFAULT_LIMIT = 100;
+const AUDIT_MAX_LIMIT = 500;
+
 export const adminRouter = Router();
+
+// ─── GET /admin/audit ─────────────────────────────────────────────────────────
+
+/**
+ * Read the most recent audit-log entries (newest first). The log is append-only
+ * (audit.ts writes privileged actions); this is the only read path. Admin only.
+ * Query: ?limit=N (1..500, default 100).
+ */
+adminRouter.get(
+  "/audit",
+  requireAuth,
+  requireAdmin,
+  uidRateLimit("auditRead", 120, HOUR_MS),
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const limit = Math.min(
+        AUDIT_MAX_LIMIT,
+        Math.max(1, Number(req.query.limit) || AUDIT_DEFAULT_LIMIT),
+      );
+      const snap = await getDatabase()
+        .ref("audit")
+        .orderByChild("timestamp")
+        .limitToLast(limit)
+        .get();
+      const rows: Array<Record<string, unknown>> = [];
+      snap.forEach((c) => { rows.push({ id: c.key, ...(c.val() as object) }); });
+      rows.reverse(); // newest first
+      res.json(rows);
+    } catch (err) {
+      res.status(500).json({ error: "read_failed", detail: errorMessage(err) });
+    }
+  },
+);
 
 // ─── DELETE /admin/loadtest-data ──────────────────────────────────────────────
 
