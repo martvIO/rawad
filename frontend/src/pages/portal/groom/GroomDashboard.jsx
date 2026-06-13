@@ -1,6 +1,8 @@
 ﻿// Groom → Dashboard: stats, distribution progress, live map, recent deliveries.
+import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { LiveMap } from "../../../components/LiveMap.jsx";
+import { replyStateOf } from "../../../data/status.js";
 import { usePortal } from "../../../context/PortalContext.jsx";
 import { C } from "../../../styles/theme.js";
 import { Num } from "../../../components/Num.jsx";
@@ -25,6 +27,20 @@ export function GroomDashboard() {
     fields: DELIVERIES_FIELDS, lang,
   });
 
+  // Reply rollup — how many guests have confirmed their details vs are still
+  // awaiting a reply vs were never sent an invite. (Delivery ≠ reply: the tiles
+  // above track physical delivery; this tracks who responded.)
+  const reply = useMemo(() => {
+    let confirmed = 0, pending = 0, notSent = 0;
+    for (const g of myGuests) {
+      const s = replyStateOf(g);
+      if (s === "confirmed") confirmed++;
+      else if (s === "pending") pending++;
+      else notSent++;
+    }
+    return { confirmed, pending, notSent };
+  }, [myGuests]);
+
   return (
           <div style={{ animation: "fadeUp .3s ease" }}>
             <div style={{ marginBottom: 20 }}>
@@ -45,6 +61,20 @@ export function GroomDashboard() {
                     <div style={{ fontSize: 26, fontWeight: 900, color: s.color }}><Num>{s.val.toLocaleString("en")}</Num></div>
                     <div style={{ fontSize: 11, color: C.dim }}>{s.label}</div>
                   </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Reply rollup — who confirmed their details (separate from delivery). */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12, marginBottom: 20 }}>
+              {[
+                { label: t("reply_confirmed"), val: reply.confirmed, color: "#4cc97a" },
+                { label: t("reply_pending"),   val: reply.pending,   color: C.gold },
+                { label: t("reply_notSent"),   val: reply.notSent,   color: C.dim },
+              ].map(s => (
+                <div key={s.label} className="card" style={{ textAlign: "center", padding: "12px 6px" }}>
+                  <div style={{ fontSize: 22, fontWeight: 900, color: s.color }}><Num>{s.val.toLocaleString("en")}</Num></div>
+                  <div style={{ fontSize: 10.5, color: C.dim, marginTop: 2 }}>{s.label}</div>
                 </div>
               ))}
             </div>
