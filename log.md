@@ -154,3 +154,6 @@ Touched: Authentication, Security Model. Added a defense-in-depth password-encry
 
 ## [2026-06-13 22:55] session | Deploy audit Phases 1-3 to production
 Committed audit Phases 1-3 only (9a2a12d) — password-encryption work left unstaged for the user. Deployed database rules + functions + hosting to dawa-aa793. Smoke test caught a route-shadowing bug (POST /payments/webhook hit /:uid → 401); fixed by ordering /webhook before /:uid (fa5d3bb), redeployed, re-verified (webhook→503 stripe_not_configured, admin route→401, /settings/public→200, /api/health ok). Live at https://dawa-aa793.web.app.
+
+## [2026-06-13 23:25] session | Audit Phase 4a — WhatsApp Cloud API core
+Added whatsapp.ts (sendWhatsAppText + verifyWebhookChallenge, env-gated) and a standalone whatsappWebhook onRequest (GET verify / POST receipts), exported from index.ts. Converted backend unit test include to a glob (explicit list was silently dropping my Phase 3 paymentsWebhook test). 419 FE / 139 BE tests green. Committed 50c53ed; not yet deployed (deploys with next functions deploy). Needs WHATSAPP_TOKEN/PHONE_ID/VERIFY_TOKEN to go live.
