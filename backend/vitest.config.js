@@ -37,6 +37,20 @@ export default defineConfig({
           hookTimeout: 30000,
         },
       },
+      {
+        // Real-AWS Rekognition accuracy tests over the facerec_examples
+        // fixtures. EXCLUDED from `test:unit` and `npm test` (CI) — they call
+        // the live service, need AWS creds, and cost a few cents. Run locally
+        // with `npm run test:rekognition`; the suite skips itself when creds
+        // are absent.
+        test: {
+          name: "rekognition",
+          include: ["tests/rekognition/**/*.test.{js,ts}"],
+          environment: "node",
+          testTimeout: 180000,
+          hookTimeout: 180000,
+        },
+      },
     ],
   },
 });

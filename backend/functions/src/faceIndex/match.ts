@@ -46,6 +46,8 @@ export type PhotoFileRow = {
   name: string;
   url: string;
   type: string;
+  /** Storage object path — needed to stream the file into a ZIP download. */
+  storagePath?: string;
 };
 
 /** One matched photo returned to the guest, sorted by distance ascending. */
@@ -139,4 +141,72 @@ export function computeMatches(
  */
 export function hashToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
+}
+
+// ─── AWS Rekognition helpers (pure; the SDK calls live in rekognition.ts) ─────
+//
+// Rekognition stores faces in a per-wedding Collection. We tag every indexed
+// face with an ExternalImageId so a search result maps straight back to its
+// source without a second lookup:
+//   - photographer-photo faces → "photo:{fileId}"
+//   - an enrolled guest selfie → "guest:{guestId}"
+// ExternalImageId allows [a-zA-Z0-9_.\-:]+, so the colon separator is legal.
+
+export const PHOTO_KIND = "photo";
+export const GUEST_KIND = "guest";
+
+/** Normalized face box as fractions [0..1] of the image (Rekognition-native). */
+export type FaceBox = { x: number; y: number; w: number; h: number };
+
+/** One face indexed into a Rekognition collection (stored in photoFaces). */
+export type RekIndexedFace = { faceId: string; box: FaceBox; confidence: number };
+
+/** A Rekognition SearchFaces / SearchFacesByImage hit (provider-agnostic shape). */
+export type RekSearchMatch = { faceId: string; externalImageId?: string; similarity: number };
+
+/** One matched photo returned to the guest, sorted by similarity descending. */
+export type PhotoMatch = { fileId: string; name: string; url: string; similarity: number };
+
+export function toExternalId(kind: string, id: string): string {
+  return `${kind}:${id}`;
+}
+
+/** Split an ExternalImageId back into { kind, id }; null if malformed. */
+export function parseExternalId(
+  extId: string | undefined | null,
+): { kind: string; id: string } | null {
+  if (typeof extId !== "string") return null;
+  const idx = extId.indexOf(":");
+  if (idx <= 0 || idx === extId.length - 1) return null;
+  return { kind: extId.slice(0, idx), id: extId.slice(idx + 1) };
+}
+
+/**
+ * Join Rekognition search hits to photographer-file metadata for display.
+ * Keeps only `photo:` faces, drops files whose metadata doc vanished, dedupes
+ * to one row per photo (best similarity wins), and sorts closest-match first.
+ */
+export function joinRekognitionMatches(
+  searchMatches: RekSearchMatch[],
+  fileRows: PhotoFileRow[],
+): PhotoMatch[] {
+  const filesById = new Map(fileRows.map((f) => [f.fileId, f]));
+  const bestByFile = new Map<string, PhotoMatch>();
+  for (const m of searchMatches) {
+    const parsed = parseExternalId(m.externalImageId);
+    if (!parsed || parsed.kind !== PHOTO_KIND) continue;
+    const file = filesById.get(parsed.id);
+    if (!file) continue;
+    const prev = bestByFile.get(file.fileId);
+    const similarity = Math.round((m.similarity ?? 0) * 100) / 100;
+    if (!prev || similarity > prev.similarity) {
+      bestByFile.set(file.fileId, {
+        fileId: file.fileId,
+        name: file.name,
+        url: file.url,
+        similarity,
+      });
+    }
+  }
+  return Array.from(bestByFile.values()).sort((a, b) => b.similarity - a.similarity);
 }

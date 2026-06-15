@@ -13,6 +13,7 @@
     "logs": "firebase functions:log"
   },
   "dependencies": {
+    "@aws-sdk/client-rekognition": "^3.700.0",
     "@napi-rs/canvas": "^0.1.100",
     "@tensorflow/tfjs": "^4.22.0",
     "@tensorflow/tfjs-backend-wasm": "^4.22.0",

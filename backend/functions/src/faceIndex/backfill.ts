@@ -11,6 +11,7 @@
 
 import { getFirestore } from "firebase-admin/firestore";
 import { MODEL_VERSION } from "./match";
+import { activeIndexVersion } from "./config";
 
 /** Firestore batch hard limit is 500 ops; stay comfortably under. */
 const BATCH_LIMIT = 400;
@@ -25,6 +26,7 @@ export async function touchUnindexedPhotographerFiles(uid: string): Promise<numb
     fs.collection(`digitalInvitations/${uid}/photoFaces`).get(),
   ]);
   const indexRows = new Map(facesSnap.docs.map((d) => [d.id, d.data()]));
+  const expectedVersion = activeIndexVersion(MODEL_VERSION);
 
   let touched = 0;
   let batch = fs.batch();
@@ -36,7 +38,7 @@ export async function touchUnindexedPhotographerFiles(uid: string): Promise<numb
     const fresh =
       row &&
       row.status === "ok" &&
-      row.modelVersion === MODEL_VERSION &&
+      row.modelVersion === expectedVersion &&
       row.storagePath === data.storagePath;
     if (fresh) continue;
 

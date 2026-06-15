@@ -17,6 +17,7 @@
     "test": "firebase emulators:exec --only database --project demo-dawa-test \"vitest run -c backend/vitest.config.js --project integration\"",
     "test:watch": "firebase emulators:exec --only database --project demo-dawa-test \"vitest -c backend/vitest.config.js --project integration\"",
     "test:unit": "npm --prefix frontend run test:unit && vitest run -c backend/vitest.config.js --project unit",
+    "test:rekognition": "vitest run -c backend/vitest.config.js --project rekognition",
     "test:unit:watch": "npm --prefix frontend run test:unit:watch",
     "test:coverage": "npm --prefix frontend run test:coverage",
     "test:e2e": "npm --prefix frontend run test:e2e",
