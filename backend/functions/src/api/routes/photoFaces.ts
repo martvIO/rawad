@@ -1,46 +1,39 @@
 // Guest face-enrollment + photo-matching endpoints (PUBLIC, token-based).
 //
-//   GET    /digital/photos/matches?token=…   read enrollment state + matches
-//   POST   /digital/photos/enroll            store guest descriptor (consent!)
+//   POST   /digital/photos/liveness/session  start an AWS Face Liveness session
+//   POST   /digital/photos/enroll            enroll a selfie (upload OR liveness)
+//   GET    /digital/photos/matches?token=…   enrollment state + matched photos
 //   DELETE /digital/photos/enroll            erase the guest's face data
+//   GET    /digital/photos/zip?token=…       stream matched photos as a .zip
 //
 // Mounted at /digital/photos BEFORE the digital router so its ":uid" params
 // can never capture the literal "photos" segment.
 //
-// Identity model: the invite token in the body/query is the credential —
-// same pattern as POST /invites/digital/submit. The server resolves
-// groomUid from the token record; it is never exposed to the client.
-//
-// Privacy model: the descriptor is BIOMETRIC data.
-//   - It is only ever written together with a consentAt timestamp; the
-//     client shows an explicit consent screen before extraction.
-//   - The selfie itself never reaches the server — only the 128-number
-//     descriptor computed in the guest's browser.
-//   - The row carries expireAt = the token's expiry; a Firestore TTL policy
-//     on guestFaces.expireAt garbage-collects it, and every endpoint here
-//     independently refuses expired tokens (TTL deletion can lag ~24h).
-//   - DELETE /enroll gives the guest immediate erasure.
+// Engine: AWS Rekognition. The invite token is the credential (the server
+// resolves groomUid from it; never exposed to the client). The guest's selfie
+// is sent to the server and to Rekognition — the consent screen says so — and
+// only the resulting FaceId is stored in Firestore (guestFaces). The face row
+// carries expireAt = the token's expiry; a Firestore TTL policy garbage-
+// collects it, and DELETE /enroll erases both the AWS face and the row.
 
 import { Router, Request, Response } from "express";
 import { getDatabase } from "firebase-admin/database";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
+import { getStorage } from "firebase-admin/storage";
 import { tokenRateLimit } from "../middleware/rateLimit";
 import { HOUR_MS } from "../../constants/time";
 import { RATE } from "../../constants/rateLimits";
 import { TOKEN_HEX_RE } from "../../constants/tokens";
-import {
-  MODEL_VERSION,
-  MATCH_THRESHOLD,
-  validateDescriptor,
-  roundDescriptor,
-  computeMatches,
-  hashToken,
-  PhotoFacesRow,
-  PhotoFileRow,
-  FaceMatch,
-} from "../../faceIndex/match";
+import { normalisePhone } from "../../helpers";
+import { isRekognitionConfigured } from "../../faceIndex/config";
+import { joinRekognitionMatches, hashToken, PhotoFileRow, PhotoMatch } from "../../faceIndex/match";
+import { parseMultipart } from "./digital/storage";
 
-// Keyed by TOKEN (guests share the venue's NAT IP) with a per-IP backstop.
+/** Selfie upload cap (downscaled to ≤5 MB before Rekognition). */
+const MAX_SELFIE_BYTES = 15 * 1024 * 1024;
+/** Minimum AWS Face Liveness confidence (0..100) to accept a camera capture. */
+const LIVENESS_MIN_CONFIDENCE = 75;
+
 const enrollLimiter = tokenRateLimit(
   "photoEnroll",
   RATE.PHOTO_ENROLL_PER_TOKEN.limit,
@@ -56,120 +49,243 @@ const matchesLimiter = tokenRateLimit(
 
 export const photoFacesRouter = Router();
 
-// ─── GET /digital/photos/matches?token=… ─────────────────────────────────────
+// ─── POST /digital/photos/liveness/session ───────────────────────────────────
 
-/**
- * Enrollment state + current matches for a guest token. Status-shaped 200
- * (`published` / `enrolled` booleans) so the page poller needs no error
- * branching; hard errors only for the token itself (400/404/410).
- */
-photoFacesRouter.get(
-  "/matches",
-  matchesLimiter,
-  async (req: Request, res: Response) => {
-    const token = (req.query?.token ?? "").toString();
-    const tk = await loadValidToken(token, res);
-    if (!tk) return;
-
-    try {
-      const published = await isPhotographerPublished(tk.groomUid);
-      if (!published) {
-        res.json({ published: false, enrolled: false, expiresAt: tk.expiresAt, matches: [] });
-        return;
-      }
-
-      const enrollSnap = await guestFaceDoc(tk.groomUid, token).get();
-      const enrollment = enrollSnap.exists ? enrollSnap.data() : null;
-      const descriptor = enrollment?.descriptor;
-      if (!validateDescriptor(descriptor) || enrollment?.modelVersion !== MODEL_VERSION) {
-        res.json({ published: true, enrolled: false, expiresAt: tk.expiresAt, matches: [] });
-        return;
-      }
-
-      const matches = await matchesForGroom(tk.groomUid, descriptor);
-      res.json({
-        published: true,
-        enrolled: true,
-        expiresAt: tk.expiresAt,
-        matches,
-      });
-    } catch (err) {
-      res.status(500).json({ error: "read_failed", detail: errorMessage(err) });
+/** Start a Face Liveness session for the camera path. Body: `{ token }`. */
+photoFacesRouter.post("/liveness/session", enrollLimiter, async (req: Request, res: Response) => {
+  const token = (req.query?.token ?? req.body?.token ?? "").toString();
+  const tk = await loadValidToken(token, res);
+  if (!tk) return;
+  if (!isRekognitionConfigured()) {
+    res.status(503).json({ error: "face_engine_unavailable" });
+    return;
+  }
+  try {
+    const rek = await import("../../faceIndex/rekognition.js");
+    const sessionId = await rek.createLivenessSession();
+    if (!sessionId) {
+      res.status(502).json({ error: "liveness_unavailable" });
+      return;
     }
-  },
-);
+    res.json({ sessionId, region: process.env.AWS_REGION ?? null });
+  } catch (err) {
+    res.status(500).json({ error: "liveness_failed", detail: errorMessage(err) });
+  }
+});
 
 // ─── POST /digital/photos/enroll ─────────────────────────────────────────────
 
 /**
- * Store the guest's face descriptor (the client shows the consent screen
- * BEFORE extracting it — `consentAt` records that moment server-side) and
- * return the first match results in the same round trip.
- * Body: `{ token, descriptor: number[128] }`.
+ * Enroll the guest's selfie and return their first matches. Two input modes:
+ *   - multipart/form-data with an image file (upload path; token in ?query),
+ *   - JSON `{ token, phone, livenessSessionId }` (camera path; the verified
+ *     Liveness reference image is fetched from AWS).
+ * The selfie is processed only to extract a FaceId; the image is not stored.
  */
-photoFacesRouter.post(
-  "/enroll",
-  enrollLimiter,
-  async (req: Request, res: Response) => {
-    const token = (req.body?.token ?? "").toString();
-    const tk = await loadValidToken(token, res);
-    if (!tk) return;
+photoFacesRouter.post("/enroll", enrollLimiter, async (req: Request, res: Response) => {
+  if (!isRekognitionConfigured()) {
+    res.status(503).json({ error: "face_engine_unavailable" });
+    return;
+  }
+  const contentType = String(req.headers["content-type"] ?? "");
 
-    const descriptor = req.body?.descriptor;
-    if (!validateDescriptor(descriptor)) {
-      res.status(400).json({ error: "invalid_descriptor" });
+  let token = (req.query?.token ?? "").toString();
+  let phone: string | undefined;
+  let livenessSessionId: string | undefined;
+  let uploadedBytes: Buffer | null = null;
+
+  try {
+    if (contentType.includes("multipart/form-data")) {
+      const parsed = await parseMultipart(req, MAX_SELFIE_BYTES);
+      token = token || (parsed.fields.token ?? "");
+      phone = parsed.fields.phone;
+      livenessSessionId = parsed.fields.livenessSessionId;
+      if (parsed.file && !parsed.file.truncated && parsed.file.buffer.length) {
+        uploadedBytes = parsed.file.buffer;
+      } else if (parsed.file?.truncated) {
+        res.status(413).json({ error: "image_too_large" });
+        return;
+      }
+    } else {
+      token = token || (req.body?.token ?? "").toString();
+      phone = req.body?.phone;
+      livenessSessionId = req.body?.livenessSessionId;
+    }
+  } catch {
+    res.status(400).json({ error: "invalid_multipart" });
+    return;
+  }
+
+  const tk = await loadValidToken(token, res);
+  if (!tk) return;
+
+  try {
+    if (!(await isPhotographerPublished(tk.groomUid))) {
+      res.status(409).json({ error: "not_published" });
       return;
     }
 
-    try {
-      const published = await isPhotographerPublished(tk.groomUid);
-      if (!published) {
-        res.status(409).json({ error: "not_published" });
+    const rek = await import("../../faceIndex/rekognition.js");
+
+    // Resolve the selfie bytes: uploaded image, or the Liveness reference image.
+    let bytes = uploadedBytes;
+    if (!bytes && livenessSessionId) {
+      const result = await rek.getLivenessResults(String(livenessSessionId));
+      if (result.status !== "SUCCEEDED" || result.confidence < LIVENESS_MIN_CONFIDENCE || !result.referenceImage) {
+        res.status(422).json({ error: "liveness_failed" });
         return;
       }
-
-      const now = Date.now();
-      await guestFaceDoc(tk.groomUid, token).set({
-        descriptor: roundDescriptor(descriptor),
-        guestId: tk.guestId ?? null,
-        guestName: tk.guestName ?? null,
-        consentAt: now,
-        createdAt: now,
-        // Firestore TTL policy on guestFaces.expireAt garbage-collects the
-        // biometric row when the invite token itself expires.
-        expireAt: Timestamp.fromMillis(tk.expiresAt),
-        modelVersion: MODEL_VERSION,
-      });
-
-      const matches = await matchesForGroom(tk.groomUid, descriptor);
-      res.json({ ok: true, expiresAt: tk.expiresAt, matches });
-    } catch (err) {
-      res.status(500).json({ error: "write_failed", detail: errorMessage(err) });
+      bytes = result.referenceImage;
     }
-  },
-);
+    if (!bytes) {
+      res.status(400).json({ error: "no_image" });
+      return;
+    }
+
+    // Re-enroll: drop the guest's previous AWS face so it doesn't linger.
+    const ref = guestFaceDoc(tk.groomUid, token);
+    const prior = await ref.get();
+    const priorFaceId = prior.exists ? (prior.data()?.faceId as string | undefined) : undefined;
+    if (priorFaceId) await rek.deleteFaces(tk.groomUid, [priorFaceId]).catch(() => undefined);
+
+    const guestId = tk.guestId || hashToken(token).slice(0, 16);
+    const faceId = await rek.enrollGuestFace(tk.groomUid, guestId, bytes);
+    if (!faceId) {
+      res.status(422).json({ error: "no_face" });
+      return;
+    }
+
+    const now = Date.now();
+    await ref.set({
+      faceId,
+      phoneE164: normalisePhone(phone ?? "") ?? tk.guestPhone ?? null,
+      guestId: tk.guestId ?? null,
+      guestName: tk.guestName ?? null,
+      consentAt: now,
+      createdAt: now,
+      expireAt: Timestamp.fromMillis(tk.expiresAt),
+      provider: "rekognition",
+    });
+
+    const matches = await matchesForGuestFace(tk.groomUid, faceId);
+    res.json({ ok: true, expiresAt: tk.expiresAt, matches });
+  } catch (err) {
+    res.status(500).json({ error: "enroll_failed", detail: errorMessage(err) });
+  }
+});
+
+// ─── GET /digital/photos/matches?token=… ─────────────────────────────────────
+
+/**
+ * Enrollment state + current matches. Status-shaped 200 so the page poller
+ * needs no error branching; hard errors only for the token (400/404/410).
+ */
+photoFacesRouter.get("/matches", matchesLimiter, async (req: Request, res: Response) => {
+  const token = (req.query?.token ?? "").toString();
+  const tk = await loadValidToken(token, res);
+  if (!tk) return;
+
+  const base = { expiresAt: tk.expiresAt, guestPhone: tk.guestPhone ?? null, matches: [] as PhotoMatch[] };
+  try {
+    if (!isRekognitionConfigured() || !(await isPhotographerPublished(tk.groomUid))) {
+      res.json({ published: false, enrolled: false, ...base });
+      return;
+    }
+    const enrollSnap = await guestFaceDoc(tk.groomUid, token).get();
+    const faceId = enrollSnap.exists ? (enrollSnap.data()?.faceId as string | undefined) : undefined;
+    if (!faceId) {
+      res.json({ published: true, enrolled: false, ...base });
+      return;
+    }
+    const matches = await matchesForGuestFace(tk.groomUid, faceId);
+    res.json({ published: true, enrolled: true, ...base, matches });
+  } catch (err) {
+    res.status(500).json({ error: "read_failed", detail: errorMessage(err) });
+  }
+});
 
 // ─── DELETE /digital/photos/enroll ───────────────────────────────────────────
 
-/**
- * Erase the guest's stored face descriptor. Idempotent. Body: `{ token }`.
- */
-photoFacesRouter.delete(
-  "/enroll",
-  enrollLimiter,
-  async (req: Request, res: Response) => {
-    const token = (req.body?.token ?? "").toString();
-    const tk = await loadValidToken(token, res);
-    if (!tk) return;
-
-    try {
-      await guestFaceDoc(tk.groomUid, token).delete();
-      res.json({ ok: true });
-    } catch (err) {
-      res.status(500).json({ error: "delete_failed", detail: errorMessage(err) });
+/** Erase the guest's stored face (AWS + Firestore). Idempotent. Body `{token}`. */
+photoFacesRouter.delete("/enroll", enrollLimiter, async (req: Request, res: Response) => {
+  const token = (req.query?.token ?? req.body?.token ?? "").toString();
+  const tk = await loadValidToken(token, res);
+  if (!tk) return;
+  try {
+    const ref = guestFaceDoc(tk.groomUid, token);
+    const snap = await ref.get();
+    const faceId = snap.exists ? (snap.data()?.faceId as string | undefined) : undefined;
+    if (faceId && isRekognitionConfigured()) {
+      const rek = await import("../../faceIndex/rekognition.js");
+      await rek.deleteFaces(tk.groomUid, [faceId]).catch(() => undefined);
     }
-  },
-);
+    await ref.delete();
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: "delete_failed", detail: errorMessage(err) });
+  }
+});
+
+// ─── GET /digital/photos/zip?token=… ─────────────────────────────────────────
+
+/** Stream the guest's matched photos as a .zip (store mode — no recompress). */
+photoFacesRouter.get("/zip", matchesLimiter, async (req: Request, res: Response) => {
+  const token = (req.query?.token ?? "").toString();
+  const tk = await loadValidToken(token, res);
+  if (!tk) return;
+  if (!isRekognitionConfigured()) {
+    res.status(503).json({ error: "face_engine_unavailable" });
+    return;
+  }
+  try {
+    if (!(await isPhotographerPublished(tk.groomUid))) {
+      res.status(409).json({ error: "not_published" });
+      return;
+    }
+    const enrollSnap = await guestFaceDoc(tk.groomUid, token).get();
+    const faceId = enrollSnap.exists ? (enrollSnap.data()?.faceId as string | undefined) : undefined;
+    if (!faceId) {
+      res.status(409).json({ error: "not_enrolled" });
+      return;
+    }
+
+    const rek = await import("../../faceIndex/rekognition.js");
+    const hits = await rek.searchByFaceId(tk.groomUid, faceId);
+    const fileRows = await loadFileRows(tk.groomUid);
+    const matched = joinRekognitionMatches(hits, fileRows);
+    if (!matched.length) {
+      res.status(404).json({ error: "no_photos" });
+      return;
+    }
+    const pathById = new Map(fileRows.map((f) => [f.fileId, f.storagePath]));
+
+    const archiver = (await import("archiver")).default;
+    res.setHeader("Content-Type", "application/zip");
+    res.setHeader("Content-Disposition", 'attachment; filename="my-photos.zip"');
+    const archive = archiver("zip", { store: true });
+    archive.on("error", () => {
+      try {
+        if (!res.headersSent) res.status(500);
+        res.end();
+      } catch {
+        /* already torn down */
+      }
+    });
+    archive.pipe(res);
+    const bucket = getStorage().bucket();
+    let n = 0;
+    for (const m of matched) {
+      const sp = pathById.get(m.fileId);
+      if (!sp) continue;
+      const safe = `${String(n++).padStart(3, "0")}_${(m.name || "photo").replace(/[^\w.\-]+/g, "_")}`;
+      archive.append(bucket.file(sp).createReadStream(), { name: safe });
+    }
+    await archive.finalize();
+  } catch (err) {
+    if (!res.headersSent) res.status(500).json({ error: "zip_failed", detail: errorMessage(err) });
+    else res.end();
+  }
+});
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -177,19 +293,12 @@ interface DigitalTokenRecord {
   groomUid: string;
   guestId?: string;
   guestName?: string;
+  guestPhone?: string;
   guestType?: string;
   expiresAt: number;
 }
 
-/**
- * Validate + load a digital invite token, writing the error response on
- * failure (same status codes as /invites/digital/submit). Returns null
- * when a response has already been sent.
- */
-async function loadValidToken(
-  token: string,
-  res: Response,
-): Promise<DigitalTokenRecord | null> {
+async function loadValidToken(token: string, res: Response): Promise<DigitalTokenRecord | null> {
   if (!TOKEN_HEX_RE.test(token)) {
     res.status(400).json({ error: "invalid_token_format" });
     return null;
@@ -224,48 +333,37 @@ function isPhotographerPublished(groomUid: string): Promise<boolean> {
 }
 
 function guestFaceDoc(groomUid: string, token: string) {
-  return getFirestore().doc(
-    `digitalInvitations/${groomUid}/guestFaces/${hashToken(token)}`,
-  );
+  return getFirestore().doc(`digitalInvitations/${groomUid}/guestFaces/${hashToken(token)}`);
 }
 
-/**
- * Compare a guest descriptor against every indexed photo of the groom and
- * join display fields (name/url) from the photographerFiles metadata.
- */
-async function matchesForGroom(
-  groomUid: string,
-  guestDescriptor: number[],
-): Promise<FaceMatch[]> {
-  const fs = getFirestore();
-  const [facesSnap, filesSnap] = await Promise.all([
-    fs.collection(`digitalInvitations/${groomUid}/photoFaces`).get(),
-    fs.collection(`digitalInvitations/${groomUid}/photographerFiles`).get(),
-  ]);
-  const faceRows: PhotoFacesRow[] = facesSnap.docs.map((d) => {
-    const data = d.data();
-    return {
-      fileId: d.id,
-      faces: Array.isArray(data.faces) ? data.faces : [],
-      modelVersion: String(data.modelVersion ?? ""),
-      status: String(data.status ?? ""),
-    };
-  });
-  const fileRows: PhotoFileRow[] = filesSnap.docs.map((d) => {
+/** Read the photographerFiles metadata as join rows (incl. storagePath). */
+async function loadFileRows(groomUid: string): Promise<PhotoFileRow[]> {
+  const snap = await getFirestore()
+    .collection(`digitalInvitations/${groomUid}/photographerFiles`)
+    .get();
+  return snap.docs.map((d) => {
     const data = d.data();
     return {
       fileId: d.id,
       name: String(data.name ?? ""),
       url: String(data.url ?? ""),
       type: String(data.type ?? ""),
+      storagePath: String(data.storagePath ?? ""),
     };
   });
-  return computeMatches(guestDescriptor, faceRows, fileRows, MATCH_THRESHOLD);
+}
+
+/** Search the wedding's collection by a guest FaceId and join to photo metadata. */
+async function matchesForGuestFace(groomUid: string, guestFaceId: string): Promise<PhotoMatch[]> {
+  const rek = await import("../../faceIndex/rekognition.js");
+  const [hits, fileRows] = await Promise.all([
+    rek.searchByFaceId(groomUid, guestFaceId),
+    loadFileRows(groomUid),
+  ]);
+  return joinRekognitionMatches(hits, fileRows);
 }
 
 function errorMessage(err: unknown): string | undefined {
-  // Suppressed by default so prod never echoes raw error text; set
-  // DAWA_DEBUG_ERRORS=1 (functions/.env.local) to debug locally.
   if (process.env.DAWA_DEBUG_ERRORS !== "1") return undefined;
   return err instanceof Error ? err.message : String(err);
 }
