@@ -13,8 +13,12 @@
 
 import { FaceBox } from "./match";
 
-/** Similarity (0..100) at/above which two faces are treated as the same person. */
-export const CLUSTER_MIN_SIMILARITY = 92;
+// Similarity (0..100) at/above which two faces are treated as the same person.
+// Chosen from the empirical gap measured on real photos (scripts/rek-diagnose):
+// same-person face pairs score ~95-100, different people sit below ~85, and
+// 85-95 is nearly empty — so a cutoff in the low 90s separates cleanly while
+// still consolidating a person whose harder shots dip toward 90.
+export const CLUSTER_MIN_SIMILARITY = 90;
 
 /** One indexed face fed into clustering. */
 export type ClusterFace = {
