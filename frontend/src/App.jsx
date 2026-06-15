@@ -14,6 +14,7 @@ import { ConfirmationForm } from "./pages/ConfirmationForm.jsx";
 import { InviteForm } from "./pages/InviteForm.jsx";
 import { DigitalInviteForm } from "./pages/DigitalInviteForm.jsx";
 import { DigitalInvitationPage } from "./pages/DigitalInvitationPage.jsx";
+import { PeopleGallery } from "./pages/PeopleGallery.jsx";
 import { Portal } from "./pages/portal/Portal.jsx";
 
 export default function App() {
@@ -60,6 +61,7 @@ export default function App() {
         <Route path="/invite/digital/:token" element={<DigitalInviteForm {...langProps} />} />
         <Route path="/invite/:token" element={<InviteForm {...langProps} />} />
         <Route path="/d/:groomUsername/:token/*" element={<DigitalInvitationPage {...langProps} />} />
+        <Route path="/g/:groomUsername/*" element={<PeopleGallery {...langProps} />} />
         <Route path="/portal/*" element={<Portal onBack={onBack} {...langProps} />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

@@ -191,6 +191,21 @@
       }
     },
 
+    "galleryGrants": {
+      // Short-lived People-gallery access grants, minted ONLY by the server
+      // after phone-OTP + guest-list membership. Server-only (Admin SDK bypasses
+      // these); no client read/write. Keyed galleryGrants/{groomUid}/{tokenHash}.
+      ".read": false,
+      ".write": false,
+      "$groomUid": {
+        "$tokenHash": {
+          "phoneE164": { ".validate": "newData.isString() && newData.val().length <= 30" },
+          "expiresAt": { ".validate": "newData.isNumber()" },
+          "$other":    { ".validate": false }
+        }
+      }
+    },
+
     "driverAssignments": {
       "$driverUid": {
         ".read":  "auth != null && (auth.token.role === 'admin' || $driverUid === auth.uid)",
