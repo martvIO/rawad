@@ -25,7 +25,7 @@ _(ideas, frameworks, patterns, principles — pages that describe a concept)_
 - [[Security Model]] — three enforced server-side layers + non-authoritative UI guard
 - [[Password Encryption]] — client RSA-OAEP-encrypts password fields as `enc:v1:` envelopes (defense-in-depth on top of HTTPS); backend middleware decrypts ahead of /auth + /users
 - [[Digital Invitations]] — the Firestore-backed WhatsApp-link invite flow
-- [[Face Matching]] — server-side face index for the guest "your photos" page; biometric consent + TTL erasure
+- [[Face Matching]] — AWS Rekognition engine: guest "your photos" (selfie→matches→ZIP) + OTP-gated "People" gallery; consent + 30-day auto-purge
 - [[Optimistic UI Pattern]] — recurring bug class from the polling architecture, and its fix convention
 - [[Inline Styling Convention]] — 100% inline styles + `theme.js` tokens, no CSS framework
 - [[Digit Normalization]] — Western ASCII digits everywhere: `numberingSystem: latn` dates, apiClient input scrubbing, DB migration script
