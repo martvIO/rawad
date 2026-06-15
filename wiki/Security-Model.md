@@ -30,5 +30,24 @@ A full audit added several server-side protections (all verified by unit/integra
 - **Access control:** `POST /live-locations` filters `shareWith` to the driver's `assignedGrooms` claim, and `database.rules.json` requires an assignment to write a location shard (clearing still allowed); `GET /digital/:uid/public` is approved-only; the public confirmation auto-attach no longer mutates a guest's GPS pin; `PATCH /users/:uid` enforces a field allowlist.
 - **Supply chain / deps:** `@grpc/grpc-js`/`uuid`/`qs` bumped to patched versions (functions `npm audit` clean); Leaflet CDN injection pinned with SRI; CORS defaults hardened (explicit `ALLOWED_ORIGINS` + always-allow localhost/`*.web.app`).
 
+## Password-encryption layer (2026-06-13)
+A defense-in-depth [[Password Encryption]] layer RSA-encrypts password fields as
+`enc:v1:` envelopes before they leave the client, keeping plaintext out of access
+logs / DevTools. It is **on top of** HTTPS (not a replacement) and does not defend
+against an active body-modifying adversary. Backward-compatible and fail-safe
+(no key ⇒ plaintext-over-TLS); `/api/health` exposes `encryption: true|false`.
+Committed `dc22fd6`; inert in prod until `PASSWORD_ENC_PRIVATE_KEY` is provisioned.
+
+## Biometric face data (2026-06-12)
+The [[Face Matching]] feature stores face descriptors (biometric data) in two
+Firestore collections that are **explicitly `allow read, write: if false`** —
+Cloud Functions Admin SDK only, never client-readable, and descriptors never
+appear in any API response. Guest enrollment requires an explicit AR/HE consent
+screen (a `consentAt` timestamp is stored) and is auto-deleted via a Firestore
+TTL policy on `guestFaces.expireAt` at token expiry, plus a guest-facing delete
+button. The public photo endpoints are rate-limited **per invite token** (with a
+per-IP backstop) rather than per-IP, because wedding guests share the venue's
+NAT IP — keying by IP alone would throttle the whole party as one client.
+
 ## Hard rules for contributors
 Per [[AI Engineering Rules]], never weaken `database.rules.json`, `storage.rules`, `assertAdmin()`, `requireAuth`, rate limits, or input validation; always test security changes with rule tests. Note: a service-account JSON key sits in the repo root and must not be committed — see [[Tasks Backlog]] TASK-008.

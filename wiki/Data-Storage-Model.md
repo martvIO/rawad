@@ -29,6 +29,12 @@ Key RTDB paths:
 Digital guest lists, media, and photographer files use Firestore — see [[Digital Invitations]]. RTDB had silent write-rollback issues on the first write after login (claim-propagation race, [[Known Bugs]] BUG-R003); Firestore proved reliable for the write-after-login pattern.
 - `digitalGuests/{groomUid}/guests/{guestId}`, `digitalMedia/{groomUid}`, `photographerFiles/{groomUid}/files/{fileId}`
 
+**Biometric face-index collections (2026-06-12, see [[Face Matching]]) — server-only:**
+- `digitalInvitations/{uid}/photoFaces/{fileId}` — per-photo 128-D face descriptors (one row per indexed photographer image)
+- `digitalInvitations/{uid}/guestFaces/{sha256(token)}` — a guest's enrolled face descriptor; `expireAt` (Firestore `Timestamp`) drives a TTL policy that garbage-collects it at token expiry
+
+Both are **biometric data**: explicitly `allow read, write: if false` in `firestore.rules` (Admin SDK only, never client-readable) — see [[Security Model]].
+
 ## Firebase Storage
 - `proofs/{groomUid}/{guestId}/{ts}.jpg` — write: drivers with `assignedGrooms[groomUid]`; read: groom + admin
 - `digitalMedia/{groomUid}/...` — write: owning groom; read: public

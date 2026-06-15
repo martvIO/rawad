@@ -12,6 +12,9 @@ Bug ledger for [[Dawa]] (full detail in `KNOWN_BUGS.md`). Convention: never dele
 ## Open
 _(none as of 2026-05-26)_
 
+## Resolved — recent (2026-06)
+- **Guest photos page stuck on "not published"** — the 2026-06-11 security commit `280ccf6` dropped `groomUid` from the public `GET /invites/token/:token` projection, but `DigitalYourPhotos.jsx` still read `rec.groomUid` (→ `undefined` → page never advanced). Fixed structurally by the [[Face Matching]] rework: the server now resolves the groom from the token internally and the client never needs `groomUid` (which must stay un-exposed).
+
 ## Resolved — recent (2026-05)
 Most resolved bugs cluster around the [[Digital Invitations]] upload/gallery flow and the [[Optimistic UI Pattern]]:
 

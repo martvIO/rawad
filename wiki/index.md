@@ -23,6 +23,7 @@ _(ideas, frameworks, patterns, principles — pages that describe a concept)_
 - [[Authentication]] — synthetic email, JWT custom claims, token manager, phone-OTP reset
 - [[Polling and Realtime]] — REST polling (15–30s) for most data; SSE for live driver GPS
 - [[Security Model]] — three enforced server-side layers + non-authoritative UI guard
+- [[Password Encryption]] — client RSA-OAEP-encrypts password fields as `enc:v1:` envelopes (defense-in-depth on top of HTTPS); backend middleware decrypts ahead of /auth + /users
 - [[Digital Invitations]] — the Firestore-backed WhatsApp-link invite flow
 - [[Face Matching]] — server-side face index for the guest "your photos" page; biometric consent + TTL erasure
 - [[Optimistic UI Pattern]] — recurring bug class from the polling architecture, and its fix convention
@@ -30,6 +31,10 @@ _(ideas, frameworks, patterns, principles — pages that describe a concept)_
 - [[Digit Normalization]] — Western ASCII digits everywhere: `numberingSystem: latn` dates, apiClient input scrubbing, DB migration script
 - [[List Search and Filter]] — reusable SearchBar + FilterChips + `useListFilter` on every portal list (12 lists); substring + phone-aware + hamza-insensitive
 - [[Load-Test Dashboard]] — local-only FastAPI+React control panel for the Locust suite; live SSE metrics, always-on LOADTEST-data cleanup (incl. new admin purge endpoint), archived run history + compare
+
+- [[Payments]] — Stripe payment links (test mode) + signature-verified webhook for the digital plans
+- [[WhatsApp Messaging]] — WhatsApp Cloud API send + Meta webhook + daily scheduled RSVP reminders
+- [[Communication Settings]] — admin contact channels + public /settings/public + landing WhatsApp CTAs
 
 ## Sources
 
@@ -47,6 +52,7 @@ _(summaries of specific sources you've ingested)_
 _(synthesized answers to questions you've asked, filed back as pages)_
 
 - [[Product Audit 2026-06-13]] — full product/UX/eng audit; biggest gaps: no proactive comms, broken promises (reminders/30-day-deletion), no payments/analytics, operator-scale ceiling
+- [[Audit Remediation 2026]] — implementation of the audit roadmap (Phases 1-13), shipped to production
 ---
 
 *This index is maintained by Claude via `/wiki-brain`. Do not edit by hand unless you know what you're doing.*

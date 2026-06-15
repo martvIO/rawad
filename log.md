@@ -160,3 +160,12 @@ Added whatsapp.ts (sendWhatsAppText + verifyWebhookChallenge, env-gated) and a s
 
 ## [2026-06-14 00:05] session | Audit Phases 4b-13 built + deployed
 Autonomous run through the rest of the roadmap, each phase verified (build+tests) then committed + deployed: 4b reminder scheduler (onSchedule), 5 groom onboarding checklist, 6 driver non-delivery outcomes, 7 bulk guest import, 8 audit-log reader, 9 dashboard reply rollup, 10 "made with Dawa" growth loop, 11 PII consent links, 12 global Hebrew fonts + mixed-language fix, 13 CSV export + Waze. 431 FE / 147 BE tests green. functions+rules+hosting deployed to dawa-aa793. Deferred (needs owner sign-off): 30-day PII auto-deletion (policy rewrite vs destructive cron); server-side invite-open analytics. WhatsApp Business + Stripe live once their credentials are set.
+
+## [2026-06-14 00:15] session | Wiki: record audit + Phases 1-13 implementation
+Touched: Audit Remediation 2026 (new), Payments (new), WhatsApp Messaging (new), Communication Settings (new), Product Audit 2026-06-13, index.md
+
+## [2026-06-14 00:30] session | Wiki: record password-encryption layer
+Touched: Password Encryption (new), Security Model, Authentication, index.md. Documented the RSA-OAEP password-encryption layer (enc:v1: envelopes, /auth/pubkey, decrypt middleware, PASSWORD_ENC_PRIVATE_KEY + REQUIRE_ENCRYPTED_PASSWORDS gating, passive-only threat boundary, no forward secrecy, /health encryption signal). Cross-linked from Security Model + Authentication; added to index Concepts. Committed dc22fd6, deploy held; inert in prod until the secret is provisioned.
+
+## [2026-06-15 05:55] ingest | server-side face index feature
+Touched: Face Matching, Data Storage Model, Security Model, API Contracts, Architecture Decisions, Known Bugs, Tasks Backlog, index

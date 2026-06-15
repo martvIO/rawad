@@ -20,3 +20,4 @@ Index of the closed architectural questions in [[Dawa]] (full rationale in `DECI
 - **No App Check** — rate limiting is the abuse gate instead. See [[Security Model]].
 - **Rate limiting: in-memory, per-instance** — resets on cold start; acceptable for low-volume endpoints. See [[Security Model]].
 - **Phone OTP password reset** — no email reset links. See [[Authentication]].
+- **Server-side face index (not client-only or third-party)** — a Cloud Function indexes every photographer photo's faces once; guests enrol a descriptor server-side for an instant, uncapped gallery. Runtime is `@vladmandic/face-api` on the **tfjs WASM backend** (not tfjs-node — no native binary build risk; speed irrelevant for a background trigger), with the recognition weights kept **byte-identical** to the browser copy so client/server descriptors stay comparable. See [[Face Matching]].
