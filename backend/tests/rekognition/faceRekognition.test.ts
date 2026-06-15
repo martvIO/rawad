@@ -14,6 +14,7 @@
 //   persons_photo/person_1|2/      — each person's enrollment selfie
 //   finial_data/person_1|2/        — the expected grouping (filenames per person)
 
+import "./_loadCreds"; // must run before isRekognitionConfigured() is read
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
