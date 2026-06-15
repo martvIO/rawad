@@ -55,6 +55,18 @@ service cloud.firestore {
       match /guestFaces/{tokenHash} {
         allow read, write: if false;
       }
+      // People-gallery data — also server-mediated only. peopleClusters carry
+      // face boxes + FaceIds (biometric-adjacent); galleryConfig + jobStatus are
+      // edited via the API and the public gallery reads through a grant.
+      match /peopleClusters/{clusterId} {
+        allow read, write: if false;
+      }
+      match /galleryConfig/{doc} {
+        allow read, write: if false;
+      }
+      match /jobStatus/{doc} {
+        allow read, write: if false;
+      }
     }
 
     // Admin reads every design / design request across all grooms via collectionGroup.

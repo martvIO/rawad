@@ -66,3 +66,7 @@ export { whatsappWebhook } from "./whatsappWebhook";
 // Daily Cloud Scheduler job that nudges unanswered digital-invite guests a week
 // before the wedding (via the WhatsApp Cloud API; a no-op until configured).
 export { sendRsvpReminders } from "./reminders";
+
+// Scheduled debounced re-clustering of the People gallery: reclusters grooms
+// whose photographer-upload burst has settled (clusterDirty + quiet period).
+export { reclusterDirtyGalleries } from "./faceIndex/clusterJob";
