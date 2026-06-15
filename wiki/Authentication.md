@@ -36,4 +36,11 @@ A `invalid_credentials` / "wrong username or password" failure on the deployed s
 
 Seed/dev defaults (`e2e/helpers/seed.ts`): `admin/Admin1234`, `groom/Groom1234`, `driver/Driver1234` — but **production passwords drift from these**, so a 401 with the seed value just means prod was changed.
 
+## Password encryption (in-body, defense-in-depth)
+As of 2026-06-13, the client RSA-encrypts the `password`/`newPassword` field as an
+`enc:v1:` envelope before POSTing to `/auth/login`, `/auth/reset-password`, and the
+`/users` password routes; a backend middleware decrypts it in place so this flow is
+otherwise unchanged. Backward-compatible (plaintext still accepted) and fail-safe.
+Full design + threat model: [[Password Encryption]].
+
 See [[User Roles]] for what each role can do once authenticated.
