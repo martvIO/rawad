@@ -70,3 +70,7 @@ export { sendRsvpReminders } from "./reminders";
 // Scheduled debounced re-clustering of the People gallery: reclusters grooms
 // whose photographer-upload burst has settled (clusterDirty + quiet period).
 export { reclusterDirtyGalleries } from "./faceIndex/clusterJob";
+
+// Daily biometric auto-purge: deletes the AWS face collection + Firestore face
+// data ~30 days after the wedding (the privacy commitment shown to guests).
+export { purgeExpiredFaces } from "./faceIndex/purge";

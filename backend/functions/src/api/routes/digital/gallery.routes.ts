@@ -23,6 +23,7 @@ import { HOUR_MS } from "../../../constants/time";
 import { canActOnUid } from "./access";
 import { safeDetail } from "./project";
 import { recomputeClusters } from "../../../faceIndex/clusterJob";
+import { purgeWeddingFaces } from "../../../faceIndex/purge";
 
 const GALLERY_STATUSES = ["draft", "pending_approval", "approved", "rejected"] as const;
 type GalleryStatus = (typeof GALLERY_STATUSES)[number];
@@ -237,6 +238,16 @@ export function registerGalleryRoutes(router: Router): void {
       res.json({ ok: true, ...(await readConfig(req.params.uid)) });
     } catch (err) {
       res.status(500).json({ error: "write_failed", detail: safeDetail(err) });
+    }
+  });
+
+  // Erase ALL face data for a wedding now (AWS collection + Firestore). Admin.
+  router.post("/:uid/gallery/erase-faces", requireAuth, requireAdmin, async (req: AuthRequest, res: Response) => {
+    try {
+      await purgeWeddingFaces(req.params.uid);
+      res.json({ ok: true });
+    } catch (err) {
+      res.status(500).json({ error: "erase_failed", detail: safeDetail(err) });
     }
   });
 
