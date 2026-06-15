@@ -18,6 +18,11 @@ export function isWhatsAppConfigured(): boolean {
   return !!(process.env.WHATSAPP_TOKEN && process.env.WHATSAPP_PHONE_ID);
 }
 
+/** The "your photos are ready" flow also needs an approved template name. */
+export function isYourPhotosTemplateConfigured(): boolean {
+  return isWhatsAppConfigured() && !!process.env.WHATSAPP_YOURPHOTOS_TEMPLATE;
+}
+
 export type WhatsAppSendResult = { ok: boolean; id?: string; error?: string };
 
 /**
@@ -40,6 +45,52 @@ export async function sendWhatsAppText(toPhone: string, body: string): Promise<W
         to,
         type: "text",
         text: { body: String(body ?? "") },
+      }),
+    });
+    const data = (await res.json()) as Record<string, unknown>;
+    if (!res.ok) {
+      const err = (data?.error as { message?: string } | undefined)?.message;
+      return { ok: false, error: err || `http_${res.status}` };
+    }
+    const messages = data?.messages as Array<{ id?: string }> | undefined;
+    return { ok: true, id: messages?.[0]?.id };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "send_failed" };
+  }
+}
+
+/**
+ * Send a WhatsApp **template** message (required for business-initiated
+ * messages outside the 24h customer-service window — e.g. "your photos are
+ * ready"). `components` is the Meta template components array (body params,
+ * button params, …); callers shape it to match their approved template.
+ * Config-gated and never throws, exactly like sendWhatsAppText.
+ */
+export async function sendWhatsAppTemplate(
+  toPhone: string,
+  templateName: string,
+  languageCode: string,
+  components: unknown[],
+): Promise<WhatsAppSendResult> {
+  const token = process.env.WHATSAPP_TOKEN;
+  const phoneId = process.env.WHATSAPP_PHONE_ID;
+  if (!token || !phoneId) return { ok: false, error: "not_configured" };
+  if (!templateName) return { ok: false, error: "no_template" };
+  const to = String(toPhone || "").replace(/[^0-9]/g, "");
+  if (!to) return { ok: false, error: "invalid_phone" };
+  try {
+    const res = await fetch(`https://graph.facebook.com/${GRAPH_VERSION}/${phoneId}/messages`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        to,
+        type: "template",
+        template: {
+          name: templateName,
+          language: { code: languageCode || "ar" },
+          ...(components && components.length ? { components } : {}),
+        },
       }),
     });
     const data = (await res.json()) as Record<string, unknown>;

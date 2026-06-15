@@ -32,6 +32,7 @@ import { registerDesignsRoutes } from "./designs.routes";
 import { registerPhotographerRoutes } from "./photographer.routes";
 import { registerWorkflowRoutes } from "./workflow.routes";
 import { registerPublicRoutes } from "./public.routes";
+import { registerPhotoShareRoutes } from "./photoShare.routes";
 
 export const digitalRouter = Router();
 
@@ -43,3 +44,4 @@ registerDesignsRoutes(digitalRouter);
 registerPhotographerRoutes(digitalRouter);
 registerWorkflowRoutes(digitalRouter);
 registerPublicRoutes(digitalRouter);
+registerPhotoShareRoutes(digitalRouter);
