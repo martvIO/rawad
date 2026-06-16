@@ -78,6 +78,8 @@ export function usePortalState({ onBack, t, lang, setLang }) {
   // Per-groom feature flags (default ON when missing — legacy grooms).
   const canSeeAttendance = authUser?.canSeeAttendance !== false;
   const canUsePhotographer = authUser?.canUsePhotographer !== false;
+  // Boarding-pass / wallet feature defaults OFF — admin enables per groom.
+  const canUseBoardingPass = authUser?.canUseBoardingPass === true;
 
   // ── Login form (transient) ──────────────────────────────────────────────────
   const [loginUser, setLoginUser]   = useState("");
@@ -517,7 +519,7 @@ export function usePortalState({ onBack, t, lang, setLang }) {
 
     // auth + session
     authed, authReady, userType, currentUid, currentUsername,
-    canSeeAttendance, canUsePhotographer,
+    canSeeAttendance, canUsePhotographer, canUseBoardingPass,
     driverServingGroom: driverServingGroomUsername,
     setDriverServingGroom,
     loginUser, setLoginUser, loginPass, setLoginPass,

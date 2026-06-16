@@ -208,6 +208,7 @@ authRouter.post(
       phoneE164: profile?.phoneE164 ?? null,
       canSeeAttendance: profile?.canSeeAttendance !== false,
       canUsePhotographer: profile?.canUsePhotographer !== false,
+      canUseBoardingPass: profile?.canUseBoardingPass === true,
     });
   }
 );
@@ -302,6 +303,7 @@ authRouter.get("/me", requireAuth, async (req: AuthRequest, res: Response) => {
     phoneE164: profile?.phoneE164 ?? null,
     canSeeAttendance: profile?.canSeeAttendance !== false,
     canUsePhotographer: profile?.canUsePhotographer !== false,
+    canUseBoardingPass: profile?.canUseBoardingPass === true,
     claims,
   });
 });
@@ -509,6 +511,7 @@ interface UserProfile {
   phoneE164?: string;
   canSeeAttendance?: boolean;
   canUsePhotographer?: boolean;
+  canUseBoardingPass?: boolean;
 }
 
 /**

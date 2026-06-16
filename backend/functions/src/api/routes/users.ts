@@ -252,6 +252,9 @@ usersRouter.post(
       // Per-groom feature flags — default ON for backward-compatibility.
       profile.canSeeAttendance = input.canSeeAttendance !== false;
       profile.canUsePhotographer = input.canUsePhotographer !== false;
+      // Boarding-pass / wallet feature defaults OFF — needs Apple/Google
+      // credentials the admin enables deliberately per groom.
+      profile.canUseBoardingPass = input.canUseBoardingPass === true;
 
       const updates: Record<string, unknown> = {};
       updates[`users/${userRecord.uid}`] = profile;
@@ -349,7 +352,7 @@ usersRouter.patch(
         return;
       }
     }
-    for (const key of ["canSeeAttendance", "canUsePhotographer"]) {
+    for (const key of ["canSeeAttendance", "canUsePhotographer", "canUseBoardingPass"]) {
       if (key in body) {
         const v = body[key];
         if (typeof v !== "boolean") { res.status(400).json({ error: "invalid_flag", field: key }); return; }
@@ -677,6 +680,7 @@ interface CreatePortalUserInput {
   displayName?: string;
   canSeeAttendance?: boolean;
   canUsePhotographer?: boolean;
+  canUseBoardingPass?: boolean;
 }
 
 interface UpdatePortalUserInput {

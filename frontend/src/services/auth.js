@@ -141,6 +141,7 @@ export function subscribeAuth(cb) {
         phoneE164: value.phoneE164 ?? null,
         canSeeAttendance: value.canSeeAttendance !== false,
         canUsePhotographer: value.canUsePhotographer !== false,
+        canUseBoardingPass: value.canUseBoardingPass === true,
         claims: value.claims ?? {},
       });
     },

@@ -35,6 +35,8 @@ import { HOUR_MS } from "../../constants/time";
 import { RATE } from "../../constants/rateLimits";
 import { TOKEN_BYTES, TOKEN_HEX_RE, TOKEN_TTL_MS } from "../../constants/tokens";
 import { ADDRESS_JOINER } from "../../constants/format";
+import { loadPassContext, PassResult } from "../../wallet/passData";
+import { renderMonogramPng } from "../../wallet/monogram";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -101,6 +103,21 @@ invitesRouter.get("/token/:token", async (req: Request, res: Response) => {
     // undefined keys, so physical (no guestType/designSnapshot) and digital
     // tokens both serialize correctly.
     const rec = snap.val() as Record<string, unknown>;
+    // Derive whether the groom may offer the wallet "boarding pass" — read the
+    // groom profile flag (default OFF) so the unauthenticated invitation page
+    // knows whether to show the Add-to-Wallet button. Only the derived boolean
+    // is exposed, never the raw groom profile. Failures fall back to false.
+    let boardingPassEnabled = false;
+    if (rec.groomUid) {
+      try {
+        const flagSnap = await getDatabase()
+          .ref(`users/${rec.groomUid}/canUseBoardingPass`)
+          .get();
+        boardingPassEnabled = flagSnap.val() === true;
+      } catch {
+        boardingPassEnabled = false;
+      }
+    }
     res.json({
       guestName: rec.guestName,
       guestPhone: rec.guestPhone,
@@ -110,11 +127,76 @@ invitesRouter.get("/token/:token", async (req: Request, res: Response) => {
       usedAt: rec.usedAt,
       designId: rec.designId,
       designSnapshot: rec.designSnapshot,
+      boardingPassEnabled,
     });
   } catch (err) {
     res.status(500).json({ error: "read_failed", detail: errorMessage(err) });
   }
 });
+
+// ─── Wallet passes (Apple .pkpass + Google Wallet) ─────────────────────────────
+//
+// Public + token-gated. The guest's invitation page shows the Add-to-Wallet
+// button only when the admin enabled `canUseBoardingPass` for the groom; these
+// endpoints ALSO enforce that flag server-side (via loadPassContext → 403). Each
+// platform degrades independently: until its signing secrets are configured the
+// endpoint returns 503 *_unconfigured and the frontend simply omits that button.
+
+/** Map a loadPassContext failure to a JSON error response. */
+function sendPassError(res: Response, r: Extract<PassResult, { ok: false }>): void {
+  res.status(r.status).json({ error: r.error });
+}
+
+// Themed monogram PNG — used as the Google Wallet logo (Google fetches it
+// server-side) and, later, the Apple .pkpass images. Stable per design → cached.
+invitesRouter.get(
+  "/pass/:token/logo.png",
+  ipRateLimit("walletPass", SUBMIT_DIGITAL_MAX_PER_HOUR_IP, HOUR_MS),
+  async (req: Request, res: Response) => {
+    try {
+      const r = await loadPassContext(req.params.token, req.query.lang);
+      if (!r.ok) { sendPassError(res, r); return; }
+      const png = await renderMonogramPng(r.ctx.design, 660);
+      res.set("Content-Type", "image/png");
+      res.set("Cache-Control", "public, max-age=86400");
+      res.send(png);
+    } catch (err) {
+      res.status(500).json({ error: "pass_failed", detail: errorMessage(err) });
+    }
+  },
+);
+
+// Apple Wallet .pkpass — Phase 2 (needs APPLE_PASS_* signing secrets + the
+// buildApplePass() builder). Enforces token + flag now; 503 until configured.
+invitesRouter.get(
+  "/pass/:token/apple",
+  ipRateLimit("walletPass", SUBMIT_DIGITAL_MAX_PER_HOUR_IP, HOUR_MS),
+  async (req: Request, res: Response) => {
+    try {
+      const r = await loadPassContext(req.params.token, req.query.lang);
+      if (!r.ok) { sendPassError(res, r); return; }
+      res.status(503).json({ error: "apple_unconfigured" });
+    } catch (err) {
+      res.status(500).json({ error: "pass_failed", detail: errorMessage(err) });
+    }
+  },
+);
+
+// Google Wallet save link — Phase 1 (needs GOOGLE_WALLET_* secrets + the
+// buildGoogleSaveUrl() signer). Enforces token + flag now; 503 until configured.
+invitesRouter.get(
+  "/pass/:token/google",
+  ipRateLimit("walletPass", SUBMIT_DIGITAL_MAX_PER_HOUR_IP, HOUR_MS),
+  async (req: Request, res: Response) => {
+    try {
+      const r = await loadPassContext(req.params.token, req.query.lang);
+      if (!r.ok) { sendPassError(res, r); return; }
+      res.status(503).json({ error: "google_unconfigured" });
+    } catch (err) {
+      res.status(500).json({ error: "pass_failed", detail: errorMessage(err) });
+    }
+  },
+);
 
 // ─── POST /invites (physical) ─────────────────────────────────────────────────
 

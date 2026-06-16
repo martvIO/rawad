@@ -200,6 +200,8 @@ function DigitalLandingMain({ lang, setLang }) {
       showEnvelope={true}
       alreadyAnswered={!!tokenRec.usedAt && !done}
       rsvpDone={done}
+      boardingPassEnabled={!!tokenRec.boardingPassEnabled}
+      token={token}
     />
   );
 }

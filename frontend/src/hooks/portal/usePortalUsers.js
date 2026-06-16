@@ -127,6 +127,8 @@ export function usePortalUsers({ authed, isAdmin, currentUid, userType, driverSe
     // صلاحيتا العريس (افتراضاً مُفعّلتان). تُمرَّران من نموذج الإنشاء.
     const canSeeAttendance   = opts.canSeeAttendance   !== false;
     const canUsePhotographer = opts.canUsePhotographer !== false;
+    // بطاقة المحفظة — افتراضاً متوقّفة (يفعّلها الأدمن لكل عريس).
+    const canUseBoardingPass = opts.canUseBoardingPass === true;
     // الهاتف اختياري في الواجهة. إذا تُرك فارغاً نُولِّد رقماً وهمياً
     // بنطاق +1202555XXXX (محجوز رسمياً للاستخدام الاختباري في NANP؛
     // تقبله libphonenumber / Firebase Auth كصيغة E.164 صالحة).
@@ -135,9 +137,9 @@ export function usePortalUsers({ authed, isAdmin, currentUid, userType, driverSe
     const phoneE164  = typedPhone ||
       ("+1202555" + (Date.now() % 10000).toString().padStart(4, "0"));
     try {
-      const result = await createPortalUser({ username, password: newUserPass, role, phoneE164, canSeeAttendance, canUsePhotographer });
+      const result = await createPortalUser({ username, password: newUserPass, role, phoneE164, canSeeAttendance, canUsePhotographer, canUseBoardingPass });
       const uid = result?.uid;
-      const newRow = { uid, id: uid, username, role, phoneE164, canSeeAttendance, canUsePhotographer };
+      const newRow = { uid, id: uid, username, role, phoneE164, canSeeAttendance, canUsePhotographer, canUseBoardingPass };
       if (uid) {
         setOptimisticUsers(prev => [...prev, newRow]);
         // إذا كان دور الحساب الجديد "عريس" نكتب سجله في /groomProfiles مباشرةً
@@ -199,6 +201,7 @@ export function usePortalUsers({ authed, isAdmin, currentUid, userType, driverSe
     // صلاحيتا العريس — قِيَم boolean صريحة فقط (undefined = لم تُرسل).
     const newCanSee      = typeof patch?.canSeeAttendance   === "boolean" ? patch.canSeeAttendance   : undefined;
     const newCanPhoto    = typeof patch?.canUsePhotographer === "boolean" ? patch.canUsePhotographer : undefined;
+    const newCanBoarding = typeof patch?.canUseBoardingPass === "boolean" ? patch.canUseBoardingPass : undefined;
 
     // ─ ما الذي تغيّر فعلاً؟ ──────────────────────────────────────────────
     const usernameChanged    = newUsername    && newUsername    !== (orig.username ?? "");
@@ -209,7 +212,9 @@ export function usePortalUsers({ authed, isAdmin, currentUid, userType, driverSe
     // المقارنة تُطبِّع الغياب على true (الافتراضي backward-compatible).
     const seeChanged         = newCanSee   !== undefined && newCanSee   !== (orig.canSeeAttendance   !== false);
     const photoChanged       = newCanPhoto !== undefined && newCanPhoto !== (orig.canUsePhotographer !== false);
-    const flagsChanged       = seeChanged || photoChanged;
+    // بطاقة المحفظة الافتراضي OFF — نُطبِّع الغياب على false.
+    const boardingChanged    = newCanBoarding !== undefined && newCanBoarding !== (orig.canUseBoardingPass === true);
+    const flagsChanged       = seeChanged || photoChanged || boardingChanged;
     const needsFunction      = usernameChanged || phoneChanged || roleChanged;
     const needsPassword      = !!newPassword;
     const needsDisplayName   = displayNameChanged;
@@ -253,12 +258,13 @@ export function usePortalUsers({ authed, isAdmin, currentUid, userType, driverSe
         await adminSetPasswordSrv(uid, newPassword);
       }
 
-      // ── 4. صلاحيتا العريس: كتابة RTDB مباشرة عبر PATCH /users/:uid ──────
-      //     (allowlist في الخادم يقبل canSeeAttendance/canUsePhotographer)
+      // ── 4. صلاحيات العريس: كتابة RTDB مباشرة عبر PATCH /users/:uid ──────
+      //     (allowlist في الخادم يقبل canSeeAttendance/canUsePhotographer/canUseBoardingPass)
       if (flagsChanged) {
         const fp = {};
-        if (seeChanged)   fp.canSeeAttendance   = newCanSee;
-        if (photoChanged) fp.canUsePhotographer = newCanPhoto;
+        if (seeChanged)      fp.canSeeAttendance   = newCanSee;
+        if (photoChanged)    fp.canUsePhotographer = newCanPhoto;
+        if (boardingChanged) fp.canUseBoardingPass = newCanBoarding;
         console.log("[dawa] patchUserInRTDB flags:", { uid, ...fp });
         await patchUserInRTDB(uid, fp);
       }
@@ -271,6 +277,7 @@ export function usePortalUsers({ authed, isAdmin, currentUid, userType, driverSe
         ...(roleChanged        && { role:        newRole }),
         ...(seeChanged         && { canSeeAttendance:   newCanSee }),
         ...(photoChanged       && { canUsePhotographer: newCanPhoto }),
+        ...(boardingChanged    && { canUseBoardingPass: newCanBoarding }),
       };
       const mergedUser = { ...orig, uid, id: uid, ...localPatch };
       setOptimisticUsers(prev => {

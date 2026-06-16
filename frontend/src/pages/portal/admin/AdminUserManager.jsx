@@ -82,6 +82,8 @@ function EditModal({ user, onSave, onCancel, t, lang }) {
   // صلاحيتا العريس — افتراضاً مُفعّلتان (backward-compatible).
   const [canSee,   setCanSee]   = useState(user.canSeeAttendance   !== false);
   const [canPhoto, setCanPhoto] = useState(user.canUsePhotographer !== false);
+  // بطاقة المحفظة — افتراضاً متوقّفة.
+  const [canBoarding, setCanBoarding] = useState(user.canUseBoardingPass === true);
 
   const canSave = username.trim() &&
     (newPass.length === 0 || isStrongPassword(newPass));
@@ -105,6 +107,7 @@ function EditModal({ user, onSave, onCancel, t, lang }) {
     if (role === "groom") {
       patch.canSeeAttendance   = canSee;
       patch.canUsePhotographer = canPhoto;
+      patch.canUseBoardingPass = canBoarding;
     }
     console.log("[dawa] EditModal → patch:", patch);
     try {
@@ -236,6 +239,13 @@ function EditModal({ user, onSave, onCancel, t, lang }) {
                 ? "האם אזור הצלם זמין לחתן"
                 : "هل تتاح صفحة المصوّر للعريس"}
             />
+            <FlagToggle
+              value={canBoarding} onChange={setCanBoarding} disabled={saving}
+              label={lang === "he" ? "🎟️ כרטיס ארנק" : "🎟️ بطاقة المحفظة"}
+              hint={lang === "he"
+                ? "האם אפשר להוסיף את ההזמנה לארנק אפל/גוגל"
+                : "هل تتاح للضيوف إضافة الدعوة إلى محفظة آبل/جوجل"}
+            />
           </div>
         )}
 
@@ -346,6 +356,8 @@ function UserManagerInner() {
   // صلاحيتا العريس الجديد — افتراضاً مُفعّلتان.
   const [newCanSee,   setNewCanSee]   = useState(true);
   const [newCanPhoto, setNewCanPhoto] = useState(true);
+  // بطاقة المحفظة للعريس الجديد — افتراضاً متوقّفة.
+  const [newCanBoarding, setNewCanBoarding] = useState(false);
 
   // تبويبات التصفية
   const TABS = [
@@ -371,10 +383,10 @@ function UserManagerInner() {
 
   // ── الإنشاء ──────────────────────────────────────────────────────────
   const handleCreate = async () => {
-    const result = await addUser({ canSeeAttendance: newCanSee, canUsePhotographer: newCanPhoto });
+    const result = await addUser({ canSeeAttendance: newCanSee, canUsePhotographer: newCanPhoto, canUseBoardingPass: newCanBoarding });
     if (result?.uid) {
       setFilter(result.role);        // اقفز للتبويب الموافق
-      setNewCanSee(true); setNewCanPhoto(true); // أعد الصلاحيات للوضع الافتراضي
+      setNewCanSee(true); setNewCanPhoto(true); setNewCanBoarding(false); // أعد الصلاحيات للوضع الافتراضي
     }
   };
 
@@ -476,6 +488,13 @@ function UserManagerInner() {
               hint={lang === "he"
                 ? "האם אזור הצלם זמין לחתן"
                 : "هل تتاح صفحة المصوّر للعريس"}
+            />
+            <FlagToggle
+              value={newCanBoarding} onChange={setNewCanBoarding}
+              label={lang === "he" ? "🎟️ כרטיס ארנק" : "🎟️ بطاقة المحفظة"}
+              hint={lang === "he"
+                ? "האם אפשר להוסיף את ההזמנה לארנק אפל/גוגל"
+                : "هل تتاح للضيوف إضافة الدعوة إلى محفظة آبل/جوجل"}
             />
           </div>
         )}

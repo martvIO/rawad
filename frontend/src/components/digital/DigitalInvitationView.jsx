@@ -26,6 +26,7 @@ import { InviteFooter, FloatingDock } from "./sections/InviteFooterDock.jsx";
 import { EnvelopeIntro } from "./sections/EnvelopeIntro.jsx";
 import { Ambience } from "./sections/InviteAmbience.jsx";
 import { ViewStyles } from "./sections/InviteStyles.jsx";
+import { WalletButton } from "./WalletButton.jsx";
 
 export function DigitalInvitationView({
   design,
@@ -41,6 +42,8 @@ export function DigitalInvitationView({
   showEnvelope = false,
   alreadyAnswered = false,
   rsvpDone = false,
+  boardingPassEnabled = false,
+  token = "",
 }) {
   const theme = getDigitalTheme(design?.themeColor);
   const font = getDigitalFont(design?.fontFamily);
@@ -222,6 +225,12 @@ export function DigitalInvitationView({
         alreadyAnswered={alreadyAnswered}
         rsvpDone={rsvpDone}
       />
+
+      {/* Add-to-Wallet — only on the real guest page, when the admin enabled the
+          per-groom flag and we have a token to mint the pass from. */}
+      {isPublic && boardingPassEnabled && token && (
+        <WalletButton token={token} lang={lang} theme={theme} font={font} />
+      )}
 
       {showGift && <GiftSection giftNote={giftNote} giftIban={giftIban} theme={theme} font={font} lang={lang} />}
       {showGuestbook && <GuestbookSection wishes={wishes} approvedWishes={approvedWishes} onSubmitWish={onSubmitWish} theme={theme} font={font} lang={lang} disabled={!isPublic} />}
