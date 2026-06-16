@@ -743,66 +743,47 @@ function ShowcaseSection({ t, onEnterPortal }) {
                 position: "absolute", top: 8, left: "50%", transform: "translateX(-50%)",
                 width: 80, height: 22, borderRadius: 12, background: "#0a0a10",
               }} />
-              <div style={{ marginTop: 24 }}>
-                <div style={{ fontSize: 9, color: "#7a6a4a", letterSpacing: 1.5, textTransform: "uppercase", fontWeight: 800, marginBottom: 6 }}>
-                  {t("dash_welcome")}
+              {/* Digital-invitation preview — monogram, couple, date, countdown, RSVP */}
+              <div style={{ marginTop: 22, textAlign: "center" }}>
+                <div style={{ fontSize: 9, color: "#a09070", letterSpacing: 2.5, textTransform: "uppercase", fontWeight: 800, marginBottom: 10 }}>
+                  دعوة زفاف
                 </div>
-                <div style={{ fontFamily: "'Amiri','Frank Ruhl Libre',serif", fontWeight: 900, color: "#f0c84c", fontSize: 18 }}>
-                  {t("dash_subtitle")}
+                <div style={{
+                  width: 52, height: 52, margin: "0 auto 12px", borderRadius: "50%",
+                  border: "1px solid rgba(201,168,76,.45)",
+                  background: "radial-gradient(circle at 50% 35%, rgba(201,168,76,.20), rgba(201,168,76,.02))",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  boxShadow: "0 0 24px rgba(240,200,76,.18)",
+                }}>
+                  <span style={{ fontFamily: "'Amiri','Frank Ruhl Libre',serif", color: "#f0c84c", fontSize: 19, fontWeight: 900 }}>أ ♥ ل</span>
                 </div>
+                <div style={{
+                  fontFamily: "'Amiri','Frank Ruhl Libre',serif", fontWeight: 900, fontSize: 25, lineHeight: 1.2,
+                  background: "linear-gradient(135deg,#fff3c0,#f0c84c,#c9a84c)",
+                  WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+                }}>أحمد &amp; ليلى</div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, margin: "9px 0" }}>
+                  <span style={{ width: 26, height: 1, background: "linear-gradient(90deg,transparent,#c9a84c)" }} />
+                  <span style={{ color: "#c9a84c", fontSize: 9 }}>✦</span>
+                  <span style={{ width: 26, height: 1, background: "linear-gradient(90deg,#c9a84c,transparent)" }} />
+                </div>
+                <div style={{ fontSize: 11, color: "#f5e6b8", fontWeight: 700, marginBottom: 3 }}>السبت · ١٢ تموز ٢٠٢٦</div>
+                <div style={{ fontSize: 10, color: "#a09070" }}>قاعة الأندلس · الناصرة</div>
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                {[
-                  { v: 187, l: t("stat_delivered"), c: "#4cc97a" },
-                  { v: 23,  l: t("stat_enroute"),   c: "#4b9fd4" },
-                ].map(s => (
-                  <div key={s.l} style={{
-                    background: "rgba(255,255,255,.03)", border: "1px solid rgba(255,255,255,.07)",
-                    borderRadius: 10, padding: "10px 12px",
-                  }}>
-                    <div style={{ fontFamily: "'Amiri','Frank Ruhl Libre',serif", color: s.c, fontSize: 22, fontWeight: 900, lineHeight: 1 }}>{s.v}</div>
-                    <div style={{ fontSize: 9, color: "#7a6a4a", marginTop: 4, letterSpacing: 1, textTransform: "uppercase" }}>{s.l}</div>
-                  </div>
-                ))}
-              </div>
-              <div>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                  <span style={{ fontSize: 9, color: "#7a6a4a", fontWeight: 700, letterSpacing: 1, textTransform: "uppercase" }}>{t("progress_label")}</span>
-                  <span style={{ fontSize: 10, color: "#f0c84c", fontWeight: 800 }}>89%</span>
-                </div>
-                <div style={{ height: 6, borderRadius: 999, background: "rgba(255,255,255,.04)", overflow: "hidden" }}>
-                  <div style={{
-                    height: "100%", width: "89%",
-                    background: "linear-gradient(90deg,#c9a84c,#f0c84c,#c9a84c)",
-                    backgroundSize: "200% 100%",
-                    borderRadius: 999,
-                    animation: "dawa-shimmer 3s linear infinite",
-                  }} />
-                </div>
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 4 }}>
-                {[
-                  { n: "أحمد محمد", s: "✓", c: "#4cc97a" },
-                  { n: "ليلى سعيد", s: "🚗", c: "#4b9fd4" },
-                  { n: "يوسف خالد", s: "⌛", c: "#a09070" },
-                ].map((g, i) => (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 5 }}>
+                {[{ v: "٤٢", l: "يوم" }, { v: "٠٨", l: "ساعة" }, { v: "١٥", l: "دقيقة" }, { v: "٣٠", l: "ثانية" }].map((c, i) => (
                   <div key={i} style={{
-                    display: "grid", gridTemplateColumns: "auto 1fr auto", gap: 8, alignItems: "center",
-                    padding: "7px 9px",
-                    background: "rgba(255,255,255,.03)", border: "1px solid rgba(255,255,255,.07)",
-                    borderRadius: 8,
+                    background: "rgba(255,255,255,.03)", border: "1px solid rgba(201,168,76,.18)",
+                    borderRadius: 8, padding: "7px 0", textAlign: "center",
                   }}>
-                    <div style={{
-                      width: 22, height: 22, borderRadius: "50%",
-                      background: "rgba(201,168,76,.12)",
-                      border: "1px solid rgba(201,168,76,.30)",
-                      color: "#c9a84c",
-                      display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10,
-                    }}>✦</div>
-                    <div style={{ fontSize: 10.5, color: "#f5e6b8", fontWeight: 700 }}>{g.n}</div>
-                    <div style={{ fontSize: 11, color: g.c }}>{g.s}</div>
+                    <div style={{ fontFamily: "'Amiri','Frank Ruhl Libre',serif", color: "#f0c84c", fontSize: 15, fontWeight: 900, lineHeight: 1 }}>{c.v}</div>
+                    <div style={{ fontSize: 7.5, color: "#7a6a4a", marginTop: 3, letterSpacing: .5 }}>{c.l}</div>
                   </div>
                 ))}
+              </div>
+              <div style={{ display: "flex", gap: 6 }}>
+                <div style={{ flex: 1, textAlign: "center", padding: "9px 0", borderRadius: 9, background: "linear-gradient(135deg,#c9a84c,#f0c84c)", color: "#2a0f00", fontSize: 11, fontWeight: 900 }}>سأحضر ♥</div>
+                <div style={{ flex: 1, textAlign: "center", padding: "9px 0", borderRadius: 9, background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.1)", color: "#a09070", fontSize: 11, fontWeight: 800 }}>أعتذر</div>
               </div>
             </div>
           </div>
