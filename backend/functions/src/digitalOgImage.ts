@@ -8,6 +8,7 @@
 // Referenced by <meta property="og:image"> in digitalInvitePreview.ts.
 import { onRequest } from "firebase-functions/v2/https";
 import { getDatabase } from "firebase-admin/database";
+import { getFirestore } from "firebase-admin/firestore";
 import { createCanvas, loadImage, GlobalFonts } from "@napi-rs/canvas";
 import * as fs from "fs";
 import * as path from "path";
@@ -41,6 +42,16 @@ function localize(v: Localized, lang = "ar"): string {
   if (v == null) return "";
   if (typeof v === "string") return v;
   return (v[lang as "ar" | "he"] || v.ar || v.he || "").toString();
+}
+
+// "#d8bd63" + alpha → "rgba(r,g,b,a)" for canvas gradients/glows.
+function hexA(hex: string, a: number): string {
+  const h = (hex || "").replace("#", "");
+  const n = h.length === 3 ? h.split("").map((c) => c + c).join("") : h;
+  const r = parseInt(n.slice(0, 2), 16) || 0;
+  const g = parseInt(n.slice(2, 4), 16) || 0;
+  const b = parseInt(n.slice(4, 6), 16) || 0;
+  return `rgba(${r},${g},${b},${a})`;
 }
 
 // Register Amiri once per cold start.
@@ -86,7 +97,7 @@ function drawCover(
  * @param guestName  the per-link guest name, drawn over the card so the
  *                   WhatsApp preview is personalised to whoever received it.
  */
-async function renderOgImage(design: DesignLike | null, guestName = ""): Promise<Buffer> {
+export async function renderOgImage(design: DesignLike | null, guestName = ""): Promise<Buffer> {
   ensureFonts();
   const lang = "ar";
   const groom = localize(design?.groomDisplayName, lang);
@@ -103,23 +114,41 @@ async function renderOgImage(design: DesignLike | null, guestName = ""): Promise
   const canvas = createCanvas(W, H);
   const ctx = canvas.getContext("2d");
 
-  // 1) Background — the real photo, full bleed and clear.
-  ctx.fillStyle = "#0b0b0f";
-  ctx.fillRect(0, 0, W, H);
+  // 1) Background. With a photo: full-bleed photo. Without one (photo-less
+  // designs + physical invites): an elegant branded gradient with a soft gold
+  // glow so the card still looks luxurious.
+  let drewPhoto = false;
   if (bgUrl) {
+    ctx.fillStyle = "#0b0b0f";
+    ctx.fillRect(0, 0, W, H);
     try {
       const r = await fetch(bgUrl);
-      if (r.ok) drawCover(ctx, await loadImage(Buffer.from(await r.arrayBuffer())));
-    } catch { /* keep solid background */ }
+      if (r.ok) { drawCover(ctx, await loadImage(Buffer.from(await r.arrayBuffer()))); drewPhoto = true; }
+    } catch { /* fall through to the branded background */ }
+  }
+  if (!drewPhoto) {
+    const base = ctx.createLinearGradient(0, 0, 0, H);
+    base.addColorStop(0, "#13111b");
+    base.addColorStop(0.5, "#0c0b12");
+    base.addColorStop(1, "#070709");
+    ctx.fillStyle = base;
+    ctx.fillRect(0, 0, W, H);
+    const glow = ctx.createRadialGradient(W / 2, H * 0.6, 40, W / 2, H * 0.6, W * 0.62);
+    glow.addColorStop(0, hexA(accent, 0.18));
+    glow.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = glow;
+    ctx.fillRect(0, 0, W, H);
   }
 
-  // 2) Light scrim ONLY toward the bottom (behind the text) — keeps the photo clear.
-  const g = ctx.createLinearGradient(0, H * 0.42, 0, H);
-  g.addColorStop(0, "rgba(8,8,12,0)");
-  g.addColorStop(0.55, "rgba(8,8,12,0.45)");
-  g.addColorStop(1, "rgba(8,8,12,0.80)");
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, W, H);
+  // 2) Light scrim toward the bottom (behind the text) — only over a photo.
+  if (drewPhoto) {
+    const g = ctx.createLinearGradient(0, H * 0.42, 0, H);
+    g.addColorStop(0, "rgba(8,8,12,0)");
+    g.addColorStop(0.55, "rgba(8,8,12,0.45)");
+    g.addColorStop(1, "rgba(8,8,12,0.80)");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+  }
 
   // 3) Thin gold frame.
   ctx.strokeStyle = accent;
@@ -128,10 +157,61 @@ async function renderOgImage(design: DesignLike | null, guestName = ""): Promise
   ctx.strokeRect(26, 26, W - 52, H - 52);
   ctx.globalAlpha = 1;
 
-  // 4) Text — RTL, centered, sitting over the bottom scrim, with shadows.
   ctx.direction = "rtl";
   ctx.textAlign = "center";
   const cx = W / 2;
+
+  // 3b) Brand wordmark — "دعوة" at the top with a thin flourish, on every card.
+  ctx.shadowColor = "rgba(0,0,0,0.6)";
+  ctx.shadowBlur = 14;
+  ctx.shadowOffsetY = 2;
+  ctx.font = '56px "AmiriBold"';
+  ctx.fillStyle = accent;
+  ctx.fillText("دعوة", cx, H * 0.17);
+  ctx.shadowColor = "transparent";
+  ctx.shadowBlur = 0;
+  ctx.shadowOffsetY = 0;
+  ctx.globalAlpha = 0.7;
+  ctx.strokeStyle = accent;
+  ctx.lineWidth = 1.4;
+  ctx.beginPath();
+  ctx.moveTo(cx - 120, H * 0.205);
+  ctx.lineTo(cx - 16, H * 0.205);
+  ctx.moveTo(cx + 16, H * 0.205);
+  ctx.lineTo(cx + 120, H * 0.205);
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+  ctx.save();
+  ctx.translate(cx, H * 0.205);
+  ctx.rotate(Math.PI / 4);
+  ctx.fillStyle = accent;
+  ctx.fillRect(-4, -4, 8, 8);
+  ctx.restore();
+
+  // 3c) Central monogram ornament — only when there's no photo (fills the gap).
+  if (!drewPhoto) {
+    const oy = H * 0.355;
+    ctx.strokeStyle = accent;
+    ctx.lineWidth = 2;
+    ctx.globalAlpha = 0.8;
+    ctx.beginPath(); ctx.arc(cx, oy, 50, 0, Math.PI * 2); ctx.stroke();
+    ctx.globalAlpha = 0.3;
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(cx, oy, 58, 0, Math.PI * 2); ctx.stroke();
+    ctx.globalAlpha = 1;
+    // Small heart, drawn with paths (Amiri has no ♥ glyph).
+    ctx.fillStyle = accent;
+    const hs = 17;
+    const hy = oy - 5;
+    ctx.beginPath();
+    ctx.moveTo(cx, hy + hs * 0.28);
+    ctx.bezierCurveTo(cx - hs, hy - hs * 0.32, cx - hs, hy + hs * 0.62, cx, hy + hs);
+    ctx.bezierCurveTo(cx + hs, hy + hs * 0.62, cx + hs, hy - hs * 0.32, cx, hy + hs * 0.28);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // 4) Text — RTL, centered, with shadows for legibility over any background.
   const guest = (guestName || "").toString().trim();
   const detailsLine = [dateText, venue].filter(Boolean).join("   ·   ");
 
@@ -193,9 +273,30 @@ export const digitalOgImage = onRequest(
       if (last && TOKEN_HEX_RE.test(last)) {
         const snap = await getDatabase().ref(`inviteTokens/${last}`).get();
         if (snap.exists()) {
-          const tk = snap.val() as { designSnapshot?: DesignLike; guestName?: string };
-          design = (tk?.designSnapshot ?? null) as DesignLike | null;
+          const tk = snap.val() as {
+            designSnapshot?: DesignLike;
+            guestName?: string;
+            groomUid?: string;
+            designId?: string;
+          };
           guestName = (tk?.guestName ?? "").toString();
+          design = (tk?.designSnapshot ?? null) as DesignLike | null;
+          // Physical / legacy tokens carry no embedded snapshot — fetch the
+          // groom's design so the couple names still appear on the card.
+          if (!design && tk?.groomUid) {
+            try {
+              const fsdb = getFirestore();
+              const parentSnap = await fsdb.doc(`digitalInvitations/${tk.groomUid}`).get();
+              const parent = (parentSnap.exists ? parentSnap.data() : {}) as Record<string, unknown>;
+              const did = (tk.designId as string) || (parent.defaultDesignId as string) || "";
+              if (did) {
+                const dSnap = await fsdb.doc(`digitalInvitations/${tk.groomUid}/designs/${did}`).get();
+                if (dSnap.exists) design = dSnap.data() as DesignLike;
+              } else if (parentSnap.exists) {
+                design = parent as DesignLike;
+              }
+            } catch { /* no design — render the branded card without couple names */ }
+          }
         }
       }
       const buf = await renderOgImage(design, guestName);

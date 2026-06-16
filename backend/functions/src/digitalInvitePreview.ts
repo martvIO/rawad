@@ -166,9 +166,11 @@ function buildOgTags(inputs: OgInputs): string {
 export const digitalInvitePreview = onRequest(
   { region: "us-central1" },
   async (req, res) => {
-    // Path shape: /d/{groomUsername}/{token}[/...]
-    const parts = req.path.split("/").filter(Boolean);   // ["d", "groom", "token", ...]
-    const token = parts[2] || "";
+    // Path shapes: /d/{groomUsername}/{token}[/...]  |  /invite/{token}  |
+    // /invite/digital/{token}. Take the last hex-looking segment so one handler
+    // serves every guest-link form (digital invitation + physical invite link).
+    const parts = req.path.split("/").filter(Boolean);
+    const token = [...parts].reverse().find((s) => TOKEN_HEX_RE.test(s)) || "";
     const fullUrl = `https://${req.hostname}${req.path}`;
     // Public origin (e.g. https://dawa.to) for building the OG-image URL.
     const origin = resolveIndexUrl(req).replace(/\/index\.html$/, "");

@@ -27,6 +27,7 @@
       { "source": "/api/**", "function": "api", "region": "us-central1" },
       { "source": "/og/**", "function": "digitalOgImage", "region": "us-central1" },
       { "source": "/d/**", "function": "digitalInvitePreview", "region": "us-central1" },
+      { "source": "/invite/**", "function": "digitalInvitePreview", "region": "us-central1" },
       { "source": "**",     "destination": "/index.html" }
     ],
     "headers": [
