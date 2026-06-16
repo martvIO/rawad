@@ -32,9 +32,44 @@ const ROLE_META = {
   groom:  { bg: "rgba(201,168,76,.15)", fg: C.gold, icon: "♥"  },
 };
 
+// ── مفتاح صلاحية (Toggle) — يُستخدم في الإنشاء والتعديل للعرسان ───────
+// صلاحيتان يتحكّم بهما المدير لكلّ عريس:
+//   • ظهور الحضور      (canSeeAttendance)   — هل يرى العريس مَن أكّد حضوره؟
+//   • منطقة المصوّر     (canUsePhotographer) — هل تتاح له صفحة المصوّر؟
+function FlagToggle({ label, hint, value, onChange, disabled }) {
+  return (
+    <div
+      onClick={disabled ? undefined : () => onChange(!value)}
+      style={{
+        display: "flex", alignItems: "center", gap: 12, padding: "12px 14px",
+        marginBottom: 10, borderRadius: 12, cursor: disabled ? "default" : "pointer",
+        background: value ? "rgba(76,201,122,.06)" : "rgba(255,255,255,.03)",
+        border: `1px solid ${value ? "rgba(76,201,122,.32)" : "rgba(255,255,255,.1)"}`,
+        transition: "background .15s, border-color .15s", opacity: disabled ? .55 : 1,
+      }}
+    >
+      {/* المقبض المنزلق */}
+      <div style={{
+        width: 42, height: 24, borderRadius: 999, flexShrink: 0, position: "relative",
+        background: value ? "#2da85a" : "rgba(255,255,255,.14)", transition: "background .2s",
+      }}>
+        <div style={{
+          position: "absolute", top: 3, insetInlineStart: value ? 21 : 3,
+          width: 18, height: 18, borderRadius: "50%", background: "#fff",
+          transition: "inset-inline-start .2s",
+        }} />
+      </div>
+      <div style={{ flex: 1, textAlign: "start" }}>
+        <div style={{ fontSize: 13, fontWeight: 800, color: value ? "#4cc97a" : C.goldDim }}>{label}</div>
+        {hint && <div style={{ fontSize: 10.5, color: C.dim, marginTop: 2, lineHeight: 1.5 }}>{hint}</div>}
+      </div>
+    </div>
+  );
+}
+
 // ── مربّع تعديل مضمَّن (Inline Edit Modal) ──────────────────────────
 // يظهر عند الضغط على «تعديل» في سطر المستخدم ويتيح تغيير:
-//   username  |  password (اختياري)  |  phone (اختياري)  |  role
+//   username  |  password (اختياري)  |  phone (اختياري)  |  role  |  الصلاحيات
 function EditModal({ user, onSave, onCancel, t, lang }) {
   const [username,    setUsername]    = useState(user.username    ?? "");
   const [displayName, setDisplayName] = useState(user.displayName ?? "");
@@ -44,6 +79,9 @@ function EditModal({ user, onSave, onCancel, t, lang }) {
   const [role,        setRole]        = useState(user.role        ?? "groom");
   const [newPass,     setNewPass]     = useState("");
   const [saving,      setSaving]      = useState(false);
+  // صلاحيتا العريس — افتراضاً مُفعّلتان (backward-compatible).
+  const [canSee,   setCanSee]   = useState(user.canSeeAttendance   !== false);
+  const [canPhoto, setCanPhoto] = useState(user.canUsePhotographer !== false);
 
   const canSave = username.trim() &&
     (newPass.length === 0 || isStrongPassword(newPass));
@@ -63,6 +101,11 @@ function EditModal({ user, onSave, onCancel, t, lang }) {
       patch.role = role;
     if (newPass.trim())
       patch.newPassword = newPass.trim();
+    // صلاحيتا العريس — نُرسلهما دائماً للعرسان؛ saveUserEdit يقارن ويكتب المتغيّر فقط.
+    if (role === "groom") {
+      patch.canSeeAttendance   = canSee;
+      patch.canUsePhotographer = canPhoto;
+    }
     console.log("[dawa] EditModal → patch:", patch);
     try {
       await onSave(user.uid ?? user.id, patch);
@@ -173,6 +216,29 @@ function EditModal({ user, onSave, onCancel, t, lang }) {
         {/* الدفع (Stripe) — للعرسان فقط */}
         {role === "groom" && <PaymentSection user={user} t={t} lang={lang} />}
 
+        {/* صلاحيات العريس — للعرسان فقط */}
+        {role === "groom" && (
+          <div style={{ marginBottom: 18 }}>
+            <div style={{ fontSize: 12, color: C.goldDim, marginBottom: 8, fontWeight: 700 }}>
+              {lang === "he" ? "הרשאות" : "الصلاحيات"}
+            </div>
+            <FlagToggle
+              value={canSee} onChange={setCanSee} disabled={saving}
+              label={lang === "he" ? "📊 הצגת נוכחות" : "📊 ظهور الحضور"}
+              hint={lang === "he"
+                ? "האם החתן רואה מי אישר הגעה ואת אחוז הנוכחות"
+                : "هل يرى العريس مَن أكّد حضوره ونسبة الحضور"}
+            />
+            <FlagToggle
+              value={canPhoto} onChange={setCanPhoto} disabled={saving}
+              label={lang === "he" ? "📸 אזור הצלם" : "📸 منطقة المصوّر"}
+              hint={lang === "he"
+                ? "האם אזור הצלם זמין לחתן"
+                : "هل تتاح صفحة المصوّر للعريس"}
+            />
+          </div>
+        )}
+
         {/* أزرار */}
         <div style={{ display: "flex", gap: 10 }}>
           <button className="ghost-btn" style={{ flex: 1 }} onClick={onCancel} disabled={saving}>
@@ -277,6 +343,9 @@ function UserManagerInner() {
   const [filter,         setFilter]         = useState("all");
   const [confirmDelete,  setConfirmDelete]  = useState(null); // uid المراد حذفه
   const [editingUser,    setEditingUser]    = useState(null); // المستخدم الذي يُعدَّل
+  // صلاحيتا العريس الجديد — افتراضاً مُفعّلتان.
+  const [newCanSee,   setNewCanSee]   = useState(true);
+  const [newCanPhoto, setNewCanPhoto] = useState(true);
 
   // تبويبات التصفية
   const TABS = [
@@ -302,8 +371,11 @@ function UserManagerInner() {
 
   // ── الإنشاء ──────────────────────────────────────────────────────────
   const handleCreate = async () => {
-    const result = await addUser();
-    if (result?.uid) setFilter(result.role); // اقفز للتبويب الموافق
+    const result = await addUser({ canSeeAttendance: newCanSee, canUsePhotographer: newCanPhoto });
+    if (result?.uid) {
+      setFilter(result.role);        // اقفز للتبويب الموافق
+      setNewCanSee(true); setNewCanPhoto(true); // أعد الصلاحيات للوضع الافتراضي
+    }
   };
 
   // ── حفظ التعديل ──────────────────────────────────────────────────────
@@ -384,6 +456,29 @@ function UserManagerInner() {
         <div style={{ marginBottom: 18 }}>
           <PhoneInput value={newUserPhone} onChange={setNewUserPhone} t={t} lang={lang} />
         </div>
+
+        {/* صلاحيات العريس الجديد — للعرسان فقط */}
+        {newUserRole === "groom" && (
+          <div style={{ marginBottom: 18 }}>
+            <div style={{ fontSize: 12, color: C.goldDim, marginBottom: 8, fontWeight: 700 }}>
+              {lang === "he" ? "הרשאות" : "الصلاحيات"}
+            </div>
+            <FlagToggle
+              value={newCanSee} onChange={setNewCanSee}
+              label={lang === "he" ? "📊 הצגת נוכחות" : "📊 ظهور الحضور"}
+              hint={lang === "he"
+                ? "האם החתן רואה מי אישר הגעה ואת אחוז הנוכחות"
+                : "هل يرى العريس مَن أكّد حضوره ونسبة الحضور"}
+            />
+            <FlagToggle
+              value={newCanPhoto} onChange={setNewCanPhoto}
+              label={lang === "he" ? "📸 אזור הצלם" : "📸 منطقة المصوّر"}
+              hint={lang === "he"
+                ? "האם אזור הצלם זמין לחתן"
+                : "هل تتاح صفحة المصوّر للعريس"}
+            />
+          </div>
+        )}
 
         <button data-testid="btn-create-user" className="gold-btn" style={{ width: "100%" }}
                 onClick={handleCreate}

@@ -75,6 +75,9 @@ export function usePortalState({ onBack, t, lang, setLang }) {
   const currentUsername = authUser?.username ?? null;
   const currentUid = authUser?.uid ?? null;
   const isAdmin = authUser?.claims?.role === ROLES.ADMIN;
+  // Per-groom feature flags (default ON when missing — legacy grooms).
+  const canSeeAttendance = authUser?.canSeeAttendance !== false;
+  const canUsePhotographer = authUser?.canUsePhotographer !== false;
 
   // ── Login form (transient) ──────────────────────────────────────────────────
   const [loginUser, setLoginUser]   = useState("");
@@ -514,6 +517,7 @@ export function usePortalState({ onBack, t, lang, setLang }) {
 
     // auth + session
     authed, authReady, userType, currentUid, currentUsername,
+    canSeeAttendance, canUsePhotographer,
     driverServingGroom: driverServingGroomUsername,
     setDriverServingGroom,
     loginUser, setLoginUser, loginPass, setLoginPass,

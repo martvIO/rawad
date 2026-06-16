@@ -119,11 +119,14 @@ export function usePortalUsers({ authed, isAdmin, currentUid, userType, driverSe
   // E.164 صالحاً (تمرّره إلى Firebase Auth التي تستخدم libphonenumber).
   // لا يوجد بادئة وهميّة آمنة 100%، فالهاتف مطلوب حتى ينشر الأدمن النسخة
   // الجديدة من الدالّة.
-  const addUser = async () => {
+  const addUser = async (opts = {}) => {
     if (!newUserName.trim() || !newUserPass.trim()) { showToast(t("admin_required")); return null; }
     if (!isStrongPassword(newUserPass)) { showToast(t("pwd_weak")); return null; }
     const username   = newUserName.trim().toLowerCase();
     const role       = newUserRole;
+    // صلاحيتا العريس (افتراضاً مُفعّلتان). تُمرَّران من نموذج الإنشاء.
+    const canSeeAttendance   = opts.canSeeAttendance   !== false;
+    const canUsePhotographer = opts.canUsePhotographer !== false;
     // الهاتف اختياري في الواجهة. إذا تُرك فارغاً نُولِّد رقماً وهمياً
     // بنطاق +1202555XXXX (محجوز رسمياً للاستخدام الاختباري في NANP؛
     // تقبله libphonenumber / Firebase Auth كصيغة E.164 صالحة).
@@ -132,9 +135,9 @@ export function usePortalUsers({ authed, isAdmin, currentUid, userType, driverSe
     const phoneE164  = typedPhone ||
       ("+1202555" + (Date.now() % 10000).toString().padStart(4, "0"));
     try {
-      const result = await createPortalUser({ username, password: newUserPass, role, phoneE164 });
+      const result = await createPortalUser({ username, password: newUserPass, role, phoneE164, canSeeAttendance, canUsePhotographer });
       const uid = result?.uid;
-      const newRow = { uid, id: uid, username, role, phoneE164 };
+      const newRow = { uid, id: uid, username, role, phoneE164, canSeeAttendance, canUsePhotographer };
       if (uid) {
         setOptimisticUsers(prev => [...prev, newRow]);
         // إذا كان دور الحساب الجديد "عريس" نكتب سجله في /groomProfiles مباشرةً
@@ -193,6 +196,9 @@ export function usePortalUsers({ authed, isAdmin, currentUid, userType, driverSe
     const newPhoneE164   = patch?.phoneE164?.trim() ?? "";
     const newRole        = typeof patch?.role === "string" ? patch.role : undefined;
     const newPassword    = patch?.newPassword?.trim() || null;
+    // صلاحيتا العريس — قِيَم boolean صريحة فقط (undefined = لم تُرسل).
+    const newCanSee      = typeof patch?.canSeeAttendance   === "boolean" ? patch.canSeeAttendance   : undefined;
+    const newCanPhoto    = typeof patch?.canUsePhotographer === "boolean" ? patch.canUsePhotographer : undefined;
 
     // ─ ما الذي تغيّر فعلاً؟ ──────────────────────────────────────────────
     const usernameChanged    = newUsername    && newUsername    !== (orig.username ?? "");
@@ -200,11 +206,15 @@ export function usePortalUsers({ authed, isAdmin, currentUid, userType, driverSe
                                && newDisplayName !== (orig.displayName ?? "");
     const phoneChanged       = newPhoneE164   && newPhoneE164   !== (orig.phoneE164 ?? "");
     const roleChanged        = newRole        && newRole        !== (orig.role    ?? "");
+    // المقارنة تُطبِّع الغياب على true (الافتراضي backward-compatible).
+    const seeChanged         = newCanSee   !== undefined && newCanSee   !== (orig.canSeeAttendance   !== false);
+    const photoChanged       = newCanPhoto !== undefined && newCanPhoto !== (orig.canUsePhotographer !== false);
+    const flagsChanged       = seeChanged || photoChanged;
     const needsFunction      = usernameChanged || phoneChanged || roleChanged;
     const needsPassword      = !!newPassword;
     const needsDisplayName   = displayNameChanged;
     const nothingChanged     = !usernameChanged && !displayNameChanged
-                               && !phoneChanged && !roleChanged && !needsPassword;
+                               && !phoneChanged && !roleChanged && !needsPassword && !flagsChanged;
 
     // ─ console.log للتشخيص ──────────────────────────────────────────────
     console.log("[dawa] saveUserEdit — diff:", {
@@ -243,12 +253,24 @@ export function usePortalUsers({ authed, isAdmin, currentUid, userType, driverSe
         await adminSetPasswordSrv(uid, newPassword);
       }
 
+      // ── 4. صلاحيتا العريس: كتابة RTDB مباشرة عبر PATCH /users/:uid ──────
+      //     (allowlist في الخادم يقبل canSeeAttendance/canUsePhotographer)
+      if (flagsChanged) {
+        const fp = {};
+        if (seeChanged)   fp.canSeeAttendance   = newCanSee;
+        if (photoChanged) fp.canUsePhotographer = newCanPhoto;
+        console.log("[dawa] patchUserInRTDB flags:", { uid, ...fp });
+        await patchUserInRTDB(uid, fp);
+      }
+
       // ── حدّث الحالة المحلية فوراً ──────────────────────────────────────
       const localPatch = {
         ...(usernameChanged    && { username:    newUsername }),
         ...(displayNameChanged && { displayName: newDisplayName }),
         ...(phoneChanged       && { phoneE164:   newPhoneE164 }),
         ...(roleChanged        && { role:        newRole }),
+        ...(seeChanged         && { canSeeAttendance:   newCanSee }),
+        ...(photoChanged       && { canUsePhotographer: newCanPhoto }),
       };
       const mergedUser = { ...orig, uid, id: uid, ...localPatch };
       setOptimisticUsers(prev => {

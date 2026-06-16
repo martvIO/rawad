@@ -46,7 +46,7 @@ const GUEST_PHONE  = ["phone"];
 const guestStatusOf = (g) => g.status;
 
 export function DigitalGuests() {
-  const { t, lang, currentUid, showToast } = usePortal();
+  const { t, lang, currentUid, showToast, canSeeAttendance } = usePortal();
   const navigate  = useNavigate();
   const location  = useLocation();
   const [guests,         setGuests]         = useState([]);
@@ -452,7 +452,7 @@ export function DigitalGuests() {
                         </div>
                       );
                     })()}
-                    {g.status === "attending" && g.companions != null && (
+                    {canSeeAttendance && g.status === "attending" && g.companions != null && (
                       <div data-testid="guest-companions" style={{ marginTop: 5, fontSize: 11, fontWeight: 800, color: C.gold }}>
                         👥 <Num>{Number(g.companions) + 1}</Num> {lang === "he" ? "אנשים" : "أشخاص"}
                       </div>
@@ -470,16 +470,21 @@ export function DigitalGuests() {
 
                   {/* Right side: status badge + edit + delete */}
                   <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
-                    {/* Status badge — tap to cycle */}
-                    <button onClick={() => cycleStatus(g)}
-                            title={lang === "he" ? "לחץ לשינוי" : "انقر لتغيير الحالة"}
-                            style={{
-                              padding: "2px 10px", borderRadius: 20, border: "none", cursor: "pointer",
-                              background: sc.bg, color: sc.color, fontWeight: 700, fontSize: 11,
-                              fontFamily: "inherit",
-                            }}>
-                      {lang === "he" ? sc.label_he : sc.label_ar}
-                    </button>
+                    {/* Status badge — tap to cycle (locked when attendance is gated off) */}
+                    {canSeeAttendance ? (
+                      <button onClick={() => cycleStatus(g)}
+                              title={lang === "he" ? "לחץ לשינוי" : "انقر لتغيير الحالة"}
+                              style={{
+                                padding: "2px 10px", borderRadius: 20, border: "none", cursor: "pointer",
+                                background: sc.bg, color: sc.color, fontWeight: 700, fontSize: 11,
+                                fontFamily: "inherit",
+                              }}>
+                        {lang === "he" ? sc.label_he : sc.label_ar}
+                      </button>
+                    ) : (
+                      <span title={lang === "he" ? "תצוגת נוכחות מושבתת" : "عرض الحضور غير مُفعّل"}
+                            style={{ padding: "2px 10px", borderRadius: 20, background: "rgba(255,255,255,.05)", color: C.dim, fontWeight: 700, fontSize: 11 }}>🔒</span>
+                    )}
 
                     {/* Read-only "Sent" badge — appears once the admin sends the invite */}
                     {g.inviteLinkSentAt && (

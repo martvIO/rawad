@@ -206,6 +206,8 @@ authRouter.post(
       username: profile?.username ?? null,
       displayName: profile?.displayName ?? null,
       phoneE164: profile?.phoneE164 ?? null,
+      canSeeAttendance: profile?.canSeeAttendance !== false,
+      canUsePhotographer: profile?.canUsePhotographer !== false,
     });
   }
 );
@@ -298,6 +300,8 @@ authRouter.get("/me", requireAuth, async (req: AuthRequest, res: Response) => {
     username: claims.username ?? profile?.username ?? null,
     displayName: profile?.displayName ?? null,
     phoneE164: profile?.phoneE164 ?? null,
+    canSeeAttendance: profile?.canSeeAttendance !== false,
+    canUsePhotographer: profile?.canUsePhotographer !== false,
     claims,
   });
 });
@@ -503,6 +507,8 @@ interface UserProfile {
   role?: "admin" | "driver" | "groom";
   displayName?: string;
   phoneE164?: string;
+  canSeeAttendance?: boolean;
+  canUsePhotographer?: boolean;
 }
 
 /**

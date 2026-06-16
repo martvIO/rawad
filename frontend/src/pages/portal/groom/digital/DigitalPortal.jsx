@@ -20,7 +20,7 @@ export function DigitalPortal() {
   const {
     onBack, t, lang, setLang,
     logoutAsking, setLogoutAsking, doLogout,
-    toast,
+    toast, canUsePhotographer,
   } = usePortal();
   const navigate = useNavigate();
 
@@ -60,9 +60,11 @@ export function DigitalPortal() {
             <NavLink to="/portal/groom/digital/add"          className={navClass} style={navStyle}>
               {lang === "he" ? "➕ הוסף" : "➕ إضافة"}
             </NavLink>
-            <NavLink to="/portal/groom/digital/photographer" className={navClass} style={navStyle}>
-              {lang === "he" ? "📸 צלם" : "📸 المصور"}
-            </NavLink>
+            {canUsePhotographer && (
+              <NavLink to="/portal/groom/digital/photographer" className={navClass} style={navStyle}>
+                {lang === "he" ? "📸 צלם" : "📸 المصور"}
+              </NavLink>
+            )}
             <NavLink to="/portal/groom/digital/design"       className={navClass} style={navStyle}>
               {lang === "he" ? "🎨 עיצוב" : "🎨 التصميم"}
             </NavLink>

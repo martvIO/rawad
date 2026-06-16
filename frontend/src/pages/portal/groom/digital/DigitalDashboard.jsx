@@ -75,7 +75,7 @@ function inputValueToEpoch(v) {
 }
 
 export function DigitalDashboard() {
-  const { lang, currentUid, showToast } = usePortal();
+  const { lang, currentUid, showToast, canSeeAttendance } = usePortal();
   const [guests, setGuests] = useState([]);
   const [doc,    setDoc]    = useState(null);     // full invitation doc
   const [busy,   setBusy]   = useState(false);
@@ -546,52 +546,60 @@ export function DigitalDashboard() {
         )}
       </div>
 
-      {/* ── الإحصائيات ─────────────────────────────────────────────────── */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 12, marginBottom: 20 }}>
-        {[
-          { label: tt(lang, "الإجمالي", "סה״כ מוזמנים"), val: stats.total,     color: C.goldLight, icon: "📋" },
-          { label: tt(lang, "حضور",     "נוכחים"),        val: stats.attending, color: "#4cc97a",   icon: "✓" },
-          { label: tt(lang, "غياب",     "נעדרים"),        val: stats.absent,    color: C.red,       icon: "✗" },
-          { label: tt(lang, "لم يرد",   "טרם ענו"),       val: stats.pending,   color: C.gold,      icon: "⌛" },
-        ].map(s => (
-          <div key={s.label} className="card" style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <div style={{ fontSize: 26 }}>{s.icon}</div>
-            <div>
-              <div style={{ fontSize: 26, fontWeight: 900, color: s.color }}><Num>{s.val.toLocaleString("en")}</Num></div>
-              <div style={{ fontSize: 11, color: C.dim }}>{s.label}</div>
+      {/* ── الإحصائيات (تُعرض فقط إذا فعّل الأدمن ميزة الحضور لهذا العريس) ── */}
+      {canSeeAttendance ? (
+        <>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 12, marginBottom: 20 }}>
+            {[
+              { label: tt(lang, "الإجمالي", "סה״כ מוזמנים"), val: stats.total,     color: C.goldLight, icon: "📋" },
+              { label: tt(lang, "حضور",     "נוכחים"),        val: stats.attending, color: "#4cc97a",   icon: "✓" },
+              { label: tt(lang, "غياب",     "נעדרים"),        val: stats.absent,    color: C.red,       icon: "✗" },
+              { label: tt(lang, "لم يرد",   "טרם ענו"),       val: stats.pending,   color: C.gold,      icon: "⌛" },
+            ].map(s => (
+              <div key={s.label} className="card" style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div style={{ fontSize: 26 }}>{s.icon}</div>
+                <div>
+                  <div style={{ fontSize: 26, fontWeight: 900, color: s.color }}><Num>{s.val.toLocaleString("en")}</Num></div>
+                  <div style={{ fontSize: 11, color: C.dim }}>{s.label}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {stats.expectedAttendees > 0 && (
+            <div className="gold-card" data-testid="digital-expected-attendees" style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
+              <div style={{ fontSize: 26 }}>👥</div>
+              <div>
+                <div style={{ fontSize: 26, fontWeight: 900, color: C.gold }}><Num>{stats.expectedAttendees.toLocaleString("en")}</Num></div>
+                <div style={{ fontSize: 11, color: C.dim }}>{tt(lang, "العدد المتوقع للحضور (مع المرافقين)", "צפי נוכחים (כולל מלווים)")}</div>
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
+          )}
 
-      {stats.expectedAttendees > 0 && (
-        <div className="gold-card" data-testid="digital-expected-attendees" style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
-          <div style={{ fontSize: 26 }}>👥</div>
-          <div>
-            <div style={{ fontSize: 26, fontWeight: 900, color: C.gold }}><Num>{stats.expectedAttendees.toLocaleString("en")}</Num></div>
-            <div style={{ fontSize: 11, color: C.dim }}>{tt(lang, "العدد المتوقع للحضور (مع المرافقين)", "צפי נוכחים (כולל מלווים)")}</div>
-          </div>
-        </div>
-      )}
-
-      {stats.total > 0 && (
-        <div className="gold-card">
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-            <span style={{ fontSize: 13, color: C.goldDim, fontWeight: 700 }}>
-              {tt(lang, "نسبة الحضور", "אחוז נוכחות")}
-            </span>
-            <span style={{ fontSize: 20, fontWeight: 900, color: "#4cc97a" }}>
-              {Math.round(stats.attending / stats.total * 100)}%
-            </span>
-          </div>
-          <div style={{ height: 10, background: "rgba(255,255,255,.06)", borderRadius: 5, overflow: "hidden" }}>
-            <div style={{
-              height: "100%",
-              width: `${Math.round(stats.attending / stats.total * 100)}%`,
-              background: "linear-gradient(90deg,#4cc97a,#2da85a)",
-              borderRadius: 5, transition: "width .6s ease",
-            }}/>
-          </div>
+          {stats.total > 0 && (
+            <div className="gold-card" style={{ marginBottom: 20 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                <span style={{ fontSize: 13, color: C.goldDim, fontWeight: 700 }}>
+                  {tt(lang, "نسبة الحضور", "אחוז נוכחות")}
+                </span>
+                <span style={{ fontSize: 20, fontWeight: 900, color: "#4cc97a" }}>
+                  {Math.round(stats.attending / stats.total * 100)}%
+                </span>
+              </div>
+              <div style={{ height: 10, background: "rgba(255,255,255,.06)", borderRadius: 5, overflow: "hidden" }}>
+                <div style={{
+                  height: "100%",
+                  width: `${Math.round(stats.attending / stats.total * 100)}%`,
+                  background: "linear-gradient(90deg,#4cc97a,#2da85a)",
+                  borderRadius: 5, transition: "width .6s ease",
+                }}/>
+              </div>
+            </div>
+          )}
+        </>
+      ) : (
+        <div className="gold-card" style={{ textAlign: "center", padding: 24, color: C.dim, lineHeight: 1.8, marginBottom: 20 }}>
+          🔒 {tt(lang, "عرض الحضور غير مُفعّل لحسابك — تواصل مع الإدارة لتفعيله.", "תצוגת הנוכחות אינה מופעלת בחשבונך — פנה לניהול להפעלה.")}
         </div>
       )}
 

@@ -249,6 +249,9 @@ usersRouter.post(
         createdBy: callerUid,
       };
       if (hasPhone) profile.phoneE164 = input.phoneE164;
+      // Per-groom feature flags — default ON for backward-compatibility.
+      profile.canSeeAttendance = input.canSeeAttendance !== false;
+      profile.canUsePhotographer = input.canUsePhotographer !== false;
 
       const updates: Record<string, unknown> = {};
       updates[`users/${userRecord.uid}`] = profile;
@@ -344,6 +347,13 @@ usersRouter.patch(
       } else {
         res.status(400).json({ error: "invalid_display_name" });
         return;
+      }
+    }
+    for (const key of ["canSeeAttendance", "canUsePhotographer"]) {
+      if (key in body) {
+        const v = body[key];
+        if (typeof v !== "boolean") { res.status(400).json({ error: "invalid_flag", field: key }); return; }
+        safe[key] = v;
       }
     }
     if (Object.keys(safe).length === 0) {
@@ -665,6 +675,8 @@ interface CreatePortalUserInput {
   phoneE164?: string;
   role: "groom" | "driver" | "admin";
   displayName?: string;
+  canSeeAttendance?: boolean;
+  canUsePhotographer?: boolean;
 }
 
 interface UpdatePortalUserInput {

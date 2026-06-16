@@ -139,6 +139,8 @@ export function subscribeAuth(cb) {
         username: value.username,
         displayName: value.displayName ?? null,
         phoneE164: value.phoneE164 ?? null,
+        canSeeAttendance: value.canSeeAttendance !== false,
+        canUsePhotographer: value.canUsePhotographer !== false,
         claims: value.claims ?? {},
       });
     },
