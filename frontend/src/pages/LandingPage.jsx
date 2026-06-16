@@ -767,11 +767,11 @@ function ShowcaseSection({ t, onEnterPortal }) {
                   <span style={{ color: "#c9a84c", fontSize: 9 }}>✦</span>
                   <span style={{ width: 26, height: 1, background: "linear-gradient(90deg,#c9a84c,transparent)" }} />
                 </div>
-                <div style={{ fontSize: 11, color: "#f5e6b8", fontWeight: 700, marginBottom: 3 }}>السبت · ١٢ تموز ٢٠٢٦</div>
+                <div style={{ fontSize: 11, color: "#f5e6b8", fontWeight: 700, marginBottom: 3 }}>السبت · 12 تموز 2026</div>
                 <div style={{ fontSize: 10, color: "#a09070" }}>قاعة الأندلس · الناصرة</div>
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 5 }}>
-                {[{ v: "٤٢", l: "يوم" }, { v: "٠٨", l: "ساعة" }, { v: "١٥", l: "دقيقة" }, { v: "٣٠", l: "ثانية" }].map((c, i) => (
+                {[{ v: "42", l: "يوم" }, { v: "08", l: "ساعة" }, { v: "15", l: "دقيقة" }, { v: "30", l: "ثانية" }].map((c, i) => (
                   <div key={i} style={{
                     background: "rgba(255,255,255,.03)", border: "1px solid rgba(201,168,76,.18)",
                     borderRadius: 8, padding: "7px 0", textAlign: "center",
