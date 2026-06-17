@@ -1,6 +1,6 @@
 ﻿// Groom → Add: form to add a new guest to the list.
 import { AddressInput } from "../../../components/AddressInput.jsx";
-import { PhoneInput } from "../../../components/PhoneInput.jsx";
+import { PhoneInput, isCompletePhone } from "../../../components/PhoneInput.jsx";
 import { usePortal } from "../../../context/PortalContext.jsx";
 import { C } from "../../../styles/theme.js";
 
@@ -9,6 +9,8 @@ export function GroomAddGuest() {
     t, lang, addGuest,
     gName, setGName, gPhone, setGPhone, gArea, setGArea, gType, setGType,
   } = usePortal();
+  // لا يُسمح بإضافة معزوم حتى يُدخِل رقم هاتف كاملاً (9 أرقام للنطاق المحلي).
+  const phoneComplete = isCompletePhone(gPhone);
   return (
           <div style={{ animation: "fadeUp .3s ease" }}>
             <div style={{ marginBottom: 18 }}>
@@ -30,6 +32,11 @@ export function GroomAddGuest() {
               <div style={{ marginBottom: 6, fontSize: 12, color: C.goldDim }}>{t("field_phone")}</div>
               <div style={{ marginBottom: 14 }}>
                 <PhoneInput value={gPhone} onChange={setGPhone} t={t} lang={lang} />
+                {gPhone && !phoneComplete && (
+                  <div data-testid="phone-incomplete-hint" style={{ fontSize: 11, color: C.red, marginTop: 6 }}>
+                    {lang === "he" ? "יש להזין מספר טלפון מלא (9 ספרות)" : "أدخل رقم هاتف كامل (9 أرقام)"}
+                  </div>
+                )}
               </div>
 
               <div style={{ marginBottom: 6, fontSize: 12, color: C.goldDim }}>
@@ -57,7 +64,7 @@ export function GroomAddGuest() {
               </div>
 
               <button data-testid="btn-add-guest" className="gold-btn" style={{ width: "100%" }} onClick={addGuest}
-                      disabled={!gName.trim() || !gPhone.trim()}>
+                      disabled={!gName.trim() || !phoneComplete}>
                 {t("add_submit")}
               </button>
             </div>

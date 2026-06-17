@@ -50,6 +50,22 @@ function isValidLength(digits, countryCode) {
   return true;
 }
 
+// True when an E.164 value is a COMPLETE, valid number for its country —
+// the right national length (9 digits for IL/PS/…) + an allowed prefix, i.e.
+// the same rule that lights the ✓ indicator. Used to gate "add"/"submit"
+// buttons so a half-typed number can't be submitted.
+export function isCompletePhone(e164) {
+  if (!e164) return false;
+  const matched = findByDial(e164);
+  if (!matched) {
+    // Legacy local digits (no dial prefix): require a full national length.
+    const d = String(e164).replace(/\D/g, "").replace(/^0+/, "");
+    return d.length === 9 || d.length === 10;
+  }
+  const national = e164.slice(matched.dial.length).replace(/\D/g, "");
+  return isValidLength(national, matched.code);
+}
+
 export function PhoneInput({
   value,
   onChange,
