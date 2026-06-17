@@ -135,17 +135,25 @@ interface OgInputs {
   dateText?: string;
   imageUrl?: string;
   url: string;
+  isPhysical?: boolean;
 }
 
 function buildOgTags(inputs: OgInputs): string {
   const title = inputs.guestName
     ? `دعوة زفاف — ${inputs.guestName}`
     : "دعوة زفاف";
-  const couple = [inputs.groomDisplayName, inputs.brideName].filter(Boolean).join(" و ");
-  let description = couple
-    ? `${couple} يتشرّفون بدعوتكم لحضور حفل زفافهم`
-    : "تفضّل بفتح بطاقة الدعوة الرقمية";
-  if (inputs.dateText) description += ` — ${inputs.dateText}`;
+  let description: string;
+  if (inputs.isPhysical) {
+    // Physical / handwritten invite link — describe the platform in the OG
+    // description, not the couple names + date (title + image stay the same).
+    description = "منصة دعوة لتوصيل مكاتيب للمناسبات";
+  } else {
+    const couple = [inputs.groomDisplayName, inputs.brideName].filter(Boolean).join(" و ");
+    description = couple
+      ? `${couple} يتشرّفون بدعوتكم لحضور حفل زفافهم`
+      : "تفضّل بفتح بطاقة الدعوة الرقمية";
+    if (inputs.dateText) description += ` — ${inputs.dateText}`;
+  }
   const tags: string[] = [
     `<meta property="og:type" content="website" />`,
     `<meta property="og:title" content="${escapeHtml(title)}" />`,
@@ -192,10 +200,15 @@ export const digitalInvitePreview = onRequest(
           const tk = snap.val() as {
             groomUid?: string;
             guestName?: string;
+            guestType?: string;
             designId?: string;
             designSnapshot?: DesignLike;
           };
           inputs.guestName = tk.guestName || "";
+          // Physical/handwritten tokens carry no `guestType: "digital"`. Flag
+          // them so the OG description becomes the platform line (title + image
+          // are unchanged). Digital links keep the couple + date description.
+          inputs.isPhysical = tk.guestType !== "digital";
           // The OG image is generated on the fly by the digitalOgImage function
           // (the design's photo + the couple names/date/venue drawn over it).
           if (origin && token) inputs.imageUrl = `${origin}/og/${token}.jpg`;
