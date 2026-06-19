@@ -3,6 +3,7 @@
 // Tabs are URL-driven: NavLink updates the path, nested Routes pick the
 // component to render. NavLink's `isActive` callback drives the active
 // styling so we don't need a parallel `adminTab` state variable.
+import { lazy, Suspense } from "react";
 import { NavLink, Routes, Route, Navigate } from "react-router-dom";
 import { LangSwitcher } from "../../../components/LangSwitcher.jsx";
 import { LogoutConfirm } from "../../../components/LogoutConfirm.jsx";
@@ -18,6 +19,12 @@ import { AdminGallery } from "./AdminGallery.jsx";
 import { AdminAuditTab } from "./AdminAuditTab.jsx";
 import { Num } from "../../../components/Num.jsx";
 import { C } from "../../../styles/theme.js";
+
+// Lazy-loaded so recharts (~90KB gz) stays out of the main bundle — it only
+// downloads when the admin opens the Analytics tab.
+const AdminAnalytics = lazy(() =>
+  import("./AdminAnalytics.jsx").then((m) => ({ default: m.AdminAnalytics })),
+);
 
 const tabStyle = ({ isActive }) => ({
   flex: "1 1 140px", padding: "10px 0", borderRadius: 10, cursor: "pointer",
@@ -69,6 +76,7 @@ export function AdminPortal() {
 
         {/* Admin sub-tabs */}
         <div style={{ display: "flex", gap: 6, marginBottom: 18, flexWrap: "wrap" }}>
+          <NavLink data-testid="nav-admin-analytics"     to="/portal/admin/analytics"     style={tabStyle}>📊 {lang === "he" ? "אנליטיקה" : "التحليلات"}</NavLink>
           <NavLink data-testid="nav-admin-users"         to="/portal/admin/users"         style={tabStyle}>👥 {t("admin_tab_users")}</NavLink>
           <NavLink data-testid="nav-admin-send"          to="/portal/admin/send"          style={tabStyle}>📨 {t("admin_tab_send")}</NavLink>
           <NavLink data-testid="nav-admin-confirmations" to="/portal/admin/confirmations" style={tabStyle}>✓ {t("admin_tab_confirmations")}{confirmations.length ? <> (<Num>{confirmations.length}</Num>)</> : ""}</NavLink>
@@ -78,17 +86,20 @@ export function AdminPortal() {
           <NavLink data-testid="nav-admin-audit"         to="/portal/admin/audit"         style={tabStyle}>📜 {lang === "he" ? "יומן" : "السجل"}</NavLink>
         </div>
 
-        <Routes>
-          <Route index                  element={<Navigate to="users" replace />} />
-          <Route path="users"           element={<AdminUserManager />} />
-          <Route path="send"            element={<AdminSendTab />} />
-          <Route path="confirmations"   element={<AdminConfirmationsTab />} />
-          <Route path="designs"         element={<AdminDesigns />} />
-          <Route path="gallery"         element={<AdminGallery lang={lang} />} />
-          <Route path="settings"        element={<AdminSettingsTab />} />
-          <Route path="audit"           element={<AdminAuditTab />} />
-          <Route path="*"               element={<Navigate to="users" replace />} />
-        </Routes>
+        <Suspense fallback={<div className="card" style={{ textAlign: "center", padding: 24, color: C.dim }}>…</div>}>
+          <Routes>
+            <Route index                  element={<Navigate to="users" replace />} />
+            <Route path="analytics"       element={<AdminAnalytics />} />
+            <Route path="users"           element={<AdminUserManager />} />
+            <Route path="send"            element={<AdminSendTab />} />
+            <Route path="confirmations"   element={<AdminConfirmationsTab />} />
+            <Route path="designs"         element={<AdminDesigns />} />
+            <Route path="gallery"         element={<AdminGallery lang={lang} />} />
+            <Route path="settings"        element={<AdminSettingsTab />} />
+            <Route path="audit"           element={<AdminAuditTab />} />
+            <Route path="*"               element={<Navigate to="users" replace />} />
+          </Routes>
+        </Suspense>
       </div>
 
       <EditConfirmationModal />

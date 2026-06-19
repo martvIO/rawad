@@ -23,7 +23,8 @@ import { getFirestore } from "firebase-admin/firestore";
 import { AuthRequest, requireAuth, requireAdmin } from "../middleware/auth";
 import { uidRateLimit } from "../middleware/rateLimit";
 import { HOUR_MS } from "../../constants/time";
-import { COLL_ROOT, COLL_GUESTS } from "./digital/constants";
+import { COLL_ROOT, COLL_GUESTS, COLL_DESIGNS } from "./digital/constants";
+import { buildAnalytics, normalizeWindow } from "../analytics/aggregate";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -51,7 +52,18 @@ const PURGE_MAX_PER_HOUR = 30;
 const AUDIT_DEFAULT_LIMIT = 100;
 const AUDIT_MAX_LIMIT = 500;
 
+/** Analytics: per-admin read cap and a short in-memory cache. The endpoint
+ *  fans out across every users/guests/confirmations/tokens read plus two
+ *  Firestore collection-group scans, so it is throttled and briefly cached to
+ *  keep repeat refreshes cheap. */
+const ANALYTICS_MAX_PER_HOUR = 60;
+const ANALYTICS_CACHE_TTL_MS = 45 * 1000;
+
 export const adminRouter = Router();
+
+/** In-memory analytics cache, keyed by window. Survives within a warm
+ *  function instance only — acceptable for a best-effort speedup. */
+let analyticsCache: { at: number; window: string; payload: unknown } | null = null;
 
 // ─── GET /admin/audit ─────────────────────────────────────────────────────────
 
@@ -80,6 +92,89 @@ adminRouter.get(
       snap.forEach((c) => { rows.push({ id: c.key, ...(c.val() as object) }); });
       rows.reverse(); // newest first
       res.json(rows);
+    } catch (err) {
+      res.status(500).json({ error: "read_failed", detail: errorMessage(err) });
+    }
+  },
+);
+
+// ─── GET /admin/analytics ───────────────────────────────────────────────────────
+
+/**
+ * Cross-platform analytics for the admin command center. Reads every relevant
+ * node once (the Admin SDK bypasses rules; authz is enforced by requireAdmin),
+ * hands the raw records to the pure aggregator, and returns a single payload of
+ * pre-computed sections (composition, revenue, operations, rsvp, designs,
+ * triage, trends). Query: ?window=30d|90d|all (default 30d) controls the trend
+ * span only. Admin only, rate-limited, with a short in-memory cache.
+ */
+adminRouter.get(
+  "/analytics",
+  requireAuth,
+  requireAdmin,
+  uidRateLimit("analyticsRead", ANALYTICS_MAX_PER_HOUR, HOUR_MS),
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const window = normalizeWindow(req.query.window);
+      const now = Date.now();
+      if (
+        analyticsCache &&
+        analyticsCache.window === window &&
+        now - analyticsCache.at < ANALYTICS_CACHE_TTL_MS
+      ) {
+        res.json(analyticsCache.payload);
+        return;
+      }
+
+      const db = getDatabase();
+      const fs = getFirestore();
+      const [
+        usersSnap, guestsSnap, confSnap, tokensSnap, assignSnap, designsSnap, digitalGuestsSnap,
+      ] = await Promise.all([
+        db.ref("users").get(),
+        db.ref("guestsByGroom").get(),
+        db.ref("confirmations").get(),
+        db.ref("inviteTokens").get(),
+        db.ref("driverAssignments").get(),
+        fs.collectionGroup(COLL_DESIGNS).get(),
+        fs.collectionGroup(COLL_GUESTS).get(),
+      ]);
+
+      const users = Object.entries(usersSnap.val() ?? {}).map(
+        ([uid, v]) => ({ uid, ...(v as Record<string, unknown>) }),
+      );
+      const guests: Record<string, unknown>[] = [];
+      guestsSnap.forEach((bucket) => {
+        const groomUid = bucket.key;
+        if (!groomUid) return;
+        bucket.forEach((g) => {
+          guests.push({ id: g.key as string, groomUid, ...(g.val() as Record<string, unknown>) });
+        });
+      });
+      const confirmations: Record<string, unknown>[] = [];
+      confSnap.forEach((c) => {
+        if (c.key) confirmations.push({ id: c.key, ...(c.val() as Record<string, unknown>) });
+      });
+      const inviteTokens: Record<string, unknown>[] = [];
+      tokensSnap.forEach((tk) => {
+        if (tk.key) inviteTokens.push({ token: tk.key, ...(tk.val() as Record<string, unknown>) });
+      });
+      const driverAssignments = (assignSnap.val() ?? {}) as Record<string, unknown>;
+      const designs = designsSnap.docs.map((d) => ({
+        groomUid: d.ref.parent.parent?.id ?? "",
+        designId: d.id,
+        ...(d.data() as Record<string, unknown>),
+      }));
+      const digitalGuests = digitalGuestsSnap.docs.map((d) => ({
+        groomUid: d.ref.parent.parent?.id ?? "",
+        ...(d.data() as Record<string, unknown>),
+      }));
+
+      const payload = buildAnalytics({
+        users, guests, confirmations, inviteTokens, driverAssignments, designs, digitalGuests, window, now,
+      });
+      analyticsCache = { at: now, window, payload };
+      res.json(payload);
     } catch (err) {
       res.status(500).json({ error: "read_failed", detail: errorMessage(err) });
     }
