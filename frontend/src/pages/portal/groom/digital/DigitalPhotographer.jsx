@@ -7,6 +7,7 @@ import {
   healPhotographerFiles,
   subscribeDigitalMedia, setPhotographerPublished,
 } from "../../../../services/digitalInvitation.js";
+import { getGallery, patchGallery } from "../../../../services/gallery.js";
 import { logErr } from "../../../../utils/logger.js";
 import { localizeApiError } from "../../../../utils/apiError.js";
 import { load, save, removeKey } from "../../../../utils/storage.js";
@@ -66,6 +67,9 @@ export function DigitalPhotographer() {
   const [editName,   setEditName]   = useState("");
   const [published,  setPublished]  = useState(false);
   const [publishBusy, setPublishBusy] = useState(false);
+  // Auto-send "your photos are ready" WhatsApp link to every guest on publish.
+  const [autoSend,    setAutoSend]    = useState(false);
+  const [autoSendBusy, setAutoSendBusy] = useState(false);
   // Local previews: shown immediately while uploading, before RTDB confirms
   const [pendingFiles, setPendingFiles] = useState([]); // [{ id, name, type, url, blobUrl }]
   const inputRef = useRef(null);
@@ -85,8 +89,27 @@ export function DigitalPhotographer() {
     const onErr = (err) => showToast(`✗ ${err?.code || err?.message || "read failed"}`);
     const u1 = subscribePhotographerFiles(currentUid, setFiles, onErr, mergePendingFiles);
     const u2 = subscribeDigitalMedia(currentUid, (d) => setPublished(d?.photographerPublished === true), onErr);
+    // Load the auto-send-on-publish preference from the gallery config.
+    getGallery(currentUid)
+      .then((cfg) => setAutoSend(cfg?.autoSendOnPublish === true))
+      .catch(() => {});
     return () => { u1(); u2(); };
   }, [currentUid]);
+
+  const toggleAutoSend = async () => {
+    const next = !autoSend;
+    setAutoSendBusy(true);
+    setAutoSend(next); // optimistic
+    try {
+      await patchGallery(currentUid, { autoSendOnPublish: next });
+    } catch (err) {
+      logErr("patchGallery autoSendOnPublish", err);
+      setAutoSend(!next); // revert
+      showToast(localizeApiError(err, lang));
+    } finally {
+      setAutoSendBusy(false);
+    }
+  };
 
   // Splice any optimistic uploads the poll result is missing; drop entries
   // the server has now echoed.
@@ -445,6 +468,37 @@ export function DigitalPhotographer() {
             (published
               ? (lang === "he" ? "ביטול פרסום" : "إلغاء النشر")
               : (lang === "he" ? "📢 פרסם" : "📢 أنشر الصور"))}
+        </button>
+      </div>
+
+      {/* ── Auto-send photos to guests on publish ──────────────────────── */}
+      <div style={{
+        display: "flex", gap: 12, alignItems: "center",
+        padding: "12px 14px", borderRadius: 12, marginBottom: 20,
+        background: autoSend ? "rgba(76,201,122,.06)" : "rgba(255,255,255,.03)",
+        border: `1px solid ${autoSend ? "rgba(76,201,122,.3)" : "rgba(255,255,255,.08)"}`,
+      }}>
+        <div style={{ fontSize: 22 }}>{autoSend ? "📲" : "✉️"}</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 13, fontWeight: 800, color: autoSend ? "#4cc97a" : C.gold, marginBottom: 2 }}>
+            {lang === "he" ? "שליחה אוטומטית של התמונות בעת פרסום" : "إرسال الصور تلقائياً عند النشر"}
+          </div>
+          <div style={{ fontSize: 10, color: C.dim, lineHeight: 1.6 }}>
+            {lang === "he"
+              ? "כשתפרסם, כל מוזמן יקבל בוואטסאפ קישור לתמונות שלו (זיהוי פנים)."
+              : "عند النشر، يصل كل مدعو رابط واتساب لصوره عبر التعرف على الوجه."}
+          </div>
+        </div>
+        <button onClick={toggleAutoSend} disabled={autoSendBusy} style={{
+          padding: "8px 14px", borderRadius: 10, cursor: autoSendBusy ? "wait" : "pointer",
+          border: "none", fontWeight: 800, fontSize: 12, fontFamily: "inherit",
+          background: autoSend ? "rgba(212,80,58,.14)" : "linear-gradient(135deg,#4cc97a,#2da85a)",
+          color: autoSend ? C.red : "#fff", whiteSpace: "nowrap",
+        }}>
+          {autoSendBusy ? "..." :
+            (autoSend
+              ? (lang === "he" ? "כבה" : "إيقاف")
+              : (lang === "he" ? "הפעל" : "تفعيل"))}
         </button>
       </div>
 

@@ -25,6 +25,76 @@ import { sendWhatsAppTemplate, isYourPhotosTemplateConfigured } from "../../../w
 const PUBLIC_BASE_URL = (process.env.PUBLIC_BASE_URL || "https://dawa-aa793.web.app").replace(/\/+$/, "");
 const TEMPLATE_LANG = process.env.WHATSAPP_YOURPHOTOS_TEMPLATE_LANG || "ar";
 
+export type SendPhotoLinksResult = {
+  ok: boolean;
+  sent: number;
+  considered: number;
+  skipped: Record<string, number | boolean>;
+};
+
+/**
+ * Send each digital guest (with a phone + valid invite token) a WhatsApp
+ * "your photos are ready" template linking to their /photos face page. Pure
+ * data function — callable from the HTTP route AND from the publish-flip hook
+ * (auto-send). No-ops cleanly when WhatsApp/template are unconfigured, and when
+ * the photographer hasn't published. Guests already sent are skipped unless
+ * `force`.
+ */
+export async function sendPhotoLinksForGroom(
+  uid: string,
+  opts: { force?: boolean } = {},
+): Promise<SendPhotoLinksResult> {
+  // No-op until WhatsApp + the template are configured.
+  if (!isYourPhotosTemplateConfigured()) {
+    return { ok: true, sent: 0, considered: 0, skipped: { not_configured: true } };
+  }
+
+  // Photographer photos must be published for the page to show anything.
+  const parent = await parentDoc(uid).get();
+  if (!parent.exists || parent.data()?.photographerPublished !== true) {
+    return { ok: false, sent: 0, considered: 0, skipped: { not_published: true } };
+  }
+
+  const force = opts.force === true;
+  const templateName = process.env.WHATSAPP_YOURPHOTOS_TEMPLATE as string;
+
+  const db = getDatabase();
+  const snap = await guestsCol(uid).get();
+  const skipped: Record<string, number> = { no_phone: 0, no_token: 0, expired_token: 0, already_sent: 0, send_failed: 0 };
+  let sent = 0;
+  let considered = 0;
+
+  for (const doc of snap.docs) {
+    const g = doc.data() as {
+      phone?: string;
+      inviteLinkToken?: string;
+      photosLinkSentAt?: number;
+    };
+    considered++;
+    if (!g.phone) { skipped.no_phone++; continue; }
+    if (!g.inviteLinkToken) { skipped.no_token++; continue; }
+    if (g.photosLinkSentAt && !force) { skipped.already_sent++; continue; }
+
+    // Reuse the guest's existing token; verify it's still valid.
+    const tkSnap = await db.ref(`inviteTokens/${g.inviteLinkToken}`).get();
+    const tk = tkSnap.exists() ? (tkSnap.val() as { groomUsername?: string; expiresAt?: number }) : null;
+    if (!tk || !tk.groomUsername) { skipped.no_token++; continue; }
+    if (tk.expiresAt && Date.now() > tk.expiresAt) { skipped.expired_token++; continue; }
+
+    const link = `${PUBLIC_BASE_URL}/d/${tk.groomUsername}/${g.inviteLinkToken}/photos`;
+    const components = [{ type: "body", parameters: [{ type: "text", text: link }] }];
+    const result = await sendWhatsAppTemplate(g.phone, templateName, TEMPLATE_LANG, components);
+    if (result.ok) {
+      sent++;
+      await doc.ref.update({ photosLinkSentAt: Date.now() }).catch(() => undefined);
+    } else {
+      skipped.send_failed++;
+    }
+  }
+
+  return { ok: true, sent, considered, skipped };
+}
+
 export function registerPhotoShareRoutes(router: Router): void {
   router.post(
     "/:uid/photos/send-links",
@@ -37,58 +107,13 @@ export function registerPhotoShareRoutes(router: Router): void {
         return;
       }
 
-      // No-op until WhatsApp + the template are configured.
-      if (!isYourPhotosTemplateConfigured()) {
-        res.json({ ok: true, sent: 0, considered: 0, skipped: { not_configured: true } });
-        return;
-      }
-
-      const force = req.body?.force === true;
-      const templateName = process.env.WHATSAPP_YOURPHOTOS_TEMPLATE as string;
-
       try {
-        // Photographer photos must be published for the page to show anything.
-        const parent = await parentDoc(uid).get();
-        if (!parent.exists || parent.data()?.photographerPublished !== true) {
+        const result = await sendPhotoLinksForGroom(uid, { force: req.body?.force === true });
+        if (!result.ok && result.skipped?.not_published) {
           res.status(409).json({ error: "not_published" });
           return;
         }
-
-        const db = getDatabase();
-        const snap = await guestsCol(uid).get();
-        const skipped = { no_phone: 0, no_token: 0, expired_token: 0, already_sent: 0, send_failed: 0 };
-        let sent = 0;
-        let considered = 0;
-
-        for (const doc of snap.docs) {
-          const g = doc.data() as {
-            phone?: string;
-            inviteLinkToken?: string;
-            photosLinkSentAt?: number;
-          };
-          considered++;
-          if (!g.phone) { skipped.no_phone++; continue; }
-          if (!g.inviteLinkToken) { skipped.no_token++; continue; }
-          if (g.photosLinkSentAt && !force) { skipped.already_sent++; continue; }
-
-          // Reuse the guest's existing token; verify it's still valid.
-          const tkSnap = await db.ref(`inviteTokens/${g.inviteLinkToken}`).get();
-          const tk = tkSnap.exists() ? (tkSnap.val() as { groomUsername?: string; expiresAt?: number }) : null;
-          if (!tk || !tk.groomUsername) { skipped.no_token++; continue; }
-          if (tk.expiresAt && Date.now() > tk.expiresAt) { skipped.expired_token++; continue; }
-
-          const link = `${PUBLIC_BASE_URL}/d/${tk.groomUsername}/${g.inviteLinkToken}/photos`;
-          const components = [{ type: "body", parameters: [{ type: "text", text: link }] }];
-          const result = await sendWhatsAppTemplate(g.phone, templateName, TEMPLATE_LANG, components);
-          if (result.ok) {
-            sent++;
-            await doc.ref.update({ photosLinkSentAt: Date.now() }).catch(() => undefined);
-          } else {
-            skipped.send_failed++;
-          }
-        }
-
-        res.json({ ok: true, sent, considered, skipped });
+        res.json(result);
       } catch (err) {
         res.status(500).json({ error: "send_failed", detail: safeDetail(err) });
       }

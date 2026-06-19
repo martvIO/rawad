@@ -2,6 +2,7 @@ import { useEffect,useState } from "react";
 import { Num } from "../../Num.jsx";
 import { ON_GOLD, SectionHead } from "../inviteShared.jsx";
 import { localizeApiError } from "../../../utils/apiError.js";
+import { PhoneInput, isCompletePhone } from "../../PhoneInput.jsx";
 
 // ── RSVP ────────────────────────────────────────────────────────────────────────
 function confettiBurst(palette) {
@@ -20,16 +21,6 @@ function confettiBurst(palette) {
     root.appendChild(sp);
   }
   setTimeout(() => root.remove(), 1800);
-}
-
-// Lightweight client gate for the guest's phone. The backend re-validates and
-// normalises strictly — this just blocks an obviously-bad submit. Accepts
-// E.164 (+8–15 digits) or a local digits-only number (8–15 digits).
-function isValidGuestPhone(raw) {
-  const cleaned = (raw || "").replace(/[\s\-()]/g, "");
-  if (!cleaned) return false;
-  if (cleaned.startsWith("+")) return /^\+\d{8,15}$/.test(cleaned);
-  return /^\d{8,15}$/.test(cleaned);
 }
 
 function RSVPSection({ theme, font, lang, opts, mealOptions, guestPhone, onSubmitRsvp, disabled, alreadyAnswered, rsvpDone }) {
@@ -56,7 +47,7 @@ function RSVPSection({ theme, font, lang, opts, mealOptions, guestPhone, onSubmi
       return;
     }
     const phoneClean = (phone || "").trim();
-    if (!isValidGuestPhone(phoneClean)) {
+    if (!isCompletePhone(phoneClean)) {
       setError(lang === "he" ? "אנא הזינו מספר טלפון תקין" : "يرجى إدخال رقم هاتف صحيح");
       return;
     }
@@ -139,14 +130,10 @@ function RSVPSection({ theme, font, lang, opts, mealOptions, guestPhone, onSubmi
             {status && (
               <div className="dawa-inv-field">
                 <label style={{ color: theme.accent, fontFamily: font.family }}>{lang === "he" ? "מספר הטלפון שלך" : "رقم هاتفك"}</label>
-                <input
-                  className="dawa-inv-input"
-                  style={{ color: theme.text, borderColor: theme.accentLine, fontFamily: font.family, direction: "ltr", textAlign: "start" }}
+                <PhoneInput
                   value={phone}
-                  onChange={(e) => setPhone(e.target.value.slice(0, 30))}
-                  placeholder="+972 5X-XXX-XXXX"
-                  inputMode="tel"
-                  dir="ltr"
+                  onChange={setPhone}
+                  lang={lang}
                 />
               </div>
             )}

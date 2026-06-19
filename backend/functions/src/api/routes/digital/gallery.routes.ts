@@ -171,8 +171,12 @@ export function registerGalleryRoutes(router: Router): void {
     }
     try {
       const cur = await readConfig(uid);
-      // Editing an approved gallery sends it back to draft for re-approval.
-      if (cur.galleryStatus === "approved") {
+      // Editing a DESIGN field of an approved gallery sends it back to draft for
+      // re-approval. Operational flags (autoSendOnPublish) don't affect the
+      // gallery's appearance, so they must not demote an approved gallery.
+      const DESIGN_KEYS = ["title", "layout", "coverPhoto"];
+      const touchesDesign = Object.keys(patch).some((k) => DESIGN_KEYS.includes(k));
+      if (touchesDesign && cur.galleryStatus === "approved") {
         patch.galleryStatus = "draft";
         patch.galleryApprovedAt = null;
       }

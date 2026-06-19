@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { usePortal } from "../../../../context/PortalContext.jsx";
 import { addDigitalGuest, subscribeDigitalMedia, subscribeDigitalGuests } from "../../../../services/digitalInvitation.js";
 import { parseGuestLines, toLocalIL } from "../../../../utils/bulkGuests.js";
+import { contactsFileToText } from "../../../../utils/contactsImport.js";
 import { toIntlPhone } from "../../../../utils/phone.js";
 import { logErr } from "../../../../utils/logger.js";
 import { localizeApiError } from "../../../../utils/apiError.js";
@@ -29,6 +30,9 @@ export function DigitalAddGuest() {
   const [bulkText,     setBulkText]     = useState("");
   const [bulkBusy,     setBulkBusy]     = useState(false);
   const [bulkProgress, setBulkProgress] = useState({ done: 0, total: 0 });
+  // Import-from-file (vCard .vcf / CSV) — fills the bulk textarea below.
+  const [importBusy,   setImportBusy]   = useState(false);
+  const importInputRef = useRef(null);
   // Tracks unmount so we don't call setSaving on a dead component after the
   // optimistic navigate has fired. Avoids React's "state on unmounted" warning
   // and prevents the spinner state from being reset to stale on a fast remount.
@@ -122,6 +126,27 @@ export function DigitalAddGuest() {
     }
   };
 
+  // Read an uploaded contacts file (.vcf / .csv) and fill the bulk textarea.
+  const onImportFile = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-picking the same file later
+    if (!file) return;
+    setImportBusy(true);
+    try {
+      const text = await contactsFileToText(file);
+      if (!text.trim()) {
+        showToast(lang === "he" ? "לא נמצאו אנשי קשר בקובץ" : "لم يتم العثور على جهات اتصال في الملف");
+      } else {
+        setBulkText((prev) => (prev.trim() ? prev.trim() + "\n" + text : text));
+        setBulkOpen(true);
+      }
+    } catch {
+      showToast(lang === "he" ? "קריאת הקובץ נכשלה" : "تعذّر قراءة الملف");
+    } finally {
+      if (mountedRef.current) setImportBusy(false);
+    }
+  };
+
   // Live preview of the pasted list, deduped against the existing guests.
   const bulkParsed = useMemo(() => {
     const existingLocals = new Set(existingGuests.map(g => toLocalIL(g.phone)).filter(Boolean));
@@ -178,10 +203,36 @@ export function DigitalAddGuest() {
         </button>
         {bulkOpen && (
           <div style={{ marginTop: 12 }}>
+            {/* Import from a contacts file (.vcf / .csv) → fills the textarea. */}
+            <input
+              ref={importInputRef}
+              type="file"
+              accept=".vcf,.csv,text/vcard,text/csv,text/plain"
+              onChange={onImportFile}
+              style={{ display: "none" }}
+            />
+            <button
+              onClick={() => importInputRef.current?.click()}
+              disabled={importBusy}
+              style={{
+                width: "100%", marginBottom: 10, padding: "10px 12px", borderRadius: 10,
+                background: "rgba(201,168,76,.10)", border: "1px solid rgba(201,168,76,.4)",
+                color: C.goldLight, fontWeight: 800, fontSize: 13, fontFamily: "inherit",
+                cursor: importBusy ? "wait" : "pointer",
+              }}>
+              {importBusy
+                ? (lang === "he" ? "קורא קובץ…" : "جاري قراءة الملف…")
+                : (lang === "he" ? "📇 ייבוא מאנשי קשר (קובץ ‎.vcf / ‎.csv)" : "📇 استيراد من جهات الاتصال (ملف ‎.vcf / ‎.csv)")}
+            </button>
+            <div style={{ fontSize: 10.5, color: C.dim, marginBottom: 10, lineHeight: 1.6 }}>
+              {lang === "he"
+                ? "באייפון: אנשי קשר → בחר → שתף → שמור כקובץ ‎.vcf. באנדרואיד/מחשב: ייצוא אנשי קשר (‎.vcf או ‎.csv) ואז העלאה כאן."
+                : "في الآيفون: جهات الاتصال ← اختر ← مشاركة ← حفظ كملف ‎.vcf. في أندرويد/الحاسوب: تصدير جهات الاتصال (‎.vcf أو ‎.csv) ثم رفعها هنا."}
+            </div>
             <div style={{ fontSize: 11, color: C.dim, marginBottom: 8, lineHeight: 1.7 }}>
               {lang === "he"
-                ? "הדביקו שורה לכל מוזמן בפורמט: שם מלא, טלפון"
-                : "الصق سطراً لكل مدعو بالصيغة: الاسم الكامل، رقم الهاتف"}
+                ? "או הדביקו שורה לכל מוזמן בפורמט: שם מלא, טלפון"
+                : "أو الصق سطراً لكل مدعو بالصيغة: الاسم الكامل، رقم الهاتف"}
             </div>
             <textarea
               className="input-field"

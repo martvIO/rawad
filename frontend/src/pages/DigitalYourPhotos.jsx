@@ -7,24 +7,24 @@
 //      - already enrolled     → INSTANT gallery; later polls pick up newly
 //                               indexed photos automatically
 //      - not enrolled         → consent + method screen
-//   2. The guest enrols a selfie one of two ways:
-//      - UPLOAD a photo (multipart → POST /digital/photos/enroll), or
-//      - CAMERA with AWS Face Liveness (anti-spoof); on completion the verified
-//        reference image is enrolled server-side.
-//      The selfie is uploaded and processed by Rekognition; only a FaceId is
-//      stored (auto-deleted when the invite expires).
+//   2. The guest enrols a selfie via the CAMERA with AWS Face Liveness
+//      (anti-spoof); on completion the verified reference image is enrolled
+//      server-side. The verified selfie is processed by Rekognition; only a
+//      FaceId is stored (auto-deleted when the invite expires). The camera is
+//      the ONLY enrollment path — there is intentionally no photo-upload
+//      fallback (anti-spoofing requires a live capture).
 //   3. Gallery: download-all (.zip), re-scan, and delete-my-face-data.
 import { useEffect, useRef, useState, lazy, Suspense } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   subscribeFaceMatches,
   createLivenessSession,
-  enrollSelfieUpload,
   enrollWithLiveness,
   deleteFaceEnrollment,
   photosZipUrl,
 } from "../services/digitalPhotos.js";
 import { livenessConfigured } from "../utils/awsLiveness.js";
+import { PhoneInput, isCompletePhone } from "../components/PhoneInput.jsx";
 import { LangSwitcher } from "../components/LangSwitcher.jsx";
 import { logErr } from "../utils/logger.js";
 import { C } from "../styles/theme.js";
@@ -35,7 +35,7 @@ export function DigitalYourPhotos({ lang, setLang }) {
   const { token } = useParams();
   const navigate = useNavigate();
 
-  // Stage: loading | invalid | not-published | consent | uploading |
+  // Stage: loading | invalid | not-published | consent |
   //        liveness-loading | liveness | enrolling | done | error
   const [stage, setStage] = useState("loading");
   const [error, setError] = useState("");
@@ -47,7 +47,6 @@ export function DigitalYourPhotos({ lang, setLang }) {
   const cancelledRef = useRef(false);
   const stageRef = useRef("loading");
   const unsubRef = useRef(null);
-  const fileInputRef = useRef(null);
   const phoneTouchedRef = useRef(false);
   useEffect(() => { stageRef.current = stage; }, [stage]);
 
@@ -89,25 +88,7 @@ export function DigitalYourPhotos({ lang, setLang }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
-  // ── Upload path ──────────────────────────────────────────────────────────
-  const pickFile = () => fileInputRef.current?.click();
-  const onPickFile = async (e) => {
-    const file = e.target.files?.[0];
-    e.target.value = ""; // allow re-picking the same file later
-    if (!file) return;
-    setStage("uploading");
-    try {
-      const resp = await enrollSelfieUpload(token, file, phone.trim());
-      if (cancelledRef.current) return;
-      setMatches(resp?.matches ?? []);
-      if (resp?.expiresAt) setExpiresAt(resp.expiresAt);
-      setStage("done");
-    } catch (err) {
-      handleEnrollError(err);
-    }
-  };
-
-  // ── Camera (AWS Face Liveness) path ──────────────────────────────────────
+  // ── Camera (AWS Face Liveness) path — the only enrollment method ──────────
   const startLiveness = async () => {
     setStage("liveness-loading");
     try {
@@ -119,7 +100,7 @@ export function DigitalYourPhotos({ lang, setLang }) {
     } catch (err) {
       logErr("createLivenessSession", err);
       setStage("error");
-      setError(tt(lang, "تعذّر بدء فحص الكاميرا — جرّب رفع صورة", "לא ניתן להתחיל בדיקת מצלמה — נסה להעלות תמונה"));
+      setError(tt(lang, "تعذّر بدء فحص الكاميرا — حاول مجدداً", "לא ניתן להתחיל בדיקת מצלמה — נסה שוב"));
     }
   };
   const onLivenessComplete = async () => {
@@ -197,8 +178,6 @@ export function DigitalYourPhotos({ lang, setLang }) {
         </div>
       </div>
 
-      <input ref={fileInputRef} type="file" accept="image/*" onChange={onPickFile} style={{ display: "none" }} />
-
       <div style={{ maxWidth: 720, margin: "0 auto", padding: "24px 16px 60px" }}>
         {stage === "loading" && <Status icon="…" text={tt(lang, "جاري التحميل", "טוען")} />}
 
@@ -223,8 +202,8 @@ export function DigitalYourPhotos({ lang, setLang }) {
             </div>
             <div style={{ fontSize: 13, color: C.dim, lineHeight: 2, marginBottom: 16 }}>
               <div>{tt(lang,
-                "📷 ارفع صورة شخصية أو استخدم الكاميرا لنعثر على كل الصور التي تظهر فيها.",
-                "📷 העלה תמונה או השתמש במצלמה כדי שנמצא את כל התמונות שאתה מופיע בהן.")}</div>
+                "📷 استخدم كاميرا جهازك لالتقاط صورة حيّة ونعثر على كل الصور التي تظهر فيها.",
+                "📷 השתמש במצלמת המכשיר לצילום חי ונמצא את כל התמונות שאתה מופיע בהן.")}</div>
               <div>{tt(lang,
                 "☁️ تُرسَل صورتك بأمان وتُعالَج عبر خدمة التعرف على الوجه (AWS) لمطابقة صور الحفل فقط — نحفظ توقيعاً رقمياً للوجه، لا الصورة نفسها.",
                 "☁️ התמונה נשלחת באופן מאובטח ומעובדת בשירות זיהוי הפנים (AWS) רק להתאמת תמונות האירוע — נשמרת חתימה מספרית, לא התמונה.")}</div>
@@ -239,29 +218,33 @@ export function DigitalYourPhotos({ lang, setLang }) {
             <label style={{ fontSize: 12, color: C.dim, display: "block", marginBottom: 6 }}>
               {tt(lang, "📱 رقم هاتفك (لإرسال رابط صورك)", "📱 מספר הטלפון שלך (לקבלת קישור התמונות)")}
             </label>
-            <input
-              value={phone}
-              onChange={(e) => { phoneTouchedRef.current = true; setPhone(e.target.value); }}
-              inputMode="tel"
-              placeholder="05X-XXXXXXX"
-              style={{
-                width: "100%", boxSizing: "border-box", marginBottom: 16, padding: "10px 12px",
-                borderRadius: 10, border: "1px solid rgba(201,168,76,.3)", background: "rgba(255,255,255,.04)",
-                color: C.text, fontSize: 14, direction: "ltr", textAlign: "center",
-              }}
-            />
+            <div style={{ marginBottom: 16 }}>
+              <PhoneInput
+                value={phone}
+                onChange={(v) => { phoneTouchedRef.current = true; setPhone(v); }}
+                lang={lang}
+              />
+            </div>
 
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              <button className="gold-btn" onClick={pickFile}>
-                {tt(lang, "📤 ارفع صورة شخصية", "📤 העלה תמונה")}
-              </button>
-              {livenessConfigured() && (
-                <button onClick={startLiveness} style={{
-                  background: "rgba(201,168,76,.1)", border: "1px solid rgba(201,168,76,.4)", color: C.goldLight,
-                  borderRadius: 10, padding: "11px 14px", cursor: "pointer", fontSize: 14, fontWeight: 800,
-                }}>
-                  {tt(lang, "📷 استخدم الكاميرا (فحص حيوية)", "📷 השתמש במצלמה (בדיקת חיות)")}
+              {livenessConfigured() ? (
+                <button
+                  className="gold-btn"
+                  onClick={startLiveness}
+                  disabled={!isCompletePhone(phone)}
+                  style={{ opacity: isCompletePhone(phone) ? 1 : 0.5, cursor: isCompletePhone(phone) ? "pointer" : "not-allowed" }}
+                >
+                  {tt(lang, "📷 افتح الكاميرا للبحث عن صورك", "📷 פתח מצלמה כדי למצוא את התמונות שלך")}
                 </button>
+              ) : (
+                <div style={{
+                  background: "rgba(212,122,75,.10)", border: "1px solid rgba(212,122,75,.4)", color: C.dim,
+                  borderRadius: 10, padding: "12px 14px", fontSize: 13, lineHeight: 1.7, textAlign: "center",
+                }}>
+                  {tt(lang,
+                    "هذه الميزة تتطلب كاميرا — افتح الرابط من هاتف بكاميرا ومتصفّح حديث.",
+                    "תכונה זו דורשת מצלמה — פתח את הקישור מטלפון עם מצלמה ודפדפן עדכני.")}
+                </div>
               )}
               <button onClick={() => navigate("..")} style={{
                 background: "none", border: "1px solid rgba(255,255,255,.15)", color: C.dim,
@@ -273,9 +256,6 @@ export function DigitalYourPhotos({ lang, setLang }) {
           </div>
         )}
 
-        {stage === "uploading" && (
-          <Status icon="🔍" text={tt(lang, "جاري رفع صورتك والبحث...", "מעלה את התמונה ומחפש...")} />
-        )}
         {stage === "liveness-loading" && (
           <Status icon="📷" text={tt(lang, "جاري تجهيز فحص الكاميرا...", "מכין את בדיקת המצלמה...")} />
         )}
@@ -289,7 +269,7 @@ export function DigitalYourPhotos({ lang, setLang }) {
               sessionId={session.sessionId}
               region={session.region}
               onComplete={onLivenessComplete}
-              onError={(err) => { logErr("liveness", err); setStage("error"); setError(tt(lang, "تعذّر فحص الكاميرا — جرّب رفع صورة", "בדיקת המצלמה נכשלה — נסה להעלות תמונה")); }}
+              onError={(err) => { logErr("liveness", err); setStage("error"); setError(tt(lang, "تعذّر فحص الكاميرا — حاول مجدداً", "בדיקת המצלמה נכשלה — נסה שוב")); }}
               onCancel={() => setStage("consent")}
             />
           </Suspense>

@@ -44,7 +44,7 @@ across 16 shots) — clustering correctly finds ~20+ people, not 2.
 
 ## Flows
 
-- **Personal** (`photoFaces.ts`): `POST /digital/photos/liveness/session` → AWS Face Liveness; `POST /enroll` (multipart selfie upload OR `livenessSessionId`) → IndexFaces guest → SearchFaces → matches; `GET /matches`; `DELETE /enroll` (DeleteFaces + erase); `GET /zip` (archiver stream from Storage). Frontend: upload-a-photo OR camera Liveness (`@aws-amplify/ui-react-liveness`, lazy-loaded, Cognito guest creds), phone capture, download-all.
+- **Personal** (`photoFaces.ts`): `POST /digital/photos/liveness/session` → AWS Face Liveness; `POST /enroll` (multipart selfie upload OR `livenessSessionId`) → IndexFaces guest → SearchFaces → matches; `GET /matches`; `DELETE /enroll` (DeleteFaces + erase); `GET /zip` (archiver stream from Storage). Frontend (`DigitalYourPhotos.jsx`): **camera Liveness only** as of 2026-06-19 — see below; the backend `/enroll` multipart branch is retained but the guest UI no longer offers upload. Phone capture via the shared `PhoneInput` (Arabic-digit-safe); download-all ZIP.
 - **Gallery** (`gallery.routes.ts` authed + `galleryAccess.routes.ts` public): groom/admin recompute + curate (hide/rename/merge) + approve + kill-switch (admin console = `AdminGallery.jsx`); public viewer enters phone → must be in the guest list → SMS code (reuses Firebase Identity Toolkit OTP) → 24h grant → themed person-tiles → person photos + ZIP. WhatsApp template bulk-send (`photoShare.routes.ts`) reuses each guest's existing token.
 
 ## Privacy / security
@@ -53,9 +53,15 @@ across 16 shots) — clustering correctly finds ~20+ people, not 2.
 - People gallery is **never public** — phone-OTP + guest-list membership + a per-wedding admin kill-switch (`enabled`, default off) + admin approval (`galleryStatus`).
 - Auto-purge ~30 days post-wedding; guest opt-out erases their face immediately.
 
+## Camera-only enrollment + auto-send on publish (2026-06-19)
+
+- **Camera-only "your photos"** — `DigitalYourPhotos.jsx` no longer shows the "upload a photo" button; AWS Face Liveness is the **only** enrollment path (anti-spoofing; per product decision "truly camera-only, no fallback"). The camera button is gated on a complete phone (`isCompletePhone`). When `livenessConfigured()` is false the page shows a graceful "this needs a camera — open on a supported phone" notice instead of the camera (so a pre-Cognito deploy degrades, it doesn't break).
+- **⚠️ Why the camera button was invisible in prod** — `livenessConfigured()` needs `VITE_COGNITO_IDENTITY_POOL_ID` + `VITE_AWS_REGION` in the frontend env, and **neither was set** in `frontend/.env` / `.env.production`. So the camera never appeared. **The Cognito Identity Pool is NOT yet provisioned** — the `dawa-rekognition-backend` IAM user is Rekognition-only (no `cognito-identity`/`iam` perms), so it can't create the pool. **Blocked on elevated AWS creds.** Region is **`us-east-1`** (matches `backend/functions/.env.local` `AWS_REGION`), NOT the `eu-west-1` placeholder in the setup doc — the browser Liveness region must match the backend session region.
+- **Auto-send "your photos are ready" on publish** — `photoShare.routes.ts` factored its bulk-send body into `sendPhotoLinksForGroom(uid,{force})`. The publish-flip hook in `media.routes.ts` (when `photographerPublished` goes false→true) now reads `galleryConfig.autoSendOnPublish` and, if on, calls it (best-effort, no-ops without WhatsApp). Groom toggle lives on the photographer page (`DigitalPhotographer.jsx`, bound to `patchGallery({autoSendOnPublish})`). `gallery.routes.ts` PATCH no longer demotes an approved gallery for operational-only flags (only `title/layout/coverPhoto` demote).
+
 ## Provisioning + verification
 
-- AWS setup (IAM user + Cognito identity pool for Liveness) in `docs/AWS_REKOGNITION_SETUP.md`. Creds in `backend/functions/.env.local` (emulator/test) and `.env` (deploy); frontend `VITE_AWS_REGION` + `VITE_COGNITO_IDENTITY_POOL_ID`.
+- AWS setup (IAM user + Cognito identity pool for Liveness) in `docs/AWS_REKOGNITION_SETUP.md`. Creds in `backend/functions/.env.local` (emulator/test) and `.env` (deploy); frontend `VITE_AWS_REGION` + `VITE_COGNITO_IDENTITY_POOL_ID` (region `us-east-1`; **pool still un-provisioned — blocked on AWS creds**).
 - `npm run test:rekognition` — real-AWS accuracy test on `facerec_examples` (recall + cluster separation). `backend/scripts/verify-faces-e2e.cjs` + `verify-gallery-e2e.cjs` — full emulator + real-Rekognition e2e (both flows pass). One-time Firestore TTL on `guestFaces.expireAt` still applies.
 
 See [[Audit Remediation 2026]], [[Security Model]], [[Data Storage Model]], [[WhatsApp Messaging]].

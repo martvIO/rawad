@@ -8,6 +8,7 @@ import { uploadAndGetUrl,deleteStorageObjectSilently,deleteStorageFolder,kindOf,
 import { canActOnUid } from "./access";
 import { sanitizeMediaSettings } from "./sanitize";
 import { projectMediaDoc,migrateLegacyBackground,safeDetail } from "./project";
+import { sendPhotoLinksForGroom } from "./photoShare.routes";
 import { Router } from "express";
 
 export function registerMediaRoutes(router: Router): void {
@@ -180,6 +181,19 @@ router.patch(
             if (n > 0) console.log(`[digital] publish flip queued ${n} file(s) for face indexing`);
           })
           .catch((err) => console.error("[digital] publish-flip backfill failed", err));
+
+        // If the groom opted in (galleryConfig.autoSendOnPublish), auto-send
+        // each guest their "your photos are ready" WhatsApp link. No-ops when
+        // WhatsApp/template are unconfigured. Best-effort — never fails publish.
+        try {
+          const cfgSnap = await fs().doc(`digitalInvitations/${req.params.uid}/galleryConfig/config`).get();
+          if (cfgSnap.exists && cfgSnap.data()?.autoSendOnPublish === true) {
+            const r = await sendPhotoLinksForGroom(req.params.uid);
+            console.log(`[digital] autoSendOnPublish: sent ${r.sent}/${r.considered}`, r.skipped);
+          }
+        } catch (err) {
+          console.error("[digital] autoSendOnPublish failed", err);
+        }
       }
       res.json({ ok: true });
     } catch (err) {
