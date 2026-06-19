@@ -73,21 +73,31 @@ The camera liveness check runs in the browser and needs **temporary** AWS creds.
 
 ## 4. Set the values
 
+> **Already provisioned for dawa-aa793 (account 849279003056):** the live
+> deployment uses region **`us-east-1`** (NOT the `eu-west-1` examples below — the
+> browser Liveness region must match the backend session region). The Cognito
+> Identity Pool already exists: name **`dawa_face_liveness`**, ID
+> **`us-east-1:f2e0f5cc-6027-4859-94d5-3b9cdab221da`**, guest access **active**,
+> guest role **`dawa-cognito-unauth`** with the `DawaFaceLiveness` inline policy
+> granting `rekognition:StartFaceLivenessSession`. The pool ID is a public client
+> value (it ships in the JS bundle), so it's safe to record here. The frontend
+> values live in `frontend/.env` on the deploy machine (gitignored).
+
 **Backend** — add to `backend/functions/.env.local` (gitignored; the Functions
 emulator and the accuracy test both read it):
 
 ```
 AWS_ACCESS_KEY_ID=AKIA...
 AWS_SECRET_ACCESS_KEY=...
-AWS_REGION=eu-west-1
+AWS_REGION=us-east-1
 REKOGNITION_COLLECTION_PREFIX=dawa
 ```
 
-**Frontend** — add to `frontend/.env.local`:
+**Frontend** — add to `frontend/.env` (gitignored; same file as the Firebase web keys):
 
 ```
-VITE_AWS_REGION=eu-west-1
-VITE_COGNITO_IDENTITY_POOL_ID=eu-west-1:xxxxxxxx-xxxx-xxxx-...
+VITE_AWS_REGION=us-east-1
+VITE_COGNITO_IDENTITY_POOL_ID=us-east-1:f2e0f5cc-6027-4859-94d5-3b9cdab221da
 ```
 
 **Production deploy** (later): set the backend values as Functions secrets
