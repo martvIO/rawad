@@ -15,10 +15,11 @@
   "dependencies": {
     "@aws-sdk/client-rekognition": "^3.700.0",
     "@napi-rs/canvas": "^0.1.100",
-    "archiver": "^7.0.1",
+    "@sentry/node": "^8.55.2",
     "@tensorflow/tfjs": "^4.22.0",
     "@tensorflow/tfjs-backend-wasm": "^4.22.0",
     "@vladmandic/face-api": "^1.7.15",
+    "archiver": "^7.0.1",
     "busboy": "^1.6.0",
     "cors": "^2.8.5",
     "express": "^4.19.2",

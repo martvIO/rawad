@@ -35,6 +35,7 @@ import { adminRouter } from "./routes/admin";
 import { paymentsRouter } from "./routes/payments";
 import { decryptPasswordFields } from "./middleware/decryptPasswordFields";
 import { isEncryptionAvailable } from "./passwordCrypto";
+import { captureError, sentryEnabled } from "../sentry";
 // NOTE: additional routers (users, guests, ...) are mounted as their files
 // are created in subsequent migration steps. The import + app.use lines
 // below are added incrementally.
@@ -116,6 +117,7 @@ app.get("/health", (_req, res) => {
     ok: true,
     uptimeSeconds: Math.floor(process.uptime()),
     encryption: isEncryptionAvailable(),
+    monitoring: sentryEnabled, // false until SENTRY_DSN is provisioned
   });
 });
 
@@ -142,6 +144,7 @@ app.use((req: Request, res: Response) => {
 app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
   // eslint-disable-next-line no-console
   console.error("[api] Unhandled error:", err);
+  captureError(err); // → Sentry when SENTRY_DSN is set; no-op otherwise.
   if (res.headersSent) return; // Streaming endpoints (SSE) may have started.
   res.status(500).json({ error: "internal_error" });
 });
