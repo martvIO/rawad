@@ -115,8 +115,8 @@ Secret Manager. Rotate by updating the secret and redeploying `api`.
 | `WEB_API_KEY` | Functions env / Secret Manager | suspected leak |
 | `PASSWORD_ENC_PRIVATE_KEY` | Secret Manager | suspected leak; regenerate with `node backend/scripts/gen-password-keypair.cjs` |
 | Stripe webhook signing secret | Functions env | after any Stripe key reset |
-| Firebase **admin-SDK key** (`*-adminsdk-*.json`, repo root) | local file only | **see §7 — it is in git history** |
-| Portal passwords (admin/groom/**driver**/rawad) | Auth | `node backend/functions/scripts/resetUser.js <user>` — driver/rawad were leaked in history |
+| Firebase **admin-SDK key** (`*-adminsdk-*.json`, repo root) | local file only | gitignored, **not in git history** (verified) — on-disk risk only; see §7 |
+| Portal passwords (admin/groom/**driver**/rawad) | Auth | `node backend/functions/scripts/resetUser.js <user>` — rotate as precaution if ever shared insecurely (only emulator seed creds are in history) |
 
 After rotating a Functions secret: `npx firebase deploy --only functions:api`
 then confirm `health.encryption:true`.
@@ -157,10 +157,16 @@ Tag every release (`git tag vX.Y.Z`) so "the previous build" is unambiguous.
 
 ## 7. Known security debt (handoff blockers)
 
-1. **Admin-SDK key + leaked portal creds are in git history.** Rotating the
-   passwords (driver/rawad) mitigates account access, but the key + history
-   need scrubbing (`git filter-repo` / BFG) before any repo handoff or making
-   it public. Treat the repo as containing live secrets until done.
+1. **Secrets in history — verified clean locally; confirm the remote.** Local
+   all-refs history is clean: the admin-SDK key is gitignored and was never
+   committed, and `backend/functions/.env` (AWS keys) is gitignored too — only a
+   test-fixture key + emulator seed passwords (`Admin1234`/`Driver1234`) exist in
+   history. Before a co-maintainer handoff, run `gitleaks detect` on a *fresh
+   clone of the remote* to confirm no secret was ever pushed on a branch/PR not
+   present locally. If clean (as expected), **no history scrub is needed.** The
+   real residual risk is on-disk: move the admin-SDK key + `.env` out of the
+   OneDrive-synced folder into Secret Manager. Rotate driver/rawad passwords only
+   if they were ever shared insecurely. (CI now runs a `gitleaks` job on every PR.)
 2. **No staging environment** — deploys go straight to prod. Use Firebase
    Hosting **preview channels** (`firebase hosting:channel:deploy <name>`) for
    risky frontend changes.
@@ -175,3 +181,41 @@ Single operator today. Define + fill in before the co-maintainer starts:
 - Stripe account owner: ____________
 - Meta/WhatsApp Business admin: ____________
 - AWS (Rekognition/Cognito) account owner: ____________
+
+---
+
+## 9. Owner activation checklist (post-2026-06-20 audit)
+
+The 2026-06-20 audit remediation shipped the *code*; these steps need owner
+access (cloud consoles, accounts, secrets, content) and cannot be done from the
+codebase. Roughly highest value-to-effort first. Full rationale: `docs/WEB-AUDIT-2026-06-20.md`.
+
+- [ ] **Set the WhatsApp business number** (Admin → Communication Settings). Until
+      set, `/api/settings/public` returns `{}` and every landing "book" CTA
+      silently falls back to the login wall. ~2 min, unblocks the whole funnel.
+- [ ] **GCP + AWS budget alerts** (₪50–100 / $5–10, email at 50/90/100%). Free.
+      Do this *before* turning on any paid integration — a runaway function or
+      Rekognition loop is the main bankruptcy risk. `api` is already capped at
+      `maxInstances:20`.
+- [ ] **Enable backups + test one restore.** `bash backend/scripts/setup-backups.sh`,
+      set `BACKUP_BUCKET=dawa-aa793-backups` in functions env, deploy
+      `functions:backupRtdb`, force a run, then rehearse a restore (§3). Untested
+      backup ≠ backup.
+- [ ] **Monitoring on `/api/health`** — UptimeRobot (free) keyword `"ok":true`,
+      alert after 2 fails. Create a Sentry project → set `SENTRY_DSN` (Functions)
+      + `VITE_SENTRY_DSN` (frontend build); `/api/health` then reports
+      `monitoring:true`.
+- [ ] **Make CI required** — GitHub → Settings → Branches → protect `main` →
+      require the `unit` + `integration` checks (e2e advisory).
+- [ ] **Confirm the remote is secret-clean** — `gitleaks detect` on a fresh clone
+      (see §7); then move the on-disk admin-SDK key + `functions/.env` out of the
+      OneDrive folder into Secret Manager.
+- [ ] **Testimonials** — paste 3–6 real, consented AR+HE quotes into the
+      `testimonials` array in `frontend/src/i18n/{ar,he}.js` (the section is built
+      and hidden until non-empty).
+- [ ] **Go-live integration secrets** (after budget alerts): Stripe live keys,
+      WhatsApp Cloud API creds, AWS Rekognition backend creds.
+- [ ] **Export `og-default.png`** (1200×630) from `frontend/public/og-default.svg`
+      for max link-preview crawler coverage, then point the og:image meta at it.
+- [ ] **KPI baseline** — capture ~1 month from the admin analytics dashboard, then
+      set targets (`docs/KPIS.md`). Optional: GA4/Clarity (needs a consent banner).

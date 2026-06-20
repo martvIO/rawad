@@ -49,8 +49,10 @@ Grant in this order; promote only after the shadowed deploy:
 - [ ] Firebase/GCP project (start: Viewer → then Editor)
 - [ ] Read-only prod (Firebase console) before any write access
 - [ ] Secrets (Stripe, WhatsApp, AWS) — **last**, and never via chat/email
-- [ ] ⚠️ The repo currently has an admin-SDK key + leaked creds in git history
-      (RUNBOOK §7) — treat the repo as containing live secrets until scrubbed.
+- [ ] ✅ Secrets are NOT in git history (verified): the admin-SDK key + `functions/.env`
+      are gitignored and were never committed. Before relying on this, run `gitleaks`
+      on a fresh clone of the remote to confirm across all branches/PRs (RUNBOOK §7).
+      The on-disk key is the real risk — keep it out of shared/synced folders.
 
 ## Hard rules (from CLAUDE.md)
 - **Ask before** any website feature change or any DB/rules change.
