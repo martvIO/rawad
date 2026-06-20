@@ -5,6 +5,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { BrandLogo } from "../components/BrandLogo.jsx";
+import { Icon } from "../components/icons/Icon.jsx";
 import { C } from "../styles/theme.js";
 import { fetchPublicSettings } from "../services/publicSettings.js";
 import { resolveContact, buildWhatsAppUrl, mailtoUrl } from "../utils/contact.js";
@@ -36,7 +37,7 @@ function useReveal(deps = []) {
 }
 
 // Top nav bar — brand, section links, language toggle, portal CTA.
-function TopNav({ t, lang, setLang, onEnterPortal, scrolled }) {
+function TopNav({ t, lang, setLang, onEnterPortal, onContact, scrolled }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const links = [
     { id: "hero",     label: t("nav_home") },
@@ -108,9 +109,14 @@ function TopNav({ t, lang, setLang, onEnterPortal, scrolled }) {
               }}>{code === "ar" ? "AR" : "HE"}</button>
             ))}
           </div>
-          <button onClick={onEnterPortal} className="gold-btn dawa-topnav-cta" style={{
-            padding: "8px 16px", fontSize: 12.5, fontWeight: 800, whiteSpace: "nowrap",
+          <button onClick={onEnterPortal} className="dawa-topnav-login" style={{
+            background: "transparent", border: "none", color: "#d8c9a6",
+            fontSize: 12.5, fontWeight: 700, fontFamily: "inherit", cursor: "pointer",
+            whiteSpace: "nowrap", padding: "8px 4px",
           }}>{t("nav_portal")}</button>
+          <button onClick={onContact} className="gold-btn dawa-topnav-cta" style={{
+            padding: "8px 16px", fontSize: 12.5, fontWeight: 800, whiteSpace: "nowrap",
+          }}>{t("nav_book")}</button>
           <button onClick={() => setMenuOpen(!menuOpen)} aria-label="menu"
             className="dawa-topnav-burger"
             style={{
@@ -118,7 +124,7 @@ function TopNav({ t, lang, setLang, onEnterPortal, scrolled }) {
               color: "#f0c84c", fontSize: 18, cursor: "pointer",
               width: 38, height: 38, borderRadius: 10, padding: 0,
               alignItems: "center", justifyContent: "center",
-            }}>{menuOpen ? "✕" : "☰"}</button>
+            }}>{menuOpen ? <Icon name="close" size={18} /> : <Icon name="menu" size={18} />}</button>
         </div>
       </div>
 
@@ -136,6 +142,15 @@ function TopNav({ t, lang, setLang, onEnterPortal, scrolled }) {
               borderBottom: "1px solid rgba(201,168,76,.08)",
             }}>{l.label}</a>
           ))}
+          <button onClick={() => { setMenuOpen(false); onContact(); }} className="gold-btn"
+            style={{ width: "100%", marginTop: 16 }}>{t("nav_book")}</button>
+          <button onClick={() => { setMenuOpen(false); onEnterPortal(); }}
+            style={{
+              width: "100%", marginTop: 10, background: "transparent",
+              border: "1px solid rgba(201,168,76,.30)", color: "#d8c9a6",
+              padding: "12px 0", borderRadius: 999, fontFamily: "inherit",
+              fontSize: 14, fontWeight: 700, cursor: "pointer",
+            }}>{t("nav_portal")}</button>
         </div>
       )}
     </header>
@@ -174,7 +189,7 @@ const PageStyles = () => (
       .dawa-topnav-burger { display: inline-flex !important; }
     }
     @media (max-width: 480px) {
-      .dawa-topnav-cta { display: none !important; }
+      .dawa-topnav-cta, .dawa-topnav-login { display: none !important; }
     }
 
     @media (max-width: 820px) {
@@ -216,27 +231,35 @@ export function LandingPage({ onEnterPortal, t, lang, setLang }) {
     : "مرحباً، أرغب بحجز خدمات دعوة 🌿") + refSuffix;
   const bookWaUrl = buildWhatsAppUrl(contact.whatsapp, bookText);
   // Booking CTA: open WhatsApp when a business number is configured, otherwise
-  // fall back to the portal login (previous behaviour).
+  // fall back to the portal login (previous behaviour). NOTE: the WhatsApp
+  // business number must be set in the admin Communication settings
+  // (/settings/public) — until it is, every "book" CTA silently degrades to the
+  // login screen. The whole WhatsApp-primary funnel depends on that number.
   const onContact = () => {
     if (bookWaUrl) window.open(bookWaUrl, "_blank", "noopener");
     else onEnterPortal();
   };
 
+  // Surface the live demo invitation so a prospect can experience the product
+  // before contacting. Reuses the existing ?demo=1 render path (no real token).
+  const openSample = () => window.open("/d/demo/demo?demo=1", "_blank", "noopener");
+
   return (
     <div style={{ background: C.bg, color: "#fff3c0", overflowX: "hidden", position: "relative" }}>
       <PageStyles />
-      <TopNav t={t} lang={lang} setLang={setLang} onEnterPortal={onEnterPortal} scrolled={scrollY > 60} />
+      <TopNav t={t} lang={lang} setLang={setLang} onEnterPortal={onEnterPortal} onContact={onContact} scrolled={scrollY > 60} />
 
-      <HeroSection t={t} lang={lang} onEnterPortal={onEnterPortal} scrollY={scrollY} />
+      <HeroSection t={t} lang={lang} onEnterPortal={onEnterPortal} onContact={onContact} openSample={openSample} scrollY={scrollY} />
+      <SocialProofSection t={t} />
       <Divider />
       <AboutSection      t={t} lang={lang} />
       <Divider />
       <FeaturesSection   t={t} />
-      <PersonalizationSection t={t} onEnterPortal={onEnterPortal} />
+      <PersonalizationSection t={t} onContact={onContact} />
       <Divider />
       <ServicesSection   t={t} onEnterPortal={onEnterPortal} />
       <ProcessSection    t={t} />
-      <ShowcaseSection   t={t} onEnterPortal={onEnterPortal} />
+      <ShowcaseSection   t={t} openSample={openSample} />
       <PricingSection    t={t} onContact={onContact} />
       <FaqSection        t={t} />
       <CtaSection        t={t} onEnterPortal={onEnterPortal} onContact={onContact} />
@@ -256,10 +279,15 @@ function Divider() {
 }
 
 // ── HERO ────────────────────────────────────────────────────────────────────
-function HeroSection({ t, lang, onEnterPortal, scrollY }) {
+function HeroSection({ t, lang, onEnterPortal, onContact, openSample, scrollY }) {
   const parallax = Math.min(scrollY * 0.25, 80);
   const opacity  = Math.max(0, 1 - scrollY / 600);
   const trustChips = t("trust_chips") || [];
+  const heroTextLink = {
+    background: "transparent", border: "none", color: "#c9a84c",
+    fontFamily: "inherit", fontSize: 13.5, fontWeight: 700, cursor: "pointer",
+    textDecoration: "underline", textUnderlineOffset: 4, padding: 4,
+  };
 
   return (
     <section id="hero" style={{
@@ -337,15 +365,25 @@ function HeroSection({ t, lang, onEnterPortal, scrollY }) {
 
         <div style={{
           display: "flex", gap: 14, flexWrap: "wrap", justifyContent: "center",
-          marginBottom: 56,
+          marginBottom: 22,
           animation: "dawa-hero-rise 1.1s .65s cubic-bezier(.2,.7,.2,1) both",
         }}>
-          <button className="gold-btn" style={{ fontSize: 16, padding: "16px 38px" }} onClick={onEnterPortal}>
-            {t("hero_cta_start")}
+          <button className="gold-btn" style={{ fontSize: 16, padding: "16px 38px" }} onClick={onContact}>
+            {t("hero_cta_book")}
           </button>
           <a href="#how" className="ghost-btn" style={{ textDecoration: "none", display: "inline-flex", alignItems: "center" }}>
             {t("portal_cta_secondary")}
           </a>
+        </div>
+
+        {/* Secondary affordances: experience the product live, or log in (returning clients). */}
+        <div style={{
+          display: "flex", gap: 22, flexWrap: "wrap", justifyContent: "center",
+          marginBottom: 50,
+          animation: "dawa-hero-rise 1.1s .72s cubic-bezier(.2,.7,.2,1) both",
+        }}>
+          <button onClick={openSample} style={heroTextLink}>{t("hero_sample_link")}</button>
+          <button onClick={onEnterPortal} style={heroTextLink}>{t("hero_login_link")}</button>
         </div>
 
         <div style={{
@@ -384,6 +422,43 @@ function HeroSection({ t, lang, onEnterPortal, scrollY }) {
           width: 1, height: 40, display: "block",
           background: "linear-gradient(180deg, #c9a84c 0%, transparent 100%)",
         }} />
+      </div>
+    </section>
+  );
+}
+
+// ── SOCIAL PROOF — testimonial band ─────────────────────────────────────────
+// Content lives in i18n `testimonials`. Kept EMPTY until the owner supplies
+// real, consented customer quotes — we never fabricate social proof. When the
+// array is empty the section renders nothing, so an unfilled band never ships a
+// hollow promise; paste real quotes into the i18n array to switch it on.
+function SocialProofSection({ t }) {
+  const items = t("testimonials") || [];
+  if (!Array.isArray(items) || items.length === 0) return null;
+  return (
+    <section style={{ padding: "100px 24px", maxWidth: 1100, margin: "0 auto" }}>
+      <SectionHead eyebrow={t("social_proof_eyebrow")} title={t("social_proof_title")} />
+      <div className="dawa-reveal" style={{
+        display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 300px), 1fr))",
+        gap: 22,
+      }}>
+        {items.map((q, i) => (
+          <figure key={i} style={{
+            margin: 0, padding: "30px 28px", borderRadius: 20,
+            background: "linear-gradient(180deg, rgba(201,168,76,.06), rgba(201,168,76,.015))",
+            border: "1px solid rgba(201,168,76,.22)",
+            backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)",
+          }}>
+            <div style={{ color: "#f0c84c", fontSize: 16, marginBottom: 12, letterSpacing: 2 }}>★★★★★</div>
+            <blockquote style={{
+              margin: 0, color: "#e8dcc0", fontSize: 15, lineHeight: 1.9,
+              fontFamily: "'Amiri','Frank Ruhl Libre',serif",
+            }}>“{q.quote}”</blockquote>
+            <figcaption style={{ marginTop: 16, color: "#c9a84c", fontSize: 13, fontWeight: 700 }}>
+              {q.name}{q.city ? ` · ${q.city}` : ""}
+            </figcaption>
+          </figure>
+        ))}
       </div>
     </section>
   );
@@ -470,10 +545,10 @@ function AboutSection({ t, lang }) {
 function FeaturesSection({ t }) {
   const [hover, setHover] = useState(null);
   const items = [
-    { icon: "✉",  title: t("feat1_title"), body: t("feat1_body"), bullets: t("feat1_bullets") || [] },
-    { icon: "📱", title: t("feat2_title"), body: t("feat2_body"), bullets: t("feat2_bullets") || [] },
-    { icon: "⏳", title: t("feat3_title"), body: t("feat3_body"), bullets: [] },
-    { icon: "💎", title: t("feat4_title"), body: t("feat4_body"), bullets: [] },
+    { icon: "mail",   title: t("feat1_title"), body: t("feat1_body"), bullets: t("feat1_bullets") || [] },
+    { icon: "mobile", title: t("feat2_title"), body: t("feat2_body"), bullets: t("feat2_bullets") || [] },
+    { icon: "clock",  title: t("feat3_title"), body: t("feat3_body"), bullets: [] },
+    { icon: "gem",    title: t("feat4_title"), body: t("feat4_body"), bullets: [] },
   ];
   return (
     <section style={{ padding: "120px 24px", maxWidth: 1100, margin: "0 auto" }}>
@@ -493,11 +568,11 @@ function FeaturesSection({ t }) {
               cursor: "default",
             }}>
             <div style={{
-              fontSize: 30, color: "#c9a84c", marginBottom: 18,
+              color: "#c9a84c", marginBottom: 18,
               opacity: hover === i ? 1 : 0.8,
               transition: "opacity .3s, transform .5s cubic-bezier(.2,.95,.25,1.1)",
               transform: hover === i ? "translateY(-2px)" : "translateY(0)",
-            }}>{f.icon}</div>
+            }}><Icon name={f.icon} size={32} strokeWidth={1.5} /></div>
             <div style={{
               fontSize: 10.5, color: "#c9a84c", fontWeight: 800,
               letterSpacing: 3, textTransform: "uppercase",
@@ -529,7 +604,7 @@ function FeaturesSection({ t }) {
 }
 
 // ── PERSONALIZATION — "think with me for a minute" narrative section ───────
-function PersonalizationSection({ t, onEnterPortal }) {
+function PersonalizationSection({ t, onContact }) {
   const lines = t("pers_body_full") || [];
   return (
     <section style={{ padding: "120px 24px", maxWidth: 880, margin: "0 auto" }}>
@@ -567,7 +642,7 @@ function PersonalizationSection({ t, onEnterPortal }) {
           })}
         </div>
         <div style={{ textAlign: "center" }}>
-          <button className="gold-btn" onClick={onEnterPortal}>{t("pers_cta")}</button>
+          <button className="gold-btn" onClick={onContact}>{t("pers_cta")}</button>
         </div>
       </div>
     </section>
@@ -601,7 +676,7 @@ function ServicesSection({ t, onEnterPortal }) {
           onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-6px)"; e.currentTarget.style.borderColor = "rgba(201,168,76,.6)"; e.currentTarget.style.boxShadow = "0 28px 60px -22px rgba(0,0,0,.5), 0 0 60px rgba(201,168,76,.18)"; }}
           onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.borderColor = "rgba(201,168,76,.35)"; e.currentTarget.style.boxShadow = "none"; }}
         >
-          <div style={{ fontSize: 44, marginBottom: 16 }}>✉</div>
+          <div style={{ color: "#f0c84c", marginBottom: 16 }}><Icon name="mail" size={44} strokeWidth={1.4} /></div>
           <div style={{ fontSize: 11, color: "#f0c84c", letterSpacing: 3, textTransform: "uppercase", fontWeight: 800, marginBottom: 10 }}>
             {t("delivery_subtitle")}
           </div>
@@ -632,7 +707,7 @@ function ServicesSection({ t, onEnterPortal }) {
           onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-6px)"; e.currentTarget.style.borderColor = "rgba(192,132,252,.7)"; e.currentTarget.style.boxShadow = "0 28px 60px -22px rgba(0,0,0,.5), 0 0 60px rgba(155,75,212,.22)"; }}
           onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.borderColor = "rgba(155,75,212,.45)"; e.currentTarget.style.boxShadow = "none"; }}
         >
-          <div style={{ fontSize: 44, marginBottom: 16 }}>📱</div>
+          <div style={{ color: "#c084fc", marginBottom: 16 }}><Icon name="mobile" size={44} strokeWidth={1.4} /></div>
           <div style={{ fontSize: 11, color: "#c084fc", letterSpacing: 3, textTransform: "uppercase", fontWeight: 800, marginBottom: 10 }}>
             DIGITAL
           </div>
@@ -701,7 +776,7 @@ function ProcessSection({ t }) {
 }
 
 // ── SHOWCASE — phone mockup with mini dashboard preview ────────────────────
-function ShowcaseSection({ t, onEnterPortal }) {
+function ShowcaseSection({ t, openSample }) {
   const bullets = t("showcase_bullets") || [];
   return (
     <section style={{ padding: "140px 24px", maxWidth: 1100, margin: "0 auto" }}>
@@ -832,7 +907,7 @@ function ShowcaseSection({ t, onEnterPortal }) {
               </li>
             ))}
           </ul>
-          <button className="gold-btn" onClick={onEnterPortal}>{t("portal_cta_inline")}</button>
+          <button className="gold-btn" onClick={openSample}>{t("hero_sample_link")}</button>
         </div>
       </div>
     </section>
@@ -859,7 +934,7 @@ function PricingSection({ t, onContact }) {
           onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-6px)"; e.currentTarget.style.borderColor = "rgba(212,168,71,.65)"; e.currentTarget.style.boxShadow = "0 28px 60px -22px rgba(0,0,0,.5), 0 0 60px rgba(184,132,60,.20)"; }}
           onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.borderColor = "rgba(212,168,71,.40)"; e.currentTarget.style.boxShadow = "none"; }}
         >
-          <div style={{ fontSize: 44, marginBottom: 16 }}>✉</div>
+          <div style={{ color: "#e8c485", marginBottom: 16 }}><Icon name="mail" size={44} strokeWidth={1.4} /></div>
           <div style={{ fontSize: 11, color: "#e8c485", letterSpacing: 3, textTransform: "uppercase", fontWeight: 800, marginBottom: 10 }}>LUXURY PRINT</div>
           <h3 style={{ fontFamily: "'Amiri','Frank Ruhl Libre',serif", color: "#ffe8c4", fontWeight: 900, fontSize: 26, marginBottom: 18, lineHeight: 1.4 }}>{t("price_phys1_label")}</h3>
           <div style={{ color: "#e0c8a0", fontSize: 14, lineHeight: 1.85, marginBottom: 20 }}>
@@ -1089,10 +1164,10 @@ function CtaSection({ t, onEnterPortal, onContact }) {
           maxWidth: 600, marginInline: "auto", marginBottom: 38,
         }}>{t("cta_sub")}</p>
         <div style={{ display: "flex", gap: 14, justifyContent: "center", flexWrap: "wrap" }}>
-          <button className="gold-btn" style={{ fontSize: 16, padding: "16px 38px" }} onClick={onEnterPortal}>
-            {t("hero_cta_start")}
+          <button className="gold-btn" style={{ fontSize: 16, padding: "16px 38px" }} onClick={onContact}>
+            {t("hero_cta_book")}
           </button>
-          <button className="ghost-btn" onClick={onContact}>{t("price_contact")}</button>
+          <button className="ghost-btn" onClick={onEnterPortal}>{t("hero_login_link")}</button>
         </div>
       </div>
     </section>
