@@ -15,6 +15,7 @@ import { getCurrentFix } from "../utils/geo.js";
 import { logErr } from "../utils/logger.js";
 import { localizeApiError } from "../utils/apiError.js";
 import { ConsentNotice } from "../components/ConsentNotice.jsx";
+import { Icon } from "../components/icons/Icon.jsx";
 import { C } from "../styles/theme.js";
 
 export function ConfirmationForm({ t, lang, setLang }) {
@@ -131,7 +132,7 @@ export function ConfirmationForm({ t, lang, setLang }) {
               background: "rgba(76,201,122,.08)", border: "1px solid rgba(76,201,122,.3)",
               display: "flex", alignItems: "center", gap: 10,
             }}>
-              <div style={{ fontSize: 18 }}>📍</div>
+              <div style={{ display: "flex", color: "#4cc97a" }}><Icon name="pin" size={18} /></div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 12, fontWeight: 800, color: "#4cc97a" }}>
                   {t("conf_form_location_attached")}
@@ -157,7 +158,7 @@ export function ConfirmationForm({ t, lang, setLang }) {
             </button>
           )}
           {locError && (
-            <div style={{ fontSize: 11, color: C.red, marginBottom: 12, lineHeight: 1.6 }}>⚠ {locError}</div>
+            <div style={{ fontSize: 11, color: C.red, marginBottom: 12, lineHeight: 1.6, display: "flex", alignItems: "center", gap: 6 }}><Icon name="warning" size={13} /> {locError}</div>
           )}
 
           <label htmlFor="conf-city" style={{ display: "block", marginBottom: 6, fontSize: 12, color: C.goldDim }}>{t("conf_form_city")} *</label>

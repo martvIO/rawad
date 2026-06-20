@@ -44,6 +44,29 @@ const PATHS = {
   menu: <path d="M4 7h16M4 12h16M4 17h16" />,
   // Close.
   close: <path d="m6 6 12 12M18 6 6 18" />,
+  // Map pin — location / address.
+  pin: (
+    <>
+      <path d="M12 21s7-6.3 7-11a7 7 0 1 0-14 0c0 4.7 7 11 7 11Z" />
+      <circle cx="12" cy="10" r="2.5" />
+    </>
+  ),
+  // Warning triangle.
+  warning: (
+    <>
+      <path d="M12 3.5 21 19H3z" />
+      <path d="M12 9.5v4" />
+      <path d="M12 16.3v.2" />
+    </>
+  ),
+  // Info circle.
+  info: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 11v5" />
+      <path d="M12 8v.2" />
+    </>
+  ),
 };
 
 export function Icon({ name, size = 24, strokeWidth = 1.6, style, title, ...rest }) {

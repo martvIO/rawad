@@ -9,6 +9,7 @@ import { C } from "../../../styles/theme.js";
 import { useListFilter } from "../../../utils/searchFilter.js";
 import { SearchBar } from "../../../components/SearchBar.jsx";
 import { FilterChips } from "../../../components/FilterChips.jsx";
+import { OnboardingChecklist } from "../../../components/OnboardingChecklist.jsx";
 
 // Module-level constants so useListFilter's memoization holds (stable identity).
 const GUEST_FIELDS = ["name", "area"];
@@ -70,6 +71,21 @@ export function DriverDeliveryList() {
 
   return (
     <>
+          {/* First-run hint — shown to a driver before their first delivery so the
+              GPS-share + photo-proof flow (the highest-confusion moment) is clear. */}
+          {myGuests.length > 0 && fullDone.length === 0 && (
+            <OnboardingChecklist
+              title={lang === "he" ? "איך זה עובד" : "كيف تبدأ"}
+              steps={[
+                { label: lang === "he" ? "שתפו מיקום חי כדי שהחתן יראה אתכם במפה" : "شارك موقعك الحي ليظهر للعريس على الخريطة", done: driverIsSharing },
+                { label: lang === "he" ? "פתחו מוזמן, צלמו תמונת מסירה וסמנו «נמסר»" : "افتح معزوماً، صوّر التسليم واضغط «تم التسليم»", done: false },
+              ]}
+              note={lang === "he"
+                ? "כל מסירה מתועדת בתמונה — היא נשמרת אוטומטית ומופיעה אצל החתן."
+                : "كل تسليم يُوثَّق بصورة — تُحفظ تلقائياً وتظهر للعريس فوراً."}
+            />
+          )}
+
           {/* Progress bar */}
           <div style={{ marginBottom: 22 }}>
             <div style={{ height: 8, background: "rgba(255,255,255,.05)", borderRadius: 4, overflow: "hidden" }}>

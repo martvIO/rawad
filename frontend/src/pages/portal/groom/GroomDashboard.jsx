@@ -9,6 +9,7 @@ import { Num } from "../../../components/Num.jsx";
 import { useListFilter } from "../../../utils/searchFilter.js";
 import { SearchBar } from "../../../components/SearchBar.jsx";
 import { isProofImage } from "../../../utils/mediaUtils.js";
+import { OnboardingChecklist } from "../../../components/OnboardingChecklist.jsx";
 
 // Stable module-level field spec for the recent-deliveries search (see useListFilter).
 const DELIVERIES_FIELDS = ["name", "area"];
@@ -47,6 +48,22 @@ export function GroomDashboard() {
               <div style={{ fontSize: 21, fontWeight: 900, color: C.goldLight, marginBottom: 4 }}>{t("dash_welcome")}</div>
               <div style={{ fontSize: 13, color: C.dim }}>{t("dash_subtitle")}</div>
             </div>
+
+            {/* First-run guidance — shown until the basics are in place so a new
+                groom isn't lost on an empty dashboard (mirrors the digital flow). */}
+            {!(myGuests.length > 0 && stats.delivered > 0 && reply.confirmed > 0) && (
+              <OnboardingChecklist
+                title={lang === "he" ? "מתחילים ב-3 צעדים" : "ابدأ بثلاث خطوات"}
+                steps={[
+                  { label: lang === "he" ? "הוסיפו את רשימת המוזמנים" : "أضف قائمة المدعوين", done: myGuests.length > 0 },
+                  { label: lang === "he" ? "הצוות שלנו מחלק את ההזמנות ומתעד כל מסירה בתמונה" : "فريقنا يوزّع المكاتيب ويوثّق كل تسليم بصورة", done: stats.delivered > 0 },
+                  { label: lang === "he" ? "עקבו אחר אישורי ההגעה" : "تابع تأكيدات الحضور", done: reply.confirmed > 0 },
+                ]}
+                note={lang === "he"
+                  ? "אתם רק מכינים את הרשימה — צוות דעוה מחלק את ההזמנות, מתעד כל מסירה ומעדכן אתכם."
+                  : "أنت فقط تجهّز القائمة — فريق دعوة يتكفّل بالتوزيع وتوثيق كل تسليم وإطلاعك أولاً بأول."}
+              />
+            )}
 
             <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 12, marginBottom: 20 }}>
               {[
