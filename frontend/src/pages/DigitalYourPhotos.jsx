@@ -268,6 +268,7 @@ export function DigitalYourPhotos({ lang, setLang }) {
             <LivenessCapture
               sessionId={session.sessionId}
               region={session.region}
+              lang={lang}
               onComplete={onLivenessComplete}
               onError={(err) => { logErr("liveness", err); setStage("error"); setError(tt(lang, "تعذّر فحص الكاميرا — حاول مجدداً", "בדיקת המצלמה נכשלה — נסה שוב")); }}
               onCancel={() => setStage("consent")}
@@ -347,9 +348,17 @@ const tt = (lang, ar, he) => (lang === "he" ? he : ar);
 
 function Status({ icon, text }) {
   return (
-    <div style={{ textAlign: "center", padding: "60px 20px", color: C.dim }}>
-      <div style={{ fontSize: 56, marginBottom: 14 }}>{icon}</div>
-      <div style={{ fontSize: 13 }}>{text}</div>
+    <div className="gold-card fade-up" style={{
+      textAlign: "center", padding: "44px 24px",
+      maxWidth: 420, margin: "0 auto",
+    }}>
+      <div style={{ fontSize: 48, marginBottom: 18, lineHeight: 1 }}>{icon}</div>
+      <div className="spinner" style={{
+        width: 30, height: 30, borderWidth: 3,
+        borderColor: "rgba(201,168,76,.18)", borderTopColor: C.gold,
+        margin: "0 auto 18px",
+      }} />
+      <div style={{ fontSize: 14, color: C.goldLight, fontWeight: 700, lineHeight: 1.6 }}>{text}</div>
     </div>
   );
 }
