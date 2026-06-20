@@ -10,8 +10,14 @@
 //   WHATSAPP_TOKEN          Meta permanent access token
 //   WHATSAPP_PHONE_ID       WhatsApp Business phone-number ID
 //   WHATSAPP_VERIFY_TOKEN   arbitrary string also entered in the Meta webhook UI
+//   WHATSAPP_APP_SECRET     Meta app secret — verifies inbound webhook POST
+//                           signatures (X-Hub-Signature-256). Optional: until set,
+//                           POST signature checks are skipped (and logged) for
+//                           back-compat; once set, unsigned/forged POSTs are rejected.
 //
 // No SDK dependency: uses the Graph REST API via fetch (mirrors auth.ts/payments).
+import * as crypto from "crypto";
+
 const GRAPH_VERSION = "v21.0";
 
 export function isWhatsAppConfigured(): boolean {
@@ -120,4 +126,36 @@ export function verifyWebhookChallenge(query: Record<string, unknown>): string |
     return challenge;
   }
   return null;
+}
+
+/**
+ * True when WHATSAPP_APP_SECRET is configured, i.e. inbound webhook POSTs should
+ * have their X-Hub-Signature-256 verified. Until the secret is set, the webhook
+ * proceeds without verification (back-compat) — see whatsappWebhook.ts.
+ */
+export function isWebhookSignatureEnforced(): boolean {
+  return !!process.env.WHATSAPP_APP_SECRET;
+}
+
+/**
+ * Verify Meta's `X-Hub-Signature-256` header against the RAW request body using
+ * the Meta app secret (HMAC-SHA256). Returns true only on an exact, timing-safe
+ * match. Call only when isWebhookSignatureEnforced() is true. Exported pure for tests.
+ */
+export function verifyWebhookSignature(
+  rawBody: Buffer | undefined,
+  signatureHeader: string | undefined,
+): boolean {
+  const secret = process.env.WHATSAPP_APP_SECRET;
+  if (!secret || !rawBody || !signatureHeader) return false;
+  const expected = "sha256=" + crypto.createHmac("sha256", secret).update(rawBody).digest("hex");
+  const got = Buffer.from(signatureHeader);
+  const want = Buffer.from(expected);
+  // timingSafeEqual throws on length mismatch — guard first.
+  if (got.length !== want.length) return false;
+  try {
+    return crypto.timingSafeEqual(got, want);
+  } catch {
+    return false;
+  }
 }
