@@ -43,6 +43,8 @@ export function DigitalYourPhotos({ lang, setLang }) {
   const [expiresAt, setExpiresAt] = useState(null);
   const [phone, setPhone] = useState("");
   const [session, setSession] = useState(null); // { sessionId, region }
+  const [confirmDelete, setConfirmDelete] = useState(false); // delete-data modal
+  const [deleting, setDeleting] = useState(false);
 
   const cancelledRef = useRef(false);
   const stageRef = useRef("loading");
@@ -135,19 +137,26 @@ export function DigitalYourPhotos({ lang, setLang }) {
   }
 
   // ── Delete my face data ──────────────────────────────────────────────────
-  const handleDeleteFaceData = async () => {
-    const sure = window.confirm(tt(lang,
-      "سيتم حذف بصمة وجهك المخزّنة نهائياً. متابعة؟",
-      "חתימת הפנים השמורה תימחק לצמיתות. להמשיך?"));
-    if (!sure) return;
+  // Native window.confirm() is silently suppressed inside in-app webviews
+  // (WhatsApp/Instagram), so we gate the erase on an in-app modal instead.
+  const confirmDeleteFaceData = async () => {
+    setDeleting(true);
     try {
       await deleteFaceEnrollment(token);
+      if (cancelledRef.current) return;
       setMatches([]);
+      setConfirmDelete(false);
       setStage("consent");
     } catch (err) {
       logErr("deleteFaceEnrollment", err);
+      if (cancelledRef.current) return;
+      setConfirmDelete(false);
       setStage("error");
-      setError(tt(lang, "فشل حذف البيانات — حاول مجدداً", "מחיקת הנתונים נכשלה — נסה שוב"));
+      setError(err?.status === 429
+        ? tt(lang, "محاولات كثيرة — انتظر قليلاً ثم حاول مجدداً", "יותר מדי ניסיונות — המתן רגע ונסה שוב")
+        : tt(lang, "فشل حذف البيانات — حاول مجدداً", "מחיקת הנתונים נכשלה — נסה שוב"));
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -306,13 +315,13 @@ export function DigitalYourPhotos({ lang, setLang }) {
               </>
             )}
             <div style={{ display: "flex", justifyContent: "center", gap: 10, marginTop: 22, flexWrap: "wrap" }}>
-              <button onClick={() => setStage("consent")} style={{
+              <button onClick={startLiveness} style={{
                 background: "none", border: "1px solid rgba(201,168,76,.4)", color: C.goldLight,
                 borderRadius: 10, padding: "9px 14px", cursor: "pointer", fontSize: 12, fontWeight: 700,
               }}>
-                {tt(lang, "🔄 إعادة المسح", "🔄 סריקה מחדש")}
+                {tt(lang, "📷 إعادة التقاط صورة", "📷 צילום מחדש")}
               </button>
-              <button onClick={handleDeleteFaceData} style={{
+              <button onClick={() => setConfirmDelete(true)} style={{
                 background: "none", border: "1px solid rgba(255,80,80,.35)", color: "#e07070",
                 borderRadius: 10, padding: "9px 14px", cursor: "pointer", fontSize: 12, fontWeight: 700,
               }}>
@@ -339,6 +348,40 @@ export function DigitalYourPhotos({ lang, setLang }) {
           </div>
         )}
       </div>
+
+      {confirmDelete && (
+        <div
+          className="modal-backdrop"
+          onClick={() => { if (!deleting) setConfirmDelete(false); }}
+        >
+          <div className="modal-shell" onClick={(e) => e.stopPropagation()} style={{ textAlign: "center" }}>
+            <div style={{ fontSize: 48, marginBottom: 12 }}>🗑</div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: C.gold, marginBottom: 10 }}>
+              {tt(lang, "حذف بصمة وجهك؟", "למחוק את חתימת הפנים שלך?")}
+            </div>
+            <div style={{ fontSize: 13, color: C.dim, lineHeight: 1.8, marginBottom: 20 }}>
+              {tt(lang,
+                "سيتم حذف بصمة وجهك المخزّنة نهائياً ولن تظهر صورك بعد الآن حتى تعيد المسح. متابعة؟",
+                "חתימת הפנים השמורה תימחק לצמיתות והתמונות שלך לא יוצגו עד שתסרוק מחדש. להמשיך?")}
+            </div>
+            <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
+              <button
+                className="danger-btn"
+                onClick={confirmDeleteFaceData}
+                disabled={deleting}
+                style={{ opacity: deleting ? 0.6 : 1 }}
+              >
+                {deleting
+                  ? <><span className="spinner" style={{ marginInlineEnd: 8 }} />{tt(lang, "جاري الحذف...", "מוחק...")}</>
+                  : tt(lang, "🗑 حذف نهائي", "🗑 מחק לצמיתות")}
+              </button>
+              <button className="ghost-btn" onClick={() => setConfirmDelete(false)} disabled={deleting}>
+                {tt(lang, "إلغاء", "ביטול")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
