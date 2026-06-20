@@ -78,8 +78,16 @@ slices / 4 bars / 4 trend lines mount, revenue/headcount/triage values correct, 
 AR↔HE toggle switches every label. Console errors during the test were unrelated (a fake
 `proofPhotoPath` test value hitting `/proofs/url`).
 
-## Not done / follow-ups
+## Status — SHIPPED (2026-06-19)
 
-- Not yet committed or deployed (built + verified locally only).
+Committed `4ae4ac8` (`feat(admin): analytics command center …`), fast-forwarded onto
+`main` (alongside the parallel session's `7f70c40` digital improvements), pushed, and
+**deployed to production** (`dawa-aa793`) — functions + hosting + Firestore rules, deploy
+clean. Prod smoke-test: landing `200`, `/api/health` ok, `/api/admin/analytics` →
+`401 unauthenticated` (route deployed + admin-gated). Live for any logged-in admin at
+https://dawa-aa793.web.app/portal/admin/analytics — the tab sits first in the admin nav.
+
+## Follow-ups
+
 - Optional future: instrument invite-open tracking to complete the RSVP funnel (sent →
   opened → confirmed) — touches the public `/d/:groomUsername/:token` hot path.

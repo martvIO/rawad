@@ -30,7 +30,7 @@ tags: [project, hub, dawa, wedding-invitations]
 - **People:** [[User Roles]] (Admin · Groom · Driver)
 - **Architecture:** [[REST API Architecture]] · [[Authentication]] · [[Polling and Realtime]] · [[Security Model]] · [[Digital Invitations]]
 - **Reference:** [[API Contracts]] · [[Data Storage Model]] · [[Architecture Decisions]]
-- **Operations:** [[Known Bugs]] · [[Tasks Backlog]] · [[AI Engineering Rules]]
+- **Operations:** [[Admin Analytics]] · [[Known Bugs]] · [[Tasks Backlog]] · [[AI Engineering Rules]]
 
 ## Key facts
 - Firebase project ID: `dawa-aa793` · hosted at `dawa-aa793.web.app`

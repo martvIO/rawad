@@ -13,7 +13,8 @@ password-encryption feature was deliberately left uncommitted for the owner.
 
 Related: [[Dawa]] · [[Product Audit 2026-06-13]] · [[Payments]] ·
 [[WhatsApp Messaging]] · [[Communication Settings]] · [[REST API Architecture]] ·
-[[Security Model]] · [[Digital Invitations]] · [[Known Bugs]] · [[Tasks Backlog]]
+[[Security Model]] · [[Digital Invitations]] · [[Admin Analytics]] ·
+[[Known Bugs]] · [[Tasks Backlog]]
 
 ---
 
@@ -74,6 +75,9 @@ Related: [[Dawa]] · [[Product Audit 2026-06-13]] · [[Payments]] ·
 - **30-day PII auto-deletion** (audit critical): either rewrite the published legal
   policy or deploy a destructive daily deletion cron. Both left for human sign-off;
   consent links added in the meantime. See [[Security Model]].
-- **Server-side "invite opened" analytics** (touches the public hot path).
+- **Server-side "invite opened" analytics** (touches the public hot path) — still
+  deferred, but the broader "no analytics" audit gap is now closed by the
+  [[Admin Analytics]] dashboard (shipped 2026-06-19); only the public-hot-path
+  open-tracking that would complete the RSVP funnel remains.
 - **Ops:** Firebase functions runtime is Node 20 — decommissioned 2026-10-30; bump
   before then.
