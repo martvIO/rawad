@@ -43,4 +43,8 @@ export const RATE = Object.freeze({
   PHOTO_MATCHES_IP_BACKSTOP: perHour(6000),
   /** Photographer face-index backfill per caller (groom/admin). */
   PHOTO_REINDEX_PER_USER: perHour(10),
+  /** Digital-invite "opened" ping — per invite token (handles refreshes). */
+  INVITE_OPEN_PER_TOKEN: perHour(60),
+  /** IP backstop for the open ping — generous for a venue sharing one NAT IP. */
+  INVITE_OPEN_IP_BACKSTOP: perHour(600),
 });

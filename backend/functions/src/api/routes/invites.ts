@@ -27,7 +27,7 @@ import {
   requireAuth,
   requireAdmin,
 } from "../middleware/auth";
-import { ipRateLimit, uidRateLimit } from "../middleware/rateLimit";
+import { ipRateLimit, uidRateLimit, tokenRateLimit } from "../middleware/rateLimit";
 import { isFiniteInRange, normalisePhone } from "../../helpers";
 import { writeAudit } from "../../audit";
 import { MAX_LEN } from "../../constants/limits";
@@ -624,6 +624,56 @@ invitesRouter.post(
       res.json({ ok: true });
     } catch (err) {
       res.status(500).json({ error: "write_failed", detail: errorMessage(err) });
+    }
+  }
+);
+
+// ─── POST /invites/digital/opened ──────────────────────────────────────────────
+// PUBLIC: fire-and-forget "the guest opened their digital invite" ping. Stamps a
+// first-party viewedAt (first open only) + the language they opened in (locale,
+// used to localize the RSVP reminder) on the Firestore guest doc. First-party so
+// it needs no cookie/consent banner, and (unlike the OG-preview function) it is
+// triggered by the real browser, not WhatsApp link-preview crawlers. Best-effort:
+// it never blocks or fails the invite page.
+invitesRouter.post(
+  "/digital/opened",
+  tokenRateLimit(
+    "inviteOpened",
+    RATE.INVITE_OPEN_PER_TOKEN.limit,
+    HOUR_MS,
+    RATE.INVITE_OPEN_IP_BACKSTOP.limit,
+  ),
+  async (req: Request, res: Response) => {
+    const token = (req.body?.token ?? "").toString();
+    const lang = req.body?.lang === "he" ? "he" : "ar";
+    if (!TOKEN_HEX_RE.test(token)) {
+      res.status(400).json({ error: "invalid_token_format" });
+      return;
+    }
+    try {
+      const db = getDatabase();
+      const tokenSnap = await db.ref(`inviteTokens/${token}`).get();
+      if (!tokenSnap.exists()) {
+        res.status(404).json({ error: "token_not_found" });
+        return;
+      }
+      const tk = tokenSnap.val() as TokenRecord;
+      if (tk.guestType !== "digital") {
+        res.status(409).json({ error: "wrong_invite_type" });
+        return;
+      }
+      const fs = getFirestore();
+      const guestRef = fs.doc(`digitalInvitations/${tk.groomUid}/guests/${tk.guestId}`);
+      const snap = await guestRef.get();
+      if (snap.exists) {
+        const patch: Record<string, unknown> = { locale: lang };
+        if (!snap.data()?.viewedAt) patch.viewedAt = Date.now();
+        await guestRef.update(patch);
+      }
+      res.json({ ok: true });
+    } catch (err) {
+      // Analytics signal only — degrade silently, never surface to the guest page.
+      res.json({ ok: false, detail: errorMessage(err) });
     }
   }
 );

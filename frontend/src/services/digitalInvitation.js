@@ -368,6 +368,18 @@ export async function getDigitalInvitationPublic(groomUid) {
 }
 
 /**
+ * Fire-and-forget "guest opened this digital invite" ping. Stamps a first-party
+ * viewedAt (for the open-rate KPI) + the language they opened in (for localized
+ * RSVP reminders). Never throws — analytics must never break the invite page.
+ */
+export function pingDigitalInviteOpened(token, lang) {
+  if (!token) return;
+  try {
+    api.post("/invites/digital/opened", { token, lang }, { skipAuth: true }).catch(() => {});
+  } catch { /* ignore */ }
+}
+
+/**
  * Full removal — clears the entire invitation doc and every file under
  * digitalMedia/{uid}. Server handles both layers atomically.
  */

@@ -40,14 +40,25 @@ export async function purgeWeddingFaces(uid: string): Promise<void> {
     .catch(() => undefined);
 }
 
-/** Resolve a wedding's date (epoch ms) from its default design, or 0. */
+/** Resolve a wedding's effective purge date (epoch ms), or 0 if unknown.
+ *  Falls back to creation-time + 90d for UNDATED weddings so abandoned events
+ *  can't retain biometric data forever (without a date the old code returned 0
+ *  and the wedding was never purged). createdAt+90d vs the 30d cutoff means an
+ *  undated wedding's faces purge ~120 days after it was created. */
 async function weddingDate(fs: Firestore, uid: string, parent: Record<string, unknown>): Promise<number> {
   const direct = Number(parent.weddingDate ?? 0);
   if (direct) return direct;
   const defaultId = parent.defaultDesignId as string | undefined;
-  if (!defaultId) return 0;
-  const d = await fs.doc(`digitalInvitations/${uid}/designs/${defaultId}`).get();
-  return Number(d.exists ? d.data()?.weddingDate ?? 0 : 0);
+  let designCreated = 0;
+  if (defaultId) {
+    const d = await fs.doc(`digitalInvitations/${uid}/designs/${defaultId}`).get();
+    const data = d.exists ? d.data() : undefined;
+    const designWedding = Number(data?.weddingDate ?? 0);
+    if (designWedding) return designWedding;
+    designCreated = Number(data?.createdAt ?? 0);
+  }
+  const created = designCreated || Number(parent.createdAt ?? 0);
+  return created ? created + 90 * DAY_MS : 0;
 }
 
 export const purgeExpiredFaces = onSchedule(

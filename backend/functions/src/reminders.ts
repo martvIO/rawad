@@ -48,6 +48,21 @@ export function guestNeedsReminder(g: {
   );
 }
 
+/** Build the reminder body in the guest's language (Arabic by default), with an
+ *  optional first-name personalization. The guest's `locale` is stamped when
+ *  they open the digital invite (see /invites/digital/opened); absent that, we
+ *  fall back to Arabic — the prior behaviour. */
+export function reminderText(locale: unknown, name?: unknown): string {
+  const lang = locale === "he" ? "he" : "ar";
+  const first = typeof name === "string" ? name.trim().split(/\s+/)[0] : "";
+  if (lang === "he") {
+    const hi = first ? `${first}, ` : "";
+    return `${hi}תזכורת ידידותית 💛 נשמח לאשר את הגעתכם לאירוע שמתקרב — אנא אשרו את ההשתתפות. תודה!`;
+  }
+  const hi = first ? `${first}، ` : "";
+  return `${hi}تذكير ودّي 💛 يسعدنا أن نؤكّد حضوركم لمناسبتنا التي تقترب — نرجو تأكيد الحضور. شكراً لكم.`;
+}
+
 // ─── Scheduled function ─────────────────────────────────────────────────────────
 
 export const sendRsvpReminders = onSchedule(
@@ -74,11 +89,10 @@ export const sendRsvpReminders = onSchedule(
 
       const guests = await inv.ref.collection("guests").where("status", "==", "pending").get();
       for (const g of guests.docs) {
-        const gd = g.data() as { phone?: string; reminderSentAt?: unknown; name?: string };
+        const gd = g.data() as { phone?: string; reminderSentAt?: unknown; name?: string; locale?: string };
         if (!guestNeedsReminder(gd)) continue;
         considered++;
-        const text =
-          "تذكير ودّي 💛 يسعدنا أن نؤكّد حضوركم لمناسبتنا التي تقترب — نرجو تأكيد الحضور. شكراً لكم.";
+        const text = reminderText(gd.locale, gd.name);
         const r = await sendWhatsAppText(gd.phone as string, text);
         if (r.ok) {
           await g.ref.update({ reminderSentAt: now });

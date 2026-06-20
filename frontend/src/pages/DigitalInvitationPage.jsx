@@ -2,10 +2,10 @@
 // (preferring the embedded designSnapshot when present), and delegates
 // rendering to <DigitalInvitationView/>. RSVP submission lives here so the
 // view stays presentational.
-import { useEffect, useState, lazy, Suspense } from "react";
+import { useEffect, useState, useRef, lazy, Suspense } from "react";
 import { useParams, Routes, Route, useSearchParams, useNavigate } from "react-router-dom";
 import { subscribeInviteToken, submitDigitalWish, getApprovedWishes } from "../services/invites.js";
-import { getDigitalInvitationPublic, submitDigitalGuestInvite } from "../services/digitalInvitation.js";
+import { getDigitalInvitationPublic, submitDigitalGuestInvite, pingDigitalInviteOpened } from "../services/digitalInvitation.js";
 import { logErr } from "../utils/logger.js";
 import { DigitalInvitationView } from "../components/digital/DigitalInvitationView.jsx";
 import { C } from "../styles/theme.js";
@@ -102,6 +102,7 @@ function DigitalLandingMain({ lang, setLang }) {
   );
   const [done, setDone] = useState(false);
   const [approvedWishes, setApprovedWishes] = useState([]);
+  const pingedRef = useRef(false);
 
   useEffect(() => {
     if (isDemo) return;
@@ -111,6 +112,16 @@ function DigitalLandingMain({ lang, setLang }) {
     }
     return subscribeInviteToken(token, setTokenRec);
   }, [token, isDemo]);
+
+  // First-party "opened" ping — once per load, when a valid token resolves.
+  // Stamps viewedAt (open-rate KPI) + the language opened in (localized reminder).
+  useEffect(() => {
+    if (isDemo || !token || pingedRef.current) return;
+    if (tokenRec && tokenRec.groomUid) {
+      pingedRef.current = true;
+      pingDigitalInviteOpened(token, lang);
+    }
+  }, [token, isDemo, tokenRec, lang]);
 
   // The groom's APPROVED guestbook wishes (live — shows the same approved
   // messages on every guest's invitation, whatever design they received).

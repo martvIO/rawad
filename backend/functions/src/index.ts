@@ -83,3 +83,7 @@ export { purgeExpiredFaces } from "./faceIndex/purge";
 // bucket (RTDB has no native scheduled export). No-op until BACKUP_BUCKET is
 // configured — see backend/scripts/setup-backups.sh + docs/RUNBOOK.md.
 export { backupRtdb } from "./backupRtdb";
+
+// Daily audit-log retention sweep: deletes /audit entries older than
+// AUDIT_RETENTION_DAYS (default 180) so the append-only log can't grow unbounded.
+export { purgeOldAuditLogs } from "./auditRetention";

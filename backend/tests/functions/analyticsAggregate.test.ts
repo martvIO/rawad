@@ -134,7 +134,8 @@ describe("composeRsvp", () => {
       {},                // 1 head (missing companions)
     ];
     const digitalGuests = [
-      { status: "attending" }, { status: "attending" }, { status: "absent" }, { status: "pending" }, {},
+      { status: "attending", viewedAt: NOW }, { status: "attending", viewedAt: NOW },
+      { status: "absent" }, { status: "pending" }, {},
     ];
     const r = composeRsvp(guests, confirmations, digitalGuests);
     expect(r.invitesSent).toBe(2);
@@ -143,6 +144,8 @@ describe("composeRsvp", () => {
     expect(r.rsvpRatePct).toBe(50); // 1 confirmed of 2 sent
     expect(r.expectedHeadcount).toBe(5); // 3 + 1 + 1
     expect(r.digital).toEqual({ attending: 2, absent: 1, pending: 2 });
+    expect(r.digitalOpened).toBe(2); // 2 of 5 have viewedAt
+    expect(r.digitalOpenRatePct).toBe(40);
   });
 });
 

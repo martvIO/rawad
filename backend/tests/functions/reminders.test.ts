@@ -3,7 +3,7 @@
 // Firestore traversal + WhatsApp send are integration concerns; the decision
 // logic is what must be correct (no double-sends, no nudging answered guests).
 import { describe, it, expect } from "vitest";
-import { daysUntil, dueForReminder, guestNeedsReminder, REMINDER_LEAD_DAYS } from "../../functions/src/reminders";
+import { daysUntil, dueForReminder, guestNeedsReminder, reminderText, REMINDER_LEAD_DAYS } from "../../functions/src/reminders";
 
 const DAY = 24 * 60 * 60 * 1000;
 const NOW = 1_700_000_000_000;
@@ -45,5 +45,20 @@ describe("guestNeedsReminder", () => {
   });
   it("never double-sends (reminderSentAt already set)", () => {
     expect(guestNeedsReminder({ status: "pending", phone: "972500000000", reminderSentAt: 123 })).toBe(false);
+  });
+});
+
+describe("reminderText", () => {
+  it("defaults to Arabic when locale is missing/unknown", () => {
+    expect(reminderText(undefined)).toContain("تذكير");
+    expect(reminderText("xx")).toContain("تذكير");
+  });
+  it("uses Hebrew when locale is he", () => {
+    expect(reminderText("he")).toContain("תזכורת");
+  });
+  it("personalizes with the guest's first name only", () => {
+    expect(reminderText("ar", "أحمد محمد")).toContain("أحمد،");
+    expect(reminderText("ar", "أحمد محمد")).not.toContain("محمد");
+    expect(reminderText("he", "דנה לוי")).toContain("דנה,");
   });
 });

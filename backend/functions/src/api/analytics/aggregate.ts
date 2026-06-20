@@ -9,8 +9,9 @@
 // HONESTY CONSTRAINTS (these reflect what the data model actually records):
 //   - guest.deliveredAt is a localized HH:MM *string*, not a timestamp — so there
 //     is NO delivery time-series; delivery is a current-state count only.
-//   - There is no invite-OPEN tracking — only "sent" (inviteLinkSentAt) and
-//     "confirmed/submitted" (confirmedAt / token.usedAt). No open-rate is produced.
+//   - Digital invite-OPEN is tracked first-party (guest.viewedAt, stamped by
+//     /invites/digital/opened) → digitalOpened/digitalOpenRatePct. Physical
+//     invites still have only "sent" (inviteLinkSentAt) and "confirmed".
 //   - Stripe only records paymentStatus pending|paid (no "failed") — failedCount
 //     is surfaced as 0 rather than fabricated.
 
@@ -194,11 +195,13 @@ export function composeRsvp(guests: AnyRec[], confirmations: AnyRec[], digitalGu
   let expectedHeadcount = 0;
   for (const c of confirmations) expectedHeadcount += 1 + Math.max(0, num(c.companions));
   const digital = { attending: 0, absent: 0, pending: 0 };
+  let digitalOpened = 0;
   for (const dg of digitalGuests) {
     const s = String(dg.status ?? "pending");
     if (s === "attending") digital.attending++;
     else if (s === "absent") digital.absent++;
     else digital.pending++;
+    if (posTs(dg.viewedAt)) digitalOpened++; // first-party open ping (/invites/digital/opened)
   }
   return {
     invitesSent,
@@ -207,6 +210,11 @@ export function composeRsvp(guests: AnyRec[], confirmations: AnyRec[], digitalGu
     rsvpRatePct: invitesSent > 0 ? Math.round((confirmedGuests / invitesSent) * 100) : 0,
     expectedHeadcount,
     digital,
+    // First-party invite-open metric (top of the digital RSVP funnel).
+    digitalOpened,
+    digitalOpenRatePct: digitalGuests.length > 0
+      ? Math.round((digitalOpened / digitalGuests.length) * 100)
+      : 0,
   };
 }
 
