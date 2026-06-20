@@ -7,15 +7,26 @@
 // convenience only — server-side enforcement lives in Cloud Functions
 // (assertAdmin) and RTDB rules; even if a client somehow renders the
 // wrong page, every privileged call will be rejected server-side.
+import { lazy, Suspense } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { PortalProvider, usePortal } from "../../context/PortalContext.jsx";
 import { RoleGuard } from "../../components/RoleGuard.jsx";
 import { BrandLogo } from "../../components/BrandLogo.jsx";
 import { LoginScreen } from "./LoginScreen.jsx";
 import { LogoutPage } from "./LogoutPage.jsx";
-import { AdminPortal } from "./admin/AdminPortal.jsx";
-import { DriverPortal } from "./driver/DriverPortal.jsx";
-import { GroomPortalView } from "./groom/GroomPortalView.jsx";
+
+// Role dashboards are code-split per role: a signed-in user only downloads the
+// bundle for their own role instead of all three. Same lazy() idiom used for
+// AdminAnalytics / DigitalYourPhotos (named export → { default }).
+const AdminPortal = lazy(() =>
+  import("./admin/AdminPortal.jsx").then((m) => ({ default: m.AdminPortal })),
+);
+const DriverPortal = lazy(() =>
+  import("./driver/DriverPortal.jsx").then((m) => ({ default: m.DriverPortal })),
+);
+const GroomPortalView = lazy(() =>
+  import("./groom/GroomPortalView.jsx").then((m) => ({ default: m.GroomPortalView })),
+);
 
 // Branded splash shown while the auth subscription resolves the session.
 // Replaces a blank screen — and prevents a login-flash for active sessions.
@@ -61,17 +72,20 @@ function PortalRouter() {
   }
 
   // Signed in — role-based routing. The index, the now-stale login route,
-  // and any unknown path redirect to the user's role dashboard.
+  // and any unknown path redirect to the user's role dashboard. Suspense covers
+  // the lazy role-dashboard chunk load (reuses the branded auth splash).
   return (
-    <Routes>
-      <Route index           element={<Navigate to={defaultPath} replace />} />
-      <Route path="login"    element={<Navigate to={defaultPath} replace />} />
-      <Route path="logout"   element={<LogoutPage />} />
-      <Route path="admin/*"  element={<RoleGuard roles={["admin"]}  fallback={<Navigate to={defaultPath} replace />}><AdminPortal />     </RoleGuard>} />
-      <Route path="driver/*" element={<RoleGuard roles={["driver"]} fallback={<Navigate to={defaultPath} replace />}><DriverPortal />    </RoleGuard>} />
-      <Route path="groom/*"  element={<RoleGuard roles={["groom"]}  fallback={<Navigate to={defaultPath} replace />}><GroomPortalView /> </RoleGuard>} />
-      <Route path="*"        element={<Navigate to={defaultPath} replace />} />
-    </Routes>
+    <Suspense fallback={<AuthLoadingScreen />}>
+      <Routes>
+        <Route index           element={<Navigate to={defaultPath} replace />} />
+        <Route path="login"    element={<Navigate to={defaultPath} replace />} />
+        <Route path="logout"   element={<LogoutPage />} />
+        <Route path="admin/*"  element={<RoleGuard roles={["admin"]}  fallback={<Navigate to={defaultPath} replace />}><AdminPortal />     </RoleGuard>} />
+        <Route path="driver/*" element={<RoleGuard roles={["driver"]} fallback={<Navigate to={defaultPath} replace />}><DriverPortal />    </RoleGuard>} />
+        <Route path="groom/*"  element={<RoleGuard roles={["groom"]}  fallback={<Navigate to={defaultPath} replace />}><GroomPortalView /> </RoleGuard>} />
+        <Route path="*"        element={<Navigate to={defaultPath} replace />} />
+      </Routes>
+    </Suspense>
   );
 }
 

@@ -1,0 +1,14 @@
+# دعوة (Dawa) — crawl directives.
+#
+# Acquisition is referral / WhatsApp / word-of-mouth, so there is little organic-
+# search surface. We only keep the auth-gated portal and the OG-image endpoint out
+# of search results.
+#
+# NOTE: /d, /invite and /confirm are intentionally NOT disallowed. WhatsApp/Facebook
+# link-preview crawlers fetch those URLs to build the invitation share card, and a
+# Disallow here could suppress that preview. Tokenized links are never linked from a
+# crawlable page, so they won't be indexed regardless. To explicitly de-index a
+# tokenized response, add an `X-Robots-Tag: noindex` header in digitalInvitePreview.
+User-agent: *
+Disallow: /portal
+Disallow: /og/
