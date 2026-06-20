@@ -14,6 +14,8 @@ _(people, places, organizations, products — pages that describe a thing)_
 
 - [[Dawa]] — wedding-invitation management & distribution platform for the Arab/Israeli market (hub page)
 - [[User Roles]] — the three portal roles: Admin, Groom, Driver
+- [[Competitor Landscape]] — first competitor scan; the digital invite is a commodity, the delivery+proof+photo-finder operation is the moat
+- [[Buyer Persona]] — hypothesis persona (organized bride as decider, family as payer); needs validation against real customers
 
 ## Concepts
 
@@ -28,6 +30,7 @@ _(ideas, frameworks, patterns, principles — pages that describe a concept)_
 - [[Face Matching]] — AWS Rekognition engine: guest "your photos" (camera-only Face Liveness → matches → ZIP) + OTP-gated "People" gallery; auto-send photos on publish; Cognito pool wired (us-east-1); consent + 30-day auto-purge
 - [[Optimistic UI Pattern]] — recurring bug class from the polling architecture, and its fix convention
 - [[Inline Styling Convention]] — 100% inline styles + `theme.js` tokens, no CSS framework
+- [[Visual Design System]] — bespoke design foundation: `theme.js` token scales, the inline-SVG Icon set, hover/press utilities, cold-load splash, favicon; + the 2026-06-20 visual-design refinement pass
 - [[Digit Normalization]] — Western ASCII digits everywhere: `numberingSystem: latn` dates, apiClient input scrubbing, DB migration script
 - [[List Search and Filter]] — reusable SearchBar + FilterChips + `useListFilter` on every portal list (12 lists); substring + phone-aware + hamza-insensitive
 - [[Load-Test Dashboard]] — local-only FastAPI+React control panel for the Locust suite; live SSE metrics, always-on LOADTEST-data cleanup (incl. new admin purge endpoint), archived run history + compare
@@ -36,6 +39,7 @@ _(ideas, frameworks, patterns, principles — pages that describe a concept)_
 - [[WhatsApp Messaging]] — WhatsApp Cloud API send + Meta webhook + daily scheduled RSVP reminders
 - [[Communication Settings]] — admin contact channels + public /settings/public + landing WhatsApp CTAs
 - [[Admin Analytics]] — admin operator command center: server-aggregated GET /admin/analytics + recharts page (composition/revenue/operations/rsvp/designs/triage/trends)
+- [[Conversion KPIs]] — North Star (paid weddings/month) + funnel KPIs + weekly cadence; flags the untracked top-of-funnel (WhatsApp-click) gap
 
 ## Sources
 
@@ -54,6 +58,7 @@ _(synthesized answers to questions you've asked, filed back as pages)_
 
 - [[Product Audit 2026-06-13]] — full product/UX/eng audit; biggest gaps: no proactive comms, broken promises (reminders/30-day-deletion), no payments/analytics, operator-scale ceiling
 - [[Audit Remediation 2026]] — implementation of the audit roadmap (Phases 1-13), shipped to production
+- [[CRO and IA Audit 2026-06-20]] — conversion/IA audit + shipped fixes (CTA flip to WhatsApp-primary, sample-invite link, social-proof band, AS-FEATURED removed); flags prod WhatsApp number unset
 ---
 
 *This index is maintained by Claude via `/wiki-brain`. Do not edit by hand unless you know what you're doing.*

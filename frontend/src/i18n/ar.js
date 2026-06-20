@@ -470,8 +470,8 @@ export const ar = {
   nav_portal: "بوابة الدخول",
   landing_eyebrow: "منصة تخدم الأعراس والمناسبات",
   scroll_cue: "اسحب للاكتشاف",
-  trust_chips: ["خدمة 24 ساعة", "تتبع حي", "بزي رسمي"],
-  about_eyebrow: "AS FEATURED",
+  trust_chips: ["تتبّع حيّ للموزّع", "إثبات تسليم بالصور", "باقة صور للضيوف", "خدمة 24 ساعة"],
+  about_eyebrow: "من نحن",
   features_eyebrow: "FEATURES",
   features_title: "تفاصيل تصنع الفرق",
   features_sub: "كل تفصيلة مفكر فيها — من القائمة إلى آخر مكتوب.",
@@ -506,6 +506,15 @@ export const ar = {
   },
   portal_cta_inline: "ابدأ مع دعوة ←",
   portal_cta_secondary: "شاهد كيف يعمل",
+  nav_book: "احجزوا الآن",
+  hero_cta_book: "← احجزوا عبر واتساب",
+  hero_login_link: "عميل حالي؟ تسجيل الدخول",
+  hero_sample_link: "← شاهد نموذجاً حيًّا للدعوة",
+  social_proof_eyebrow: "آراء عملائنا",
+  social_proof_title: "عرسان وثقوا بدعوة",
+  // ⤵ شهادات حقيقية فقط (اسم العميل ومدينته، بعد إذنه). اتركها [] لإخفاء القسم بالكامل.
+  //    مثال لكل عنصر: { quote: "وصلت كل الدعوات بيومين وكل تسليم موثّق بصورة.", name: "أحمد ع.", city: "الناصرة" }
+  testimonials: [],
 
   // ── Terms page ─────────────────────────────────────────────────────
   terms_title: "شروط وأحكام استخدام الموقع",

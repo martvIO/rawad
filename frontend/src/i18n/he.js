@@ -460,8 +460,8 @@ export const he = {
   nav_portal: "כניסה לפורטל",
   landing_eyebrow: "פלטפורמה שמשרתת חתונות ואירועים",
   scroll_cue: "גלול לגלות",
-  trust_chips: ["תוך 24 שעות", "מעקב חי", "במדים רשמיים"],
-  about_eyebrow: "AS FEATURED",
+  trust_chips: ["מעקב חי אחר השליח", "הוכחת מסירה בתמונות", "גלריית תמונות לאורחים", "שירות 24 שעות"],
+  about_eyebrow: "אודות",
   features_eyebrow: "FEATURES",
   features_title: "פרטים שעושים את ההבדל",
   features_sub: "כל פרט נחשב — מהרשימה עד ההזמנה האחרונה.",
@@ -496,6 +496,15 @@ export const he = {
   },
   portal_cta_inline: "התחל עם דעוה ←",
   portal_cta_secondary: "ראה איך זה עובד",
+  nav_book: "הזמינו עכשיו",
+  hero_cta_book: "← הזמנה בוואטסאפ",
+  hero_login_link: "כבר לקוח? התחברות",
+  hero_sample_link: "← צפו בדוגמה חיה של ההזמנה",
+  social_proof_eyebrow: "המלצות לקוחות",
+  social_proof_title: "חתנים שסמכו על דעוה",
+  // ⤵ המלצות אמיתיות בלבד (שם ועיר הלקוח, באישורו). השאירו [] כדי להסתיר את הקטע לגמרי.
+  //    דוגמה לכל פריט: { quote: "כל ההזמנות הגיעו תוך יומיים וכל מסירה מתועדת בתמונה.", name: "אחמד ע.", city: "נצרת" }
+  testimonials: [],
 
   // ── Terms page ─────────────────────────────────────────────────────
   terms_title: "תקנון ותנאי שימוש באתר",
