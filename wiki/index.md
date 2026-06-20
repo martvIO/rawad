@@ -60,6 +60,7 @@ _(synthesized answers to questions you've asked, filed back as pages)_
 - [[Audit Remediation 2026]] — implementation of the audit roadmap (Phases 1-13), shipped to production
 - [[CRO and IA Audit 2026-06-20]] — conversion/IA audit + shipped fixes (CTA flip to WhatsApp-primary, sample-invite link, social-proof band, AS-FEATURED removed); flags prod WhatsApp number unset
 - [[QA Analytics and Ops Hardening 2026-06-20]] — analytics/QA/web-ops audit remediation: shipped DR backups (backupRtdb + setup-backups.sh + RUNBOOK), CI pipeline, cross-browser/device Playwright, Firestore/Storage rules tests (123 pass), axe a11y, handoff docs; GA4/Clarity/monitoring/backup-enablement remain owner-gated
+- [[Five-Domain Audit Implementation 2026-06-20]] — full five-domain web audit (`docs/WEB-AUDIT-2026-06-20.md`) executed + deployed on Node 22: a11y/iOS-zoom, venue-NAT confirm rate-limit, invite-open KPI, localized reminders, audit-log+biometric retention, Sentry (DSN-gated), CI build+gitleaks, onboarding/OG/icons, softened deletion copy + corrected false "secrets-in-history" docs; build/admin-SDK-key alarms verified false
 ---
 
 *This index is maintained by Claude via `/wiki-brain`. Do not edit by hand unless you know what you're doing.*
