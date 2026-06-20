@@ -153,6 +153,31 @@ Expected: only `firebasestorage.googleapis.com` / `storage.googleapis.com` URLs 
 
 ---
 
+## G. Real-device matrix (mobile-first — do before every prod deploy)
+
+Playwright now runs the suite across Chromium/Firefox/WebKit + emulated Pixel 7
+& iPhone 14 (`npx playwright test`). Emulation catches layout/CSS/RTL
+regressions but **cannot** test the camera, Face-Liveness, or GPS, and emulated
+Safari ≠ real iOS Safari. So before each prod deploy, run this short pass on
+**≥1 real iPhone + ≥1 real Android** (your own devices are enough — no paid lab).
+
+Keep it under ~10 minutes. ✅/❌ each; fix before deploying.
+
+| # | Flow | Watch specifically for (mobile/RTL) |
+|---|------|-------------------------------------|
+| 1 | Landing page | RTL layout intact; CTA tappable; no horizontal scroll; fonts render AR + HE |
+| 2 | Login per role (admin/groom/driver) | Keyboard doesn't cover inputs; submit reachable; redirect correct |
+| 3 | Groom adds a guest | PhoneInput accepts Arabic digits; city picker usable one-handed |
+| 4 | Public RSVP `/confirm/:groom` | Form submits in WhatsApp's in-app browser (open the link FROM WhatsApp) |
+| 5 | Digital invite open `/d/:groom/:token` | Renders in WhatsApp in-app browser; OG preview shows; no clipped RTL text |
+| 6 | Driver: photo upload + GPS share | Native camera opens; upload completes on cellular; live pin appears |
+| 7 | Face-finder: camera + Face-Liveness | Front camera + Liveness challenge run on **real** hardware (iOS + Android) |
+
+> The WhatsApp in-app browser (rows 4–5) is where guests actually open links and
+> is the single highest-value real-device check — emulation can't reproduce it.
+
+---
+
 ## F. Common failure modes
 
 | Symptom | Likely cause | Fix |

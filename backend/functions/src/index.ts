@@ -74,3 +74,8 @@ export { reclusterDirtyGalleries } from "./faceIndex/clusterJob";
 // Daily biometric auto-purge: deletes the AWS face collection + Firestore face
 // data ~30 days after the wedding (the privacy commitment shown to guests).
 export { purgeExpiredFaces } from "./faceIndex/purge";
+
+// Daily disaster-recovery snapshot of the Realtime Database to a GCS backup
+// bucket (RTDB has no native scheduled export). No-op until BACKUP_BUCKET is
+// configured — see backend/scripts/setup-backups.sh + docs/RUNBOOK.md.
+export { backupRtdb } from "./backupRtdb";

@@ -23,7 +23,19 @@ export default defineConfig({
     actionTimeout: 8_000,
     navigationTimeout: 20_000,
   },
+  // Dawa is mobile-first and serves a large iOS-Safari (WebKit) share in the
+  // Arab/Israeli market, where RTL + Safari quirks hide bugs Chromium never
+  // shows. Run the full suite across desktop Chromium/Firefox/WebKit AND
+  // emulated mobile viewports. For a fast local loop, target one project:
+  //   npx playwright test --project=chromium
+  // CI runs all of them (block-on-red). Emulation catches layout/CSS/RTL
+  // regressions; real-device checks (docs/SMOKE_TEST.md §G) remain the source
+  // of truth for camera / Face-Liveness / GPS, which can't be emulated.
   projects: [
     { name: "chromium", use: { ...devices["Desktop Chrome"] } },
+    { name: "firefox", use: { ...devices["Desktop Firefox"] } },
+    { name: "webkit", use: { ...devices["Desktop Safari"] } },
+    { name: "mobile-chrome", use: { ...devices["Pixel 7"] } },
+    { name: "mobile-safari", use: { ...devices["iPhone 14"] } },
   ],
 });
