@@ -277,6 +277,29 @@ export const GlobalStyle = () => (
       background: rgba(201,168,76,.12); color: #c9a84c;
     }
 
+    /* ── Generic interactive helpers ───────────────────────────────────── */
+    /* Selectable row for inline dropdowns / menus. Replaces fragile
+       onMouseEnter style-mutation with a real CSS hover + transition, so the
+       feedback is smooth and keyboard-focusable. */
+    .menu-item {
+      width: 100%; padding: 9px 12px; border-radius: 8px;
+      background: transparent; border: none; cursor: pointer; text-align: inherit;
+      color: #f5e6b8; font-size: 13px; font-family: inherit; line-height: 1.5;
+      transition: background .15s ease, color .15s ease;
+    }
+    /* .row variant lays the content out as a space-between flex row. */
+    .menu-item.row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .menu-item:hover, .menu-item.active { background: rgba(201,168,76,.12); }
+    .menu-item:focus-visible {
+      outline: 2px solid rgba(201,168,76,.55); outline-offset: -2px;
+    }
+    /* Press feedback for custom inline buttons that don't use the .*-btn classes. */
+    .tap {
+      transition: transform .12s ease, opacity .15s ease,
+                  background .18s ease, border-color .18s ease;
+    }
+    .tap:active:not(:disabled) { transform: scale(.97); }
+
     /* ── Skeleton shimmer (loading placeholders) ───────────────────────── */
     @keyframes shimmer {
       0%   { background-position: -240px 0; }

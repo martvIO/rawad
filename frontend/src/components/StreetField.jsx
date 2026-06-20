@@ -128,15 +128,8 @@ export function StreetField({ value, onChange, city, lang, t }) {
             </div>
           )}
           {!loading && results.map(r => (
-            <div key={r.place_id} onMouseDown={e => e.preventDefault()}
-                 onClick={() => { onChange(labelFor(r)); setOpen(false); }}
-                 style={{
-                   padding: "9px 12px", borderRadius: 8, cursor: "pointer",
-                   fontSize: 13, color: C.goldLight, lineHeight: 1.5,
-                   transition: "background .15s",
-                 }}
-                 onMouseEnter={e => e.currentTarget.style.background = "rgba(201,168,76,.12)"}
-                 onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+            <div key={r.place_id} className="menu-item" onMouseDown={e => e.preventDefault()}
+                 onClick={() => { onChange(labelFor(r)); setOpen(false); }}>
               <div style={{ fontWeight: 700 }}>🛣 {labelFor(r)}</div>
               {r.type && (
                 <div style={{ fontSize: 10, color: C.dim, marginTop: 2 }}>

@@ -1,7 +1,6 @@
 ﻿// Autocomplete input that picks a city from the local CITIES_DB.
 import { useState, useMemo } from "react";
 import { CITIES_DB } from "../data/cities.js";
-import { C } from "../styles/theme.js";
 
 export function CityField({ value, onChange, lang, t }) {
   const [open, setOpen] = useState(false);
@@ -34,16 +33,8 @@ export function CityField({ value, onChange, lang, t }) {
             const primary = lang === "he" ? c.he : c.ar;
             const secondary = lang === "he" ? c.ar : c.he;
             return (
-              <div key={c.ar} onMouseDown={e => e.preventDefault()}
-                   onClick={() => { onChange(primary); setOpen(false); }}
-                   style={{
-                     padding: "9px 12px", borderRadius: 8, cursor: "pointer",
-                     fontSize: 13, color: C.goldLight, lineHeight: 1.5,
-                     transition: "background .15s",
-                     display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8,
-                   }}
-                   onMouseEnter={e => e.currentTarget.style.background = "rgba(201,168,76,.12)"}
-                   onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+              <div key={c.ar} className="menu-item row" onMouseDown={e => e.preventDefault()}
+                   onClick={() => { onChange(primary); setOpen(false); }}>
                 <span style={{ fontWeight: 700 }}>🏘 {primary}</span>
                 <span style={{ fontSize: 11, color: "#5a5040" }}>{secondary}</span>
               </div>
