@@ -4,7 +4,8 @@
 
 export const GlobalStyle = () => (
   <style>{`
-    @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&family=Amiri:wght@400;700&family=Noto+Naskh+Arabic:wght@400;500;700&family=Heebo:wght@300;400;600;700;900&family=Frank+Ruhl+Libre:wght@400;700;900&display=swap');
+    /* Fonts are loaded via <link> in index.html <head> (preconnect + stylesheet)
+       so they start downloading before this JS-injected stylesheet parses. */
 
     /* ── Reset + base ──────────────────────────────────────────────────── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -145,7 +146,7 @@ export const GlobalStyle = () => (
       display: block; margin-bottom: 6px;
       font-size: 12px; color: #a09070; font-weight: 600;
     }
-    .field-hint { font-size: 11px; color: #7a6a4a; margin-top: 4px; }
+    .field-hint { font-size: 11px; color: #8a7a58; margin-top: 4px; }
     .field-error {
       font-size: 12px; color: #d47a4b; margin-top: 6px;
       animation: shake .25s ease both;
@@ -177,7 +178,7 @@ export const GlobalStyle = () => (
     .nav-tab {
       padding: 7px 15px; border-radius: 10px; font-size: 13px; font-weight: 700;
       cursor: pointer; border: none; background: transparent; font-family: inherit;
-      color: #7a6a4a; text-decoration: none; display: inline-block;
+      color: #8a7a58; text-decoration: none; display: inline-block;
       transition: background .2s, color .2s;
     }
     .nav-tab.active { background: rgba(201,168,76,.15); color: #c9a84c; }
@@ -185,7 +186,7 @@ export const GlobalStyle = () => (
 
     /* ── Utility labels & dividers ─────────────────────────────────────── */
     .section-label {
-      font-size: 11px; color: #7a6a4a; font-weight: 700;
+      font-size: 11px; color: #8a7a58; font-weight: 700;
       letter-spacing: 2px; text-transform: uppercase; margin-bottom: 10px;
     }
     .divider { height: 1px; background: rgba(201,168,76,.1); margin: 28px 0; }

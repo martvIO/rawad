@@ -1,0 +1,14 @@
+{
+  "name": "دعوة",
+  "short_name": "دعوة",
+  "description": "منصة إدارة وتوزيع دعوات الأعراس",
+  "lang": "ar",
+  "dir": "rtl",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#07070a",
+  "theme_color": "#07070a",
+  "icons": [
+    { "src": "/favicon.svg", "type": "image/svg+xml", "sizes": "any", "purpose": "any maskable" }
+  ]
+}
