@@ -37,6 +37,10 @@ export const api = onRequest(
     timeoutSeconds: 3600,
     memory: "512MiB",
     cors: false, // CORS is handled inside the Express app, not by the framework.
+    // Cap concurrency so a traffic spike or polling bug can't fan out to an
+    // unbounded (and unbudgeted) number of instances. Sized well above the
+    // ~20–30 concurrent-weddings ceiling so real load is never throttled.
+    maxInstances: 20,
   },
   expressApp,
 );

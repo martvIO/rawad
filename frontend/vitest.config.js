@@ -13,6 +13,7 @@ export default defineConfig({
             "src/__tests__/utils/**/*.test.{js,ts}",
             "src/__tests__/data/**/*.test.{js,ts}",
             "src/__tests__/services/**/*.test.{js,ts}",
+            "src/__tests__/i18n/**/*.test.{js,ts}",
           ],
           environment: "jsdom",
           testTimeout: 10000,

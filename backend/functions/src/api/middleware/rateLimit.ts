@@ -109,6 +109,39 @@ export function tokenRateLimit(
 }
 
 /**
+ * Throttle a public endpoint by an arbitrary request-derived key (e.g. the
+ * target groomUsername on the confirmation form) with a generous per-IP
+ * backstop. Same rationale as `tokenRateLimit`: a wedding venue NATs all its
+ * guests behind one IP, so an IP-only cap rate-limits the whole party as one
+ * client. Keying by groom gives each wedding its own bucket while the IP
+ * backstop still stops a single source from flooding. Requests with an empty
+ * key fall back to a per-IP bucket.
+ */
+export function keyedRateLimit(
+  prefix: string,
+  keyOf: (req: Request) => string,
+  maxPerKey: number,
+  windowMs: number,
+  ipBackstopMax: number,
+) {
+  return function keyedGate(req: Request, res: Response, next: NextFunction): void {
+    if (IN_EMULATOR) { next(); return; }
+    const ip = resolveClientIp(req);
+    const raw = (keyOf(req) || "").toString();
+    const primaryKey = raw ? `${prefix}:k:${raw}` : `${prefix}:noKey:${ip}`;
+    if (!allow(primaryKey, maxPerKey, windowMs)) {
+      res.status(429).json({ error: "too_many_requests", scope: "key" });
+      return;
+    }
+    if (!allow(`${prefix}:ip:${ip}`, ipBackstopMax, windowMs)) {
+      res.status(429).json({ error: "too_many_requests", scope: "ip" });
+      return;
+    }
+    next();
+  };
+}
+
+/**
  * Resolve the client IP for rate-limit keying.
  *
  * We deliberately rely on Express's `req.ip`, which is derived from

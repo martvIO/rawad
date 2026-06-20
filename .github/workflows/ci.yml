@@ -31,6 +31,25 @@ jobs:
       - name: Frontend + backend unit tests
         run: npm run test:unit
 
+  # Production build gate — catches Vite/tsc breakage before a manual deploy.
+  # (The e2e job builds Functions but never the frontend bundle.)
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install deps
+        run: |
+          npm install --no-audit --no-fund
+          npm install --no-audit --no-fund --prefix frontend
+          npm install --no-audit --no-fund --prefix backend/functions
+      - name: Build frontend bundle
+        run: npm run build
+      - name: Build Cloud Functions
+        run: node backend/scripts/build-functions.cjs
+
   # RTDB + (new) Firestore/Storage security-rules tests — needs the Java
   # emulators. firebase emulators:exec starts and tears the DB emulator down.
   integration:
@@ -92,3 +111,17 @@ jobs:
           name: playwright-report
           path: frontend/playwright-report/
           retention-days: 14
+
+  # Secrets scan — prevents a credential from ever being committed. The repo is
+  # currently clean (the admin-SDK key + functions/.env are gitignored and were
+  # never committed); this keeps it that way on every PR/push.
+  gitleaks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

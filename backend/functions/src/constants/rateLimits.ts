@@ -12,8 +12,11 @@ const perHour = (limit: number): RateLimitPolicy =>
   Object.freeze({ limit, windowMs: HOUR_MS });
 
 export const RATE = Object.freeze({
-  /** Guest confirmation form — anonymous public endpoint. */
-  CONFIRM_PER_IP: perHour(5),
+  /** Guest confirmation form — anonymous public endpoint. Keyed per-groom so a
+   *  venue full of guests sharing one NAT IP isn't throttled as a single client. */
+  CONFIRM_PER_GROOM: perHour(600),
+  /** IP backstop for the confirmation form (one venue ≈ one wedding ≈ one IP). */
+  CONFIRM_IP_BACKSTOP: perHour(600),
   /** Phone-OTP password reset (per phone number). */
   RESET_PER_PHONE: perHour(5),
   /** Admin actions against the user CRUD endpoints. */

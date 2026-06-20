@@ -31,7 +31,10 @@ import { writeAudit } from "../../audit";
 const STRIPE_API = "https://api.stripe.com/v1";
 // Display/charge amounts per plan, in ILS. (Later: move to adminSettings so the
 // operator can change prices without a deploy — audit item 13.)
-const PLAN_AMOUNTS_ILS: Record<string, number> = { premium: 2500, vip: 3500 };
+// Exported so a drift test asserts these stay in sync with the marketing/admin
+// price strings in frontend i18n (price_pkg*_price, admin_pay_*) — changing a
+// price here should fail that test and prompt updating every source.
+export const PLAN_AMOUNTS_ILS: Record<string, number> = { premium: 2500, vip: 3500 };
 const VALID_PLANS = new Set(Object.keys(PLAN_AMOUNTS_ILS));
 const CURRENCY = "ils";
 // Reject webhook events whose timestamp is older than this (replay protection).

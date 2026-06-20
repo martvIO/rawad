@@ -21,7 +21,7 @@
 import { Router, Response } from "express";
 import { getDatabase } from "firebase-admin/database";
 import { AuthRequest, requireAuth, requireAdmin } from "../middleware/auth";
-import { ipRateLimit, uidRateLimit } from "../middleware/rateLimit";
+import { uidRateLimit, keyedRateLimit } from "../middleware/rateLimit";
 import {
   isUsername,
   normalisePhone,
@@ -50,7 +50,8 @@ const MAX_LNG = 180;
 const MIN_ACCURACY_M = 0;
 const MAX_ACCURACY_M = 100_000;
 
-const SUBMIT_MAX_PER_HOUR = RATE.CONFIRM_PER_IP.limit;
+const CONFIRM_PER_GROOM = RATE.CONFIRM_PER_GROOM.limit;
+const CONFIRM_IP_BACKSTOP = RATE.CONFIRM_IP_BACKSTOP.limit;
 const ATTACH_MAX_PER_HOUR = RATE.ATTACH_LOC_PER_ADMIN.limit;
 
 const MIN_NAME_WORDS = 2;
@@ -158,7 +159,15 @@ confirmationsRouter.patch(
  */
 confirmationsRouter.post(
   "/",
-  ipRateLimit("confirm", SUBMIT_MAX_PER_HOUR, HOUR_MS),
+  // Key by target groom (not IP): a wedding venue NATs hundreds of guests behind
+  // one IP, so an IP-only cap would 429 the party after the 5th confirmation.
+  keyedRateLimit(
+    "confirm",
+    (req) => (req.body?.groomUsername ?? "").toString().trim().toLowerCase(),
+    CONFIRM_PER_GROOM,
+    HOUR_MS,
+    CONFIRM_IP_BACKSTOP,
+  ),
   async (req, res) => {
     const parsed = parseSubmitBody(req.body);
     if (!parsed.ok) {
@@ -614,16 +623,5 @@ interface ConfirmationRecord extends Record<string, unknown> {
   id: string;
 }
 
-/**
- * Best-effort error-to-string conversion for JSON error responses.
- * Never returns a stack trace; we only surface the human-readable text.
- */
-function errorMessage(err: unknown): string | undefined {
-  // Public/admin 5xx responses must not echo raw error text in production — it
-  // can leak Firestore paths / GCS bucket names. Suppressed by default; set
-  // DAWA_DEBUG_ERRORS=1 (e.g. functions/.env.local) to see detail locally.
-  if (process.env.DAWA_DEBUG_ERRORS !== "1") return undefined;
-  if (err instanceof Error) return err.message;
-  if (typeof err === "string") return err;
-  return "unknown";
-}
+// errorMessage (suppress-by-default 5xx detail) is now shared — see ../errorDetail.
+import { errorMessage } from "../errorDetail";
