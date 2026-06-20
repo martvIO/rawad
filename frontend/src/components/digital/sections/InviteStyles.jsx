@@ -147,7 +147,7 @@ function ViewStyles({ theme, fixed }) {
     .dawa-inv .dawa-inv-field label { display: block; font-style: italic; font-size: 11px; letter-spacing: 2.8px; text-transform: uppercase; margin-bottom: 12px; opacity: .9; }
     .dawa-inv .dawa-inv-toggle { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; border-bottom: 1px solid; padding-bottom: 16px; }
     .dawa-inv .dawa-inv-toggle-btn { border: 1px solid; background: transparent; cursor: pointer; padding: 12px 14px; border-radius: 999px; font-weight: 700; font-size: 14px; transition: all .35s cubic-bezier(.2,.95,.25,1.1); }
-    .dawa-inv .dawa-inv-input { width: 100%; padding: 12px 0; background: transparent; border: none; border-bottom: 1px solid; border-radius: 0; font-size: 15px; outline: none; transition: border-color .25s; }
+    .dawa-inv .dawa-inv-input { width: 100%; padding: 12px 0; background: transparent; border: none; border-bottom: 1px solid; border-radius: 0; font-size: 16px; outline: none; transition: border-color .25s; }
     .dawa-inv .dawa-inv-input::placeholder { opacity: .4; }
     .dawa-inv .dawa-inv-textarea { resize: none; line-height: 1.6; min-height: 70px; }
     .dawa-inv .dawa-inv-chips { display: flex; gap: 8px; flex-wrap: wrap; }

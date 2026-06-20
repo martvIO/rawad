@@ -33,6 +33,17 @@ export const GlobalStyle = () => (
     }
     a { text-decoration: none; color: inherit; }
     ul { list-style: none; }
+    #main-content:focus { outline: none; }
+
+    /* Skip-to-content link — off-screen until keyboard-focused. */
+    .skip-link {
+      position: absolute; inset-inline-start: 12px; top: -48px;
+      z-index: 2000; background: #c9a84c; color: #07070a;
+      padding: 8px 16px; border-radius: 0 0 10px 10px;
+      font-weight: 800; font-size: 14px;
+      transition: top .18s ease;
+    }
+    .skip-link:focus { top: 0; }
 
     /* Better text selection contrast on the dark theme. */
     ::selection { background: rgba(201,168,76,.30); color: #fff; }
@@ -117,7 +128,8 @@ export const GlobalStyle = () => (
       background: rgba(255,255,255,.04);
       border: 1px solid rgba(255,255,255,.10);
       border-radius: 12px; padding: 12px 16px; color: #f5e6b8;
-      font-size: 14px; width: 100%; outline: none; font-family: inherit;
+      /* 16px keeps iOS Safari from auto-zooming on focus (sub-16px inputs zoom) */
+      font-size: 16px; width: 100%; outline: none; font-family: inherit;
       transition: border-color .2s, box-shadow .2s, background .2s;
     }
     .input-field::placeholder { color: rgba(245,230,184,.34); }
@@ -244,7 +256,8 @@ export const GlobalStyle = () => (
     .phone-input-native {
       flex: 1; min-width: 0;
       background: transparent; border: none; outline: none;
-      color: #f5e6b8; font-size: 15px; font-weight: 600;
+      /* 16px avoids iOS focus auto-zoom */
+      color: #f5e6b8; font-size: 16px; font-weight: 600;
       padding: 12px 14px; font-family: inherit;
       direction: ltr; text-align: left;
       letter-spacing: .5px; font-variant-numeric: tabular-nums;

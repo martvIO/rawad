@@ -79,8 +79,8 @@ export function ConfirmationForm({ t, lang, setLang }) {
   if (done) {
     return (
       <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
-        <div style={{ maxWidth: 460, width: "100%", textAlign: "center" }}>
-          <div style={{ fontSize: 64, marginBottom: 16 }}>🎉</div>
+        <div role="status" aria-live="polite" style={{ maxWidth: 460, width: "100%", textAlign: "center" }}>
+          <div style={{ fontSize: 64, marginBottom: 16 }} aria-hidden>🎉</div>
           <h1 data-testid="conf-thanks-title" style={{ fontFamily: "'Amiri','Frank Ruhl Libre',serif", color: "#4cc97a", fontSize: 28, marginBottom: 12 }}>
             {t("conf_form_thanks_title")}
           </h1>
@@ -112,14 +112,15 @@ export function ConfirmationForm({ t, lang, setLang }) {
         </div>
 
         <div className="gold-card">
-          <div style={{ marginBottom: 6, fontSize: 12, color: C.goldDim }}>{t("conf_form_full_name")} *</div>
-          <input data-testid="field-conf-name" className="input-field" type="text" placeholder={t("example_name")}
+          <label htmlFor="conf-name" style={{ display: "block", marginBottom: 6, fontSize: 12, color: C.goldDim }}>{t("conf_form_full_name")} *</label>
+          <input id="conf-name" data-testid="field-conf-name" className="input-field" type="text" placeholder={t("example_name")}
+                 autoComplete="name"
                  value={name} onChange={e => setName(e.target.value)}
                  style={{ marginBottom: 14 }}/>
 
-          <div style={{ marginBottom: 6, fontSize: 12, color: C.goldDim }}>{t("conf_form_phone")} *</div>
+          <label htmlFor="conf-phone" style={{ display: "block", marginBottom: 6, fontSize: 12, color: C.goldDim }}>{t("conf_form_phone")} *</label>
           <div style={{ marginBottom: 14 }}>
-            <PhoneInput value={phone} onChange={setPhone} t={t} lang={lang} />
+            <PhoneInput value={phone} onChange={setPhone} t={t} lang={lang} inputId="conf-phone" />
           </div>
 
           {/* Share-location block. Optional — guests who decline still submit
@@ -159,26 +160,29 @@ export function ConfirmationForm({ t, lang, setLang }) {
             <div style={{ fontSize: 11, color: C.red, marginBottom: 12, lineHeight: 1.6 }}>⚠ {locError}</div>
           )}
 
-          <div style={{ marginBottom: 6, fontSize: 12, color: C.goldDim }}>{t("conf_form_city")} *</div>
+          <label htmlFor="conf-city" style={{ display: "block", marginBottom: 6, fontSize: 12, color: C.goldDim }}>{t("conf_form_city")} *</label>
           <div style={{ marginBottom: 14 }}>
-            <CityField value={city} onChange={setCity} lang={lang} t={t}/>
+            <CityField value={city} onChange={setCity} lang={lang} t={t} inputId="conf-city"/>
           </div>
 
-          <div style={{ marginBottom: 6, fontSize: 12, color: C.goldDim }}>{t("conf_form_street")}</div>
-          <input data-testid="field-conf-street" className="input-field" type="text"
+          <label htmlFor="conf-street" style={{ display: "block", marginBottom: 6, fontSize: 12, color: C.goldDim }}>{t("conf_form_street")}</label>
+          <input id="conf-street" data-testid="field-conf-street" className="input-field" type="text"
+                 autoComplete="address-line1"
                  value={street} onChange={e => setStreet(e.target.value)}
                  style={{ marginBottom: 14 }}/>
 
-          <div style={{ marginBottom: 6, fontSize: 12, color: C.goldDim }}>{t("conf_form_house_number")}</div>
-          <input data-testid="field-conf-house" className="input-field" type="text" placeholder="86"
+          <label htmlFor="conf-house" style={{ display: "block", marginBottom: 6, fontSize: 12, color: C.goldDim }}>{t("conf_form_house_number")}</label>
+          <input id="conf-house" data-testid="field-conf-house" className="input-field" type="text" placeholder="86"
                  value={house} onChange={e => setHouse(e.target.value)}
                  style={{ marginBottom: 14, direction: "ltr", textAlign: "right" }}/>
 
-          <div style={{ marginBottom: 6, fontSize: 12, color: C.goldDim }}>{t("conf_form_companions")}</div>
-          <CompanionsStepper value={partySize} onChange={setPartySize} />
+          <div id="conf-companions-label" style={{ marginBottom: 6, fontSize: 12, color: C.goldDim }}>{t("conf_form_companions")}</div>
+          <div role="group" aria-labelledby="conf-companions-label">
+            <CompanionsStepper value={partySize} onChange={setPartySize} />
+          </div>
 
           {error && (
-            <div data-testid="alert-conf-error" style={{ color: C.red, fontSize: 12, marginBottom: 12, textAlign: "center" }}>{error}</div>
+            <div data-testid="alert-conf-error" role="alert" aria-live="assertive" style={{ color: C.red, fontSize: 12, marginBottom: 12, textAlign: "center" }}>{error}</div>
           )}
 
           <button data-testid="btn-conf-submit" className="gold-btn" style={{ width: "100%" }} onClick={submit}

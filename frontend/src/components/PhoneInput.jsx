@@ -76,6 +76,7 @@ export function PhoneInput({
   autoFocus = false,
   disabled = false,
   hasError = false,
+  inputId,
 }) {
   const [country, setCountry]       = useState(defaultCountry);
   const [display, setDisplay]       = useState("");
@@ -186,6 +187,7 @@ export function PhoneInput({
 
         <input
           ref={inputRef}
+          id={inputId}
           type="tel"
           inputMode="numeric"
           autoComplete="tel-national"

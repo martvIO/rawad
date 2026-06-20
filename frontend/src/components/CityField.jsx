@@ -2,7 +2,7 @@
 import { useState, useMemo } from "react";
 import { CITIES_DB } from "../data/cities.js";
 
-export function CityField({ value, onChange, lang, t }) {
+export function CityField({ value, onChange, lang, t, inputId }) {
   const [open, setOpen] = useState(false);
   const matches = useMemo(() => {
     const q = (value || "").trim().toLowerCase();
@@ -16,7 +16,7 @@ export function CityField({ value, onChange, lang, t }) {
 
   return (
     <div style={{ position: "relative" }}>
-      <input data-testid="field-city" className="input-field" type="text" placeholder={t("addr_city_placeholder")}
+      <input data-testid="field-city" id={inputId} className="input-field" type="text" placeholder={t("addr_city_placeholder")}
              value={value}
              onChange={e => { onChange(e.target.value); setOpen(true); }}
              onFocus={() => setOpen(true)}

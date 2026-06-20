@@ -59,6 +59,9 @@ const MAX_BACKOFF_EXP = 10;
  * @param {Object} [opts]
  * @param {number} [opts.intervalMs=15000]  poll interval in milliseconds
  * @param {(err: Error) => void} [opts.onError]  called on non-401 network errors
+ * @param {boolean} [opts.pauseWhenHidden=false]  stop polling while the tab is
+ *        backgrounded (document.visibilityState === "hidden"); resume on focus.
+ *        Halves invocations for non-urgent reads when guests background the tab.
  * @returns {() => void}  unsubscribe handle
  */
 export function createPoller(fetchFn, callback, opts) {
@@ -70,13 +73,20 @@ export function createPoller(fetchFn, callback, opts) {
   }
   const intervalMs = Math.max(MIN_INTERVAL_MS, opts?.intervalMs ?? DEFAULT_INTERVAL_MS);
   const onError = opts?.onError ?? null;
+  const pauseWhenHidden = opts?.pauseWhenHidden ?? false;
 
   let stopped = false;
   let timer = null;
   let consecutiveErrors = 0;
 
+  const isHidden = () =>
+    pauseWhenHidden && typeof document !== "undefined" && document.visibilityState === "hidden";
+
   const tick = async () => {
     if (stopped) return;
+    // While backgrounded, skip the fetch and don't reschedule — the
+    // visibilitychange listener resumes the loop when the tab is shown again.
+    if (isHidden()) { timer = null; return; }
     try {
       const value = await fetchFn();
       consecutiveErrors = 0;
@@ -93,7 +103,7 @@ export function createPoller(fetchFn, callback, opts) {
       if (onError && !stopped) onError(err);
       // Other errors: swallow and let the next tick retry, with backoff.
     } finally {
-      if (!stopped) {
+      if (!stopped && !isHidden()) {
         // First error retries at the normal interval — single transient
         // failures shouldn't cause perceptible UI lag. Backoff only kicks in
         // on the SECOND consecutive failure: 2×, 4×, 8× … capped at MAX.
@@ -106,12 +116,23 @@ export function createPoller(fetchFn, callback, opts) {
     }
   };
 
+  // Resume polling the moment the tab is foregrounded again (if paused).
+  const onVisibility = () => {
+    if (!stopped && !timer && document.visibilityState === "visible") tick();
+  };
+  if (pauseWhenHidden && typeof document !== "undefined") {
+    document.addEventListener("visibilitychange", onVisibility);
+  }
+
   // Fire once synchronously (on the microtask queue) so the first paint
   // doesn't wait the full interval for initial data.
   tick();
 
   return function unsubscribe() {
     stopped = true;
+    if (pauseWhenHidden && typeof document !== "undefined") {
+      document.removeEventListener("visibilitychange", onVisibility);
+    }
     if (timer) {
       clearTimeout(timer);
       timer = null;

@@ -220,8 +220,11 @@ export function LandingPage({ onEnterPortal, t, lang, setLang }) {
   // Referral source (e.g. ?ref=invite from a "made with Dawa" credit) — folded
   // into the WhatsApp booking message so the operator sees where the lead came from.
   const ref = (() => {
-    try { return new URLSearchParams(window.location.search).get("ref") || ""; }
-    catch { return ""; }
+    try {
+      const raw = new URLSearchParams(window.location.search).get("ref") || "";
+      // Whitelist to a short slug so a junk/long ?ref can't pollute the prefilled message.
+      return raw.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 24);
+    } catch { return ""; }
   })();
   const refSuffix = ref
     ? (lang === "he" ? ` (הגעתי דרך: ${ref})` : ` (وصلت عبر: ${ref})`)

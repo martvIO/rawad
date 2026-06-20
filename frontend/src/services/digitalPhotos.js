@@ -33,6 +33,9 @@ export function subscribeFaceMatches(token, cb, onErr) {
   return createPoller(() => fetchFaceMatches(token), cb, {
     intervalMs: POLL_MS.DIGITAL,
     onError: onErr,
+    // Venue guests background this tab constantly — don't keep polling Functions
+    // while it's hidden; resume on focus.
+    pauseWhenHidden: true,
   });
 }
 

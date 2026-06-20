@@ -54,17 +54,21 @@ export default function App() {
   return (
     <>
       <GlobalStyle />
-      <Routes>
-        <Route path="/" element={<LandingPage onEnterPortal={() => navigate("/portal")} {...langProps} />} />
-        <Route path="/terms" element={<TermsPage {...langProps} />} />
-        <Route path="/confirm/:groomUsername" element={<ConfirmationForm {...langProps} />} />
-        <Route path="/invite/digital/:token" element={<DigitalInviteForm {...langProps} />} />
-        <Route path="/invite/:token" element={<InviteForm {...langProps} />} />
-        <Route path="/d/:groomUsername/:token/*" element={<DigitalInvitationPage {...langProps} />} />
-        <Route path="/g/:groomUsername/*" element={<PeopleGallery {...langProps} />} />
-        <Route path="/portal/*" element={<Portal onBack={onBack} {...langProps} />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+      {/* Keyboard skip-link — first focusable element, visible only on focus */}
+      <a href="#main-content" className="skip-link">{t("skip_to_content")}</a>
+      <main id="main-content" tabIndex={-1}>
+        <Routes>
+          <Route path="/" element={<LandingPage onEnterPortal={() => navigate("/portal")} {...langProps} />} />
+          <Route path="/terms" element={<TermsPage {...langProps} />} />
+          <Route path="/confirm/:groomUsername" element={<ConfirmationForm {...langProps} />} />
+          <Route path="/invite/digital/:token" element={<DigitalInviteForm {...langProps} />} />
+          <Route path="/invite/:token" element={<InviteForm {...langProps} />} />
+          <Route path="/d/:groomUsername/:token/*" element={<DigitalInvitationPage {...langProps} />} />
+          <Route path="/g/:groomUsername/*" element={<PeopleGallery {...langProps} />} />
+          <Route path="/portal/*" element={<Portal onBack={onBack} {...langProps} />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </main>
     </>
   );
 }
