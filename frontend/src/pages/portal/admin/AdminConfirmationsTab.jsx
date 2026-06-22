@@ -10,6 +10,7 @@ import { MATCH_STATUS } from "../../../constants/matchStatuses.js";
 import { useListFilter } from "../../../utils/searchFilter.js";
 import { SearchBar } from "../../../components/SearchBar.jsx";
 import { FilterChips } from "../../../components/FilterChips.jsx";
+import { SkeletonList } from "../../../components/Skeleton.jsx";
 
 // Search field specs + chip status mapping — MODULE LEVEL for stable identity so
 // useListFilter's memos hold. statusOf reads a `_matchKey` we stamp onto each
@@ -20,7 +21,7 @@ const confStatusOf = (c) => c?._matchKey ?? null;
 
 export function AdminConfirmationsTab() {
   const {
-    confirmations, matchColor, matchedGuestFor,
+    confirmations, confirmationsLoading, matchColor, matchedGuestFor,
     confirmationReasons, useConfirmationData, setEditingConf,
     users, adminSelectedGroom, setAdminSelectedGroom, digitalGuestsForSelectedGroom,
     t, lang,
@@ -255,6 +256,8 @@ export function AdminConfirmationsTab() {
         <div className="card" style={{ textAlign: "center", padding: 32, color: C.dim }}>
           {lang === "he" ? "בחר חתן כדי להציג את אישוריו" : "اختر عريساً لعرض تأكيداته"}
         </div>
+      ) : confirmationsLoading && confirmations.length === 0 ? (
+        <SkeletonList variant="row" count={4} />
       ) : (groomConfirmations.length + declined.length === 0) ? (
         <div className="card" style={{ textAlign: "center", padding: 32, color: C.dim }}>
           {t("admin_conf_empty")}

@@ -157,15 +157,23 @@ export function usePortalState({ onBack, t, lang, setLang }) {
       return applyDeliveredOverlay(list);
     });
   }, [applyDeliveredOverlay]);
+  // True until the first guest poll lands, so list screens can show a skeleton
+  // instead of an empty state while loading (the array starts []).
+  const [guestsLoading, setGuestsLoading] = useState(true);
+  const onGuestsData = useCallback((list) => {
+    setGuestsWithOverlay(list);
+    setGuestsLoading(false);
+  }, [setGuestsWithOverlay]);
   useEffect(() => {
-    if (!authed) { setGuests([]); return; }
-    if (isAdmin)                                 return subscribeAllGuests(setGuestsWithOverlay);
+    if (!authed) { setGuests([]); setGuestsLoading(false); return; }
+    setGuestsLoading(true);
+    if (isAdmin)                                 return subscribeAllGuests(onGuestsData);
     if (userType === ROLES.DRIVER && driverServingGroomUid)
-      return subscribeGuestsForGroom(driverServingGroomUid, setGuestsWithOverlay);
+      return subscribeGuestsForGroom(driverServingGroomUid, onGuestsData);
     if (userType === ROLES.GROOM && currentUid)
-      return subscribeGuestsForGroom(currentUid, setGuestsWithOverlay);
-    setGuests([]);
-  }, [authed, isAdmin, userType, currentUid, driverServingGroomUid, setGuestsWithOverlay]);
+      return subscribeGuestsForGroom(currentUid, onGuestsData);
+    setGuests([]); setGuestsLoading(false);
+  }, [authed, isAdmin, userType, currentUid, driverServingGroomUid, onGuestsData]);
 
   // ── قائمة الـ UIDs المُسنَدة للمرسل (من JWT claim assignedGrooms) ────────────
   // تُستخدم في البلدات المشتركة لمعرفة أي عرسان يمكنه قراءة معازيمهم.
@@ -219,7 +227,7 @@ export function usePortalState({ onBack, t, lang, setLang }) {
 
   // ── Confirmations domain (admin-only) ───────────────────────────────────────
   const {
-    confirmations, editingConf, setEditingConf,
+    confirmations, confirmationsLoading, editingConf, setEditingConf,
     matchedGuestFor, matchColor, confirmationReasons,
     useConfirmationData, saveConfirmationEdit, attachConfirmationToGuest,
     guestConfirmationStatus,
@@ -533,7 +541,7 @@ export function usePortalState({ onBack, t, lang, setLang }) {
     toast, showToast,
 
     // guests
-    guests: decoratedGuests, myGuests: decoratedGuests, activeGroomUsername, stats,
+    guests: decoratedGuests, myGuests: decoratedGuests, guestsLoading, activeGroomUsername, stats,
     addGuest, removeGuest,
     gName, setGName, gPhone, setGPhone, gArea, setGArea, gType, setGType,
     editingGuest, startEdit, cancelEdit, saveEdit,
@@ -563,7 +571,7 @@ export function usePortalState({ onBack, t, lang, setLang }) {
     adminDigitalBaseUrl, setAdminDigitalBaseUrl,
     adminDigitalMessage, setAdminDigitalMessage,
     contact, setContactField,
-    confirmations, editingConf, setEditingConf,
+    confirmations, confirmationsLoading, editingConf, setEditingConf,
     sendWaToOne, sendWaToAll,
     matchedGuestFor, matchColor, useConfirmationData, guestConfirmationStatus,
     confirmationReasons, saveConfirmationEdit, attachConfirmationToGuest,

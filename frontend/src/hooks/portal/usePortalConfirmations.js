@@ -18,9 +18,16 @@ import { classifyAll, normalizePhoneForMatching } from "../../utils/matchUtils.j
 export function usePortalConfirmations({ isAdmin, guests, t, showToast }) {
   // Confirmations (admin-only subscription)
   const [confirmations, setConfirmations] = useState([]);
+  // True until the first poll lands, so the list can show a skeleton instead of
+  // an empty state while data is still loading (the array starts []).
+  const [confirmationsLoading, setConfirmationsLoading] = useState(false);
   useEffect(() => {
-    if (!isAdmin) { setConfirmations([]); return; }
-    return subscribeConfirmations(setConfirmations);
+    if (!isAdmin) { setConfirmations([]); setConfirmationsLoading(false); return; }
+    setConfirmationsLoading(true);
+    return subscribeConfirmations((list) => {
+      setConfirmations(list);
+      setConfirmationsLoading(false);
+    });
   }, [isAdmin]);
   const [editingConf, setEditingConf] = useState(null);
 
@@ -141,7 +148,7 @@ export function usePortalConfirmations({ isAdmin, guests, t, showToast }) {
   };
 
   return {
-    confirmations, editingConf, setEditingConf,
+    confirmations, confirmationsLoading, editingConf, setEditingConf,
     matchedGuestFor, matchColor, confirmationReasons,
     useConfirmationData, saveConfirmationEdit, attachConfirmationToGuest,
     guestConfirmationStatus,

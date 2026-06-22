@@ -17,6 +17,7 @@ import { isPlaceholderPhone } from "../../../utils/phone.js";
 import { C } from "../../../styles/theme.js";
 import { useListFilter } from "../../../utils/searchFilter.js";
 import { SearchBar } from "../../../components/SearchBar.jsx";
+import { SkeletonList } from "../../../components/Skeleton.jsx";
 import { createPaymentLink } from "../../../services/payments.js";
 import { buildWhatsAppUrl } from "../../../utils/contact.js";
 import { localizeApiError } from "../../../utils/apiError.js";
@@ -529,18 +530,15 @@ function UserManagerInner() {
         totalCount={filtered.length}
       />
 
-      {/* عداد + حالة التحميل */}
+      {/* عداد */}
       <div style={{ fontSize: 13, color: C.dim, fontWeight: 700, marginBottom: 10, display: "flex", alignItems: "center", gap: 10 }}>
         <span>{t("admin_existing")} (<Num>{filtered.length.toLocaleString("en")}</Num>)</span>
-        {usersLoading && (
-          <span style={{ fontSize: 11, color: C.goldDim, fontWeight: 400 }}>
-            ⟳ {lang === "he" ? "טוען…" : "جاري التحميل…"}
-          </span>
-        )}
       </div>
 
       {/* ── قائمة المستخدمين ───────────────────────────────────────── */}
-      {!usersLoading && filtered.length === 0 ? (
+      {usersLoading && filtered.length === 0 ? (
+        <SkeletonList variant="row" count={5} />
+      ) : !usersLoading && filtered.length === 0 ? (
         <div className="card" style={{ textAlign: "center", padding: 32, color: C.dim }}>
           {t("admin_no_users")}
         </div>

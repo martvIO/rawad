@@ -10,6 +10,7 @@ import { useListFilter } from "../../../utils/searchFilter.js";
 import { SearchBar } from "../../../components/SearchBar.jsx";
 import { FilterChips } from "../../../components/FilterChips.jsx";
 import { OnboardingChecklist } from "../../../components/OnboardingChecklist.jsx";
+import { SkeletonList } from "../../../components/Skeleton.jsx";
 
 // Module-level constants so useListFilter's memoization holds (stable identity).
 const GUEST_FIELDS = ["name", "area"];
@@ -18,7 +19,7 @@ const guestStatusOf = (g) => g.status;
 
 export function DriverDeliveryList() {
   const {
-    t, lang, myGuests, users,
+    t, lang, myGuests, guestsLoading, users,
     liveShareWith, setLiveShareWith, driverIsSharing, driverGeoPermission,
     driverGeoError, driverCoords, myLiveLocation, saveLiveLocation, stopLiveLocation,
     activeId, setActiveId, photoTaken, setPhotoTaken, photoData, setPhotoData,
@@ -251,6 +252,11 @@ export function DriverDeliveryList() {
           />
           {chips.length > 0 && (
             <FilterChips options={chips} value={activeStatus} onChange={setActiveStatus} lang={lang} />
+          )}
+
+          {/* Loading skeleton — first poll hasn't landed yet (route still empty) */}
+          {guestsLoading && myGuests.length === 0 && (
+            <SkeletonList variant="row" count={5} />
           )}
 
           {/* No-results notice (active search/filter yields nothing) */}

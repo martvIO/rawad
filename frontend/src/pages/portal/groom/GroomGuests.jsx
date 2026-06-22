@@ -7,6 +7,7 @@ import { Num } from "../../../components/Num.jsx";
 import { useListFilter } from "../../../utils/searchFilter.js";
 import { SearchBar } from "../../../components/SearchBar.jsx";
 import { FilterChips } from "../../../components/FilterChips.jsx";
+import { SkeletonList } from "../../../components/Skeleton.jsx";
 
 // Stable identities for the search/filter hook's memoization (module level).
 const GUESTS_FIELDS = ["name", "area"];
@@ -16,7 +17,7 @@ const guestsStatusOf = (g) => g.status;
 export function GroomGuests() {
   const navigate = useNavigate();
   const {
-    t, lang, myGuests,
+    t, lang, myGuests, guestsLoading,
     revealedId, setRevealedId, swipeStartRef, removeGuest, startEdit,
   } = usePortal();
 
@@ -42,7 +43,10 @@ export function GroomGuests() {
                 {t("guests_add_btn")}
               </button>
             </div>
-            {myGuests.length === 0 && (
+            {guestsLoading && myGuests.length === 0 && (
+              <SkeletonList variant="row" count={6} />
+            )}
+            {!guestsLoading && myGuests.length === 0 && (
               <div className="card" style={{ textAlign: "center", padding: 32, color: C.dim }}>
                 {t("guests_empty")}
               </div>
