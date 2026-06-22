@@ -18,7 +18,7 @@ const DELIVERIES_FIELDS = ["name", "area"];
 export function GroomDashboard() {
   const navigate = useNavigate();
   const {
-    t, lang, stats, myGuests, setViewingPhoto,
+    t, lang, stats, myGuests, guestsLoading, setViewingPhoto,
     groomCoords, groomMapMarkers, driversSharingWithMe,
   } = usePortal();
 
@@ -52,13 +52,13 @@ export function GroomDashboard() {
 
             {/* First-run guidance — shown until the basics are in place so a new
                 groom isn't lost on an empty dashboard (mirrors the digital flow). */}
-            {!(myGuests.length > 0 && stats.delivered > 0 && reply.confirmed > 0) && (
+            {!guestsLoading && !(myGuests.length > 0 && stats.delivered > 0 && reply.confirmed > 0) && (
               <OnboardingChecklist
                 title={lang === "he" ? "מתחילים ב-3 צעדים" : "ابدأ بثلاث خطوات"}
                 steps={[
                   { label: lang === "he" ? "הוסיפו את רשימת המוזמנים" : "أضف قائمة المدعوين", done: myGuests.length > 0 },
                   { label: lang === "he" ? "הצוות שלנו מחלק את ההזמנות ומתעד כל מסירה בתמונה" : "فريقنا يوزّع المكاتيب ويوثّق كل تسليم بصورة", done: stats.delivered > 0 },
-                  { label: lang === "he" ? "עקבו אחר אישורי ההגעה" : "تابع تأكيدات الحضور", done: reply.confirmed > 0 },
+                  { label: lang === "he" ? "עקבו אחר אישורי ההגעה" : "تابع تأكيدات التسليم", done: reply.confirmed > 0 },
                 ]}
                 note={lang === "he"
                   ? "אתם רק מכינים את הרשימה — צוות דעוה מחלק את ההזמנות, מתעד כל מסירה ומעדכן אתכם."
