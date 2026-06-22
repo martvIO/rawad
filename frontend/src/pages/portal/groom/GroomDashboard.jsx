@@ -10,6 +10,7 @@ import { useListFilter } from "../../../utils/searchFilter.js";
 import { SearchBar } from "../../../components/SearchBar.jsx";
 import { isProofImage } from "../../../utils/mediaUtils.js";
 import { OnboardingChecklist } from "../../../components/OnboardingChecklist.jsx";
+import { Icon } from "../../../components/icons/Icon.jsx";
 
 // Stable module-level field spec for the recent-deliveries search (see useListFilter).
 const DELIVERIES_FIELDS = ["name", "area"];
@@ -67,13 +68,13 @@ export function GroomDashboard() {
 
             <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 12, marginBottom: 20 }}>
               {[
-                { label:t("stat_total"),     val:stats.total,     color:C.goldLight, icon:"📋" },
-                { label:t("stat_delivered"), val:stats.delivered, color:"#4cc97a", icon:"✓" },
-                { label:t("stat_enroute"),   val:stats.enroute,   color:C.blue, icon:"🚗" },
-                { label:t("stat_pending"),   val:stats.pending,   color:C.gold, icon:"⌛" },
+                { label:t("stat_total"),     val:stats.total,     color:C.goldLight, iconName:"list" },
+                { label:t("stat_delivered"), val:stats.delivered, color:"#4cc97a", iconName:"check" },
+                { label:t("stat_enroute"),   val:stats.enroute,   color:C.blue, iconName:"car" },
+                { label:t("stat_pending"),   val:stats.pending,   color:C.gold, iconName:"hourglass" },
               ].map(s => (
                 <div key={s.label} className="card" style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  <div style={{ fontSize: 26 }}>{s.icon}</div>
+                  <div style={{ display: "flex", color: s.color }}><Icon name={s.iconName} size={26} /></div>
                   <div>
                     <div style={{ fontSize: 26, fontWeight: 900, color: s.color }}><Num>{s.val.toLocaleString("en")}</Num></div>
                     <div style={{ fontSize: 11, color: C.dim }}>{s.label}</div>
@@ -112,7 +113,7 @@ export function GroomDashboard() {
 
             {stats.expectedAttendees > 0 && (
               <div className="gold-card" data-testid="groom-expected-attendees" style={{ marginBottom: 20, display: "flex", alignItems: "center", gap: 12 }}>
-                <div style={{ fontSize: 26 }}>👥</div>
+                <div style={{ display: "flex", color: C.gold }}><Icon name="users" size={26} /></div>
                 <div>
                   <div style={{ fontSize: 26, fontWeight: 900, color: C.gold }}><Num>{stats.expectedAttendees.toLocaleString("en")}</Num></div>
                   <div style={{ fontSize: 11, color: C.dim }}>
@@ -198,7 +199,7 @@ export function GroomDashboard() {
                     }}>
                     {isImg
                       ? <img src={g.proofImg} alt="proof" style={{ width: "100%", height: "100%", objectFit: "cover" }}/>
-                      : <span style={{ fontSize: 24 }}>{g.proofImg || "📸"}</span>}
+                      : <span style={{ display: "flex", color: C.dim }}>{g.proofImg || <Icon name="camera" size={24} />}</span>}
                   </div>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 800, color: C.goldLight, fontSize: 14 }}>{g.name}</div>

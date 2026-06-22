@@ -8,6 +8,7 @@ import { useListFilter } from "../../../utils/searchFilter.js";
 import { SearchBar } from "../../../components/SearchBar.jsx";
 import { FilterChips } from "../../../components/FilterChips.jsx";
 import { SkeletonList } from "../../../components/Skeleton.jsx";
+import { Icon } from "../../../components/icons/Icon.jsx";
 
 // Stable identities for the search/filter hook's memoization (module level).
 const GUESTS_FIELDS = ["name", "area"];
@@ -125,11 +126,11 @@ export function GroomGuests() {
                         position: "relative", zIndex: 1, touchAction: "pan-y",
                       }}
                     >
-                      <div style={{ fontSize: 20 }}>{st.icon}</div>
+                      <div style={{ display: "flex", color: st.color }}><Icon name={st.iconName} size={20} /></div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontWeight: 800, color: C.goldLight, fontSize: 14, marginBottom: 2 }}>{g.name}</div>
                         <div style={{ fontSize: 11, color: "#5a5040", direction: "ltr", textAlign: "right" }}>{g.phone}</div>
-                        {g.area && <div style={{ fontSize: 12, color: C.dim }}>📍 {g.area}</div>}
+                        {g.area && <div style={{ fontSize: 12, color: C.dim, display: "flex", alignItems: "center", gap: 5 }}><Icon name="pin" size={12} /> {g.area}</div>}
                         {g.confirmedAt && Number(g.companions) > 0 && (
                           <div data-testid="guest-companions" style={{ fontSize: 11, fontWeight: 800, color: C.gold, marginTop: 2 }}>
                             <Num>+{g.companions}</Num> {lang === "he" ? "מלווים" : "مرافق"}

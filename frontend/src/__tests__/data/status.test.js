@@ -37,25 +37,27 @@ describe("replyStateOf", () => {
 });
 
 describe("STATUS map", () => {
-  it("has a fully-populated entry for each delivery status", () => {
-    for (const key of ["pending", "enroute", "delivered"]) {
+  it("has a fully-populated entry for each delivery status (incl. iconName)", () => {
+    for (const key of ["pending", "enroute", "delivered", "no_answer", "wrong_address", "refused"]) {
       expect(STATUS[key]).toMatchObject({
         label: expect.any(String),
         color: expect.any(String),
         bg: expect.any(String),
-        icon: expect.any(String),
+        icon: expect.any(String),     // legacy emoji (Leaflet marker)
+        iconName: expect.any(String), // SVG Icon glyph (JSX)
       });
     }
   });
 });
 
 describe("REPLY_STATUS map", () => {
-  it("has a presentation entry for each reply state", () => {
+  it("has a presentation entry (incl. iconName) for each reply state", () => {
     for (const key of ["notSent", "pending", "confirmed"]) {
       expect(REPLY_STATUS[key]).toMatchObject({
         color: expect.any(String),
         bg: expect.any(String),
         icon: expect.any(String),
+        iconName: expect.any(String),
       });
     }
   });

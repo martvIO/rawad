@@ -9,6 +9,7 @@ import {
 import { logErr } from "../../../utils/logger.js";
 import { localizeApiError } from "../../../utils/apiError.js";
 import { C } from "../../../styles/theme.js";
+import { Icon } from "../../../components/icons/Icon.jsx";
 import { Num } from "../../../components/Num.jsx";
 import { DigitalInvitationPreviewModal } from "../../../components/digital/DigitalInvitationPreviewModal.jsx";
 import { getDigitalTheme } from "../../../styles/digitalThemes.js";
@@ -40,10 +41,10 @@ const titleOf = (r, lang) => {
 };
 
 const STATUS_META = {
-  pending_approval: { icon: "👀", color: "#c084fc", label_ar: "بانتظار الموافقة", label_he: "ממתין לאישור", bucket: "pending" },
-  approved:         { icon: "✓", color: "#4cc97a", label_ar: "معتمد", label_he: "אושר", bucket: "approved" },
-  rejected:         { icon: "⚠", color: "#d4533a", label_ar: "مرفوض", label_he: "נדחה", bucket: "rejected" },
-  draft:            { icon: "✎", color: C.gold, label_ar: "مسوّدة", label_he: "טיוטה", bucket: "other" },
+  pending_approval: { iconName: "eye", color: "#c084fc", label_ar: "بانتظار الموافقة", label_he: "ממתין לאישור", bucket: "pending" },
+  approved:         { iconName: "check", color: "#4cc97a", label_ar: "معتمد", label_he: "אושר", bucket: "approved" },
+  rejected:         { iconName: "warning", color: "#d4533a", label_ar: "مرفوض", label_he: "נדחה", bucket: "rejected" },
+  draft:            { iconName: "pencil", color: C.gold, label_ar: "مسوّدة", label_he: "טיוטה", bucket: "other" },
 };
 
 export function AdminDesigns() {
@@ -434,8 +435,8 @@ function DesignCard({ row, lang, busy, onPreview, onSetStatus, showApprovedAt, s
             </div>
           )}
         </div>
-        <div style={{ fontSize: 11, color: meta.color, fontWeight: 800, padding: "4px 8px", borderRadius: 8, background: `${meta.color}14`, border: `1px solid ${meta.color}33`, whiteSpace: "nowrap" }}>
-          {meta.icon} {tt(lang, meta.label_ar, meta.label_he)}
+        <div style={{ fontSize: 11, color: meta.color, fontWeight: 800, padding: "4px 8px", borderRadius: 8, background: `${meta.color}14`, border: `1px solid ${meta.color}33`, whiteSpace: "nowrap", display: "inline-flex", alignItems: "center", gap: 5 }}>
+          <Icon name={meta.iconName} size={12} /> {tt(lang, meta.label_ar, meta.label_he)}
         </div>
       </div>
 

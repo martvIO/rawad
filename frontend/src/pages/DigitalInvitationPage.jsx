@@ -9,6 +9,7 @@ import { getDigitalInvitationPublic, submitDigitalGuestInvite, pingDigitalInvite
 import { logErr } from "../utils/logger.js";
 import { DigitalInvitationView } from "../components/digital/DigitalInvitationView.jsx";
 import { C } from "../styles/theme.js";
+import { Icon } from "../components/icons/Icon.jsx";
 import { SAMPLE_STORY, SAMPLE_DETAILS, SAMPLE_HOTELS, SAMPLE_WISHES, DEFAULT_MEAL_OPTIONS } from "../data/digitalInviteDefaults.js";
 
 const DEMO_MEDIA = [
@@ -178,7 +179,7 @@ function DigitalLandingMain({ lang, setLang }) {
   if (tokenRec === null) {
     return (
       <CenteredMessage>
-        <div style={{ fontSize: 56, marginBottom: 12 }}>⚠️</div>
+        <div style={{ display: "flex", justifyContent: "center", marginBottom: 12, color: C.red }}><Icon name="warning" size={52} /></div>
         <h1 style={{ fontFamily: "'Amiri','Frank Ruhl Libre',serif", color: C.red, fontSize: 24 }}>
           {lang === "he" ? "הזמנה לא חוקית" : "دعوة غير صالحة"}
         </h1>
@@ -188,7 +189,7 @@ function DigitalLandingMain({ lang, setLang }) {
   if (tokenRec.expiresAt && Date.now() > tokenRec.expiresAt) {
     return (
       <CenteredMessage>
-        <div style={{ fontSize: 56, marginBottom: 12 }}>⏰</div>
+        <div style={{ display: "flex", justifyContent: "center", marginBottom: 12, color: C.red }}><Icon name="clock" size={52} /></div>
         <h1 style={{ fontFamily: "'Amiri','Frank Ruhl Libre',serif", color: C.red, fontSize: 24 }}>
           {lang === "he" ? "ההזמנה פגה" : "انتهت صلاحية الدعوة"}
         </h1>

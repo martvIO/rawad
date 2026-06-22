@@ -18,6 +18,7 @@ import {
 } from "recharts";
 import { usePortal } from "../../../context/PortalContext.jsx";
 import { C } from "../../../styles/theme.js";
+import { Icon } from "../../../components/icons/Icon.jsx";
 import { Num } from "../../../components/Num.jsx";
 import { ProgressBar } from "../../../components/ProgressBar.jsx";
 import { SkeletonList } from "../../../components/Skeleton.jsx";
@@ -381,11 +382,11 @@ function Designs({ data, lang }) {
 // ─── Section 6: Triage ──────────────────────────────────────────────────────────
 
 const TRIAGE_META = {
-  design_pending: { icon: "🎨", ar: "تصميم بانتظار الموافقة", he: "עיצוב ממתין לאישור", to: "/portal/admin/designs", color: PAL.purple },
-  payment_pending: { icon: "💳", ar: "دفعة معلّقة", he: "תשלום ממתין", to: "/portal/admin/users", color: PAL.amber },
-  no_driver: { icon: "🚗", ar: "بلا سائق", he: "ללא נהג", to: "/portal/admin/users", color: PAL.blue },
-  low_delivery: { icon: "⚠", ar: "تسليم منخفض", he: "מסירה נמוכה", to: "/portal/admin/confirmations", color: PAL.red },
-  wedding_soon: { icon: "⏰", ar: "عرس قريب", he: "חתונה קרובה", to: "/portal/admin/confirmations", color: PAL.green },
+  design_pending: { iconName: "palette", ar: "تصميم بانتظار الموافقة", he: "עיצוב ממתין לאישור", to: "/portal/admin/designs", color: PAL.purple },
+  payment_pending: { iconName: "card", ar: "دفعة معلّقة", he: "תשלום ממתין", to: "/portal/admin/users", color: PAL.amber },
+  no_driver: { iconName: "car", ar: "بلا سائق", he: "ללא נהג", to: "/portal/admin/users", color: PAL.blue },
+  low_delivery: { iconName: "warning", ar: "تسليم منخفض", he: "מסירה נמוכה", to: "/portal/admin/confirmations", color: PAL.red },
+  wedding_soon: { iconName: "clock", ar: "عرس قريب", he: "חתונה קרובה", to: "/portal/admin/confirmations", color: PAL.green },
 };
 
 function triageDetail(item, lang) {
@@ -419,7 +420,7 @@ function Triage({ data, lang }) {
                 className="card"
                 style={{ padding: "11px 14px", display: "flex", alignItems: "center", gap: 10, textDecoration: "none" }}
               >
-                <span style={{ fontSize: 18, flexShrink: 0 }}>{meta.icon}</span>
+                <span style={{ display: "flex", flexShrink: 0, color: meta.color }}><Icon name={meta.iconName} size={18} /></span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 13, fontWeight: 800, color: meta.color || C.goldLight }}>
                     {tt(lang, meta.ar, meta.he)}

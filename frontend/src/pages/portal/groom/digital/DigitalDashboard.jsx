@@ -40,6 +40,7 @@ import {
 import { logErr } from "../../../../utils/logger.js";
 import { localizeApiError } from "../../../../utils/apiError.js";
 import { C } from "../../../../styles/theme.js";
+import { Icon } from "../../../../components/icons/Icon.jsx";
 import { Num } from "../../../../components/Num.jsx";
 import { getStoredUid } from "../../../../utils/tokenManager.js";
 import { useListFilter } from "../../../../utils/searchFilter.js";
@@ -551,13 +552,13 @@ export function DigitalDashboard() {
         <>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 12, marginBottom: 20 }}>
             {[
-              { label: tt(lang, "الإجمالي", "סה״כ מוזמנים"), val: stats.total,     color: C.goldLight, icon: "📋" },
-              { label: tt(lang, "حضور",     "נוכחים"),        val: stats.attending, color: "#4cc97a",   icon: "✓" },
-              { label: tt(lang, "غياب",     "נעדרים"),        val: stats.absent,    color: C.red,       icon: "✗" },
-              { label: tt(lang, "لم يرد",   "טרם ענו"),       val: stats.pending,   color: C.gold,      icon: "⌛" },
+              { label: tt(lang, "الإجمالي", "סה״כ מוזמנים"), val: stats.total,     color: C.goldLight, iconName: "list" },
+              { label: tt(lang, "حضور",     "נוכחים"),        val: stats.attending, color: "#4cc97a",   iconName: "check" },
+              { label: tt(lang, "غياب",     "נעדרים"),        val: stats.absent,    color: C.red,       iconName: "x" },
+              { label: tt(lang, "لم يرد",   "טרם ענו"),       val: stats.pending,   color: C.gold,      iconName: "hourglass" },
             ].map(s => (
               <div key={s.label} className="card" style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <div style={{ fontSize: 26 }}>{s.icon}</div>
+                <div style={{ display: "flex", color: s.color }}><Icon name={s.iconName} size={26} /></div>
                 <div>
                   <div style={{ fontSize: 26, fontWeight: 900, color: s.color }}><Num>{s.val.toLocaleString("en")}</Num></div>
                   <div style={{ fontSize: 11, color: C.dim }}>{s.label}</div>

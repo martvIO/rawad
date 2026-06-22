@@ -11,6 +11,7 @@ import { SearchBar } from "../../../components/SearchBar.jsx";
 import { FilterChips } from "../../../components/FilterChips.jsx";
 import { OnboardingChecklist } from "../../../components/OnboardingChecklist.jsx";
 import { SkeletonList } from "../../../components/Skeleton.jsx";
+import { Icon } from "../../../components/icons/Icon.jsx";
 
 // Module-level constants so useListFilter's memoization holds (stable identity).
 const GUEST_FIELDS = ["name", "area"];
@@ -118,7 +119,7 @@ export function DriverDeliveryList() {
                 border: `1px solid ${isActive ? "rgba(76,201,122,.25)" : "rgba(75,159,212,.18)"}`,
               }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                  <span style={{ fontSize: 18 }}>📡</span>
+                  <span style={{ display: "flex", color: isActive ? "#4cc97a" : C.blue }}><Icon name="broadcast" size={18} /></span>
                   <div style={{ fontSize: 13, fontWeight: 800, color: isActive ? "#4cc97a" : C.blue }}>
                     {t("share_section")}
                   </div>
@@ -147,7 +148,7 @@ export function DriverDeliveryList() {
                         display: "flex", flexDirection: "column", gap: 4,
                       }}>
                         <div style={{ fontSize: 11, color: C.dim, direction: "ltr", textAlign: "right" }}>
-                          📍 {driverCoords.lat.toFixed(5)}, {driverCoords.lng.toFixed(5)}
+                          <Icon name="pin" size={11} style={{ display: "inline-block", verticalAlign: "-1px" }} /> {driverCoords.lat.toFixed(5)}, {driverCoords.lng.toFixed(5)}
                         </div>
                         <div style={{ fontSize: 11, color: C.dim }}>
                           {t("geo_accuracy")} <Num>±{driverCoords.accuracy}</Num> {t("geo_meters")}
@@ -182,7 +183,7 @@ export function DriverDeliveryList() {
                         background: "rgba(212,122,75,.08)", border: "1px solid rgba(212,122,75,.3)",
                         fontSize: 12, color: C.red, lineHeight: 1.6,
                       }}>
-                        ⚠ {driverGeoError}
+<Icon name="warning" size={12} style={{ display: "inline-block", verticalAlign: "-2px" }} /> {driverGeoError}
                       </div>
                     )}
 
@@ -281,7 +282,7 @@ export function DriverDeliveryList() {
                     padding: "8px 12px", borderRadius: 10,
                     background: "rgba(201,168,76,.08)", border: "1px solid rgba(201,168,76,.2)",
                   }}>
-                    <span style={{ fontSize: 16 }}>🏘</span>
+                    <span style={{ display: "flex", color: C.gold }}><Icon name="pin" size={16} /></span>
                     <div style={{ flex: 1, fontWeight: 800, color: C.gold, fontSize: 14 }}>
                       {group.city}
                     </div>
@@ -310,7 +311,7 @@ export function DriverDeliveryList() {
                           }}>{ordinal}</div>
                           <div>
                             <div style={{ fontWeight: 800, color: C.goldLight, fontSize: 15 }}>{g.name}</div>
-                            {g.area && <div style={{ fontSize: 12, color: C.dim, marginTop: 4 }}>📍 {g.area}</div>}
+                            {g.area && <div style={{ fontSize: 12, color: C.dim, marginTop: 4, display: "flex", alignItems: "center", gap: 5 }}><Icon name="pin" size={12} /> {g.area}</div>}
                             {g.deliveryNote && (
                               <div style={{
                                 fontSize: 12, color: C.gold, marginTop: 6, lineHeight: 1.5,

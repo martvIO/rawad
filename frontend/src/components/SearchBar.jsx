@@ -15,6 +15,7 @@
 //   style         — optional extra wrapper styles
 import { C } from "../styles/theme.js";
 import { Num } from "./Num.jsx";
+import { Icon } from "./icons/Icon.jsx";
 
 export function SearchBar({
   value,
@@ -49,15 +50,15 @@ export function SearchBar({
           marginBottom: 0,
         }}
       />
-      {/* 🔍 leading icon */}
+      {/* leading search icon */}
       <span
         style={{
           position: "absolute", insetInlineStart: 12, top: "50%",
-          transform: "translateY(-50%)", fontSize: 14, pointerEvents: "none",
+          transform: "translateY(-50%)", display: "flex", pointerEvents: "none",
           color: C.dim,
         }}
       >
-        🔍
+        <Icon name="search" size={15} />
       </span>
 
       {/* live result count pill (only while searching) */}

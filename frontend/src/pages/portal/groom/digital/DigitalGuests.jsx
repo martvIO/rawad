@@ -10,6 +10,7 @@ import {
 import { logErr } from "../../../../utils/logger.js";
 import { localizeApiError } from "../../../../utils/apiError.js";
 import { C } from "../../../../styles/theme.js";
+import { Icon } from "../../../../components/icons/Icon.jsx";
 import { Num } from "../../../../components/Num.jsx";
 import { useListFilter } from "../../../../utils/searchFilter.js";
 import { SearchBar } from "../../../../components/SearchBar.jsx";
@@ -34,9 +35,9 @@ function getGuestRanks(g) {
 }
 
 const STATUS_CFG = {
-  pending:   { icon: "⌛", label_ar: "لم يرد",   label_he: "טרם ענה",   bg: "rgba(201,168,76,.15)", color: C.gold    },
-  attending: { icon: "✓",  label_ar: "حضور",      label_he: "מגיע",      bg: "rgba(76,201,122,.15)", color: "#4cc97a" },
-  absent:    { icon: "✗",  label_ar: "غياب",      label_he: "לא מגיע",   bg: "rgba(212,80,58,.15)",  color: "#d4533a" },
+  pending:   { iconName: "hourglass", label_ar: "لم يرد",   label_he: "טרם ענה",   bg: "rgba(201,168,76,.15)", color: C.gold    },
+  attending: { iconName: "check",     label_ar: "حضور",      label_he: "מגיע",      bg: "rgba(76,201,122,.15)", color: "#4cc97a" },
+  absent:    { iconName: "x",         label_ar: "غياب",      label_he: "לא מגיע",   bg: "rgba(212,80,58,.15)",  color: "#d4533a" },
 };
 const CYCLE = ["pending", "attending", "absent"];
 
@@ -426,7 +427,7 @@ export function DigitalGuests() {
                 /* ── Normal view ── */
                 <>
                   {/* Status icon */}
-                  <div style={{ fontSize: 20 }}>{sc.icon}</div>
+                  <div style={{ display: "flex", color: sc.color }}><Icon name={sc.iconName} size={20} /></div>
 
                   {/* Name + phone + ranks */}
                   <div style={{ flex: 1, minWidth: 0 }}>
