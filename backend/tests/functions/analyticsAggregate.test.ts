@@ -85,8 +85,8 @@ describe("composeRevenue", () => {
     const r = composeRevenue([
       { uid: "g1", role: "groom", paymentStatus: "paid", paymentPlan: "vip" },
     ]);
-    expect(r.totalRevenueIls).toBe(3500);
-    expect(r.arpuIls).toBe(3500);
+    expect(r.totalRevenueIls).toBe(2000);
+    expect(r.arpuIls).toBe(2000);
     const empty = composeRevenue([]);
     expect(empty.arpuIls).toBe(0);
     expect(empty.avgTimeToPayMs).toBeNull();

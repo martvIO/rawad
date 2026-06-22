@@ -102,7 +102,7 @@ export const he = {
     "מעקב באמצעות פורטל החתן"
   ],
   price_pkg1_label: "העיצוב המקצועי",
-  price_pkg1_price: "2,500 ₪",
+  price_pkg1_price: "1,500 ₪",
   price_pkg1_sub: "ההזמנה הדיגיטלית היוקרתית — כל הפרטים החיוניים בסגנון הראוי לאירועך.",
   price_pkg1_bullets: [
     "עיצוב מותאם ואלגנטי לכל מוזמן",
@@ -112,7 +112,7 @@ export const he = {
     "שליחה ישירה בוואטסאפ"
   ],
   price_pkg2_label: "החבילה השנייה: החבילה המתאימה ביותר",
-  price_pkg2_price: "3,500 ₪",
+  price_pkg2_price: "2,000 ₪",
   price_pkg2_sub: "כל מה שבחבילת העיצוב המקצועי — ועוד. לאירועים הראויים לחוויה שלמה שלא משאירה דבר ליד המקרה.",
   price_pkg2_bullets: [
     "כל מאפייני החבילה הראשונה",
@@ -310,8 +310,8 @@ export const he = {
   admin_payment_created: "קישור התשלום נוצר",
   admin_payment_copied: "הקישור הועתק",
   admin_payment_wa_msg: "שלום, הנה קישור התשלום לחבילה שלך בדעוה:",
-  admin_pay_premium: "Premium — ₪2,500",
-  admin_pay_vip: "VIP Royal — ₪3,500",
+  admin_pay_premium: "Premium — ₪1,500",
+  admin_pay_vip: "VIP Royal — ₪2,000",
   admin_bulk_warn: "⚠ תיפתח חלון WhatsApp לכל מוזמן בנפרד — נדרשת הרשאה לחלונות קופצים",
   admin_send_hint: "לחיצה על «שלח» פותחת חלון WhatsApp עם ההודעה מוכנה לשליחה למוזמן",
   admin_conf_title: "אישורי מוזמנים",

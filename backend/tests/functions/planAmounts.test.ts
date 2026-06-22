@@ -7,7 +7,7 @@ import { describe, it, expect } from "vitest";
 import { PLAN_AMOUNTS_ILS } from "../../functions/src/api/routes/payments";
 
 describe("PLAN_AMOUNTS_ILS (price drift guard)", () => {
-  it("matches the published prices (Premium ₪2,500 / VIP ₪3,500)", () => {
-    expect(PLAN_AMOUNTS_ILS).toEqual({ premium: 2500, vip: 3500 });
+  it("matches the published prices (Premium ₪1,500 / VIP ₪2,000)", () => {
+    expect(PLAN_AMOUNTS_ILS).toEqual({ premium: 1500, vip: 2000 });
   });
 });

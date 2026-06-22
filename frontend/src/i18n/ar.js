@@ -102,7 +102,7 @@ export const ar = {
     "متابعة عبر بوابة العريس"
   ],
   price_pkg1_label: "التصميم الاحترافي",
-  price_pkg1_price: "2,500 ₪",
+  price_pkg1_price: "1,500 ₪",
   price_pkg1_sub: "الدعوة الرقمية الراقية — كل التفاصيل الأساسية بأسلوب يليق بمناسبتك.",
   price_pkg1_bullets: [
     "تصميم مخصص وأنيق لكل مدعو",
@@ -112,7 +112,7 @@ export const ar = {
     "إرسال مباشر عبر واتساب"
   ],
   price_pkg2_label: "الباقة الثانية: الباقة الأنسب",
-  price_pkg2_price: "3,500 ₪",
+  price_pkg2_price: "2,000 ₪",
   price_pkg2_sub: "كل شيء في باقة التصميم الاحترافي — وأكثر. للمناسبات التي تستحق تجربة متكاملة لا تترك شيئاً للصدفة.",
   price_pkg2_bullets: [
     "كل مميزات الباقة الأولى",
@@ -318,8 +318,8 @@ export const ar = {
   admin_payment_created: "تم إنشاء رابط الدفع",
   admin_payment_copied: "تم نسخ الرابط",
   admin_payment_wa_msg: "مرحباً، هذا رابط الدفع لباقتك في دعوة:",
-  admin_pay_premium: "Premium — ₪2,500",
-  admin_pay_vip: "VIP Royal — ₪3,500",
+  admin_pay_premium: "Premium — ₪1,500",
+  admin_pay_vip: "VIP Royal — ₪2,000",
   admin_bulk_warn: "⚠ ستفتح نافذة WhatsApp لكل معزوم بشكل منفصل — السماح بالنوافذ المنبثقة مطلوب",
   admin_send_hint: "ضغطة على «إرسال» تفتح نافذة WhatsApp مع الرسالة جاهزة لإرسالها للمعزوم",
   // Admin Confirmations

@@ -4,7 +4,7 @@
 //  2. Structured-array parity — keys whose value is an array must have the same
 //     length in both languages (top-level key parity won't catch a short array).
 //  3. Price drift — the four marketing/admin price strings must match the
-//     published Premium ₪2,500 / VIP ₪3,500 (twin of the backend planAmounts test).
+//     published Premium ₪1,500 / VIP ₪2,000 (twin of the backend planAmounts test).
 import { describe, it, expect } from "vitest";
 import { ar } from "../../i18n/ar.js";
 import { he } from "../../i18n/he.js";
@@ -29,13 +29,13 @@ describe("i18n parity", () => {
 });
 
 describe("price drift guard", () => {
-  // Mirrors backend PLAN_AMOUNTS_ILS ({ premium: 2500, vip: 3500 }). If a price
+  // Mirrors backend PLAN_AMOUNTS_ILS ({ premium: 1500, vip: 2000 }). If a price
   // changes anywhere, this fails so all five sources are updated together.
   it.each([
-    ["price_pkg1_price", "2,500"],
-    ["price_pkg2_price", "3,500"],
-    ["admin_pay_premium", "2,500"],
-    ["admin_pay_vip", "3,500"],
+    ["price_pkg1_price", "1,500"],
+    ["price_pkg2_price", "2,000"],
+    ["admin_pay_premium", "1,500"],
+    ["admin_pay_vip", "2,000"],
   ])("%s contains %s in both languages", (key, amount) => {
     expect(ar[key]).toContain(amount);
     expect(he[key]).toContain(amount);

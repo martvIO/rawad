@@ -21,7 +21,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** Per-plan ILS amounts, mirroring PLAN_AMOUNTS_ILS in routes/payments.ts. Used
  *  only as a fallback when a paid user record lacks a stored paymentAmountIls. */
-const PLAN_AMOUNTS_ILS: Record<string, number> = { premium: 2500, vip: 3500 };
+const PLAN_AMOUNTS_ILS: Record<string, number> = { premium: 1500, vip: 2000 };
 
 /** Physical delivery statuses, mirroring ALLOWED_STATUS in routes/guests.ts. */
 const DELIVERY_STATUSES = [
