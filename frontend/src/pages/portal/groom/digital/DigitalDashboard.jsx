@@ -408,9 +408,9 @@ export function DigitalDashboard() {
   return (
     <div style={{ animation: "fadeUp .3s ease" }}>
 
-      {/* ── First-run onboarding — shown until the basics are in place ─── */}
-      {(guests.length === 0 || media.length === 0) && (
-        <OnboardingChecklist
+      {/* ── Progress guide — shown to every groom on every visit (not just
+           first-run); completed steps render struck-through. ─── */}
+      <OnboardingChecklist
           title={tt(lang, "ابدأ بثلاث خطوات", "מתחילים ב-3 צעדים")}
           steps={[
             { label: tt(lang, "أضف قائمة المدعوين", "הוסיפו את רשימת המוזמנים"), done: guests.length > 0 },
@@ -421,7 +421,6 @@ export function DigitalDashboard() {
             "بعد اعتماد التصميم، يتولّى فريق دعوة إرسال الدعوات للمدعوين عبر واتساب — لا حاجة لإرسالها بنفسك.",
             "לאחר אישור העיצוב, צוות דעוה שולח את ההזמנות למוזמנים בוואטסאפ — אין צורך לשלוח בעצמכם.")}
         />
-      )}
 
       {/* ── معرض الوسائط ─────────────────────────────────────────── */}
       <div style={{ marginBottom: 22 }}>

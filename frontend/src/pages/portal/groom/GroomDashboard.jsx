@@ -50,9 +50,10 @@ export function GroomDashboard() {
               <div style={{ fontSize: 13, color: C.dim }}>{t("dash_subtitle")}</div>
             </div>
 
-            {/* First-run guidance — shown until the basics are in place so a new
-                groom isn't lost on an empty dashboard (mirrors the digital flow). */}
-            {!guestsLoading && !(myGuests.length > 0 && stats.delivered > 0 && reply.confirmed > 0) && (
+            {/* Always-on progress guide — shown to every groom on every visit (not
+                just first-run); completed steps render struck-through. Gated only on
+                the guest load so the step checkmarks are correct on first paint. */}
+            {!guestsLoading && (
               <OnboardingChecklist
                 title={lang === "he" ? "מתחילים ב-3 צעדים" : "ابدأ بثلاث خطوات"}
                 steps={[
