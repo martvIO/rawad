@@ -55,6 +55,22 @@ returns `{}`); **GCP+AWS budget alerts**; enable **backups** + test a restore;
 **testimonials** (AR+HE); go-live secrets (Stripe/WhatsApp/AWS); export
 `og-default.png`; **KPI baseline** (+ optional GA4/Clarity). See [[Conversion KPIs]].
 
+## Deferred items — now completed (2026-06-22)
+The three LATER-tier items scoped down on 06-20 were finished + deployed (hosting-only):
+- **Default OG share image (PNG):** `frontend/scripts/render-og-default.cjs` draws a
+  branded card via @napi-rs/canvas + Amiri (no new frontend dep); committed
+  `frontend/public/og-default.png`; og:image → absolute `https://dawa.to/og-default.png`
+  (verified live, 200 image/png on both origins).
+- **Skeleton loaders on the busy lists:** added `guestsLoading`/`confirmationsLoading`
+  flags to the portal hooks (mirroring `usersLoading`) and gated `SkeletonList
+  variant="row"` in groom guests, driver deliveries, admin users, admin confirmations.
+- **Emoji → SVG icon sweep:** +21 `Icon` glyphs; `status.js` gained `iconName` (kept
+  `icon` emoji for the Leaflet marker); converted the status/stat/triage/design badge
+  maps + SearchBar + the digital-invite error page + driver screen; stripped functional
+  color emoji from all AR/HE copy (parity preserved). Decorative dingbats (✦ ♛ ♥ ✎) and
+  dead dock/process emoji kept. Remaining: a few inline location pins in secondary
+  modals/forms — low-risk follow-up.
+
 ## Explicitly skipped (audit "skip" tier)
 PWA service worker, bundle gold-plating, enabling the RSA password layer,
 `NODE_ENV=production`, self-serve signup, adminSettings price migration, and a
