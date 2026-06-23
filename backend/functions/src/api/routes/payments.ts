@@ -104,20 +104,32 @@ paymentsRouter.post("/webhook", async (req: Request, res: Response) => {
         const uidSnap = await db.ref(`stripePaymentLinks/${linkId}`).get();
         const uid = uidSnap.val();
         if (typeof uid === "string" && uid) {
-          await db.ref(`users/${uid}`).update({
-            paymentStatus: "paid",
-            paymentPaidAt: Date.now(),
-          });
-          await writeAudit("stripe", "payment_paid", { uid, linkId });
+          const userRef = db.ref(`users/${uid}`);
+          // Idempotent: Stripe can deliver the same event more than once (and we
+          // now return 5xx on failure, which makes a retry more likely). Only
+          // write + audit the FIRST time we see it paid, so retries don't drift
+          // paymentPaidAt or push duplicate "payment_paid" audit rows.
+          const already = (await userRef.child("paymentStatus").get()).val();
+          if (already !== "paid") {
+            await userRef.update({
+              paymentStatus: "paid",
+              paymentPaidAt: Date.now(),
+            });
+            await writeAudit("stripe", "payment_paid", { uid, linkId });
+          }
         }
       }
     }
+    res.json({ received: true });
   } catch (err) {
-    // Acknowledge anyway — Stripe retries on non-2xx, but a DB hiccup shouldn't
-    // make it retry forever; the event is logged for manual reconciliation.
+    // A genuine processing failure (e.g. a transient RTDB outage on the
+    // paid-status write). Do NOT ack with 200: that tells Stripe the event is
+    // handled and it will never re-deliver, silently losing a real payment.
+    // Return 5xx so Stripe retries — the paid-status write is an idempotent
+    // upsert, so re-processing the same event is safe.
     console.error("[payments] webhook handling error", err);
+    res.status(500).json({ error: "processing_failed" });
   }
-  res.json({ received: true });
 });
 
 // ─── POST /payments/:uid — create a payment link (admin) ────────────────────────

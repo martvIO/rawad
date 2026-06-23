@@ -16,8 +16,9 @@
 
 import { Router, Response } from "express";
 import { AuthRequest, requireAuth } from "../middleware/auth";
-import { guestStore } from "../stores/guestStore";
 import { MAX_LEN } from "../../constants/limits";
+import { firebaseGuestStore } from "../../domain/guests/firebaseGuestStore";
+import { sendDomainError } from "../../domain/httpError";
 
 // ─── Schema constants (mirror database.rules.json) ────────────────────────────
 
@@ -63,6 +64,12 @@ const KNOWN_FIELDS = new Set([
 
 export const guestsRouter = Router();
 
+// The guest domain raises no DomainError (field validation lives in the route's
+// sanitizeGuest), so this {code → status} table is empty: every store failure is
+// an infra error that falls through to each handler's 500 fallback slug via
+// sendDomainError — byte-identical output to the pre-extraction handlers.
+const GUEST_STATUS: Record<string, number> = {};
+
 // ─── GET /guests ──────────────────────────────────────────────────────────────
 
 /**
@@ -75,9 +82,9 @@ guestsRouter.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
     return;
   }
   try {
-    res.json(await guestStore.listAll());
+    res.json(await firebaseGuestStore().listAll());
   } catch (err) {
-    res.status(500).json({ error: "read_failed", detail: errorMessage(err) });
+    sendDomainError(res, err, GUEST_STATUS, "read_failed");
   }
 });
 
@@ -106,7 +113,7 @@ guestsRouter.get(
     const claims = req.caller!.claims;
     const stripToken = claims.role !== "admin" && req.caller!.uid !== groomUid;
     try {
-      const guests = await guestStore.listByGroom(groomUid);
+      const guests = await firebaseGuestStore().listByGroom(groomUid);
       // Shallow-copy before stripping so we never mutate the store's record.
       const out = guests.map((g) => {
         if (!stripToken) return g;
@@ -116,7 +123,7 @@ guestsRouter.get(
       });
       res.json(out);
     } catch (err) {
-      res.status(500).json({ error: "read_failed", detail: errorMessage(err) });
+      sendDomainError(res, err, GUEST_STATUS, "read_failed");
     }
   }
 );
@@ -149,10 +156,10 @@ guestsRouter.post(
     if (typeof guest.createdAt !== "number") guest.createdAt = Date.now();
 
     try {
-      const created = await guestStore.create(groomUid, guest);
+      const created = await firebaseGuestStore().create(groomUid, guest);
       res.json({ id: created.id, ...guest });
     } catch (err) {
-      res.status(500).json({ error: "write_failed", detail: errorMessage(err) });
+      sendDomainError(res, err, GUEST_STATUS, "write_failed");
     }
   }
 );
@@ -186,10 +193,10 @@ guestsRouter.patch(
       return;
     }
     try {
-      await guestStore.patch(groomUid, guestId, sanitized.value);
+      await firebaseGuestStore().patch(groomUid, guestId, sanitized.value);
       res.json({ ok: true });
     } catch (err) {
-      res.status(500).json({ error: "write_failed", detail: errorMessage(err) });
+      sendDomainError(res, err, GUEST_STATUS, "write_failed");
     }
   }
 );
@@ -211,10 +218,10 @@ guestsRouter.delete(
       return;
     }
     try {
-      await guestStore.remove(groomUid, guestId);
+      await firebaseGuestStore().remove(groomUid, guestId);
       res.json({ ok: true });
     } catch (err) {
-      res.status(500).json({ error: "delete_failed", detail: errorMessage(err) });
+      sendDomainError(res, err, GUEST_STATUS, "delete_failed");
     }
   }
 );
@@ -320,7 +327,12 @@ function validateField(key: string, value: unknown): FieldResult {
       }
       return { ok: true, value };
     case "phone":
-      if (typeof value !== "string" || value.length > MAX_PHONE_LEN) {
+      // Reject empty exactly like `name` does: the add-guest UI already requires
+      // a complete phone (submit is disabled without one), phone drives the
+      // confirmation auto-match + WhatsApp flows, and the prior length-only check
+      // let an empty phone slip past the requireRequired guard (typeof "" is
+      // still "string"), creating un-matchable guest records.
+      if (typeof value !== "string" || value.length === 0 || value.length > MAX_PHONE_LEN) {
         return { ok: false, error: "invalid_phone", field: key };
       }
       return { ok: true, value };
@@ -400,7 +412,3 @@ function validateField(key: string, value: unknown): FieldResult {
   }
 }
 
-// ─── Util ─────────────────────────────────────────────────────────────────────
-
-// errorMessage (suppress-by-default 5xx detail) is now shared — see ../errorDetail.
-import { errorMessage } from "../errorDetail";

@@ -170,13 +170,17 @@
 
     "inviteTokens": {
       "$token": {
-        // No direct client read. The token record holds guest PII (name/phone)
-        // + the full digital designSnapshot; it is served ONLY through the
-        // server GET /invites/token/:token (Admin SDK, which bypasses rules and
-        // projects the response). Setting this to false closes the world-read of
-        // the raw record via the RTDB REST API / any client SDK.
+        // No direct client read OR write. The token record holds guest PII
+        // (name/phone) + the full digital designSnapshot; it is minted and read
+        // ONLY through the admin-gated server endpoints (POST /invites[/digital]
+        // + GET /invites/token/:token), all via the Admin SDK which bypasses
+        // these rules. Closing both sides keeps a client (even an authenticated
+        // groom holding their own Firebase ID token) from minting tokens
+        // directly against the RTDB REST API — which would bypass the admin
+        // gate, the per-user mint rate limit, and the audit log — or reading the
+        // raw record. Same Function-only pattern as confirmations/audit/galleryGrants.
         ".read":  false,
-        ".write": "auth != null && (auth.token.role === 'admin' || (auth.token.role === 'groom' && (!newData.exists() || newData.child('groomUid').val() === auth.uid)))",
+        ".write": false,
         ".validate": "!newData.exists() || newData.hasChildren(['groomUid','groomUsername','guestId','guestName','guestPhone','createdAt','expiresAt'])",
         "groomUid":      { ".validate": "newData.isString() && newData.val().length <= 64" },
         "groomUsername": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 60" },

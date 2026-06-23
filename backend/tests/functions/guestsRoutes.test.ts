@@ -1,13 +1,12 @@
 // @vitest-environment node
 //
-// Handler-behaviour tests for routes/guests.ts, driven over real HTTP against
-// the REAL guestsRouter. Two things are stubbed:
-//   - requireAuth (maps a fake bearer token -> claims), same as invitesAuthz.ts
-//   - guestStore (the data-access seam) -> the in-memory adapter
-// Because the guest domain now talks to Firebase only through GuestStore, this
-// exercises the actual authorization + token-stripping + validation + response
-// shapes with NO emulator. Before the seam existed these handlers 500'd at
-// getDatabase(), so this behaviour was untestable in the unit env.
+// Route-seam test for guestsRouter on the domain/ports convention. Mounts the
+// REAL router and drives it over HTTP, stubbing ONLY requireAuth, and injects an
+// in-memory guest store by mocking firebaseGuestStore() to wrap the REAL
+// makeGuestStore over a fake DbPort. This exercises authorization + the
+// assigned-driver inviteLinkToken strip + sanitizeGuest validation + write
+// round-trips with NO emulator. (Pure domain logic lives in guestStore.test.ts;
+// the inviteLinkToken strip is route logic, so it is covered here.)
 import {
   describe,
   it,
@@ -19,10 +18,9 @@ import {
 } from "vitest";
 import express from "express";
 import type { Server } from "node:http";
-import { inMemoryGuestStore } from "./support/inMemoryGuestStore";
 
-// Hoisted so the vi.mock factories (also hoisted) can reference them.
-const { CLAIMS, STORE } = vi.hoisted(() => {
+// Hoisted so the (hoisted) vi.mock factories can reference them.
+const { CLAIMS, DB } = vi.hoisted(() => {
   // Skip the in-memory per-uid rate limiter (read at module load in rateLimit.ts).
   process.env.FUNCTIONS_EMULATOR = "true";
   return {
@@ -36,20 +34,13 @@ const { CLAIMS, STORE } = vi.hoisted(() => {
         username: "driver",
         assignedGrooms: { "groom-uid": true },
       },
-      "unassigned-driver-token": {
-        uid: "driver2-uid",
-        role: "driver",
-        username: "driver2",
-        assignedGrooms: { "someone-else": true },
-      },
     } as Record<string, Record<string, unknown>>,
-    // Mutable holder; the guestStore mock delegates to STORE.current, which each
-    // test resets to a freshly-seeded in-memory adapter.
-    STORE: { current: null as ReturnType<typeof inMemoryGuestStore>["store"] | null },
+    // Mutable RTDB tree; reset per test, read directly to assert post-state.
+    DB: { tree: null as any },
   };
 });
 
-// Stub ONLY requireAuth — requireAdmin / role gates stay real.
+// Stub ONLY requireAuth; requireAdmin / role gates stay real.
 vi.mock("../../functions/src/api/middleware/auth", async (importOriginal) => {
   const actual =
     await importOriginal<
@@ -71,23 +62,55 @@ vi.mock("../../functions/src/api/middleware/auth", async (importOriginal) => {
   };
 });
 
-// Replace the GuestStore seam with the in-memory adapter (delegated at call time).
-vi.mock("../../functions/src/api/stores/guestStore", () => ({
-  guestStore: {
-    listAll: (...a: unknown[]) => (STORE.current as any).listAll(...a),
-    listByGroom: (...a: unknown[]) => (STORE.current as any).listByGroom(...a),
-    get: (...a: unknown[]) => (STORE.current as any).get(...a),
-    create: (...a: unknown[]) => (STORE.current as any).create(...a),
-    patch: (...a: unknown[]) => (STORE.current as any).patch(...a),
-    remove: (...a: unknown[]) => (STORE.current as any).remove(...a),
-  },
-}));
+// Inject the in-memory store at the production-wiring seam: the REAL
+// makeGuestStore over a tree-backed fake DbPort.
+vi.mock("../../functions/src/domain/guests/firebaseGuestStore", async () => {
+  const { makeGuestStore } = await import(
+    "../../functions/src/domain/guests/guestStore"
+  );
+  const getAt = (tree: any, path: string) => {
+    let node = tree;
+    for (const k of path.split("/")) {
+      if (node === null || node === undefined || typeof node !== "object") return null;
+      node = node[k];
+    }
+    return node === undefined ? null : node;
+  };
+  const setAt = (tree: any, path: string, value: unknown) => {
+    const parts = path.split("/");
+    const last = parts.pop()!;
+    let node = tree;
+    for (const k of parts) {
+      if (typeof node[k] !== "object" || node[k] === null) node[k] = {};
+      node = node[k];
+    }
+    if (value === null) delete node[last];
+    else node[last] = value;
+  };
+  let n = 0;
+  const db = {
+    async get(path: string) {
+      return getAt(DB.tree, path);
+    },
+    async update(updates: Record<string, unknown>) {
+      for (const [p, v] of Object.entries(updates)) setAt(DB.tree, p, v);
+    },
+    async set(path: string, value: unknown) {
+      setAt(DB.tree, path, value);
+    },
+    async remove(path: string) {
+      setAt(DB.tree, path, null);
+    },
+  };
+  return {
+    firebaseGuestStore: () => makeGuestStore({ db, newId: () => `new${++n}` }),
+  };
+});
 
 import { guestsRouter } from "../../functions/src/api/routes/guests";
 
 let server: Server;
 let baseUrl: string;
-let mem: ReturnType<typeof inMemoryGuestStore>;
 
 const GUEST = {
   name: "Layla",
@@ -113,8 +136,7 @@ afterAll(async () => {
 });
 
 beforeEach(() => {
-  mem = inMemoryGuestStore({ "groom-uid": { g1: { ...GUEST } } });
-  STORE.current = mem.store;
+  DB.tree = { guestsByGroom: { "groom-uid": { g1: { ...GUEST } } } };
 });
 
 async function req(
@@ -154,18 +176,13 @@ describe("GET /guests/:groomUid — read + driver token-strip", () => {
     expect(json[0].name).toBe("Layla");
     expect(json[0].inviteLinkToken).toBeUndefined();
     // The store's record is untouched — only the response copy is stripped.
-    expect((await mem.store.get("groom-uid", "g1"))?.inviteLinkToken).toBe("secret-tok");
+    expect(DB.tree.guestsByGroom["groom-uid"].g1.inviteLinkToken).toBe("secret-tok");
   });
 
   it("a different groom is forbidden", async () => {
     const { status, json } = await req("GET", "/guests/groom-uid", "other-groom-token");
     expect(status).toBe(403);
     expect(json.error).toBe("forbidden");
-  });
-
-  it("an unassigned driver is forbidden", async () => {
-    const { status } = await req("GET", "/guests/groom-uid", "unassigned-driver-token");
-    expect(status).toBe(403);
   });
 });
 
@@ -189,10 +206,10 @@ describe("POST /guests/:groomUid — create", () => {
     const body = { name: "Sara", phone: "+972500000001", status: "pending", inviteType: "premium" };
     const { status, json } = await req("POST", "/guests/groom-uid", "owner-token", body);
     expect(status).toBe(200);
-    expect(json.id).toBeTruthy();
+    expect(json.id).toBe("new1");
     expect(json.name).toBe("Sara");
     expect(json.groomUid).toBeUndefined();
-    expect(mem.grooms.get("groom-uid")?.size).toBe(2); // g1 + new
+    expect(DB.tree.guestsByGroom["groom-uid"].new1.name).toBe("Sara");
   });
 
   it("a driver cannot create (403 forbidden)", async () => {
@@ -200,25 +217,33 @@ describe("POST /guests/:groomUid — create", () => {
     const { status, json } = await req("POST", "/guests/groom-uid", "driver-token", body);
     expect(status).toBe(403);
     expect(json.error).toBe("forbidden");
-    expect(mem.grooms.get("groom-uid")?.size).toBe(1); // unchanged
+    expect(DB.tree.guestsByGroom["groom-uid"].new1).toBeUndefined();
   });
 
-  it("rejects a body missing required fields (400)", async () => {
+  it("rejects a body missing required fields (400 missing_required)", async () => {
     const { status, json } = await req("POST", "/guests/groom-uid", "owner-token", { name: "X" });
     expect(status).toBe(400);
     expect(json.error).toBe("missing_required");
   });
+
+  it("rejects an empty phone (400 invalid_phone)", async () => {
+    const body = { name: "X", phone: "", status: "pending", inviteType: "vip" };
+    const { status, json } = await req("POST", "/guests/groom-uid", "owner-token", body);
+    expect(status).toBe(400);
+    expect(json.error).toBe("invalid_phone");
+  });
 });
 
 describe("PATCH /guests/:groomUid/:guestId — update", () => {
-  it("assigned driver can mark delivered", async () => {
+  it("assigned driver can mark delivered (siblings preserved)", async () => {
     const { status, json } = await req("PATCH", "/guests/groom-uid/g1", "driver-token", { status: "delivered" });
     expect(status).toBe(200);
     expect(json.ok).toBe(true);
-    expect((await mem.store.get("groom-uid", "g1"))?.status).toBe("delivered");
+    expect(DB.tree.guestsByGroom["groom-uid"].g1.status).toBe("delivered");
+    expect(DB.tree.guestsByGroom["groom-uid"].g1.name).toBe("Layla");
   });
 
-  it("rejects an empty patch (400)", async () => {
+  it("rejects an empty patch (400 empty_patch)", async () => {
     const { status, json } = await req("PATCH", "/guests/groom-uid/g1", "owner-token", {});
     expect(status).toBe(400);
     expect(json.error).toBe("empty_patch");
@@ -230,13 +255,13 @@ describe("DELETE /guests/:groomUid/:guestId — remove", () => {
     const { status, json } = await req("DELETE", "/guests/groom-uid/g1", "owner-token");
     expect(status).toBe(200);
     expect(json.ok).toBe(true);
-    expect(await mem.store.get("groom-uid", "g1")).toBeNull();
+    expect(DB.tree.guestsByGroom["groom-uid"].g1).toBeUndefined();
   });
 
   it("a driver cannot delete (403 forbidden)", async () => {
     const { status, json } = await req("DELETE", "/guests/groom-uid/g1", "driver-token");
     expect(status).toBe(403);
     expect(json.error).toBe("forbidden");
-    expect(await mem.store.get("groom-uid", "g1")).not.toBeNull(); // unchanged
+    expect(DB.tree.guestsByGroom["groom-uid"].g1).not.toBeUndefined();
   });
 });

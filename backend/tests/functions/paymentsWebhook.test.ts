@@ -2,9 +2,18 @@
 // correctly-signed payload passes, and that tampering / wrong secret / stale
 // timestamp are rejected — this is the only thing standing between the public
 // webhook endpoint and a forged "mark this groom paid" request.
-import { describe, it, expect } from "vitest";
+//
+// Plus: ack semantics. A correctly-signed event whose downstream processing
+// FAILS must NOT be acked with 200 — that tells Stripe the event is handled and
+// it never retries, silently losing a real payment. The handler must return 5xx
+// so Stripe re-delivers. We exercise the real route over HTTP and rely on
+// getDatabase() being unavailable in the unit env (same trick as
+// invitesAuthz.test.ts) to force the processing failure.
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { createHmac } from "crypto";
-import { verifyStripeSignature } from "../../functions/src/api/routes/payments";
+import express from "express";
+import type { Server } from "node:http";
+import { verifyStripeSignature, paymentsRouter } from "../../functions/src/api/routes/payments";
 
 const SECRET = "whsec_test_secret";
 
@@ -41,5 +50,91 @@ describe("verifyStripeSignature", () => {
   it("rejects a malformed header", () => {
     expect(verifyStripeSignature(Buffer.from(body), "garbage", SECRET)).toBe(false);
     expect(verifyStripeSignature(Buffer.from(body), "", SECRET)).toBe(false);
+  });
+});
+
+// ── POST /webhook ack semantics ──────────────────────────────────────────────
+// Drive the REAL paymentsRouter over HTTP. getDatabase() is unavailable in this
+// unit env, so a relevant, correctly-signed event that reaches the paid-status
+// write throws — standing in for a real transient RTDB failure in prod.
+describe("POST /webhook ack semantics", () => {
+  let server: Server;
+  let baseUrl = "";
+
+  beforeAll(async () => {
+    process.env.STRIPE_WEBHOOK_SECRET = SECRET;
+    const app = express();
+    // Capture the raw bytes alongside JSON parsing — the handler verifies the
+    // signature against req.rawBody (Firebase populates it in prod).
+    app.use(
+      express.json({
+        verify: (req, _res, buf) => {
+          (req as unknown as { rawBody?: Buffer }).rawBody = buf;
+        },
+      }),
+    );
+    app.use("/payments", paymentsRouter);
+    await new Promise<void>((resolve) => {
+      server = app.listen(0, "127.0.0.1", () => resolve());
+    });
+    const addr = server.address();
+    if (addr && typeof addr === "object") baseUrl = `http://127.0.0.1:${addr.port}`;
+  });
+
+  afterAll(async () => {
+    if (server) await new Promise<void>((resolve) => server.close(() => resolve()));
+  });
+
+  async function postWebhook(rawBody: string, header: string) {
+    const res = await fetch(`${baseUrl}/payments/webhook`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "stripe-signature": header },
+      body: rawBody,
+    });
+    const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    return { status: res.status, json };
+  }
+
+  const nowS = () => Math.floor(Date.now() / 1000);
+
+  it("returns 5xx (so Stripe retries) when the paid-status write fails", async () => {
+    // A paid checkout that WILL reach the db write — which throws in this env.
+    const raw = JSON.stringify({
+      type: "checkout.session.completed",
+      data: { object: { payment_link: "plink_test", payment_status: "paid" } },
+    });
+    const { status } = await postWebhook(raw, sign(raw, SECRET, nowS()));
+    // Pre-fix: the handler swallowed the error and returned 200 received:true,
+    // so Stripe never retried and the payment was lost. Must be 5xx now.
+    expect(status).toBeGreaterThanOrEqual(500);
+  });
+
+  it("acks 200 for an irrelevant event type (no retry storm)", async () => {
+    const raw = JSON.stringify({
+      type: "payment_intent.created",
+      data: { object: {} },
+    });
+    const { status, json } = await postWebhook(raw, sign(raw, SECRET, nowS()));
+    expect(status).toBe(200);
+    expect(json.received).toBe(true);
+  });
+
+  it("acks 200 for a completed-but-unpaid session (nothing to write)", async () => {
+    const raw = JSON.stringify({
+      type: "checkout.session.completed",
+      data: { object: { payment_link: "plink_test", payment_status: "unpaid" } },
+    });
+    const { status, json } = await postWebhook(raw, sign(raw, SECRET, nowS()));
+    expect(status).toBe(200);
+    expect(json.received).toBe(true);
+  });
+
+  it("rejects a forged signature with 400 (never reaches processing)", async () => {
+    const raw = JSON.stringify({
+      type: "checkout.session.completed",
+      data: { object: { payment_link: "plink_test", payment_status: "paid" } },
+    });
+    const { status } = await postWebhook(raw, "t=123,v1=deadbeef");
+    expect(status).toBe(400);
   });
 });

@@ -436,7 +436,16 @@ export function usePortalState({ onBack, t, lang, setLang }) {
     if (!guest) return false;
     const priorStatus = guest.status;
     const deliveredBy = lang === "he" ? "השליח (אתה)" : "المرسل (أنت)";
-    const time = new Date().toLocaleTimeString("ar", { hour: "2-digit", minute: "2-digit", numberingSystem: "latn" });
+    // deliveredAt is a HH:MM display string by design (analytics + the RTDB
+    // isString() validator depend on that shape — converting to a timestamp is a
+    // separate, larger migration). Force 24-hour latn HH:MM so the stored value
+    // is uniform across BOTH languages: without hour12:false the "ar" locale
+    // emits 12-hour "4:35 م" while "he" emits 24-hour "16:35", which would mix
+    // formats in the shared delivery lists. hour12:false makes both render the
+    // documented HH:MM, and drops the previously hardcoded locale.
+    const time = new Date().toLocaleTimeString(lang === "he" ? "he" : "ar", {
+      hour: "2-digit", minute: "2-digit", hour12: false, numberingSystem: "latn",
+    });
 
     // Optimistic: move the guest to "delivered" instantly so the driver sees it
     // accept immediately (no 15s poll wait). The proof upload + status PATCH run

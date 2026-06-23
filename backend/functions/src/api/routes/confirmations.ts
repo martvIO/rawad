@@ -151,9 +151,11 @@ confirmationsRouter.patch(
  *   2. Resolve groomUid via `/usernameIndex/{groomUsername}`.
  *   3. Push a new `/confirmations/{id}` record.
  *   4. Best-effort auto-attach: if exactly one guest under this groom has
- *      a matching normalized phone, stamp `confirmedAt` (+ coords if the
- *      guest had none) and record `attachedGuestId` on the confirmation.
- *      Auto-attach failure is logged but never fails the submission.
+ *      a matching normalized phone, stamp `confirmedAt` (+ `companions` when
+ *      provided) on that guest and record `attachedGuestId` on the confirmation.
+ *      Location is NOT written here — coordinates are only ever copied onto a
+ *      guest via the admin-gated POST /confirmations/attach-location. Auto-attach
+ *      failure is logged but never fails the submission.
  *
  * Returns `{ ok: true, id, attachedGuestId: string | null }`.
  */

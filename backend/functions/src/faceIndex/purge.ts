@@ -14,30 +14,56 @@ import { isRekognitionConfigured } from "./config";
 const PURGE_DAYS = Number(process.env.REKOGNITION_PURGE_DAYS || 30);
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-/** Delete every doc in a collection in chunks. */
+/** Delete every doc in a collection in chunks. A commit failure propagates so
+ *  the caller aborts BEFORE recording the purge as complete (see below). */
 async function clearCollection(fs: Firestore, path: string): Promise<void> {
   const snap = await fs.collection(path).get();
   for (let i = 0; i < snap.docs.length; i += 400) {
     const batch = fs.batch();
     for (const d of snap.docs.slice(i, i + 400)) batch.delete(d.ref);
-    await batch.commit().catch(() => undefined);
+    await batch.commit();
   }
 }
 
 /** Erase ALL face data for a wedding (AWS collection + Firestore rows). */
 export async function purgeWeddingFaces(uid: string): Promise<void> {
-  if (isRekognitionConfigured()) {
-    const rek = await import("./rekognition.js");
-    await rek.deleteCollection(uid).catch(() => undefined);
-  }
-  const fs = getFirestore();
+  // Resolve the AWS deleter only when Rekognition is configured; otherwise there
+  // is no collection to remove and the purge is Firestore-only.
+  const deleteAwsCollection = isRekognitionConfigured()
+    ? (await import("./rekognition.js")).deleteCollection
+    : null;
+  await purgeWeddingFacesWith(getFirestore(), uid, deleteAwsCollection);
+}
+
+/**
+ * Testable core of {@link purgeWeddingFaces}. Deps are injected (Firestore +
+ * the AWS collection deleter) so the success/failure invariant can be unit
+ * tested without a live Firestore or AWS.
+ *
+ * Ordering matters: delete the AWS Rekognition collection FIRST. That collection
+ * is the ONLY copy of the biometric face vectors and the one thing that can't be
+ * TTL'd, so it must be gone before we record the purge as complete.
+ * `deleteCollection` is idempotent (a ResourceNotFoundException counts as
+ * success), so retrying after a partial failure is safe. A REAL failure (AWS
+ * throttle / IAM / network, or a Firestore batch failure) propagates and aborts
+ * BEFORE the stamp below — leaving `facesPurgedAt` unset so the daily
+ * `purgeExpiredFaces` job retries the wedding, instead of silently marking it
+ * "purged" while the faces persist in AWS forever (a breach of the 30-day
+ * privacy commitment).
+ */
+export async function purgeWeddingFacesWith(
+  fs: Firestore,
+  uid: string,
+  deleteAwsCollection: ((uid: string) => Promise<void>) | null,
+): Promise<void> {
+  if (deleteAwsCollection) await deleteAwsCollection(uid);
   await clearCollection(fs, `digitalInvitations/${uid}/photoFaces`);
   await clearCollection(fs, `digitalInvitations/${uid}/guestFaces`);
   await clearCollection(fs, `digitalInvitations/${uid}/peopleClusters`);
+  // Only now — every delete above succeeded — record the purge as complete.
   await fs
     .doc(`digitalInvitations/${uid}`)
-    .set({ facesPurgedAt: Date.now(), clusterDirty: false }, { merge: true })
-    .catch(() => undefined);
+    .set({ facesPurgedAt: Date.now(), clusterDirty: false }, { merge: true });
 }
 
 /** Resolve a wedding's effective purge date (epoch ms), or 0 if unknown.

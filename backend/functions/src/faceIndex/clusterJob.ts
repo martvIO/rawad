@@ -21,6 +21,24 @@ import { isRekognitionConfigured } from "./config";
 
 type CurationOverride = { label: unknown; hidden: boolean; linkedPhone: string | null };
 
+/** A clustering run older than this is treated as crashed, so a new run may take
+ *  over the lock. Must exceed the function's max runtime (timeoutSeconds: 540). */
+export const CLUSTER_LOCK_STALE_MS = 9 * 60 * 1000;
+
+/** True when another clustering run currently holds the jobStatus lock — phase
+ *  "clustering" with a startedAt inside the stale window. Exported for tests. */
+export function clusterLockIsHeld(
+  jobData: { phase?: unknown; startedAt?: unknown } | undefined,
+  nowMs: number,
+): boolean {
+  return (
+    !!jobData &&
+    jobData.phase === "clustering" &&
+    typeof jobData.startedAt === "number" &&
+    nowMs - jobData.startedAt < CLUSTER_LOCK_STALE_MS
+  );
+}
+
 /** Recompute every person cluster for a wedding. Returns the resulting counts. */
 export async function recomputeClusters(
   uid: string,
@@ -30,12 +48,33 @@ export async function recomputeClusters(
   const stamp = (extra: Record<string, unknown>) =>
     jobRef.set({ updatedAt: Date.now(), ...extra }, { merge: true });
 
-  await stamp({ phase: "clustering", startedAt: Date.now(), error: null });
-
   if (!isRekognitionConfigured()) {
     await stamp({ phase: "failed", error: "rekognition_not_configured" });
     return { clusterCount: 0, faceCount: 0, skipped: "not_configured" };
   }
+
+  // Mutual exclusion: recompute can fire on-demand (the "recompute people"
+  // button) AND from the every-10-min scheduler. Two concurrent runs would
+  // delete-all then rewrite over each other — dropping clusters and the manual
+  // curation (hide/rename/link-phone) carried by FaceId. Claim a lock
+  // transactionally on the jobStatus doc; a run older than CLUSTER_LOCK_STALE_MS
+  // is treated as crashed and can be taken over so the gallery never wedges.
+  const claimed = await fs.runTransaction(async (tx) => {
+    const snap = await tx.get(jobRef);
+    if (clusterLockIsHeld(snap.exists ? snap.data() : undefined, Date.now())) {
+      return false;
+    }
+    tx.set(
+      jobRef,
+      { phase: "clustering", startedAt: Date.now(), error: null, updatedAt: Date.now() },
+      { merge: true },
+    );
+    return true;
+  });
+  if (!claimed) {
+    return { clusterCount: 0, faceCount: 0, skipped: "already_running" };
+  }
+
   const rek = await import("./rekognition.js");
 
   // 1. Gather all indexed photo faces + their photo metadata.
@@ -92,7 +131,7 @@ export async function recomputeClusters(
   }
 
   // 5. Replace the cluster set (delete old, write new) carrying overrides over.
-  await commitInChunks(existing.docs.map((d) => () => d.ref.delete()));
+  const delFailures = await commitInChunks(existing.docs.map((d) => () => d.ref.delete()));
 
   const writes: (() => Promise<unknown>)[] = [];
   for (const cl of clusters) {
@@ -122,18 +161,49 @@ export async function recomputeClusters(
       }),
     );
   }
-  await commitInChunks(writes);
+  const writeFailures = await commitInChunks(writes);
+
+  const failures = delFailures + writeFailures;
+  if (failures > 0) {
+    // A delete/write failed (quota, permission, transient). Do NOT report "done"
+    // and do NOT clear clusterDirty — the cluster set is now partially written.
+    // Mark the job failed and leave the gallery dirty so the next scheduled run
+    // recomputes it, rather than silently serving corrupted People data.
+    await stamp({
+      phase: "failed",
+      error: `write_failures:${failures}`,
+      clusterCount: clusters.length,
+      faceCount: faces.length,
+    });
+    return {
+      clusterCount: clusters.length,
+      faceCount: faces.length,
+      skipped: `write_failures:${failures}`,
+    };
+  }
 
   await stamp({ phase: "done", clusterCount: clusters.length, faceCount: faces.length });
   await fs.doc(`digitalInvitations/${uid}`).set({ clusterDirty: false }, { merge: true }).catch(() => undefined);
   return { clusterCount: clusters.length, faceCount: faces.length };
 }
 
-/** Run a list of write thunks with bounded concurrency (avoids batch limits). */
-async function commitInChunks(thunks: (() => Promise<unknown>)[], size = 50): Promise<void> {
+/**
+ * Run a list of write thunks with bounded concurrency (avoids batch limits).
+ * Returns the number that FAILED so the caller can refuse to mark the job
+ * "done" on a partial write. (The old version swallowed every error with
+ * `.catch(() => undefined)`, silently corrupting the cluster set.) Uses
+ * allSettled so one failure doesn't abort the rest of the batch.
+ */
+export async function commitInChunks(
+  thunks: (() => Promise<unknown>)[],
+  size = 50,
+): Promise<number> {
+  let failures = 0;
   for (let i = 0; i < thunks.length; i += size) {
-    await Promise.all(thunks.slice(i, i + size).map((t) => t().catch(() => undefined)));
+    const results = await Promise.allSettled(thunks.slice(i, i + size).map((t) => t()));
+    failures += results.filter((r) => r.status === "rejected").length;
   }
+  return failures;
 }
 
 /** Quiet period after the last index before a dirty gallery reclusters. */

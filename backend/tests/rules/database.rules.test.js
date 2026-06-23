@@ -361,3 +361,43 @@ describe("/audit", () => {
     await assertFails(set(ref(asGroom(), "audit/e1"), e()));
   });
 });
+
+// ── /inviteTokens ──────────────────────────────────────────────────────────
+// Token records are minted ONLY by the Admin SDK (server-side, which bypasses
+// these rules) via the admin-gated POST /invites + POST /invites/digital
+// endpoints. No client — not even a groom for their OWN guest — may write a
+// token directly: doing so would bypass the admin gate, the per-user mint rate
+// limit, and the audit log. Reads are already closed (the raw record carries
+// guest PII + the full design snapshot; it is only ever projected by the
+// server GET /invites/token/:token).
+describe("/inviteTokens", () => {
+  const TOK = "a".repeat(32); // 32-char token id, like randomBytes(16).hex
+  const token = () => ({
+    groomUid:      GROOM,
+    groomUsername: "g1",
+    guestId:       "guest1",
+    guestName:     "Khaled Tester",
+    guestPhone:    "0501112233",
+    guestType:     "physical", // mirror the real Admin-SDK mint payload
+    createdAt:     Date.now(),
+    expiresAt:     Date.now() + 90 * 24 * 60 * 60 * 1000,
+  });
+  // A groom authenticated WITH the role claim they actually carry in
+  // production (asGroom() above is claimless, so it can't exercise a
+  // role-gated rule branch).
+  const asGroomRole = (uid = GROOM) =>
+    env.authenticatedContext(uid, { role: "groom", username: "g1" }).database();
+
+  test("a groom cannot self-mint an invite token for their own guest", async () => {
+    await assertFails(set(ref(asGroomRole(), `inviteTokens/${TOK}`), token()));
+  });
+  test("no client can write /inviteTokens (admin client included — Function-only path)", async () => {
+    await assertFails(set(ref(asAdmin(), `inviteTokens/${TOK}`), token()));
+    await assertFails(set(ref(asAnon(),  `inviteTokens/${TOK}`), token()));
+  });
+  test("clients cannot read a raw token record", async () => {
+    await seed({ [`inviteTokens/${TOK}`]: token() });
+    await assertFails(get(ref(asGroomRole(), `inviteTokens/${TOK}`)));
+    await assertFails(get(ref(asAnon(),      `inviteTokens/${TOK}`)));
+  });
+});
