@@ -17,6 +17,7 @@
 import { Router, Response } from "express";
 import { getDatabase } from "firebase-admin/database";
 import { AuthRequest, requireAuth } from "../middleware/auth";
+import { guestStore } from "../stores/guestStore";
 import { MAX_LEN } from "../../constants/limits";
 
 // ─── Schema constants (mirror database.rules.json) ────────────────────────────
@@ -75,16 +76,7 @@ guestsRouter.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
     return;
   }
   try {
-    const snap = await getDatabase().ref("guestsByGroom").get();
-    const out: GuestRecord[] = [];
-    snap.forEach((groomBucket) => {
-      const groomUid = groomBucket.key;
-      if (!groomUid) return;
-      groomBucket.forEach((g) => {
-        out.push({ id: g.key as string, groomUid, ...(g.val() as Record<string, unknown>) });
-      });
-    });
-    res.json(out);
+    res.json(await guestStore.listAll());
   } catch (err) {
     res.status(500).json({ error: "read_failed", detail: errorMessage(err) });
   }
@@ -115,13 +107,13 @@ guestsRouter.get(
     const claims = req.caller!.claims;
     const stripToken = claims.role !== "admin" && req.caller!.uid !== groomUid;
     try {
-      const snap = await getDatabase().ref(`guestsByGroom/${groomUid}`).get();
-      const out: GuestRecord[] = [];
-      snap.forEach((g) => {
-        // Shallow-copy before stripping so we never mutate the snapshot value.
-        const val = { ...(g.val() as Record<string, unknown>) };
-        if (stripToken) delete val.inviteLinkToken;
-        out.push({ id: g.key as string, groomUid, ...val });
+      const guests = await guestStore.listByGroom(groomUid);
+      // Shallow-copy before stripping so we never mutate the store's record.
+      const out = guests.map((g) => {
+        if (!stripToken) return g;
+        const copy = { ...g };
+        delete copy.inviteLinkToken;
+        return copy;
       });
       res.json(out);
     } catch (err) {
@@ -412,12 +404,7 @@ function validateField(key: string, value: unknown): FieldResult {
   }
 }
 
-// ─── Types & util ─────────────────────────────────────────────────────────────
-
-interface GuestRecord extends Record<string, unknown> {
-  id: string;
-  groomUid: string;
-}
+// ─── Util ─────────────────────────────────────────────────────────────────────
 
 // errorMessage (suppress-by-default 5xx detail) is now shared — see ../errorDetail.
 import { errorMessage } from "../errorDetail";
