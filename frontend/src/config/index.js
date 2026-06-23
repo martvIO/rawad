@@ -45,13 +45,15 @@ export const INVITE_BASE_URL =
  * Contact-channel BUILD-TIME fallbacks for the marketing site's "talk to us"
  * CTAs. The admin overrides/disables these in the Communication settings page
  * (stored in /adminSettings, served via GET /settings/public); these values are
- * only used until the admin fills them in. The WhatsApp business number is added
- * later — leave blank here and set it in the admin Communication tab (or via
- * VITE_CONTACT_WHATSAPP). Numbers are in international format, digits only or
+ * only used until the admin fills them in (or set them per-build via the
+ * VITE_CONTACT_* env vars). Numbers are in international format, digits only or
  * with a leading "+", e.g. "972500000000".
+ *
+ * WHATSAPP is the business booking line (local 052-934-8797) in international
+ * form so every "احجزوا" / "تواصل للحجز" CTA opens WhatsApp at this number.
  */
 export const CONTACT = {
-  WHATSAPP: import.meta.env?.VITE_CONTACT_WHATSAPP ?? "",
+  WHATSAPP: import.meta.env?.VITE_CONTACT_WHATSAPP ?? "972529348797",
   PHONE:    import.meta.env?.VITE_CONTACT_PHONE ?? "",
   EMAIL:    import.meta.env?.VITE_CONTACT_EMAIL ?? "",
 };
