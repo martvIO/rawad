@@ -61,7 +61,7 @@ function TopNav({ t, lang, setLang, onEnterPortal, onContact, scrolled }) {
       backdropFilter: "blur(22px)", WebkitBackdropFilter: "blur(22px)",
       transition: "background .35s ease, border-color .35s ease",
     }}>
-      <div style={{
+      <div className="dawa-topnav-inner" style={{
         maxWidth: 1280, margin: "0 auto", padding: "12px 22px",
         display: "flex", alignItems: "center", gap: 16,
       }}>
@@ -185,11 +185,39 @@ const PageStyles = () => (
     }
 
     @media (max-width: 900px) {
-      .dawa-topnav-links { display: none !important; }
-      .dawa-topnav-burger { display: inline-flex !important; }
+      /* Header wraps to two rows: brand + controls on top, then the section
+         tabs as a full-width strip. The whole header is position:fixed, so the
+         tabs stay pinned at the top while the page scrolls. */
+      .dawa-topnav-inner { flex-wrap: wrap !important; row-gap: 10px !important; }
+      .dawa-topnav-links {
+        display: flex !important;
+        order: 3 !important;
+        flex-basis: 100% !important;
+        justify-content: flex-start !important;
+        gap: 8px !important;
+        flex-wrap: nowrap !important;
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        scrollbar-width: none;            /* Firefox: hide scrollbar */
+        padding-bottom: 2px !important;
+      }
+      .dawa-topnav-links::-webkit-scrollbar { display: none; } /* WebKit: hide scrollbar */
+      .dawa-topnav-links a {
+        flex: 0 0 auto !important;        /* keep full width — scroll, don't squish */
+        padding: 8px 16px !important;
+        border-radius: 999px !important;
+        border: 1px solid rgba(201,168,76,.30) !important;
+        background: rgba(201,168,76,.06) !important;
+        white-space: nowrap !important;
+        font-size: 13px !important;
+      }
+      /* Tabs replace the burger on mobile — no hamburger needed anymore. */
+      .dawa-topnav-burger { display: none !important; }
+      html { scroll-padding-top: 124px; }
     }
     @media (max-width: 480px) {
-      .dawa-topnav-cta, .dawa-topnav-login { display: none !important; }
+      .dawa-topnav-login { display: none !important; }
+      .dawa-topnav-cta { padding: 7px 12px !important; font-size: 11.5px !important; }
     }
 
     @media (max-width: 820px) {
