@@ -49,7 +49,8 @@
       "Bash(graphify query *)",
       "WebFetch(domain:raw.githubusercontent.com)",
       "WebFetch(domain:api.github.com)",
-      "PowerShell(npm install *)"
+      "PowerShell(npm install *)",
+      "Bash(npx skills@latest --help)"
     ]
   },
   "hooks": {
@@ -79,6 +80,9 @@
       }
     ]
   },
+  "enabledPlugins": {
+    "ui-ux-pro-max@ui-ux-pro-max-skill": true
+  },
   "defaultMode": "plan",
   "mcpServers": {
     "playwright": {
@@ -87,8 +91,5 @@
         "@playwright/mcp@latest"
       ]
     }
-  },
-  "enabledPlugins": {
-    "ui-ux-pro-max@ui-ux-pro-max-skill": true
   }
 }
