@@ -15,7 +15,6 @@
 // keep RTDB clean, matching the `.validate: false` $other rule.
 
 import { Router, Response } from "express";
-import { getDatabase } from "firebase-admin/database";
 import { AuthRequest, requireAuth } from "../middleware/auth";
 import { guestStore } from "../stores/guestStore";
 import { MAX_LEN } from "../../constants/limits";
@@ -150,9 +149,8 @@ guestsRouter.post(
     if (typeof guest.createdAt !== "number") guest.createdAt = Date.now();
 
     try {
-      const newRef = getDatabase().ref(`guestsByGroom/${groomUid}`).push();
-      await newRef.set(guest);
-      res.json({ id: newRef.key, ...guest });
+      const created = await guestStore.create(groomUid, guest);
+      res.json({ id: created.id, ...guest });
     } catch (err) {
       res.status(500).json({ error: "write_failed", detail: errorMessage(err) });
     }
@@ -188,9 +186,7 @@ guestsRouter.patch(
       return;
     }
     try {
-      await getDatabase()
-        .ref(`guestsByGroom/${groomUid}/${guestId}`)
-        .update(sanitized.value);
+      await guestStore.patch(groomUid, guestId, sanitized.value);
       res.json({ ok: true });
     } catch (err) {
       res.status(500).json({ error: "write_failed", detail: errorMessage(err) });
@@ -215,7 +211,7 @@ guestsRouter.delete(
       return;
     }
     try {
-      await getDatabase().ref(`guestsByGroom/${groomUid}/${guestId}`).remove();
+      await guestStore.remove(groomUid, guestId);
       res.json({ ok: true });
     } catch (err) {
       res.status(500).json({ error: "delete_failed", detail: errorMessage(err) });
