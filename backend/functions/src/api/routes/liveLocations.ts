@@ -28,13 +28,18 @@
 //     unassigned so they can clean up a stale share.
 //   - GET /:groomUid/stream is gated by `canReadGroom` (admin or the groom).
 
-import { Router, Request, Response } from "express";
+import { Router, Request, Response, NextFunction } from "express";
 import { getDatabase, DataSnapshot } from "firebase-admin/database";
 import {
   AuthRequest,
   requireAuth,
   requireRole,
 } from "../middleware/auth";
+import {
+  mintStreamToken,
+  verifyStreamToken,
+  STREAM_TOKEN_TTL_MS,
+} from "../streamToken";
 
 // ─── Schema constants (mirror database.rules.json /liveLocationsByGroom) ──────
 
@@ -174,11 +179,30 @@ liveLocationsRouter.post(
  *   - On client disconnect (`req.on("close")`), detaches the listener and
  *     clears the heartbeat timer.
  *
- * Token transport: EventSource cannot set custom headers, so the client
- * passes `?token=<idToken>`. `requireAuth` already supports this fallback.
+ * Token transport: EventSource cannot set custom headers, so the auth token
+ * rides in the URL. Preferred: a SHORT-LIVED stream token from
+ * POST /:groomUid/stream-token (`?streamToken=`), which bounds a URL leak to
+ * ~5 min and one groom. Back-compat: the full idToken via `?token=` still works
+ * (verified by requireAuth) so older clients keep streaming during rollout.
  */
 liveLocationsRouter.get(
   "/:groomUid/stream",
+  requireStreamAuth,
+  (req: AuthRequest, res: Response) => {
+    openSseStream(req, res, req.params.groomUid);
+  }
+);
+
+// ─── POST /live-locations/:groomUid/stream-token ──────────────────────────────
+
+/**
+ * Mint a short-lived (~5-min) stream token scoped to this groom, for the SSE
+ * stream above. Same authz as the stream itself (admin or the groom). The client
+ * calls this with its Bearer idToken, then opens the EventSource with the
+ * returned token — keeping the long-lived idToken out of the stream URL.
+ */
+liveLocationsRouter.post(
+  "/:groomUid/stream-token",
   requireAuth,
   (req: AuthRequest, res: Response) => {
     const { groomUid } = req.params;
@@ -186,9 +210,38 @@ liveLocationsRouter.get(
       res.status(403).json({ error: "forbidden" });
       return;
     }
-    openSseStream(req, res, groomUid);
+    res.json({
+      streamToken: mintStreamToken(groomUid),
+      expiresInMs: STREAM_TOKEN_TTL_MS,
+    });
   }
 );
+
+/**
+ * Auth gate for the SSE stream: accept a short-lived `?streamToken=` (HMAC,
+ * scoped to this groomUid) when present; otherwise fall back to the standard
+ * idToken auth (`?token=` / Bearer) + the groom/admin authz check.
+ */
+function requireStreamAuth(req: AuthRequest, res: Response, next: NextFunction): void {
+  const { groomUid } = req.params;
+  const st = req.query?.streamToken;
+  if (typeof st === "string" && st.length > 0) {
+    if (verifyStreamToken(st, groomUid)) {
+      next();
+      return;
+    }
+    res.status(401).json({ error: "invalid_stream_token" });
+    return;
+  }
+  // Back-compat: full idToken, then mirror the stream's authz.
+  void requireAuth(req, res, () => {
+    if (canReadGroom(req, groomUid)) {
+      next();
+      return;
+    }
+    res.status(403).json({ error: "forbidden" });
+  });
+}
 
 // ─── SSE plumbing ─────────────────────────────────────────────────────────────
 
