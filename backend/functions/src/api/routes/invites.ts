@@ -39,6 +39,16 @@ import { loadPassContext, PassResult } from "../../wallet/passData";
 import { renderMonogramPng } from "../../wallet/monogram";
 import { isGroomFrozen, readGroomStatus } from "../../lifecycle/gate";
 import { publicEventState } from "../../lifecycle/status";
+import { WhatsAppSendResult } from "../../whatsapp";
+import {
+  deliverInvite,
+  notifyGuestText,
+  recordSent,
+  recordFailed,
+  inviteLocale,
+  InviteType,
+  InviteLocale,
+} from "../../whatsappInvite";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -56,6 +66,9 @@ const MAX_HOUSE_LEN = MAX_LEN.HOUSE;
 const MAX_NAME_LEN = MAX_LEN.NAME;
 const MAX_PHONE_LEN = MAX_LEN.PHONE;
 const MAX_DELIVERY_NOTE_LEN = MAX_LEN.AREA;
+// Free-form WhatsApp message body for the text-fallback send path. Matches the
+// adminSettings.messageBody / digitalMessage cap in database.rules.json.
+const MAX_INVITE_MESSAGE_LEN = 4000;
 
 const MIN_LAT = -90;
 const MAX_LAT = 90;
@@ -275,7 +288,25 @@ invitesRouter.post(
       });
       await writeAudit(callerUid, "createGuestInvite", { groomUid, guestId });
 
-      res.json({ token, expiresAt });
+      // Opt-in auto-send over WhatsApp (admin Send tab). Physical guests carry
+      // no locale → Arabic. Failures here never undo the mint above.
+      let send: WhatsAppSendResult | undefined;
+      if (req.body?.deliver === "whatsapp") {
+        send = await autoSendInvite({
+          type: "physical",
+          groomUid,
+          guestId,
+          groomUsername,
+          token,
+          phone: guest?.phone,
+          guestName: guest?.name,
+          locale: "ar",
+          messageBody: clampStr(req.body?.messageBody, MAX_INVITE_MESSAGE_LEN),
+          stampGuest: (patch) => db.ref(`guestsByGroom/${groomUid}/${guestId}`).update(patch),
+        });
+      }
+
+      res.json({ token, expiresAt, ...(send ? { send } : {}) });
     } catch (err) {
       res.status(500).json({ error: "write_failed", detail: errorMessage(err) });
     }
@@ -442,7 +473,7 @@ invitesRouter.post(
         return;
       }
       const guest = guestSnap.data() as
-        | { name?: string; phone?: string; designId?: string }
+        | { name?: string; phone?: string; designId?: string; locale?: string }
         | undefined;
       const parentData = (invDocSnap.exists ? invDocSnap.data() ?? {} : {}) as Record<string, unknown>;
 
@@ -531,7 +562,65 @@ invitesRouter.post(
         guestId,
       });
 
-      res.json({ token, expiresAt });
+      // Opt-in auto-send over WhatsApp (admin Send tab). Locale = the language
+      // the guest opened their invite in (stamped on first open); default ar.
+      let send: WhatsAppSendResult | undefined;
+      if (req.body?.deliver === "whatsapp") {
+        send = await autoSendInvite({
+          type: "digital",
+          groomUid,
+          guestId,
+          groomUsername,
+          token,
+          phone: guest?.phone,
+          guestName: guest?.name,
+          locale: inviteLocale(guest?.locale),
+          messageBody: clampStr(req.body?.messageBody, MAX_INVITE_MESSAGE_LEN),
+          stampGuest: (patch) => guestRef.update(patch),
+        });
+      }
+
+      res.json({ token, expiresAt, ...(send ? { send } : {}) });
+    } catch (err) {
+      res.status(500).json({ error: "write_failed", detail: errorMessage(err) });
+    }
+  }
+);
+
+// ─── POST /invites/notify ─────────────────────────────────────────────────────
+//
+// Admin-only free-form WhatsApp text to a DIGITAL guest with NO link — backs the
+// "بدون تصميم / ללא עיצוב" (message only) Send-tab option that used to open a
+// wa.me tab. Free-form text only delivers inside the 24h customer-service window
+// (Meta rule), so this is a best-effort nudge, not a guaranteed business-initiated
+// send. No-op (returns { send:{ ok:false, error:"not_configured" } }) until
+// WhatsApp is configured, which the client treats as "fall back to wa.me".
+//
+// Body: `{ groomUid, guestId, message }`. Returns: `{ send: { ok, id?, error? } }`.
+invitesRouter.post(
+  "/notify",
+  requireAuth,
+  requireAdmin,
+  uidRateLimit("notifyGuest", CREATE_INVITE_MAX_PER_HOUR, HOUR_MS),
+  async (req: AuthRequest, res: Response) => {
+    const groomUid = (req.body?.groomUid ?? "").toString();
+    const guestId = (req.body?.guestId ?? "").toString();
+    const message = clampStr(req.body?.message, MAX_INVITE_MESSAGE_LEN);
+    if (!groomUid || !guestId) {
+      res.status(400).json({ error: "missing_required" });
+      return;
+    }
+    try {
+      const guestSnap = await getFirestore()
+        .doc(`digitalInvitations/${groomUid}/guests/${guestId}`)
+        .get();
+      if (!guestSnap.exists) {
+        res.status(404).json({ error: "guest_not_found" });
+        return;
+      }
+      const phone = (guestSnap.data() as { phone?: string } | undefined)?.phone;
+      const send = await notifyGuestText(phone, message);
+      res.json({ send });
     } catch (err) {
       res.status(500).json({ error: "write_failed", detail: errorMessage(err) });
     }
@@ -783,6 +872,49 @@ function mintToken(): { token: string; expiresAt: number; now: number } {
   const token = randomBytes(TOKEN_BYTES).toString("hex");
   const expiresAt = now + TOKEN_TTL_MS;
   return { token, expiresAt, now };
+}
+
+/**
+ * Auto-deliver a freshly-minted invite over WhatsApp (opt-in via `deliver:
+ * "whatsapp"`). Stamps the guest record with the send status and indexes the
+ * message id for delivery/read tracking. Returns the send result so the route
+ * can echo it to the admin UI; the frontend falls back to opening a wa.me tab
+ * when WhatsApp isn't configured yet ("not_configured"). Never throws — a send
+ * failure must not undo a successful mint.
+ */
+async function autoSendInvite(params: {
+  type: InviteType;
+  groomUid: string;
+  guestId: string;
+  groomUsername: string;
+  token: string;
+  phone: string | undefined;
+  guestName: string | undefined;
+  locale: InviteLocale;
+  messageBody: string;
+  stampGuest: (patch: Record<string, unknown>) => Promise<unknown>;
+}): Promise<WhatsAppSendResult> {
+  const send = await deliverInvite({
+    type: params.type,
+    locale: params.locale,
+    phone: params.phone,
+    guestName: params.guestName,
+    groomUsername: params.groomUsername,
+    token: params.token,
+    messageBody: params.messageBody,
+  });
+  if (send.ok && send.id) {
+    await recordSent(
+      { groomUid: params.groomUid, guestId: params.guestId, type: params.type },
+      send.id,
+      params.stampGuest,
+    );
+  } else if (!send.ok && send.error !== "not_configured") {
+    // "not_configured" is the dormant pre-Meta state — the client falls back to
+    // a wa.me tab, so don't brand the guest's send as failed.
+    await recordFailed(params.stampGuest, send.error);
+  }
+  return send;
 }
 
 /**

@@ -1,25 +1,64 @@
 import { useState } from "react";
 
-// ── Envelope intro ────────────────────────────────────────────────────────────
-function EnvelopeIntro({ guestName, font, lang }) {
+// 2D wax-seal envelope — the fallback intro for devices that don't run the 3D
+// WebGL envelope (weak GPU / no WebGL / reduced-motion / immersive3d off). Tap
+// cracks the seal and reveals the couple's names, then fades into the hero.
+function EnvelopeIntro({ guestName, groomName = "", brideName = "", monogram = "", theme, font, lang }) {
   const [opened, setOpened] = useState(() => {
     try { return localStorage.getItem("dawa-invite-opened") === "1"; } catch { return false; }
   });
-  const [opening, setOpening] = useState(false);
+  const [phase, setPhase] = useState("sealed"); // sealed → open (names) → closing
+
   const onOpen = () => {
-    if (opening) return;
-    setOpening(true);
+    if (phase !== "sealed") return;
     try { localStorage.setItem("dawa-invite-opened", "1"); } catch { /* ignore */ }
-    setTimeout(() => setOpened(true), 1100);
+    setPhase("open");
+    setTimeout(() => setPhase("closing"), 1500);
+    setTimeout(() => setOpened(true), 2600);
   };
+
   if (opened) return null;
+  const showNames = phase === "open" || phase === "closing";
+  const gradStyle = theme
+    ? {
+        fontFamily: font.family,
+        background: `linear-gradient(135deg,${theme.gradientStops.join(",")})`,
+        WebkitBackgroundClip: "text",
+        WebkitTextFillColor: "transparent",
+      }
+    : { fontFamily: font.family };
+
   return (
-    <div className={`dawa-inv-env-overlay${opening ? " is-opening" : ""}`} role="dialog" aria-label="invitation">
-      <div className="dawa-inv-env" role="button" tabIndex={0} onClick={onOpen} onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onOpen()}>
-        <div className="dawa-inv-wax" aria-hidden="true">د</div>
-      </div>
-      <div className="dawa-inv-env-hint">— {lang === "he" ? "לחץ לפתיחת ההזמנה" : "اضغط لفتح الدعوة"} —</div>
-      {guestName && <div className="dawa-inv-env-name dawa-inv-grad" style={{ fontFamily: font.family }}>{guestName}</div>}
+    <div className={`dawa-inv-env-overlay${phase === "closing" ? " is-opening" : ""}`} role="dialog" aria-label="invitation">
+      {!showNames && (
+        <>
+          <div
+            className="dawa-inv-env"
+            role="button"
+            tabIndex={0}
+            onClick={onOpen}
+            onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onOpen()}
+          >
+            <div className="dawa-inv-wax" aria-hidden="true">{monogram || "د"}</div>
+          </div>
+          <div className="dawa-inv-env-hint">— {lang === "he" ? "לחץ לפתיחת ההזמנה" : "اضغط لفتح الدعوة"} —</div>
+          {guestName && (
+            <div className="dawa-inv-env-name dawa-inv-grad" style={{ fontFamily: font.family }}>{guestName}</div>
+          )}
+        </>
+      )}
+
+      {showNames && (
+        <div style={{ textAlign: "center", animation: "dawa-inv-rise .9s cubic-bezier(.2,.7,.2,1) both" }}>
+          {groomName && <h1 className="dawa-inv-couple dawa-inv-grad" style={gradStyle}>{groomName}</h1>}
+          {groomName && brideName && (
+            <span className="dawa-inv-amp" style={{ color: theme?.accent, fontFamily: font.family }}>
+              {lang === "he" ? "ו" : "و"}
+            </span>
+          )}
+          {brideName && <h1 className="dawa-inv-couple dawa-inv-grad" style={gradStyle}>{brideName}</h1>}
+        </div>
+      )}
     </div>
   );
 }

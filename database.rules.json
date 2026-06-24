@@ -98,6 +98,11 @@
           "locationUpdatedAt":{ ".validate": "!newData.exists() || newData.isNumber()" },
           "inviteLinkToken":  { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 64)" },
           "inviteLinkSentAt": { ".validate": "!newData.exists() || newData.isNumber()" },
+          "inviteWaStatus":    { ".validate": "!newData.exists() || newData.val() === 'sent' || newData.val() === 'delivered' || newData.val() === 'read' || newData.val() === 'failed'" },
+          "inviteWaMessageId": { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 128)" },
+          "inviteWaSentAt":    { ".validate": "!newData.exists() || newData.isNumber()" },
+          "inviteWaStatusAt":  { ".validate": "!newData.exists() || newData.isNumber()" },
+          "inviteWaError":     { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 240)" },
           "confirmedAt":      { ".validate": "!newData.exists() || newData.isNumber()" },
           "companions":       { ".validate": "!newData.exists() || (newData.isNumber() && newData.val() >= 0 && newData.val() <= 20)" },
           "$other":         { ".validate": false }
@@ -174,6 +179,17 @@
       "socialFacebookEnabled":   { ".validate": "!newData.exists() || newData.isBoolean()" },
       "socialInstagramEnabled":  { ".validate": "!newData.exists() || newData.isBoolean()" },
       "socialTiktokEnabled":     { ".validate": "!newData.exists() || newData.isBoolean()" },
+      "waPhoneId":         { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 64)" },
+      "waWabaId":          { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 64)" },
+      "waVerifyToken":     { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 128)" },
+      "waAutoSendEnabled": { ".validate": "!newData.exists() || newData.isBoolean()" },
+      "waDailyCap":        { ".validate": "!newData.exists() || (newData.isNumber() && newData.val() >= 1 && newData.val() <= 100000)" },
+      "waFallbackTextAr":  { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 4000)" },
+      "waFallbackTextHe":  { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 4000)" },
+      "waTemplatePhysicalAr": { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 128)" },
+      "waTemplatePhysicalHe": { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 128)" },
+      "waTemplateDigitalAr":  { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 128)" },
+      "waTemplateDigitalHe":  { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 128)" },
       "$other":         { ".validate": false }
     },
 
@@ -201,6 +217,22 @@
         "expiresAt":     { ".validate": "newData.isNumber()" },
         "usedAt":        { ".validate": "!newData.exists() || newData.isNumber()" },
         "$other":        { ".validate": false }
+      }
+    },
+
+    "waMessages": {
+      // Reverse index wamid → { groomUid, guestId, type } written when an invite
+      // is auto-sent over WhatsApp, so the Meta delivery/read webhook can map a
+      // receipt back to the guest record. Server-only (Admin SDK bypasses these);
+      // no client read/write — same Function-only pattern as inviteTokens.
+      ".read": false,
+      ".write": false,
+      "$messageId": {
+        "groomUid": { ".validate": "newData.isString() && newData.val().length <= 64" },
+        "guestId":  { ".validate": "newData.isString() && newData.val().length <= 64" },
+        "type":     { ".validate": "newData.val() === 'physical' || newData.val() === 'digital'" },
+        "sentAt":   { ".validate": "newData.isNumber()" },
+        "$other":   { ".validate": false }
       }
     },
 

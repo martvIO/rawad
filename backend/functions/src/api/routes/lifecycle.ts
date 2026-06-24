@@ -35,7 +35,8 @@ import {
   requireRole,
 } from "../middleware/auth";
 import { userStore } from "../stores/userStore";
-import { isWhatsAppConfigured, sendWhatsAppText } from "../../whatsapp";
+import { sendWhatsAppText } from "../../whatsapp";
+import { getWhatsAppConfig, isConfigured } from "../../whatsappConfig";
 import {
   LIFECYCLE,
   DEFAULT_CANCEL_GRACE_HOURS,
@@ -88,11 +89,14 @@ async function readCancelGraceHours(): Promise<number> {
 /** Best-effort WhatsApp ping to the admin contact number. No-op (no DB touch)
  *  unless WhatsApp is actually configured, so it is inert in unit tests. */
 async function pingAdmin(text: string): Promise<void> {
-  if (!isWhatsAppConfigured()) return;
+  const cfg = await getWhatsAppConfig();
+  if (!isConfigured(cfg)) return;
   try {
     const snap = await getDatabase().ref("adminSettings/contactWhatsapp").get();
     const num = snap.val();
-    if (typeof num === "string" && num.trim()) await sendWhatsAppText(num, text);
+    if (typeof num === "string" && num.trim()) {
+      await sendWhatsAppText(num, text, { token: cfg.token, phoneId: cfg.phoneId });
+    }
   } catch {
     /* notification is best-effort — never block the transition */
   }

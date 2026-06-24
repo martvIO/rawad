@@ -13,6 +13,8 @@ import { usePortal } from "../../../context/PortalContext.jsx";
 import { AdminUserManager } from "./AdminUserManager.jsx";
 import { AdminSendTab } from "./AdminSendTab.jsx";
 import { AdminSettingsTab } from "./AdminSettingsTab.jsx";
+import { AdminWhatsAppSetupTab } from "./AdminWhatsAppSetupTab.jsx";
+import { AdminMessageTemplatesTab } from "./AdminMessageTemplatesTab.jsx";
 import { AdminConfirmationsTab } from "./AdminConfirmationsTab.jsx";
 import { AdminDesigns } from "./AdminDesigns.jsx";
 import { AdminGallery } from "./AdminGallery.jsx";
@@ -84,6 +86,8 @@ export function AdminPortal() {
           <NavLink data-testid="nav-admin-designs"       to="/portal/admin/designs"       style={tabStyle}>🎨 {lang === "he" ? "עיצובים" : "التصاميم"}</NavLink>
           <NavLink data-testid="nav-admin-gallery"       to="/portal/admin/gallery"       style={tabStyle}>📸 {lang === "he" ? "גלריה" : "المعرض"}</NavLink>
           <NavLink data-testid="nav-admin-settings"      to="/portal/admin/settings"      style={tabStyle}>⚙ {t("admin_tab_settings")}</NavLink>
+          <NavLink data-testid="nav-admin-whatsapp"      to="/portal/admin/whatsapp"      style={tabStyle}>📱 {t("admin_tab_whatsapp")}</NavLink>
+          <NavLink data-testid="nav-admin-templates"     to="/portal/admin/templates"     style={tabStyle}>📝 {t("admin_tab_templates")}</NavLink>
           <NavLink data-testid="nav-admin-lifecycle"     to="/portal/admin/lifecycle"     style={tabStyle}>🚫 {t("adm_lc_tab")}</NavLink>
           <NavLink data-testid="nav-admin-audit"         to="/portal/admin/audit"         style={tabStyle}>📜 {lang === "he" ? "יומן" : "السجل"}</NavLink>
         </div>
@@ -98,6 +102,8 @@ export function AdminPortal() {
             <Route path="designs"         element={<AdminDesigns />} />
             <Route path="gallery"         element={<AdminGallery lang={lang} />} />
             <Route path="settings"        element={<AdminSettingsTab />} />
+            <Route path="whatsapp"        element={<AdminWhatsAppSetupTab />} />
+            <Route path="templates"       element={<AdminMessageTemplatesTab />} />
             <Route path="lifecycle"       element={<AdminLifecycleTab />} />
             <Route path="audit"           element={<AdminAuditTab />} />
             <Route path="*"               element={<Navigate to="users" replace />} />

@@ -33,6 +33,7 @@ import { proofsRouter } from "./routes/proofs";
 import { digitalRouter } from "./routes/digital";
 import { photoFacesRouter } from "./routes/photoFaces";
 import { adminRouter } from "./routes/admin";
+import { whatsappRouter } from "./routes/whatsapp.routes";
 import { paymentsRouter } from "./routes/payments";
 import { decryptPasswordFields } from "./middleware/decryptPasswordFields";
 import { isEncryptionAvailable } from "./passwordCrypto";
@@ -101,6 +102,7 @@ app.use("/proofs", proofsRouter);
 app.use("/digital/photos", photoFacesRouter);
 app.use("/digital", digitalRouter);
 app.use("/admin", adminRouter);
+app.use("/whatsapp", whatsappRouter);
 app.use("/payments", paymentsRouter);
 
 // ─── Health probe ─────────────────────────────────────────────────────────────

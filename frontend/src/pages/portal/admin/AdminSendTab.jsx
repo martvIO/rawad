@@ -32,6 +32,16 @@ const digitalStatusOf = (g) => g.status || "pending";
 // Sentinel for the "بدون تصميم" (no design) picker option — send the message
 // with NO invitation link. Client-side only; never persisted onto a guest.
 const NODESIGN = "__nodesign__";
+// Meta's starting business-initiated tier is 250 conversations / 24h; warn the
+// admin before a bulk send exceeds it (a new number can get flagged otherwise).
+const WA_DAILY_CAP = 250;
+// Per-guest WhatsApp delivery pill (driven by the Meta receipt webhook).
+const WA_STATUS_STYLE = {
+  sent:      { icon: "📤", color: "#7a6a4a", bg: "rgba(122,106,74,.12)" },
+  delivered: { icon: "✓",  color: "#4b9fd4", bg: "rgba(75,159,212,.14)" },
+  read:      { icon: "👁", color: "#4cc97a", bg: "rgba(76,201,122,.15)" },
+  failed:    { icon: "⚠",  color: "#d47a4b", bg: "rgba(212,122,75,.18)" },
+};
 // Replace {الاسم}/{name}/{שם} placeholders with the guest's name.
 const personalize = (msg, name) =>
   (msg || "").replace(/\{\s*(?:الاسم|name|שם)\s*\}/g, (name || "").trim());
@@ -74,19 +84,44 @@ export function AdminSendTab() {
     }
   };
   // Per-guest invite tokens are minted on demand (createGuestInvite Cloud
-  // Function); each guest gets a unique 90-day link, so there's no global
-  // adminFormLink to gate the buttons on anymore.
+  // Function); each guest gets a unique 90-day link.
+  //
+  // Bulk send now fires REAL WhatsApp messages from the business number (no more
+  // opening N tabs), so we (1) confirm with the exact count, (2) warn when the
+  // count exceeds Meta's starting daily limit, and (3) send sequentially with a
+  // small delay to stay under the rate limiter. Per-send toasts are silenced in
+  // favour of one summary at the end.
   const sendAll = async (guestList) => {
     if (guestList.length === 0) return;
-    showToast(t("admin_bulk_warn"));
-    for (let i = 0; i < guestList.length; i++) {
-      // Sequential awaits avoid hammering the rate limiter and let the
-      // browser keep popup permission alive between window.opens.
-      await sendInviteLink(guestList[i]);
-      if (i < guestList.length - 1) {
-        await new Promise(r => setTimeout(r, 300));
+    const n = guestList.length;
+    const overCap = n > WA_DAILY_CAP;
+    const confirmMsg =
+      (lang === "he"
+        ? `יישלחו ${n.toLocaleString("en")} הודעות וואטסאפ אמיתיות עכשיו ממספר העסק.`
+        : `سيتم إرسال ${n.toLocaleString("en")} رسالة واتساب فعلية الآن من رقم العمل.`) +
+      (overCap
+        ? lang === "he"
+          ? `\n\n⚠ מעל המגבלה היומית (${WA_DAILY_CAP}) — ייתכן שחלק מההודעות לא יישלחו.`
+          : `\n\n⚠ أكثر من الحد اليومي (${WA_DAILY_CAP}) — قد لا تصل بعض الرسائل.`
+        : "") +
+      (lang === "he" ? "\n\nלהמשיך?" : "\n\nمتابعة؟");
+    if (!window.confirm(confirmMsg)) return;
+
+    let ok = 0;
+    let fail = 0;
+    for (let i = 0; i < n; i++) {
+      // Sequential awaits keep us under the per-user rate limit.
+      const res = await sendInviteLink(guestList[i], { silent: true });
+      if (res?.ok) ok++; else fail++;
+      if (i < n - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 300));
       }
     }
+    showToast(
+      lang === "he"
+        ? `נשלחו: ${ok.toLocaleString("en")} · נכשלו: ${fail.toLocaleString("en")}`
+        : `تم الإرسال: ${ok.toLocaleString("en")} · فشل: ${fail.toLocaleString("en")}`,
+    );
   };
             const groomList = users.filter(u => u.role === "groom");
             // Show ALL of the groom's guests (confirmed + not). Each card labels
@@ -350,6 +385,15 @@ export function AdminSendTab() {
                                     fontSize: 10, padding: "2px 8px", borderRadius: 20, fontWeight: 700,
                                     background: REPLY_STATUS.pending.bg, color: REPLY_STATUS.pending.color,
                                   }}>{t("reply_pending")}</span>
+                                )}
+                                {/* WhatsApp delivery status — sent → delivered → read (or failed),
+                                    advanced by the Meta receipt webhook. */}
+                                {WA_STATUS_STYLE[g.inviteWaStatus] && (
+                                  <span style={{
+                                    fontSize: 10, padding: "2px 8px", borderRadius: 20, fontWeight: 700,
+                                    background: WA_STATUS_STYLE[g.inviteWaStatus].bg,
+                                    color: WA_STATUS_STYLE[g.inviteWaStatus].color,
+                                  }}>{WA_STATUS_STYLE[g.inviteWaStatus].icon} {t("wa_status_" + g.inviteWaStatus)}</span>
                                 )}
                               </div>
                               <div style={{ fontSize: 11, color: "#5a5040", direction: "ltr", textAlign: "right" }}>{g.phone}</div>

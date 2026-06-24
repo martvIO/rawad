@@ -20,7 +20,8 @@ import { HOUR_MS } from "../../../constants/time";
 import { guestsCol, parentDoc } from "./firestore";
 import { canActOnUid } from "./access";
 import { safeDetail } from "./project";
-import { sendWhatsAppTemplate, isYourPhotosTemplateConfigured } from "../../../whatsapp";
+import { sendWhatsAppTemplate } from "../../../whatsapp";
+import { getWhatsAppConfig, isConfigured } from "../../../whatsappConfig";
 
 const PUBLIC_BASE_URL = (process.env.PUBLIC_BASE_URL || "https://dawa-aa793.web.app").replace(/\/+$/, "");
 const TEMPLATE_LANG = process.env.WHATSAPP_YOURPHOTOS_TEMPLATE_LANG || "ar";
@@ -44,10 +45,14 @@ export async function sendPhotoLinksForGroom(
   uid: string,
   opts: { force?: boolean } = {},
 ): Promise<SendPhotoLinksResult> {
-  // No-op until WhatsApp + the template are configured.
-  if (!isYourPhotosTemplateConfigured()) {
+  // No-op until WhatsApp + the template are configured. Phone id / token come
+  // from the resolved config (admin DB over env); the template name stays env.
+  const cfg = await getWhatsAppConfig();
+  const yourPhotosTemplate = (process.env.WHATSAPP_YOURPHOTOS_TEMPLATE || "").trim();
+  if (!isConfigured(cfg) || !yourPhotosTemplate) {
     return { ok: true, sent: 0, considered: 0, skipped: { not_configured: true } };
   }
+  const creds = { token: cfg.token, phoneId: cfg.phoneId };
 
   // Photographer photos must be published for the page to show anything.
   const parent = await parentDoc(uid).get();
@@ -56,7 +61,6 @@ export async function sendPhotoLinksForGroom(
   }
 
   const force = opts.force === true;
-  const templateName = process.env.WHATSAPP_YOURPHOTOS_TEMPLATE as string;
 
   const db = getDatabase();
   const snap = await guestsCol(uid).get();
@@ -83,7 +87,7 @@ export async function sendPhotoLinksForGroom(
 
     const link = `${PUBLIC_BASE_URL}/d/${tk.groomUsername}/${g.inviteLinkToken}/photos`;
     const components = [{ type: "body", parameters: [{ type: "text", text: link }] }];
-    const result = await sendWhatsAppTemplate(g.phone, templateName, TEMPLATE_LANG, components);
+    const result = await sendWhatsAppTemplate(g.phone, yourPhotosTemplate, TEMPLATE_LANG, components, creds);
     if (result.ok) {
       sent++;
       await doc.ref.update({ photosLinkSentAt: Date.now() }).catch(() => undefined);

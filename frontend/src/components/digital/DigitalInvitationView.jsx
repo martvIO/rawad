@@ -23,7 +23,6 @@ import { RSVPSection } from "./sections/InviteRsvp.jsx";
 import { GiftSection } from "./sections/InviteGift.jsx";
 import { GuestbookSection } from "./sections/InviteGuestbook.jsx";
 import { InviteFooter, FloatingDock } from "./sections/InviteFooterDock.jsx";
-import { EnvelopeIntro } from "./sections/EnvelopeIntro.jsx";
 import { CelestialAmbience } from "./sections/CelestialAmbience.jsx";
 import { ViewStyles } from "./sections/InviteStyles.jsx";
 import { WalletButton } from "./WalletButton.jsx";
@@ -179,8 +178,19 @@ export function DigitalInvitationView({
         <SorekButton lang={lang} isPublic={isPublic} onClick={onOpenSorek} theme={theme} font={font} />
       )}
 
-      {showEnvelopeNow && <EnvelopeIntro guestName={guestName} font={font} lang={lang} />}
-      <CelestialAmbience theme={theme} mode={mode} fixed={isPublic} immersive3d={on(design?.immersive3d)} />
+      <CelestialAmbience
+        theme={theme}
+        font={font}
+        lang={lang}
+        mode={mode}
+        fixed={isPublic}
+        immersive3d={on(design?.immersive3d)}
+        showEnvelope={showEnvelopeNow}
+        guestName={guestName}
+        groomName={groomName}
+        brideName={brideName}
+        monogram={monogram}
+      />
 
       <Hero
         guestName={guestName}

@@ -13,7 +13,7 @@ import { useTiltParallax } from "../../../hooks/useTiltParallax.js";
 // the engine — which force-loses the GL context to free it immediately — never
 // poisons a reused canvas. React StrictMode's mount→unmount→remount, and any
 // real remount, each get a brand-new canvas.
-export default function CelestialCanvas({ theme, mode = "public", fixed = true, tier = 2, onFpsDowngrade }) {
+export default function CelestialCanvas({ theme, mode = "public", fixed = true, tier = 2, onFpsDowngrade, envelope = null, onReady, elevated = false }) {
   const containerRef = useRef(null);
   const worldRef = useRef(null);
   const scrollRef = useRef(0);
@@ -23,6 +23,11 @@ export default function CelestialCanvas({ theme, mode = "public", fixed = true, 
   fpsCbRef.current = onFpsDowngrade;
   const themeRef = useRef(theme);
   themeRef.current = theme;
+  // Envelope config is captured at mount (the engine builds it once); a ref
+  // avoids re-running the create effect when the parent re-renders.
+  const envelopeRef = useRef(envelope);
+  const onReadyRef = useRef(onReady);
+  onReadyRef.current = onReady;
 
   // public (guest invite): scroll + pointer + device tilt (asks gyro permission)
   // landing (marketing hero): scroll + pointer, no gyro prompt
@@ -50,6 +55,7 @@ export default function CelestialCanvas({ theme, mode = "public", fixed = true, 
         tier: interactive ? tier : Math.min(tier, 1),
         interactive,
         inputRefs: { scrollRef, pointerRef, tiltRef },
+        envelope: envelopeRef.current,
         onFpsDowngrade: () => fpsCbRef.current && fpsCbRef.current(),
       });
     } catch (err) {
@@ -63,6 +69,8 @@ export default function CelestialCanvas({ theme, mode = "public", fixed = true, 
     }
     worldRef.current = world;
     world.setTheme(themeToUniforms(themeRef.current));
+    // Hand the engine up so the parent can drive openEnvelope() from the tap.
+    if (onReadyRef.current) onReadyRef.current(world);
 
     // The engine reads scrollRef/pointerRef/tiltRef directly (passed as
     // inputRefs), so there's no separate pump loop here.
@@ -114,7 +122,9 @@ export default function CelestialCanvas({ theme, mode = "public", fixed = true, 
       style={{
         position: fixed ? "fixed" : "absolute",
         inset: 0,
-        zIndex: 0,
+        // Elevated above the DOM hero (z 6) while the envelope intro covers the
+        // page; drops behind everything for the normal scene.
+        zIndex: elevated ? 999 : 0,
         pointerEvents: "none",
       }}
     />
