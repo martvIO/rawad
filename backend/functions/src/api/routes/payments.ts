@@ -37,6 +37,30 @@ const STRIPE_API = "https://api.stripe.com/v1";
 export const PLAN_AMOUNTS_ILS: Record<string, number> = { premium: 1500, vip: 2000 };
 const VALID_PLANS = new Set(Object.keys(PLAN_AMOUNTS_ILS));
 const CURRENCY = "ils";
+
+/**
+ * Build the SINGLE root multi-path RTDB update for a created payment link: the
+ * groom's payment metadata under /users/{uid} AND the /stripePaymentLinks/{linkId}
+ * reverse index the webhook resolves uid from. Returning one object lets the route
+ * apply both atomically via ref().update — exported pure so the atomicity (both
+ * the user paths AND the reverse index present in one write) is unit-testable.
+ */
+export function paymentLinkUpdates(
+  uid: string,
+  linkId: string,
+  f: { plan: string; amountIls: number; url: string; mode: string; createdAt: number },
+): Record<string, unknown> {
+  return {
+    [`users/${uid}/paymentPlan`]: f.plan,
+    [`users/${uid}/paymentStatus`]: "pending",
+    [`users/${uid}/paymentAmountIls`]: f.amountIls,
+    [`users/${uid}/paymentLinkUrl`]: f.url,
+    [`users/${uid}/paymentLinkId`]: linkId,
+    [`users/${uid}/paymentCreatedAt`]: f.createdAt,
+    [`users/${uid}/paymentMode`]: f.mode,
+    [`stripePaymentLinks/${linkId}`]: uid,
+  };
+}
 // Reject webhook events whose timestamp is older than this (replay protection).
 const WEBHOOK_TOLERANCE_S = 5 * 60;
 
@@ -199,16 +223,13 @@ paymentsRouter.post(
       const url = linkRes.data.url as string;
       const mode = key.startsWith("sk_live_") ? "live" : "test";
 
-      await db.ref(`users/${uid}`).update({
-        paymentPlan: plan,
-        paymentStatus: "pending",
-        paymentAmountIls: amountIls,
-        paymentLinkUrl: url,
-        paymentLinkId: linkId,
-        paymentCreatedAt: Date.now(),
-        paymentMode: mode,
-      });
-      await db.ref(`stripePaymentLinks/${linkId}`).set(uid);
+      // Single atomic multi-path update: the user's payment metadata AND the
+      // reverse index the webhook maps linkId→uid with land together (or neither).
+      // Previously these were two separate writes — a failure of the second left a
+      // payment link the webhook couldn't attribute, silently dropping the payment.
+      await db.ref().update(
+        paymentLinkUpdates(uid, linkId, { plan, amountIls, url, mode, createdAt: Date.now() }),
+      );
       await writeAudit(req.caller?.uid ?? "admin", "payment_link_created", { uid, plan, linkId, mode });
 
       res.json({ url, linkId, plan, amountIls, mode });
