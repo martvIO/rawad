@@ -19,6 +19,7 @@
 
 import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
+import { buildCorsOriginCheck } from "./cors";
 
 import { authRouter } from "./routes/auth";
 import { settingsRouter } from "./routes/settings";
@@ -46,9 +47,6 @@ import { captureError, sentryEnabled } from "../sentry";
 
 /** Max JSON body size. 10 MB is enough for legacy data-URL photo payloads. */
 const JSON_BODY_LIMIT = "10mb";
-
-/** Env var listing allowed origins, comma-separated. */
-const ALLOWED_ORIGINS_ENV = "ALLOWED_ORIGINS";
 
 // ─── App construction ─────────────────────────────────────────────────────────
 
@@ -173,72 +171,5 @@ export function stripApiPrefix(
   next();
 }
 
-// ─── CORS helper ──────────────────────────────────────────────────────────────
-
-type CorsOriginCallback = (err: Error | null, allow?: boolean) => void;
-
-/**
- * Origins that are ALWAYS allowed regardless of `ALLOWED_ORIGINS`, so a config
- * gap can never lock out local dev or the project's own Firebase Hosting
- * domains (which serve the SPA that opens cross-origin SSE to this API):
- *   - localhost / 127.0.0.1 on any port (Vite dev server)
- *   - `<anything>.web.app` and `<anything>.firebaseapp.com` (Firebase Hosting)
- */
-function isAlwaysAllowedOrigin(origin: string): boolean {
-  return (
-    /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin) ||
-    /^https:\/\/[a-z0-9-]+\.(web\.app|firebaseapp\.com)$/i.test(origin)
-  );
-}
-
-/**
- * Build the CORS origin-checker from the `ALLOWED_ORIGINS` env var.
- *
- * Behavior:
- *   - If `ALLOWED_ORIGINS` is set, only the listed origins (comma-separated,
- *     exact match) PLUS the always-allowed set above are permitted; everything
- *     else is denied (fail-closed for unknown origins). This is the production
- *     posture — set the prod domains (dawa.to, *.web.app, …) in functions/.env.
- *   - If unset/empty, all origins are allowed. This preserves the documented
- *     dev-friendly default (`npm run dev` hits the cross-origin Cloud Run URL),
- *     but logs a warning so an unconfigured production deploy is visible.
- *   - Requests with no Origin header (server-to-server, curl, native WebView)
- *     are always allowed.
- */
-function buildCorsOriginCheck() {
-  const raw = process.env[ALLOWED_ORIGINS_ENV] ?? "";
-  const allowList = raw
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-
-  if (allowList.length === 0) {
-    // eslint-disable-next-line no-console
-    console.warn(
-      "[api] ALLOWED_ORIGINS is not set — CORS allows ANY origin. Set it in " +
-        "functions/.env to the production domains to lock this down."
-    );
-    return true; // cors lib: allow any origin
-  }
-
-  return function originCheck(
-    origin: string | undefined,
-    cb: CorsOriginCallback
-  ): void {
-    if (!origin) {
-      cb(null, true); // server-to-server, curl, mobile WebView
-      return;
-    }
-    if (isAlwaysAllowedOrigin(origin) || allowList.includes(origin)) {
-      cb(null, true);
-      return;
-    }
-    // Disallowed origin: do NOT throw (that turns into a 500 and takes the whole
-    // API down for that browser). Instead deny CORS headers — the browser blocks
-    // genuine cross-origin reads, while same-origin requests (the app calling its
-    // own /api) still succeed because same-origin doesn't require CORS headers.
-    // eslint-disable-next-line no-console
-    console.warn(`[api] CORS: origin not in allowlist: ${origin}`);
-    cb(null, false);
-  };
-}
+// CORS origin policy (fail-closed; always-allowed set + ALLOWED_ORIGINS) lives in
+// ./cors so the allow/deny decision is unit-testable — see api/cors.ts.
