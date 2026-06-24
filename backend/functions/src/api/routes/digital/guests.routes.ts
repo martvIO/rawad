@@ -1,6 +1,6 @@
 import { Response } from "express";
 import { AuthRequest,requireAuth } from "../../middleware/auth";
-import { guestsCol } from "./firestore";
+import { firebaseDigitalGuestStore } from "../../../domain/digital/firebaseDigitalGuestStore";
 import { canActOnUid } from "./access";
 import { ilNational,sanitizeDigitalGuestCreate,sanitizeDigitalGuestPatch } from "./sanitize";
 import { safeDetail } from "./project";
@@ -24,10 +24,7 @@ router.get(
       return;
     }
     try {
-      const snap = await guestsCol(req.params.uid)
-        .orderBy("createdAt", "asc")
-        .get();
-      res.json(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+      res.json(await firebaseDigitalGuestStore().list(req.params.uid));
     } catch (err) {
       res.status(500).json({ error: "read_failed", detail: safeDetail(err) });
     }
@@ -57,23 +54,30 @@ router.post(
       return;
     }
     try {
-      // Block a duplicate phone within THIS groom's digital guest list.
+      // Block a duplicate phone within THIS groom's digital guest list. The
+      // scan-then-add runs in one Firestore transaction inside the store, so two
+      // concurrent submits with the same phone can't both pass the check (the
+      // legacy read-then-add could). sanitize guarantees a normalisable phone,
+      // so newNat is non-null here.
       const newNat = ilNational(sanitized.value.phone);
-      const existing = await guestsCol(req.params.uid).get();
-      const dup = existing.docs.some(
-        (d) => ilNational(((d.data() as { phone?: unknown }).phone ?? "").toString()) === newNat
-      );
-      if (dup) {
-        res.status(409).json({ error: "duplicate_phone", field: "phone" });
-        return;
-      }
-      const docRef = await guestsCol(req.params.uid).add({
+      const record = {
         ...sanitized.value,
         status: "pending",
         createdAt: Date.now(),
-      });
-      const snap = await docRef.get();
-      res.json({ id: docRef.id, ...snap.data() });
+      };
+      const result = await firebaseDigitalGuestStore().create(
+        req.params.uid,
+        record,
+        {
+          key: newNat ?? "",
+          keyOf: (g) => ilNational(((g.phone ?? "") as unknown as string).toString()),
+        }
+      );
+      if (!result.ok) {
+        res.status(409).json({ error: "duplicate_phone", field: "phone" });
+        return;
+      }
+      res.json({ id: result.id, ...record });
     } catch (err) {
       res.status(500).json({ error: "write_failed", detail: safeDetail(err) });
     }
@@ -104,9 +108,11 @@ router.patch(
       return;
     }
     try {
-      await guestsCol(req.params.uid)
-        .doc(req.params.id)
-        .update(sanitized.value as Record<string, unknown>);
+      await firebaseDigitalGuestStore().patch(
+        req.params.uid,
+        req.params.id,
+        sanitized.value as Record<string, unknown>
+      );
       res.json({ ok: true });
     } catch (err) {
       res.status(500).json({ error: "write_failed", detail: safeDetail(err) });
@@ -123,7 +129,7 @@ router.delete(
       return;
     }
     try {
-      await guestsCol(req.params.uid).doc(req.params.id).delete();
+      await firebaseDigitalGuestStore().remove(req.params.uid, req.params.id);
       res.json({ ok: true });
     } catch (err) {
       res.status(500).json({ error: "delete_failed", detail: safeDetail(err) });

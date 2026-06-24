@@ -31,6 +31,45 @@ export interface DbPort {
   ): Promise<{ committed: boolean }>;
 }
 
+/** A Firestore document as it crosses the seam: id + plain data, never a snapshot. */
+export interface FsDoc {
+  id: string;
+  data: Record<string, unknown>;
+}
+
+/**
+ * Firestore access, reduced to the operations the digital domain needs. Paths
+ * are full slash paths — a collection ("digitalInvitations/uid/guests") or a
+ * doc ("digitalInvitations/uid/guests/gid"). Modelled separately from DbPort
+ * because Firestore is a distinct store with its own atomicity primitive
+ * (runTransaction), which `addAfterScan` exposes at exactly the grain the
+ * digital guest list needs.
+ */
+export interface FirestorePort {
+  /** Read every doc in a collection, optionally ordered by a field. */
+  list(
+    collectionPath: string,
+    opts?: { orderBy?: { field: string; dir: "asc" | "desc" } },
+  ): Promise<FsDoc[]>;
+  /** Shallow-merge update an existing doc (Firestore `.update` — rejects if absent). */
+  update(docPath: string, patch: Record<string, unknown>): Promise<void>;
+  /** Delete a doc (idempotent). */
+  remove(docPath: string): Promise<void>;
+  /**
+   * Atomically scan a collection then conditionally add ONE doc, inside a single
+   * Firestore transaction: read every doc, call `decide(existing)`, and — when
+   * it returns a value — add a fresh auto-id doc with that value. Returns
+   * `{ added:false, id:null }` when `decide` returns `undefined` (e.g. a
+   * duplicate was found). This is the race-free form of read-then-add that the
+   * digital guest-list duplicate-phone guard needs (a plain list()+add() lets
+   * two concurrent inserts both pass the check).
+   */
+  addAfterScan(
+    collectionPath: string,
+    decide: (existing: FsDoc[]) => Record<string, unknown> | undefined,
+  ): Promise<{ added: boolean; id: string | null }>;
+}
+
 /** The subset of a Firebase Auth user record the domains read. */
 export interface AuthUserRecord {
   uid: string;

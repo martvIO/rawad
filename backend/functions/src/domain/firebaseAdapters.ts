@@ -9,7 +9,8 @@
 
 import { getDatabase } from "firebase-admin/database";
 import { getAuth } from "firebase-admin/auth";
-import { DbPort, AuthPort } from "./ports";
+import { getFirestore, Query } from "firebase-admin/firestore";
+import { DbPort, AuthPort, FirestorePort } from "./ports";
 
 // Reuse the SDK's own parameter types so the adapter stays in lock-step with
 // firebase-admin without importing named request types.
@@ -43,6 +44,43 @@ export function rtdbPort(): DbPort {
           transform(current === undefined ? null : current),
         );
       return { committed: result.committed };
+    },
+  };
+}
+
+/** Firestore adapter — thin pass-through to the Admin SDK. */
+export function firestorePort(): FirestorePort {
+  const fs = getFirestore();
+  return {
+    async list(collectionPath, opts) {
+      let q: Query = fs.collection(collectionPath);
+      if (opts?.orderBy) q = q.orderBy(opts.orderBy.field, opts.orderBy.dir);
+      const snap = await q.get();
+      return snap.docs.map((d) => ({
+        id: d.id,
+        data: d.data() as Record<string, unknown>,
+      }));
+    },
+    async update(docPath, patch) {
+      await fs.doc(docPath).update(patch);
+    },
+    async remove(docPath) {
+      await fs.doc(docPath).delete();
+    },
+    async addAfterScan(collectionPath, decide) {
+      const col = fs.collection(collectionPath);
+      return fs.runTransaction(async (tx) => {
+        const snap = await tx.get(col);
+        const existing = snap.docs.map((d) => ({
+          id: d.id,
+          data: d.data() as Record<string, unknown>,
+        }));
+        const data = decide(existing);
+        if (data === undefined) return { added: false, id: null };
+        const ref = col.doc(); // fresh auto id
+        tx.set(ref, data);
+        return { added: true, id: ref.id };
+      });
     },
   };
 }
