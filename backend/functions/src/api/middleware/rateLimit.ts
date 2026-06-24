@@ -20,6 +20,8 @@
 
 import { Request, Response, NextFunction } from "express";
 import { allow } from "../../rateLimit";
+import { allowPersistent } from "../../rateLimitPersistent";
+import { rtdbPort } from "../../domain/firebaseAdapters";
 import { AuthRequest } from "./auth";
 
 /** Fallback IP key when Express cannot resolve the client address. */
@@ -50,6 +52,27 @@ export function ipRateLimit(prefix: string, maxPerHour: number, windowMs: number
         error: "too_many_requests",
         scope: "ip",
       });
+      return;
+    }
+    next();
+  };
+}
+
+/**
+ * Like `ipRateLimit`, but backed by the PERSISTENT (cross-instance) store so the
+ * limit survives Cloud Function cold starts. Use ONLY for the security-critical
+ * auth surface (login, OTP) where a cold-start bypass is a real brute-force gap;
+ * the cheap high-volume limiters stay in-memory. `allowPersistent` fail-opens on a
+ * store error, so a limiter outage can't lock out every login. Skipped in the
+ * emulator like the others so e2e tests don't trip it.
+ */
+export function ipRateLimitPersistent(prefix: string, maxPerHour: number, windowMs: number) {
+  return async function ipGate(req: Request, res: Response, next: NextFunction): Promise<void> {
+    if (IN_EMULATOR) { next(); return; }
+    const ip = resolveClientIp(req);
+    const allowed = await allowPersistent(rtdbPort(), `${prefix}:${ip}`, maxPerHour, windowMs);
+    if (!allowed) {
+      res.status(429).json({ error: "too_many_requests", scope: "ip" });
       return;
     }
     next();

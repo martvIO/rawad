@@ -17,28 +17,34 @@ import { DbPort, AuthPort, FirestorePort, FsBatchOp } from "./ports";
 type CreateReq = Parameters<ReturnType<typeof getAuth>["createUser"]>[0];
 type UpdateReq = Parameters<ReturnType<typeof getAuth>["updateUser"]>[1];
 
-/** Realtime Database adapter. `get` collapses `!exists()` to `null`. */
+/**
+ * Realtime Database adapter. `get` collapses `!exists()` to `null`.
+ *
+ * `getDatabase()` is resolved LAZILY inside each method (not at construction) so
+ * building the port never throws when the SDK app isn't initialised — that lets
+ * resilient callers (the persistent rate limiter) fail-open instead of crashing,
+ * and keeps unit tests that don't boot Firebase from hanging. Still per-request.
+ */
 export function rtdbPort(): DbPort {
-  const db = getDatabase();
   return {
     async get(path) {
-      const snap = await db.ref(path).get();
+      const snap = await getDatabase().ref(path).get();
       return snap.exists() ? snap.val() : null;
     },
     async update(updates) {
-      await db.ref().update(updates);
+      await getDatabase().ref().update(updates);
     },
     async set(path, value) {
-      await db.ref(path).set(value);
+      await getDatabase().ref(path).set(value);
     },
     async remove(path) {
-      await db.ref(path).remove();
+      await getDatabase().ref(path).remove();
     },
     async transaction(path, transform) {
       // RTDB hands the transform `null` for an absent path and aborts the write
       // when it returns `undefined` — the exact contract the DbPort declares, so
       // this is a straight pass-through.
-      const result = await db
+      const result = await getDatabase()
         .ref(path)
         .transaction((current) =>
           transform(current === undefined ? null : current),

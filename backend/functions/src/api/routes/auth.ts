@@ -24,8 +24,16 @@ import { getDatabase } from "firebase-admin/database";
 import { isStrongPassword, phoneIndexKey, syntheticEmail } from "../../helpers";
 import { writeAudit } from "../../audit";
 import { AuthRequest, requireAuth } from "../middleware/auth";
-import { ipRateLimit } from "../middleware/rateLimit";
-import { allow, failureCount, recordFailure, clearFailures } from "../../rateLimit";
+import { ipRateLimit, ipRateLimitPersistent } from "../middleware/rateLimit";
+// Security-critical auth limiters (login/OTP/reset/lockout) are PERSISTENT
+// (cross-instance) so a cold start can't reset brute-force protection.
+import {
+  allowPersistent,
+  failureCountPersistent,
+  recordFailurePersistent,
+  clearFailuresPersistent,
+} from "../../rateLimitPersistent";
+import { rtdbPort } from "../../domain/firebaseAdapters";
 import { HOUR_MS } from "../../constants/time";
 import { RATE } from "../../constants/rateLimits";
 import { getPublicKeyMeta, isEphemeralKey } from "../passwordCrypto";
@@ -140,7 +148,7 @@ authRouter.get("/pubkey", (_req, res) => {
  */
 authRouter.post(
   "/login",
-  ipRateLimit("login", LOGIN_RATE_PER_HOUR, ONE_HOUR_MS),
+  ipRateLimitPersistent("login", LOGIN_RATE_PER_HOUR, ONE_HOUR_MS),
   async (req, res) => {
     const { username, password } = req.body ?? {};
     if (typeof username !== "string" || typeof password !== "string") {
@@ -152,7 +160,7 @@ authRouter.post(
     const acctKey = `login_acct:${acct}`;
     // Per-account lockout (see LOGIN_MAX_FAILURES_PER_ACCOUNT). Skipped under the
     // emulator so e2e suites can hammer login without tripping it.
-    if (!IN_EMULATOR && failureCount(acctKey) >= LOGIN_MAX_FAILURES_PER_ACCOUNT) {
+    if (!IN_EMULATOR && (await failureCountPersistent(rtdbPort(), acctKey)) >= LOGIN_MAX_FAILURES_PER_ACCOUNT) {
       res.status(429).json({ error: "too_many_requests", scope: "account" });
       return;
     }
@@ -177,7 +185,7 @@ authRouter.post(
     if (!fbRes.ok) {
       const code = extractFirebaseErrorCode(fbData);
       if (LOGIN_INVALID_CREDENTIAL_CODES.has(code)) {
-        if (!IN_EMULATOR) recordFailure(acctKey, ONE_HOUR_MS);
+        if (!IN_EMULATOR) await recordFailurePersistent(rtdbPort(), acctKey, ONE_HOUR_MS);
         res.status(401).json({ error: "invalid_credentials" });
         return;
       }
@@ -192,7 +200,7 @@ authRouter.post(
 
     const uid = String(fbData.localId ?? "");
     // Successful credential check — reset this account's failure counter.
-    if (!IN_EMULATOR) clearFailures(acctKey);
+    if (!IN_EMULATOR) await clearFailuresPersistent(rtdbPort(), acctKey);
     // Enrich the response with the RTDB profile so the client can render
     // the role-appropriate portal without a second round-trip.
     const profile = await loadUserProfile(uid);
@@ -323,7 +331,7 @@ authRouter.get("/me", requireAuth, async (req: AuthRequest, res: Response) => {
  */
 authRouter.post(
   "/send-otp",
-  ipRateLimit("otp", OTP_RATE_PER_HOUR, ONE_HOUR_MS),
+  ipRateLimitPersistent("otp", OTP_RATE_PER_HOUR, ONE_HOUR_MS),
   async (req, res) => {
     const { phoneE164, recaptchaToken } = req.body ?? {};
     if (typeof phoneE164 !== "string" || typeof recaptchaToken !== "string") {
@@ -373,7 +381,7 @@ authRouter.post(
  */
 authRouter.post(
   "/verify-otp",
-  ipRateLimit("verifyOtp", VERIFY_OTP_RATE_PER_HOUR, ONE_HOUR_MS),
+  ipRateLimitPersistent("verifyOtp", VERIFY_OTP_RATE_PER_HOUR, ONE_HOUR_MS),
   async (req, res) => {
     const { sessionInfo, code } = req.body ?? {};
     if (typeof sessionInfo !== "string" || typeof code !== "string") {
@@ -450,11 +458,12 @@ authRouter.post(
       return;
     }
     if (
-      !allow(
+      !(await allowPersistent(
+        rtdbPort(),
         `reset:${phoneE164}`,
         RESET_PASSWORD_MAX_PER_HOUR_PER_PHONE,
         ONE_HOUR_MS
-      )
+      ))
     ) {
       res.status(429).json({ error: "too_many_requests", scope: "phone" });
       return;
