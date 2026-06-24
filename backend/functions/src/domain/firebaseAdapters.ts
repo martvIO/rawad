@@ -10,7 +10,7 @@
 import { getDatabase } from "firebase-admin/database";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore, Query } from "firebase-admin/firestore";
-import { DbPort, AuthPort, FirestorePort } from "./ports";
+import { DbPort, AuthPort, FirestorePort, FsBatchOp } from "./ports";
 
 // Reuse the SDK's own parameter types so the adapter stays in lock-step with
 // firebase-admin without importing named request types.
@@ -61,11 +61,42 @@ export function firestorePort(): FirestorePort {
         data: d.data() as Record<string, unknown>,
       }));
     },
+    async get(docPath) {
+      const snap = await fs.doc(docPath).get();
+      return snap.exists
+        ? { id: snap.id, data: snap.data() as Record<string, unknown> }
+        : null;
+    },
+    async findByField(collectionPath, field, value) {
+      const snap = await fs
+        .collection(collectionPath)
+        .where(field, "==", value)
+        .get();
+      return snap.docs.map((d) => ({
+        id: d.id,
+        data: d.data() as Record<string, unknown>,
+      }));
+    },
+    async add(collectionPath, data) {
+      const ref = await fs.collection(collectionPath).add(data);
+      return ref.id;
+    },
     async update(docPath, patch) {
       await fs.doc(docPath).update(patch);
     },
+    async setMerge(docPath, data) {
+      await fs.doc(docPath).set(data, { merge: true });
+    },
     async remove(docPath) {
       await fs.doc(docPath).delete();
+    },
+    async batchWrite(ops: FsBatchOp[]) {
+      const batch = fs.batch();
+      for (const op of ops) {
+        if (op.type === "update") batch.update(fs.doc(op.docPath), op.patch);
+        else batch.delete(fs.doc(op.docPath));
+      }
+      await batch.commit();
     },
     async addAfterScan(collectionPath, decide) {
       const col = fs.collection(collectionPath);

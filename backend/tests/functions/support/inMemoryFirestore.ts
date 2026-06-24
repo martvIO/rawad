@@ -8,7 +8,11 @@
 // sequential calls therefore serialise, so a duplicate-guard test sees the first
 // insert win and the second observe it.
 
-import { FirestorePort, FsDoc } from "../../../functions/src/domain/ports";
+import {
+  FirestorePort,
+  FsDoc,
+  FsBatchOp,
+} from "../../../functions/src/domain/ports";
 
 type DocData = Record<string, unknown>;
 
@@ -46,6 +50,21 @@ export function inMemoryFirestore(
       }
       return docs;
     },
+    async get(docPath) {
+      const [cp, id] = splitDoc(docPath);
+      const data = cols.get(cp)?.get(id);
+      return data ? { id, data } : null;
+    },
+    async findByField(collectionPath, field, value) {
+      return snapshot(cols.get(collectionPath) ?? new Map()).filter(
+        (d) => d.data[field] === value,
+      );
+    },
+    async add(collectionPath, data) {
+      const id = `fsdoc${++auto}`;
+      colOf(collectionPath).set(id, data);
+      return id;
+    },
     async update(docPath, patch) {
       const [cp, id] = splitDoc(docPath);
       const m = cols.get(cp);
@@ -55,9 +74,26 @@ export function inMemoryFirestore(
       }
       m.set(id, { ...m.get(id)!, ...patch });
     },
+    async setMerge(docPath, data) {
+      const [cp, id] = splitDoc(docPath);
+      const m = colOf(cp);
+      m.set(id, { ...(m.get(id) ?? {}), ...data });
+    },
     async remove(docPath) {
       const [cp, id] = splitDoc(docPath);
       cols.get(cp)?.delete(id);
+    },
+    async batchWrite(ops: FsBatchOp[]) {
+      for (const op of ops) {
+        const [cp, id] = splitDoc(op.docPath);
+        if (op.type === "update") {
+          const m = cols.get(cp);
+          if (!m || !m.has(id)) throw new Error(`NOT_FOUND: ${op.docPath}`);
+          m.set(id, { ...m.get(id)!, ...op.patch });
+        } else {
+          cols.get(cp)?.delete(id);
+        }
+      }
     },
     async addAfterScan(collectionPath, decide) {
       const m = colOf(collectionPath);

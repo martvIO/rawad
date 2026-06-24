@@ -1,7 +1,8 @@
 import { Response } from "express";
 import { AuthRequest,requireAuth } from "../../middleware/auth";
 import { MAX_DESIGNS_PER_GROOM,MAX_DESIGN_TITLE_LEN } from "./constants";
-import { fs,parentDoc,designsCol,designDoc,ensureMigrated,guestsCol } from "./firestore";
+import { ensureMigrated } from "./firestore";
+import { firebaseDigitalDesignStore } from "../../../domain/digital/firebaseDigitalDesignStore";
 import { canActOnUid } from "./access";
 import { safeDetail } from "./project";
 import { Router } from "express";
@@ -23,23 +24,20 @@ router.get(
     try {
       const uid = req.params.uid;
       const defaultDesignId = await ensureMigrated(uid);
-      const snap = await designsCol(uid).get();
-      const rows = snap.docs.map((d) => {
-        const data = d.data() || {};
-        return {
-          id: d.id,
-          title: data.title ?? "",
-          order: typeof data.order === "number" ? data.order : 0,
-          createdAt: data.createdAt ?? 0,
-          designStatus: data.designStatus ?? "draft",
-          designVersion: data.designVersion ?? 1,
-          designRejectionNote: data.designRejectionNote ?? null,
-          brideName: data.brideName ?? "",
-          groomDisplayName: data.groomDisplayName ?? "",
-          themeColor: data.themeColor ?? "gold",
-          isDefault: d.id === defaultDesignId,
-        };
-      });
+      const designs = await firebaseDigitalDesignStore().list(uid);
+      const rows = designs.map((data) => ({
+        id: data.id,
+        title: data.title ?? "",
+        order: typeof data.order === "number" ? data.order : 0,
+        createdAt: typeof data.createdAt === "number" ? data.createdAt : 0,
+        designStatus: data.designStatus ?? "draft",
+        designVersion: data.designVersion ?? 1,
+        designRejectionNote: data.designRejectionNote ?? null,
+        brideName: data.brideName ?? "",
+        groomDisplayName: data.groomDisplayName ?? "",
+        themeColor: data.themeColor ?? "gold",
+        isDefault: data.id === defaultDesignId,
+      }));
       rows.sort((a, b) => a.order - b.order || a.createdAt - b.createdAt);
       res.json(rows);
     } catch (err) {
@@ -64,36 +62,23 @@ router.post(
     try {
       const uid = req.params.uid;
       await ensureMigrated(uid);
-      const existing = await designsCol(uid).get();
-      if (existing.size >= MAX_DESIGNS_PER_GROOM) {
-        res.status(409).json({ error: "too_many_designs", max: MAX_DESIGNS_PER_GROOM });
-        return;
-      }
       const titleRaw = (req.body?.title ?? "").toString().trim().slice(0, MAX_DESIGN_TITLE_LEN);
       const copyFromId = (req.body?.copyFromId ?? "").toString();
 
-      let payload: Record<string, unknown> = {};
-      if (copyFromId) {
-        const src = await designDoc(uid, copyFromId).get();
-        if (!src.exists) {
-          res.status(404).json({ error: "source_not_found" });
+      const result = await firebaseDigitalDesignStore().create(uid, {
+        title: titleRaw,
+        copyFromId: copyFromId || null,
+        maxDesigns: MAX_DESIGNS_PER_GROOM,
+      });
+      if (!result.ok) {
+        if (result.reason === "too_many_designs") {
+          res.status(409).json({ error: "too_many_designs", max: MAX_DESIGNS_PER_GROOM });
           return;
         }
-        payload = { ...(src.data() as Record<string, unknown>) };
-        delete payload.designApprovedAt;
-        delete payload.designRejectedAt;
-        delete payload.designSubmittedAt;
-        delete payload.designRejectionNote;
+        res.status(404).json({ error: "source_not_found" });
+        return;
       }
-      payload.title = titleRaw || payload.title || { ar: "تصميم جديد", he: "עיצוב חדש" };
-      payload.order = existing.size;
-      payload.createdAt = Date.now();
-      payload.designStatus = "draft";
-      payload.designVersion = 1;
-
-      const ref = await designsCol(uid).add(payload);
-      await parentDoc(uid).set({ designCount: existing.size + 1 }, { merge: true });
-      res.json({ id: ref.id, ...payload });
+      res.json({ id: result.id, ...result.payload });
     } catch (err) {
       res.status(500).json({ error: "write_failed", detail: safeDetail(err) });
     }
@@ -118,35 +103,20 @@ router.delete(
       const uid = req.params.uid;
       const targetId = req.params.designId;
       await ensureMigrated(uid);
-      const all = await designsCol(uid).get();
-      if (all.size <= 1) {
-        res.status(409).json({ error: "last_design" });
-        return;
-      }
-      if (!all.docs.some((d) => d.id === targetId)) {
+      const result = await firebaseDigitalDesignStore().remove(uid, targetId);
+      if (!result.ok) {
+        if (result.reason === "last_design") {
+          res.status(409).json({ error: "last_design" });
+          return;
+        }
         res.status(404).json({ error: "not_found" });
         return;
       }
-
-      const pSnap = await parentDoc(uid).get();
-      const currentDefault = pSnap.exists ? (pSnap.data()?.defaultDesignId as string) : null;
-      let newDefault = currentDefault;
-      if (currentDefault === targetId) {
-        const other = all.docs.find((d) => d.id !== targetId);
-        newDefault = other ? other.id : null;
-      }
-
-      const affected = await guestsCol(uid).where("designId", "==", targetId).get();
-      const batch = fs().batch();
-      affected.docs.forEach((g) => batch.update(g.ref, { designId: newDefault }));
-      batch.delete(designDoc(uid, targetId));
-      await batch.commit();
-
-      await parentDoc(uid).set(
-        { defaultDesignId: newDefault, designCount: all.size - 1 },
-        { merge: true }
-      );
-      res.json({ ok: true, defaultDesignId: newDefault, reassignedGuests: affected.size });
+      res.json({
+        ok: true,
+        defaultDesignId: result.defaultDesignId,
+        reassignedGuests: result.reassignedGuests,
+      });
     } catch (err) {
       res.status(500).json({ error: "delete_failed", detail: safeDetail(err) });
     }

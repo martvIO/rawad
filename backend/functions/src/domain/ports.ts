@@ -37,6 +37,11 @@ export interface FsDoc {
   data: Record<string, unknown>;
 }
 
+/** One op in a FirestorePort.batchWrite — a per-doc update or delete. */
+export type FsBatchOp =
+  | { type: "update"; docPath: string; patch: Record<string, unknown> }
+  | { type: "delete"; docPath: string };
+
 /**
  * Firestore access, reduced to the operations the digital domain needs. Paths
  * are full slash paths — a collection ("digitalInvitations/uid/guests") or a
@@ -51,10 +56,24 @@ export interface FirestorePort {
     collectionPath: string,
     opts?: { orderBy?: { field: string; dir: "asc" | "desc" } },
   ): Promise<FsDoc[]>;
+  /** Read one doc, or null when absent. */
+  get(docPath: string): Promise<FsDoc | null>;
+  /** Every doc in a collection whose `field` equals `value` (`.where(field,'==',value)`). */
+  findByField(
+    collectionPath: string,
+    field: string,
+    value: unknown,
+  ): Promise<FsDoc[]>;
+  /** Add a doc with a fresh auto id; returns the new id. */
+  add(collectionPath: string, data: Record<string, unknown>): Promise<string>;
   /** Shallow-merge update an existing doc (Firestore `.update` — rejects if absent). */
   update(docPath: string, patch: Record<string, unknown>): Promise<void>;
+  /** Merge-set a doc, creating it if absent (Firestore `.set(data, { merge: true })`). */
+  setMerge(docPath: string, data: Record<string, unknown>): Promise<void>;
   /** Delete a doc (idempotent). */
   remove(docPath: string): Promise<void>;
+  /** Apply a list of update/delete ops atomically (Firestore `WriteBatch`). */
+  batchWrite(ops: FsBatchOp[]): Promise<void>;
   /**
    * Atomically scan a collection then conditionally add ONE doc, inside a single
    * Firestore transaction: read every doc, call `decide(existing)`, and — when
