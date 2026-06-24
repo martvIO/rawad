@@ -98,6 +98,26 @@ export function firestorePort(): FirestorePort {
       }
       await batch.commit();
     },
+    async listGroup(collectionId) {
+      const snap = await fs.collectionGroup(collectionId).get();
+      return snap.docs.map((d) => ({
+        id: d.id,
+        parentId: d.ref.parent.parent?.id ?? "",
+        data: d.data() as Record<string, unknown>,
+      }));
+    },
+    async transactDoc(docPath, decide) {
+      const ref = fs.doc(docPath);
+      return fs.runTransaction(async (tx) => {
+        const snap = await tx.get(ref);
+        const current = snap.exists
+          ? { id: snap.id, data: snap.data() as Record<string, unknown> }
+          : null;
+        const outcome = decide(current);
+        if ("write" in outcome) tx.set(ref, outcome.write, { merge: true });
+        return outcome.result;
+      });
+    },
     async addAfterScan(collectionPath, decide) {
       const col = fs.collection(collectionPath);
       return fs.runTransaction(async (tx) => {

@@ -42,6 +42,16 @@ export type FsBatchOp =
   | { type: "update"; docPath: string; patch: Record<string, unknown> }
   | { type: "delete"; docPath: string };
 
+/** A collectionGroup hit: an FsDoc plus the id of its parent doc. */
+export interface FsGroupDoc extends FsDoc {
+  parentId: string;
+}
+
+/** The outcome a `transactDoc` decision returns: merge-write + value, or abort + value. */
+export type FsTxOutcome<T> =
+  | { write: Record<string, unknown>; result: T }
+  | { abort: true; result: T };
+
 /**
  * Firestore access, reduced to the operations the digital domain needs. Paths
  * are full slash paths — a collection ("digitalInvitations/uid/guests") or a
@@ -74,6 +84,19 @@ export interface FirestorePort {
   remove(docPath: string): Promise<void>;
   /** Apply a list of update/delete ops atomically (Firestore `WriteBatch`). */
   batchWrite(ops: FsBatchOp[]): Promise<void>;
+  /** Every doc across all subcollections named `collectionId` (Firestore `collectionGroup`). */
+  listGroup(collectionId: string): Promise<FsGroupDoc[]>;
+  /**
+   * Atomic read-modify-write on a SINGLE doc (Firestore runTransaction over one
+   * doc). `decide` sees the current doc (or null) and returns either a merge to
+   * write plus a result, or an abort (no write) plus a result. Resolves to that
+   * result. This is the doc-level compare-and-set the design state machine needs
+   * (validate the current designStatus, then write the next state or reject).
+   */
+  transactDoc<T>(
+    docPath: string,
+    decide: (current: FsDoc | null) => FsTxOutcome<T>,
+  ): Promise<T>;
   /**
    * Atomically scan a collection then conditionally add ONE doc, inside a single
    * Firestore transaction: read every doc, call `decide(existing)`, and — when

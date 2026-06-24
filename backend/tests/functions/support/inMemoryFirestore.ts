@@ -12,6 +12,7 @@ import {
   FirestorePort,
   FsDoc,
   FsBatchOp,
+  FsGroupDoc,
 } from "../../../functions/src/domain/ports";
 
 type DocData = Record<string, unknown>;
@@ -94,6 +95,27 @@ export function inMemoryFirestore(
           cols.get(cp)?.delete(id);
         }
       }
+    },
+    async listGroup(collectionId) {
+      const out: FsGroupDoc[] = [];
+      for (const [cp, m] of cols.entries()) {
+        const parts = cp.split("/");
+        if (parts[parts.length - 1] !== collectionId) continue;
+        const parentId = parts[parts.length - 2] ?? "";
+        for (const [id, data] of m.entries()) out.push({ id, parentId, data });
+      }
+      return out;
+    },
+    async transactDoc(docPath, decide) {
+      const [cp, id] = splitDoc(docPath);
+      const data = cols.get(cp)?.get(id);
+      const current = data ? { id, data } : null;
+      const outcome = decide(current);
+      if ("write" in outcome) {
+        const m = colOf(cp);
+        m.set(id, { ...(m.get(id) ?? {}), ...outcome.write });
+      }
+      return outcome.result;
     },
     async addAfterScan(collectionPath, decide) {
       const m = colOf(collectionPath);

@@ -1,8 +1,8 @@
-import { getFirestore } from "firebase-admin/firestore";
 import { Response } from "express";
 import { AuthRequest,requireAuth,requireAdmin } from "../../middleware/auth";
-import { COLL_DESIGNS,MAX_REJECT_NOTE_LEN } from "./constants";
-import { fs,designDoc,resolveDesignId } from "./firestore";
+import { MAX_REJECT_NOTE_LEN } from "./constants";
+import { resolveDesignId } from "./firestore";
+import { firebaseDigitalWorkflowStore } from "../../../domain/digital/firebaseDigitalWorkflowStore";
 import { canActOnUid } from "./access";
 import { safeDetail } from "./project";
 import { Router } from "express";
@@ -36,13 +36,11 @@ router.get(
   requireAdmin,
   async (_req: AuthRequest, res: Response) => {
     try {
-      const snap = await getFirestore().collectionGroup(COLL_DESIGNS).get();
-      const rows = snap.docs.map((d) => {
-        const data = d.data() || {};
-        const groomUid = d.ref.parent.parent?.id ?? "";
+      const designs = await firebaseDigitalWorkflowStore().listDesigns();
+      const rows = designs.map(({ groomUid, designId, data }) => {
         return {
           groomUid,
-          designId: d.id,
+          designId,
           title: data.title ?? "",
           order: typeof data.order === "number" ? data.order : 0,
           brideName: data.brideName ?? "",
@@ -114,30 +112,10 @@ router.post(
       return;
     }
     try {
-      const docRef = designDoc(req.params.uid, await resolveDesignId(req));
-      const result = await fs().runTransaction(async (tx) => {
-        const snap = await tx.get(docRef);
-        const data = snap.exists ? snap.data() : null;
-        const status = (data?.designStatus ?? "draft") as string;
-        if (status !== "draft" && status !== "rejected") {
-          return { ok: false as const, error: "invalid_state", status };
-        }
-        const version = Number(data?.designVersion ?? 0) + 1;
-        const now = Date.now();
-        tx.set(
-          docRef,
-          {
-            designStatus: "pending_approval",
-            designSubmittedAt: now,
-            designRejectionNote: null,
-            designVersion: version,
-          },
-          { merge: true }
-        );
-        return { ok: true as const, version, submittedAt: now };
-      });
+      const designId = await resolveDesignId(req);
+      const result = await firebaseDigitalWorkflowStore().submit(req.params.uid, designId);
       if (!result.ok) {
-        res.status(409).json({ error: result.error, currentStatus: result.status });
+        res.status(409).json({ error: "invalid_state", currentStatus: result.status });
         return;
       }
       res.json({ ok: true, designVersion: result.version, designSubmittedAt: result.submittedAt });
@@ -160,19 +138,10 @@ router.post(
       return;
     }
     try {
-      const docRef = designDoc(req.params.uid, await resolveDesignId(req));
-      const result = await fs().runTransaction(async (tx) => {
-        const snap = await tx.get(docRef);
-        const data = snap.exists ? snap.data() : null;
-        const status = (data?.designStatus ?? "draft") as string;
-        if (status !== "pending_approval") {
-          return { ok: false as const, error: "invalid_state", status };
-        }
-        tx.set(docRef, { designStatus: "draft" }, { merge: true });
-        return { ok: true as const };
-      });
+      const designId = await resolveDesignId(req);
+      const result = await firebaseDigitalWorkflowStore().cancel(req.params.uid, designId);
       if (!result.ok) {
-        res.status(409).json({ error: result.error, currentStatus: result.status });
+        res.status(409).json({ error: "invalid_state", currentStatus: result.status });
         return;
       }
       res.json({ ok: true });
@@ -192,28 +161,10 @@ router.post(
   requireAdmin,
   async (req: AuthRequest, res: Response) => {
     try {
-      const docRef = designDoc(req.params.uid, await resolveDesignId(req));
-      const result = await fs().runTransaction(async (tx) => {
-        const snap = await tx.get(docRef);
-        const data = snap.exists ? snap.data() : null;
-        const status = (data?.designStatus ?? "draft") as string;
-        if (status !== "pending_approval") {
-          return { ok: false as const, error: "invalid_state", status };
-        }
-        const now = Date.now();
-        tx.set(
-          docRef,
-          {
-            designStatus: "approved",
-            designApprovedAt: now,
-            designRejectionNote: null,
-          },
-          { merge: true }
-        );
-        return { ok: true as const, approvedAt: now };
-      });
+      const designId = await resolveDesignId(req);
+      const result = await firebaseDigitalWorkflowStore().approve(req.params.uid, designId);
       if (!result.ok) {
-        res.status(409).json({ error: result.error, currentStatus: result.status });
+        res.status(409).json({ error: "invalid_state", currentStatus: result.status });
         return;
       }
       res.json({ ok: true, designApprovedAt: result.approvedAt });
@@ -242,28 +193,10 @@ router.post(
       return;
     }
     try {
-      const docRef = designDoc(req.params.uid, await resolveDesignId(req));
-      const result = await fs().runTransaction(async (tx) => {
-        const snap = await tx.get(docRef);
-        const data = snap.exists ? snap.data() : null;
-        const status = (data?.designStatus ?? "draft") as string;
-        if (status !== "pending_approval") {
-          return { ok: false as const, error: "invalid_state", status };
-        }
-        const now = Date.now();
-        tx.set(
-          docRef,
-          {
-            designStatus: "rejected",
-            designRejectedAt: now,
-            designRejectionNote: note,
-          },
-          { merge: true }
-        );
-        return { ok: true as const, rejectedAt: now };
-      });
+      const designId = await resolveDesignId(req);
+      const result = await firebaseDigitalWorkflowStore().reject(req.params.uid, designId, note);
       if (!result.ok) {
-        res.status(409).json({ error: result.error, currentStatus: result.status });
+        res.status(409).json({ error: "invalid_state", currentStatus: result.status });
         return;
       }
       res.json({ ok: true, designRejectedAt: result.rejectedAt });
@@ -290,21 +223,12 @@ router.post(
     }
     const note = (req.body?.note ?? "").toString().trim().slice(0, MAX_REJECT_NOTE_LEN);
     try {
-      const docRef = designDoc(req.params.uid, req.params.designId);
-      const now = Date.now();
-      const update: Record<string, unknown> = { designStatus: status };
-      if (status === "approved") {
-        update.designApprovedAt = now;
-        update.designRejectionNote = null;
-      } else if (status === "rejected") {
-        update.designRejectedAt = now;
-        update.designRejectionNote = note || null;
-      } else {
-        // draft — back to the groom for editing
-        update.designApprovedAt = null;
-        update.designRejectionNote = null;
-      }
-      await docRef.set(update, { merge: true });
+      await firebaseDigitalWorkflowStore().setStatus(
+        req.params.uid,
+        req.params.designId,
+        status as "approved" | "draft" | "rejected", // validated just above
+        note
+      );
       res.json({ ok: true, designStatus: status });
     } catch (err) {
       res.status(500).json({ error: "write_failed", detail: safeDetail(err) });
