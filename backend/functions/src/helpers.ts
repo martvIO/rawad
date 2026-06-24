@@ -66,9 +66,13 @@ export function normalisePhoneForMatching(raw: string): string {
   return d;
 }
 
-// Strong-password policy — must match src/utils/password.js exactly.
-// Keep the two in lock-step when changing the policy: min 8 chars,
-// at least one uppercase, lowercase, and digit.
+// Strong-password policy — min 8 chars, at least one uppercase, lowercase, and
+// digit. This is duplicated in the frontend (src/utils/password.js) because the
+// two packages share no build. The single source of truth for the RULE is the
+// shared fixture shared/passwordPolicy.cases.mjs: both packages' parity tests
+// (tests/functions/passwordPolicyParity, src/__tests__/utils/passwordPolicyParity)
+// assert their isStrongPassword against it, so changing the policy here without
+// updating the frontend (or the fixture) fails CI. Edit all three together.
 export function isStrongPassword(v: unknown): v is string {
   return (
     typeof v === "string" &&
