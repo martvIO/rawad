@@ -37,6 +37,8 @@ import { TOKEN_BYTES, TOKEN_HEX_RE, TOKEN_TTL_MS } from "../../constants/tokens"
 import { ADDRESS_JOINER } from "../../constants/format";
 import { loadPassContext, PassResult } from "../../wallet/passData";
 import { renderMonogramPng } from "../../wallet/monogram";
+import { isGroomFrozen, readGroomStatus } from "../../lifecycle/gate";
+import { publicEventState } from "../../lifecycle/status";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -118,6 +120,12 @@ invitesRouter.get("/token/:token", async (req: Request, res: Response) => {
         boardingPassEnabled = false;
       }
     }
+    // Guest-facing lifecycle state: when the wedding is cancelled/postponed the
+    // invitation page shows the notice instead of the RSVP form. `active` for a
+    // healthy wedding, so existing invites are unaffected.
+    const eventStatus = rec.groomUid
+      ? publicEventState(await readGroomStatus(rec.groomUid as string))
+      : "active";
     res.json({
       guestName: rec.guestName,
       guestPhone: rec.guestPhone,
@@ -128,6 +136,7 @@ invitesRouter.get("/token/:token", async (req: Request, res: Response) => {
       designId: rec.designId,
       designSnapshot: rec.designSnapshot,
       boardingPassEnabled,
+      eventStatus,
     });
   } catch (err) {
     res.status(500).json({ error: "read_failed", detail: errorMessage(err) });
@@ -315,6 +324,11 @@ invitesRouter.post(
       // authoritative guard against a concurrent double-submit.
       if (tk.usedAt) {
         res.status(409).json({ error: "already_submitted" });
+        return;
+      }
+      // Freeze: a cancelled / postponed wedding rejects new RSVPs.
+      if (await isGroomFrozen(tk.groomUid)) {
+        res.status(403).json({ error: "event_unavailable" });
         return;
       }
 
@@ -561,6 +575,11 @@ invitesRouter.post(
       }
       if (tk.usedAt) {
         res.status(409).json({ error: "already_submitted" });
+        return;
+      }
+      // Freeze: a cancelled / postponed wedding rejects new RSVPs.
+      if (await isGroomFrozen(tk.groomUid)) {
+        res.status(403).json({ error: "event_unavailable" });
         return;
       }
 

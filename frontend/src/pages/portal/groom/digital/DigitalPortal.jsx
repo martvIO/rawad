@@ -10,6 +10,8 @@ import { DigitalGuests } from "./DigitalGuests.jsx";
 import { DigitalAddGuest } from "./DigitalAddGuest.jsx";
 import { DigitalPhotographer } from "./DigitalPhotographer.jsx";
 import { DigitalDesignEditor } from "./DigitalDesignEditor.jsx";
+import { GroomManage } from "../GroomManage.jsx";
+import { GroomLifecycleBanner } from "../../../../components/GroomLifecycleBanner.jsx";
 import { C } from "../../../../styles/theme.js";
 import { STORAGE_KEYS } from "../../../../constants/storageKeys.js";
 
@@ -68,6 +70,9 @@ export function DigitalPortal() {
             <NavLink to="/portal/groom/digital/design"       className={navClass} style={navStyle}>
               {lang === "he" ? "🎨 עיצוב" : "🎨 التصميم"}
             </NavLink>
+            <NavLink data-testid="nav-digital-manage" to="/portal/groom/digital/manage" className={navClass} style={navStyle}>
+              {t("lc_tab")}
+            </NavLink>
           </div>
           <div className="dawa-phead-ctrl">
             <button
@@ -93,6 +98,8 @@ export function DigitalPortal() {
 
       <TermsNotice t={t} />
 
+      <GroomLifecycleBanner t={t} managePath="/portal/groom/digital/manage" />
+
       <div style={{ maxWidth: 900, margin: "0 auto", padding: "20px 16px 80px" }}>
         <Routes>
           <Route index               element={<Navigate to="dashboard" replace />} />
@@ -101,6 +108,7 @@ export function DigitalPortal() {
           <Route path="add"          element={<DigitalAddGuest />} />
           <Route path="photographer" element={<DigitalPhotographer />} />
           <Route path="design"       element={<DigitalDesignEditor />} />
+          <Route path="manage"       element={<GroomManage />} />
           <Route path="*"            element={<Navigate to="dashboard" replace />} />
         </Routes>
       </div>

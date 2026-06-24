@@ -222,6 +222,7 @@ interface MediaSettings {
   venueEnabled?: boolean;
   guestbookEnabled?: boolean;
   envelopeEnabled?: boolean;
+  immersive3d?: boolean;
   rsvpCompanionsEnabled?: boolean;
   rsvpMealEnabled?: boolean;
   rsvpSongEnabled?: boolean;
@@ -499,6 +500,7 @@ function sanitizeMediaSettings(body: unknown): Sanitized<MediaSettings> {
     "rsvpMealEnabled",
     "rsvpSongEnabled",
     "heroMediaEnabled",
+    "immersive3d",
   ];
   for (const key of boolKeys) {
     if (data[key] !== undefined) {

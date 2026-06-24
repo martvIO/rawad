@@ -33,6 +33,7 @@ import { RATE } from "../../constants/rateLimits";
 import { firebaseConfirmationStore } from "../../domain/confirmations/firebaseConfirmationStore";
 import { firebaseGuestStore } from "../../domain/guests/firebaseGuestStore";
 import { firebaseUserIndex } from "../../domain/users/firebaseUserIndex";
+import { isGroomFrozen } from "../../lifecycle/gate";
 
 // ─── Schema constants (mirror database.rules.json /confirmations) ─────────────
 
@@ -179,6 +180,14 @@ confirmationsRouter.post(
       );
       if (!groomUid) {
         res.status(404).json({ error: "unknown_groom" });
+        return;
+      }
+
+      // Freeze: reject new confirmations for a cancelled / postponed wedding so
+      // no replies pile up under a frozen event. The form already shows the
+      // notice (GET /lifecycle/public/:username); this is the server-side guard.
+      if (await isGroomFrozen(groomUid)) {
+        res.status(403).json({ error: "event_unavailable" });
         return;
       }
 

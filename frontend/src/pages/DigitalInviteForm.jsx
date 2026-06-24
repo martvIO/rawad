@@ -12,6 +12,7 @@ import { BrandLogo } from "../components/BrandLogo.jsx";
 import { LangSwitcher } from "../components/LangSwitcher.jsx";
 import { subscribeInviteToken } from "../services/invites.js";
 import { submitDigitalGuestInvite } from "../services/digitalInvitation.js";
+import { EventUnavailableNotice } from "../components/EventUnavailableNotice.jsx";
 import { logErr } from "../utils/logger.js";
 import { localizeApiError } from "../utils/apiError.js";
 import { C } from "../styles/theme.js";
@@ -76,6 +77,9 @@ export function DigitalInviteForm({ t, lang, setLang }) {
         </h1>
       </CenteredMessage>
     );
+  }
+  if (tokenRec.eventStatus && tokenRec.eventStatus !== "active" && !done) {
+    return <EventUnavailableNotice state={tokenRec.eventStatus} t={t} lang={lang} />;
   }
   if (tokenRec.expiresAt && Date.now() > tokenRec.expiresAt) {
     return (

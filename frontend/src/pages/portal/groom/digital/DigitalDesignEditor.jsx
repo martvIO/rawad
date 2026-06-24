@@ -80,6 +80,7 @@ const TOGGLE_KEYS = [
   "countdownEnabled", "guestbookEnabled", "giftEnabled", "musicEnabled",
   "footerDockEnabled", "envelopeEnabled", "heroMediaEnabled",
   "rsvpCompanionsEnabled", "rsvpMealEnabled", "rsvpSongEnabled",
+  "immersive3d",
 ];
 
 const DESIGN_STATUS_META = {
@@ -1016,6 +1017,7 @@ function DesignEditorBody({ groomUid, designId }) {
             {tt(lang, "كل الأقسام تظهر افتراضياً. أزل العلامة لإخفاء قسم.", "כל החלקים מוצגים כברירת מחדל. הסר סימון כדי להסתיר.")}
           </div>
           <ToggleRow label={tt(lang, "غلاف الفتح (المظروف)", "מעטפת פתיחה")} checked={tog("envelopeEnabled")} disabled={!editable} testid="design-toggle-envelope" onChange={(c) => toggle("envelopeEnabled", c)} />
+          <ToggleRow label={tt(lang, "عالم ثلاثي الأبعاد غامر (خلفية متحركة)", "עולם תלת-ממדי סוחף (רקע מונפש)")} checked={tog("immersive3d")} disabled={!editable} testid="design-toggle-immersive3d" onChange={(c) => toggle("immersive3d", c)} />
           <ToggleRow label={tt(lang, "شريط الأدوات العائم (مشاركة / تقويم)", "סרגל צף (שיתוף / יומן)")} checked={tog("footerDockEnabled")} disabled={!editable} testid="design-toggle-footer" onChange={(c) => toggle("footerDockEnabled", c)} />
         </Section>
 

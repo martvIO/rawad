@@ -17,6 +17,7 @@ import { PhoneInput } from "../components/PhoneInput.jsx";
 import { localizeApiError } from "../utils/apiError.js";
 import { ConsentNotice } from "../components/ConsentNotice.jsx";
 import { MapPickerInline } from "../components/MapPickerInline.jsx";
+import { EventUnavailableNotice } from "../components/EventUnavailableNotice.jsx";
 import { subscribeInviteToken, submitGuestInvite } from "../services/invites.js";
 import { getCurrentFix } from "../utils/geo.js";
 import { logErr } from "../utils/logger.js";
@@ -124,6 +125,10 @@ export function InviteForm({ t, lang, setLang }) {
         </h1>
       </CenteredMessage>
     );
+  }
+  // Wedding cancelled / postponed → neutral notice instead of the RSVP form.
+  if (tokenRec.eventStatus && tokenRec.eventStatus !== "active" && !done) {
+    return <EventUnavailableNotice state={tokenRec.eventStatus} t={t} lang={lang} />;
   }
   if (tokenRec.expiresAt && Date.now() > tokenRec.expiresAt) {
     return (

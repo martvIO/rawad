@@ -30,6 +30,14 @@
         "paymentCreatedAt": { ".validate": "!newData.exists() || newData.isNumber()" },
         "paymentPaidAt":    { ".validate": "!newData.exists() || newData.isNumber()" },
         "paymentMode":      { ".validate": "!newData.exists() || newData.val() === 'test' || newData.val() === 'live'" },
+        "lifecycleStatus":   { ".validate": "!newData.exists() || newData.val() === 'active' || newData.val() === 'cancel_pending' || newData.val() === 'cancelled' || newData.val() === 'paused'" },
+        "cancelRequestedAt": { ".validate": "!newData.exists() || newData.isNumber()" },
+        "cancelGraceEndsAt": { ".validate": "!newData.exists() || newData.isNumber()" },
+        "cancelReason":      { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 500)" },
+        "cancelledAt":       { ".validate": "!newData.exists() || newData.isNumber()" },
+        "pausedAt":          { ".validate": "!newData.exists() || newData.isNumber()" },
+        "pausedNewDate":     { ".validate": "!newData.exists() || newData.isNumber()" },
+        "statusUpdatedBy":   { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 64)" },
         "$other":      { ".validate": false }
       }
     },
@@ -159,6 +167,7 @@
       "socialFacebook":   { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 500 && (newData.val().length === 0 || newData.val().matches(/^https:\\/\\//)))" },
       "socialInstagram":  { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 500 && (newData.val().length === 0 || newData.val().matches(/^https:\\/\\//)))" },
       "socialTiktok":     { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 500 && (newData.val().length === 0 || newData.val().matches(/^https:\\/\\//)))" },
+      "cancelGraceHours":        { ".validate": "!newData.exists() || (newData.isNumber() && newData.val() >= 1 && newData.val() <= 720)" },
       "contactWhatsappEnabled":  { ".validate": "!newData.exists() || newData.isBoolean()" },
       "contactPhoneEnabled":     { ".validate": "!newData.exists() || newData.isBoolean()" },
       "contactEmailEnabled":     { ".validate": "!newData.exists() || newData.isBoolean()" },

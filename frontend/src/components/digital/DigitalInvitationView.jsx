@@ -24,7 +24,7 @@ import { GiftSection } from "./sections/InviteGift.jsx";
 import { GuestbookSection } from "./sections/InviteGuestbook.jsx";
 import { InviteFooter, FloatingDock } from "./sections/InviteFooterDock.jsx";
 import { EnvelopeIntro } from "./sections/EnvelopeIntro.jsx";
-import { Ambience } from "./sections/InviteAmbience.jsx";
+import { CelestialAmbience } from "./sections/CelestialAmbience.jsx";
 import { ViewStyles } from "./sections/InviteStyles.jsx";
 import { WalletButton } from "./WalletButton.jsx";
 
@@ -180,7 +180,7 @@ export function DigitalInvitationView({
       )}
 
       {showEnvelopeNow && <EnvelopeIntro guestName={guestName} font={font} lang={lang} />}
-      <Ambience theme={theme} fixed={isPublic} />
+      <CelestialAmbience theme={theme} mode={mode} fixed={isPublic} immersive3d={on(design?.immersive3d)} />
 
       <Hero
         guestName={guestName}
