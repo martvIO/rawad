@@ -1,6 +1,6 @@
 import { Response } from "express";
 import { AuthRequest,requireAuth } from "../../middleware/auth";
-import { wishesCol } from "./firestore";
+import { firebaseDigitalWishStore } from "../../../domain/digital/firebaseDigitalWishStore";
 import { canActOnUid } from "./access";
 import { safeDetail } from "./project";
 import { Router } from "express";
@@ -17,12 +17,7 @@ router.get(
   async (req: AuthRequest, res: Response) => {
     if (!canActOnUid(req, req.params.uid)) { res.status(403).json({ error: "forbidden" }); return; }
     try {
-      const snap = await wishesCol(req.params.uid).get();
-      const wishes = snap.docs.map(
-        (d) => ({ id: d.id, ...(d.data() as Record<string, unknown>) })
-      ) as Array<Record<string, unknown>>;
-      wishes.sort((a, b) => (Number(b.submittedAt) || 0) - (Number(a.submittedAt) || 0));
-      res.json(wishes);
+      res.json(await firebaseDigitalWishStore().list(req.params.uid));
     } catch (err) {
       res.status(500).json({ error: "read_failed", detail: safeDetail(err) });
     }
@@ -38,9 +33,7 @@ router.patch(
     const status = (req.body?.status ?? "").toString();
     if (status !== "approved" && status !== "pending") { res.status(400).json({ error: "invalid_status" }); return; }
     try {
-      await wishesCol(req.params.uid).doc(req.params.wishId).update({
-        status, approvedAt: status === "approved" ? Date.now() : null,
-      });
+      await firebaseDigitalWishStore().setStatus(req.params.uid, req.params.wishId, status);
       res.json({ ok: true });
     } catch (err) {
       res.status(500).json({ error: "write_failed", detail: safeDetail(err) });
@@ -55,7 +48,7 @@ router.delete(
   async (req: AuthRequest, res: Response) => {
     if (!canActOnUid(req, req.params.uid)) { res.status(403).json({ error: "forbidden" }); return; }
     try {
-      await wishesCol(req.params.uid).doc(req.params.wishId).delete();
+      await firebaseDigitalWishStore().remove(req.params.uid, req.params.wishId);
       res.json({ ok: true });
     } catch (err) {
       res.status(500).json({ error: "delete_failed", detail: safeDetail(err) });
