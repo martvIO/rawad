@@ -14,8 +14,11 @@ export default defineConfig({
             "src/__tests__/data/**/*.test.{js,ts}",
             "src/__tests__/services/**/*.test.{js,ts}",
             "src/__tests__/i18n/**/*.test.{js,ts}",
+            "src/__tests__/components/**/*.test.{js,jsx,ts,tsx}",
           ],
           environment: "jsdom",
+          // jest-dom matchers (toBeDisabled, toBeInTheDocument, …) for RTL tests.
+          setupFiles: ["./src/__tests__/setup.js"],
           testTimeout: 10000,
         },
       },
