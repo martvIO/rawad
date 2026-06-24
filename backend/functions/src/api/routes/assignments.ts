@@ -14,15 +14,14 @@
 //     exposed yet). Drivers self-assign by passing a groom's username.
 
 import { Router, Response } from "express";
-import { getAuth } from "firebase-admin/auth";
-import { getDatabase } from "firebase-admin/database";
 import {
   AuthRequest,
   requireAuth,
   requireRole,
 } from "../middleware/auth";
-import { isUsername, DawaClaims } from "../../helpers";
+import { isUsername } from "../../helpers";
 import { writeAudit } from "../../audit";
+import { firebaseAssignmentStore } from "../../domain/assignments/firebaseAssignmentStore";
 
 export const assignmentsRouter = Router();
 
@@ -46,10 +45,7 @@ assignmentsRouter.get(
       return;
     }
     try {
-      const snap = await getDatabase()
-        .ref(`driverAssignments/${driverUid}`)
-        .get();
-      res.json(snap.val() ?? {});
+      res.json(await firebaseAssignmentStore().list(driverUid));
     } catch (err) {
       res.status(500).json({ error: "read_failed", detail: errorMessage(err) });
     }
@@ -87,24 +83,16 @@ assignmentsRouter.post(
     }
 
     try {
-      const db = getDatabase();
-      const groomUidSnap = await db.ref(`usernameIndex/${groomUsername}`).get();
-      if (!groomUidSnap.exists()) {
-        res.status(404).json({ error: "unknown_groom" });
-        return;
-      }
-      const groomUid = groomUidSnap.val() as string;
-
-      const groomProfile = (
-        await db.ref(`users/${groomUid}`).get()
-      ).val() as { role?: string } | null;
-      if (groomProfile?.role !== "groom") {
+      const result = await firebaseAssignmentStore().assign(driverUid, groomUsername);
+      if (!result.ok) {
+        if (result.reason === "unknown_groom") {
+          res.status(404).json({ error: "unknown_groom" });
+          return;
+        }
         res.status(409).json({ error: "target_not_a_groom" });
         return;
       }
-
-      await db.ref(`driverAssignments/${driverUid}/${groomUid}`).set(true);
-      await restampDriverAssignedGroomsClaim(driverUid);
+      const { groomUid } = result;
       await writeAudit(driverUid, "assignDriverToGroom", { groomUid });
       // Self-service assignment grants this driver read access to the groom's full
       // guest list (names/phones/addresses). Drivers are admin-provisioned and this
@@ -123,29 +111,9 @@ assignmentsRouter.post(
   }
 );
 
-// ─── Custom-claim refresh ─────────────────────────────────────────────────────
-
-/**
- * Recompute the driver's `assignedGrooms` claim from /driverAssignments/{uid}
- * and merge it into their existing claims. The claim is what Storage rules
- * read to gate proof-photo uploads under `proofs/{groomUid}/`.
- *
- * Reading + writing claims is split into two Admin SDK calls so a stale
- * read does not clobber another concurrent claim update — the existing
- * claims are merged into the new shape rather than replaced wholesale.
- */
-async function restampDriverAssignedGroomsClaim(driverUid: string): Promise<void> {
-  const db = getDatabase();
-  const allAssignedSnap = await db.ref(`driverAssignments/${driverUid}`).get();
-  const allAssigned = (allAssignedSnap.val() ?? {}) as Record<string, true>;
-
-  const existingClaims =
-    ((await getAuth().getUser(driverUid)).customClaims as DawaClaims) ?? {};
-  await getAuth().setCustomUserClaims(driverUid, {
-    ...existingClaims,
-    assignedGrooms: allAssigned,
-  });
-}
+// The assignment write + `assignedGrooms` claim restamp (and the compensating
+// rollback that keeps them consistent) now live in the AssignmentStore domain
+// module — see domain/assignments/assignmentStore.ts.
 
 function errorMessage(err: unknown): string | undefined {
   // Public/admin 5xx responses must not echo raw error text in production — it
