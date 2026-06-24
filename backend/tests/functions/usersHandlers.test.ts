@@ -188,6 +188,29 @@ describe("POST /users — create", () => {
     expect(status).toBe(409);
     expect(json.error).toBe("phone_taken");
   });
+
+  it("creates a phone-less user: no Auth phoneNumber, no phoneIndex entry, no profile phoneE164", async () => {
+    // Phone is optional end-to-end (Issue 6). Omitting phoneE164 must create a
+    // valid account with no Auth phoneNumber and no /phoneIndex row.
+    const { username, password, role } = NEW_USER;
+    const { status, json } = await req("POST", "/users", "admin-token", { username, password, role });
+    expect(status).toBe(200);
+    const uid = json.uid;
+    expect(uid).toBeTruthy();
+    expect(mem.rtdb.users[uid].username).toBe("sara");
+    expect(mem.rtdb.users[uid].phoneE164).toBeUndefined();
+    expect(Object.values(mem.rtdb.phoneIndex)).not.toContain(uid);
+    expect(mem.authUsers[uid].phoneNumber).toBeUndefined();
+  });
+
+  it("treats an empty-string phoneE164 as absent (no phone)", async () => {
+    const { status, json } = await req("POST", "/users", "admin-token", { ...NEW_USER, phoneE164: "" });
+    expect(status).toBe(200);
+    const uid = json.uid;
+    expect(mem.rtdb.users[uid].phoneE164).toBeUndefined();
+    expect(Object.values(mem.rtdb.phoneIndex)).not.toContain(uid);
+    expect(mem.authUsers[uid].phoneNumber).toBeUndefined();
+  });
 });
 
 describe("PUT /users/:uid — update", () => {
