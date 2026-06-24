@@ -43,6 +43,19 @@ const MAX_BACKOFF_MS = 60 * 1000;
 /** Cap on the doubling exponent so `1 << n` cannot blow up to NaN/Infinity. */
 const MAX_BACKOFF_EXP = 10;
 
+/** Jitter spread (±) applied to every scheduled delay. */
+const JITTER = 0.15;
+
+/**
+ * Spread a delay by ±15% so independent pollers (multiple tabs / many clients)
+ * don't fire in lockstep and stack into periodic load spikes on the API. Pure;
+ * `rand` is injectable for tests. Returns a non-negative integer of ms.
+ */
+export function applyJitter(ms, rand = Math.random) {
+  const factor = 1 + (rand() * 2 - 1) * JITTER; // [1-JITTER, 1+JITTER)
+  return Math.max(0, Math.round(ms * factor));
+}
+
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 /**
@@ -108,10 +121,11 @@ export function createPoller(fetchFn, callback, opts) {
         // failures shouldn't cause perceptible UI lag. Backoff only kicks in
         // on the SECOND consecutive failure: 2×, 4×, 8× … capped at MAX.
         const exp = Math.min(Math.max(0, consecutiveErrors - 1), MAX_BACKOFF_EXP);
-        const delay = consecutiveErrors === 0
+        const base = consecutiveErrors === 0
           ? intervalMs
           : Math.min(intervalMs * (1 << exp), MAX_BACKOFF_MS);
-        timer = setTimeout(tick, delay);
+        // Jitter so concurrent tabs/clients don't poll in lockstep.
+        timer = setTimeout(tick, applyJitter(base));
       }
     }
   };
