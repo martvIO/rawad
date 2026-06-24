@@ -17,6 +17,18 @@ export interface DbPort {
   set(path: string, value: unknown): Promise<void>;
   /** Delete the value at a single path. */
   remove(path: string): Promise<void>;
+  /**
+   * Atomic read-modify-write at a single path. `transform` receives the current
+   * value (`null` when the path is absent) and returns the next value to
+   * commit, or `undefined` to ABORT the write. Resolves to whether a write
+   * committed. Mirrors RTDB `ref(path).transaction(...)` and exists for
+   * compare-and-set guards like the one-shot invite-token claim (set `usedAt`
+   * only if still empty) that a plain `update` can't express race-free.
+   */
+  transaction(
+    path: string,
+    transform: (current: unknown) => unknown,
+  ): Promise<{ committed: boolean }>;
 }
 
 /** The subset of a Firebase Auth user record the domains read. */

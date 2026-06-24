@@ -33,6 +33,17 @@ export function rtdbPort(): DbPort {
     async remove(path) {
       await db.ref(path).remove();
     },
+    async transaction(path, transform) {
+      // RTDB hands the transform `null` for an absent path and aborts the write
+      // when it returns `undefined` — the exact contract the DbPort declares, so
+      // this is a straight pass-through.
+      const result = await db
+        .ref(path)
+        .transaction((current) =>
+          transform(current === undefined ? null : current),
+        );
+      return { committed: result.committed };
+    },
   };
 }
 
