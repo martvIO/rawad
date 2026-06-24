@@ -110,7 +110,8 @@ function EditModal({ user, onSave, onCancel, t, lang }) {
       patch.canUsePhotographer = canPhoto;
       patch.canUseBoardingPass = canBoarding;
     }
-    console.log("[dawa] EditModal → patch:", patch);
+    // NOTE: never log `patch` — it can contain patch.newPassword (a plaintext
+    // password), which would leak into the browser console / any log sink.
     try {
       await onSave(user.uid ?? user.id, patch);
     } finally {
