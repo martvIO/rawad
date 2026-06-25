@@ -25,7 +25,7 @@ const BASE = {
   phoneE164: "+972511111111",
   password: "Abcd1234!xyz",
   features: PACKAGES.vip.features,
-  createdBy: "stripe",
+  createdBy: "lemonsqueezy",
 };
 
 describe("createGroomAccount", () => {
@@ -38,7 +38,7 @@ describe("createGroomAccount", () => {
     const u = mem.rtdb.users[uid];
     expect(u.username).toBe("newgroom");
     expect(u.role).toBe("groom");
-    expect(u.createdBy).toBe("stripe");
+    expect(u.createdBy).toBe("lemonsqueezy");
     expect(u.phoneE164).toBe("+972511111111");
     expect(u.canUseBoardingPass).toBe(true); // from VIP features
     expect(u.mustChangePassword).toBe(true);

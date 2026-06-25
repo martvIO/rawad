@@ -23,7 +23,7 @@ runtime settings, the code-level config constants, and the infra/config files.
 | Set the CORS allowlist | `ALLOWED_ORIGINS` (functions env) → read in `backend/functions/src/api/cors.ts` | Env |
 | Set the server-side Firebase Web API key | `WEB_API_KEY` (functions env, never `VITE_*`) | Env (secret) |
 | Enable the password-encryption layer | `PASSWORD_ENC_PRIVATE_KEY` (functions env) + optional `REQUIRE_ENCRYPTED_PASSWORDS` | Env (secret) |
-| Enable Stripe payments | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` (functions env) | Env (secret) |
+| Enable Lemon Squeezy payments | `LEMONSQUEEZY_API_KEY`, `LEMONSQUEEZY_STORE_ID`, `LEMONSQUEEZY_WEBHOOK_SECRET`, `LS_VARIANT_ID_PREMIUM`, `LS_VARIANT_ID_VIP` (functions env) | Env (secret) |
 | Enable AWS Rekognition face matching | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION` (functions env) | Env (secret) |
 | Tune poll intervals / request timeouts | `frontend/src/config/index.js` (`POLL_MS`, `API_TIMEOUT_MS`) | Code config |
 | Tune rate limits / field caps / token TTL | `backend/functions/src/constants/*` (`rateLimits.ts`, `limits.ts`, `tokens.ts`, `time.ts`) | Code config |
@@ -86,8 +86,10 @@ Manager or functions env (`.env.local` for the emulator). Template: `backend/fun
 | `WHATSAPP_YOURPHOTOS_TEMPLATE_LANG` | `api/routes/digital/photoShare.routes.ts` | Optional | `ar` | Language for the photos-ready template |
 | `WHATSAPP_CREDENTIALS_TEMPLATE_AR`, `WHATSAPP_CREDENTIALS_TEMPLATE_HE` | `whatsappConfig.ts` | Optional | DB (`waTemplateCredentialsAr/He`) / delivery off if blank | Approved template (3 body vars: username, password, login URL) delivering a new groom's credentials after a paid signup |
 | `PUBLIC_BASE_URL` | `whatsappInvite.ts`, `whatsappTemplates.ts`, `api/routes/payments.ts`, `api/routes/digital/photoShare.routes.ts` | Optional | `https://dawa-aa793.web.app` | Origin used to build invite/pay/login links in WhatsApp messages |
-| `STRIPE_SECRET_KEY` | `api/routes/payments.ts` | Optional | unset (payments off) | Stripe secret key (paid-signup PaymentIntents) |
-| `STRIPE_WEBHOOK_SECRET` | `api/routes/payments.ts` | Optional | unset | Stripe webhook signing secret. Dashboard event to subscribe: `payment_intent.succeeded` |
+| `LEMONSQUEEZY_API_KEY` | `api/routes/payments.ts` | Optional | unset (payments off) | Lemon Squeezy API key (creates the overlay checkout) |
+| `LEMONSQUEEZY_STORE_ID` | `api/routes/payments.ts` | Optional | unset | Numeric LS store id (use an ILS store) |
+| `LEMONSQUEEZY_WEBHOOK_SECRET` | `api/routes/payments.ts` | Optional | unset | LS webhook signing secret. Dashboard event to subscribe: `order_created` |
+| `LS_VARIANT_ID_PREMIUM`, `LS_VARIANT_ID_VIP` | `config/packages.ts` (`variantIdFor`) | Optional | unset | LS variant id per package (price set in the LS dashboard, tax-inclusive) |
 | `AWS_ACCESS_KEY_ID` | `faceIndex/config.ts` | Optional | unset (Rekognition off) | AWS key for face indexing (set with the other two) |
 | `AWS_SECRET_ACCESS_KEY` | `faceIndex/config.ts` | Optional | unset | AWS secret for face indexing |
 | `AWS_REGION` | `faceIndex/config.ts`, `faceIndex/rekognition.ts`, `api/routes/photoFaces.ts` | Optional | unset | AWS region for Rekognition |
@@ -235,7 +237,7 @@ Other frontend constants: `frontend/src/constants/roles.js` (`ROLES`),
 - **`.env*` files are gitignored** — never commit them. Templates: `backend/functions/.env.example`,
   `loadtest/.env.example`.
 - **Production secrets** (`WEB_API_KEY`, `WHATSAPP_TOKEN`, `WHATSAPP_APP_SECRET`,
-  `PASSWORD_ENC_PRIVATE_KEY`, `STRIPE_*`, `AWS_*`, `STREAM_TOKEN_SECRET`, …) go in **Firebase Secret
+  `PASSWORD_ENC_PRIVATE_KEY`, `LEMONSQUEEZY_API_KEY`, `LEMONSQUEEZY_WEBHOOK_SECRET`, `AWS_*`, `STREAM_TOKEN_SECRET`, …) go in **Firebase Secret
   Manager** / functions env, **not** the DB and **not** `VITE_*`.
 - **Service-account JSON** is referenced by path via `GOOGLE_APPLICATION_CREDENTIALS` (it lives in
   the repo root for local admin scripts — never stage it in a commit).

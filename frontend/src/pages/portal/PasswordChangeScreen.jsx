@@ -79,13 +79,13 @@ export function PasswordChangeScreen() {
 
         <div className="gold-card">
           <div style={{ marginBottom: 6, fontSize: 12, color: C.goldDim }}>{t("pwch_current")} *</div>
-          <input className="input-field" type="password" autoComplete="current-password"
+          <input data-testid="field-pwch-current" className="input-field" type="password" autoComplete="current-password"
                  value={current} onChange={(e) => setCurrent(e.target.value)}
                  placeholder="••••••••" disabled={busy}
                  style={{ marginBottom: 14, direction: "ltr", textAlign: "left" }} />
 
           <div style={{ marginBottom: 6, fontSize: 12, color: C.goldDim }}>{t("pwch_new")} *</div>
-          <input className="input-field" type="password" autoComplete="new-password"
+          <input data-testid="field-pwch-new" className="input-field" type="password" autoComplete="new-password"
                  value={next} onChange={(e) => setNext(e.target.value)}
                  placeholder="••••••••" disabled={busy}
                  style={{ marginBottom: next ? 8 : 14, direction: "ltr", textAlign: "left" }} />
@@ -96,16 +96,16 @@ export function PasswordChangeScreen() {
           )}
 
           <div style={{ marginBottom: 6, fontSize: 12, color: C.goldDim }}>{t("pwch_confirm")} *</div>
-          <input className="input-field" type="password" autoComplete="new-password"
+          <input data-testid="field-pwch-confirm" className="input-field" type="password" autoComplete="new-password"
                  value={confirm} onChange={(e) => setConfirm(e.target.value)}
                  placeholder="••••••••" disabled={busy}
                  style={{ marginBottom: 14, direction: "ltr", textAlign: "left" }} />
 
           {error && (
-            <div style={{ color: C.red, fontSize: 12, marginBottom: 12, textAlign: "center" }}>{error}</div>
+            <div data-testid="alert-pwch-error" style={{ color: C.red, fontSize: 12, marginBottom: 12, textAlign: "center" }}>{error}</div>
           )}
 
-          <button className="gold-btn" style={{ width: "100%" }} onClick={submit} disabled={!canSubmit}>
+          <button data-testid="btn-pwch-submit" className="gold-btn" style={{ width: "100%" }} onClick={submit} disabled={!canSubmit}>
             {busy ? "…" : t("pwch_submit")}
           </button>
         </div>

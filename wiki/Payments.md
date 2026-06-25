@@ -1,76 +1,72 @@
 ---
 date: 2026-06-25
-tags: [payments, stripe, billing, signup]
+tags: [payments, lemonsqueezy, billing, signup]
 ---
 
 # Payments
 
-Paid groom **self-signup** via Stripe Elements. The admin mints a single-use
-payment link for a package; the groom opens it, picks a username + phone, and
-pays on our own branded page; a webhook then auto-creates the groom account and
-WhatsApps the login credentials. Replaces the previous "Stripe Payment Link
-attached to an existing groom" flow entirely.
+Paid groom **self-signup** via **Lemon Squeezy** (overlay checkout). The admin mints
+a single-use payment link for a package; the groom opens it on our branded page,
+picks a username + phone, and pays in the **Lemon Squeezy checkout overlay** (LS is a
+Merchant of Record, so the card UI is theirs but opens as a modal on our page). A
+webhook then auto-creates the groom account and WhatsApps the login credentials.
+
+> History: this flow was first built on Stripe Elements, then the **payment provider
+> was swapped to Lemon Squeezy** (UI unchanged — only the checkout creation + webhook
+> verification differ). All account-provisioning is provider-agnostic and was reused.
 
 Related: [[Dawa]] · [[REST API Architecture]] · [[Security Model]] · [[User Roles]]
 · [[Communication Settings]]
 
 ## Packages (price templates)
 
-Authoritative price list lives in `backend/functions/src/config/packages.ts` —
-**edit prices/labels/feature flags there**. Each package = `{ id, label{ar,he},
-amountIls, currency:"ils", features{canSeeAttendance, canUsePhotographer,
-canUseBoardingPass} }`. Seeded: Premium ₪1,500, VIP ₪2,000 (VIP adds the wallet
-boarding pass). The PaymentIntent amount is computed server-side from this file
-(never trusted from the client) and re-verified in the webhook.
+`backend/functions/src/config/packages.ts` holds each package = `{ id, label{ar,he},
+amountIls, currency:"ils", features{…} }`. Premium ₪1,500 / VIP ₪2,000. With LS, the
+**LS variant price is what the groom is charged** (set in the LS dashboard, tax-inclusive);
+`amountIls` is the display/record value and must be kept in sync by hand. Each package
+maps to an LS variant id via `variantIdFor(id)` → env `LS_VARIANT_ID_<ID>`.
 
 ## Flow
-1. Admin → **Payment Links** tab (`AdminPaymentLinks.jsx`) → pick a package →
-   `POST /payments/links` mints a single-use token at `paymentTokens/{token}`
-   (role always `groom`, 7-day TTL) and returns a `payUrl` to share.
-2. Groom opens `/pay/:token` (`PayPage.jsx`). `GET /payments/links/:token`
-   resolves projected package fields; a live `GET /payments/username-available`
-   check guards the username.
-3. On submit, `POST /payments/links/:token/intent` atomically **reserves** the
-   username (`usernameReservations`) and phone (`phoneReservations`), creates a
-   Stripe **PaymentIntent** (server-authoritative amount), and returns a
-   `clientSecret`. The groom pays with Stripe Elements (card tokenized in-browser).
-4. `POST /payments/webhook` (public, **Stripe-Signature verified with Node
-   crypto**, event `payment_intent.succeeded`) atomically **claims** the token
-   (`status: provisioning`, serializes concurrent re-deliveries), re-verifies
-   `pi.amount` against the package, then `createGroomAccount()` writes the Auth
-   user + indices + `/users/{uid}` + `purchases/{token}` ledger + the admin-only
-   `generatedPasswords/{uid}` in one atomic update, and WhatsApps the credentials.
-5. Groom logs in → `mustChangePassword` gate (`PasswordChangeScreen.jsx`) forces
-   a change; `POST /auth/change-password` clears the flag and purges the stored
-   generated password.
+1. Admin → **Payment Links** tab → pick a package → `POST /payments/links` mints a
+   single-use token at `paymentTokens/{token}` (role always `groom`, 7-day TTL).
+2. Groom opens `/pay/:token` (`PayPage.jsx`). `GET /payments/links/:token` resolves
+   projected package fields; a live `GET /payments/username-available` check guards
+   the username.
+3. On Pay, `POST /payments/links/:token/intent` atomically **reserves** the username
+   (`usernameReservations`) + phone (`phoneReservations`), then creates an **LS checkout**
+   for the package's variant with `checkout_data.custom = {token, username, phone,
+   package_id}` and `checkout_options.embed=true`, and returns `{ checkoutUrl }`.
+4. The frontend opens that URL in the **Lemon.js overlay**; on `Checkout.Success` it
+   shows the success screen. (Card entry is LS's; our page is untouched.)
+5. `POST /payments/webhook` (public, **X-Signature** HMAC-SHA256 verified, event
+   `order_created`, status `paid`) atomically **claims** the token, **verifies the order's
+   variant** matches the package (amount-tamper guard), then `createGroomAccount()` writes
+   the Auth user + indices + `/users/{uid}` + `purchases/{token}` (with the real
+   `amountPaidCents` + LS `orderId`) + admin-only `generatedPasswords/{uid}`, and WhatsApps
+   the credentials.
+6. Groom logs in → `mustChangePassword` gate (`PasswordChangeScreen.jsx`) → change →
+   flag + stored password cleared.
 
-## RTDB paths (all Function-only unless noted)
-- `paymentTokens/{token}` — link state machine (pending→reserved→provisioning→
-  paid→delivered / amount_mismatch / account_conflict / delivery_failed).
-- `usernameReservations/{username}`, `phoneReservations/{phoneIdx}` — soft
-  reservations (TTL'd by `expiresAt`).
-- `generatedPasswords/{uid}` — admin-visible fallback password, **purged on the
-  groom's first password change**. Read only via `GET /payments/links` (admin).
-- `purchases/{token}` — admin-readable purchase ledger.
-- `/users/{uid}` adds `paymentPackageId` + `mustChangePassword`; the webhook also
-  stamps the legacy `paymentStatus/paymentPlan/paymentAmountIls/paymentPaidAt`
-  fields so the Revenue analytics keep counting.
+## RTDB paths (Function-only unless noted)
+`paymentTokens/{token}` (state machine), `usernameReservations` + `phoneReservations`
+(soft reservations), `generatedPasswords/{uid}` (admin-visible fallback, purged on first
+change; read only via `GET /payments/links`), `purchases/{token}` (admin-readable ledger),
+`/users/{uid}` adds `paymentPackageId` + `mustChangePassword` (+ legacy `payment*` KPI fields).
 
 ## Files
-- backend: `api/routes/payments.ts`, `api/services/createGroomAccount.ts`,
-  `config/packages.ts`, `passwordGen.ts`, `api/routes/auth.ts` (change-password),
-  `whatsappConfig.ts` (credentials templates).
-- frontend: `pages/PayPage.jsx`, `pages/portal/PasswordChangeScreen.jsx`,
-  `pages/portal/admin/AdminPaymentLinks.jsx`, `services/payments.js`,
-  `services/auth.js`, `pages/portal/Portal.jsx` (gate).
-- rules: `paymentTokens / usernameReservations / phoneReservations /
-  generatedPasswords / purchases` + user fields in `database.rules.json`.
-- tests: `paymentsWebhook`, `createGroomAccount`, `packages`, `passwordGen`.
+- backend: `api/routes/payments.ts` (LS checkout + `order_created` webhook +
+  `verifyLemonSignature`), `api/services/createGroomAccount.ts`, `config/packages.ts`
+  (`variantIdFor`), `passwordGen.ts`, `auth.ts` (change-password), `whatsappConfig.ts`.
+- frontend: `pages/PayPage.jsx` (Lemon.js overlay), `services/payments.js` (`createCheckout`),
+  `pages/portal/PasswordChangeScreen.jsx`, `pages/portal/admin/AdminPaymentLinks.jsx`.
+- tests: `paymentsWebhook` (`verifyLemonSignature` + `order_created`), `createGroomAccount`,
+  `packages`, `passwordGen`.
 
 ## Config (test mode → live)
-Backend env: `STRIPE_SECRET_KEY` (sk_test_…), `STRIPE_WEBHOOK_SECRET` (whsec_…);
-point a Stripe webhook at `…/api/payments/webhook` for **`payment_intent.succeeded`**.
-Frontend build env: `VITE_STRIPE_PUBLISHABLE_KEY` (pk_test_…). WhatsApp delivery
-needs Meta-approved templates `WHATSAPP_CREDENTIALS_TEMPLATE_AR/_HE` (3 body vars).
-Until set, the pay endpoints return `503 stripe_not_configured` and credential
-delivery degrades to the admin reading the password from the Payment Links tab.
+Backend env: `LEMONSQUEEZY_API_KEY`, `LEMONSQUEEZY_STORE_ID` (ILS store),
+`LEMONSQUEEZY_WEBHOOK_SECRET`, `LS_VARIANT_ID_PREMIUM`, `LS_VARIANT_ID_VIP`. Operator
+setup in the LS dashboard: a product with Premium + VIP variants (priced in ₪,
+tax-inclusive), and a webhook to `<host>/api/payments/webhook` for `order_created`. No
+frontend key (the overlay loads the public lemon.js script). Until set, the pay endpoints
+return `503 lemonsqueezy_not_configured` and credential delivery degrades to the admin
+reading the password from the Payment Links tab.

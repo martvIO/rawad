@@ -1,29 +1,66 @@
 // Public paid-signup page, opened from an admin-minted link of the shape
-// /pay/:token. The groom picks a username + phone, then pays with Stripe
-// Elements (the card form is ours; Stripe.js tokenizes the card in-browser).
+// /pay/:token. The groom picks a username + phone, then pays via the Lemon
+// Squeezy checkout OVERLAY (Lemon Squeezy is a Merchant of Record, so the card
+// form is theirs — but it opens as a modal on top of this page, so the groom
+// never leaves our branded page).
 //
-// On a successful payment the BACKEND webhook creates the groom account and
-// WhatsApps the credentials — so the success screen here only confirms the
-// payment and points the groom at /portal/login; it must NOT assume the account
-// already exists (the webhook may lag a moment).
-import { useEffect, useMemo, useState } from "react";
+// On a successful payment the BACKEND `order_created` webhook creates the groom
+// account and WhatsApps the credentials — so the success screen here only
+// confirms the payment and points the groom at /portal/login; it must NOT assume
+// the account already exists (the webhook may lag a moment).
+import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { loadStripe } from "@stripe/stripe-js";
-import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import { BrandLogo } from "../components/BrandLogo.jsx";
 import { LangSwitcher } from "../components/LangSwitcher.jsx";
 import { PhoneInput, isCompletePhone } from "../components/PhoneInput.jsx";
 import {
   resolvePaymentToken,
   checkUsernameAvailable,
-  createPaymentIntent,
+  createCheckout,
 } from "../services/payments.js";
 import { logErr } from "../utils/logger.js";
 import { C } from "../styles/theme.js";
 
 // Mirror the server-side USERNAME_RE (helpers.ts).
 const USERNAME_RE = /^[a-zA-Z0-9_.-]{2,60}$/;
-const PUB_KEY = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || "";
+
+// ── Lemon.js loader (overlay checkout) ───────────────────────────────────────
+let lemonReady = null;
+function loadLemon() {
+  if (lemonReady) return lemonReady;
+  lemonReady = new Promise((resolve) => {
+    if (typeof window === "undefined") { resolve(); return; }
+    if (window.LemonSqueezy || window.createLemonSqueezy) { resolve(); return; }
+    const existing = document.querySelector("script[data-lemon]");
+    if (existing) { existing.addEventListener("load", () => resolve(), { once: true }); return; }
+    const s = document.createElement("script");
+    s.src = "https://assets.lemonsqueezy.com/lemon.js";
+    s.defer = true;
+    s.setAttribute("data-lemon", "1");
+    s.onload = () => resolve();
+    s.onerror = () => resolve(); // resolve anyway → fall back to full redirect
+    document.head.appendChild(s);
+  });
+  return lemonReady;
+}
+
+/** Open an LS checkout URL as an overlay; call onSuccess when payment completes.
+ *  Falls back to a full-page redirect if the overlay script is unavailable. */
+async function openLemonOverlay(url, onSuccess) {
+  await loadLemon();
+  try {
+    if (typeof window.createLemonSqueezy === "function") window.createLemonSqueezy();
+  } catch { /* older lemon.js auto-initializes window.LemonSqueezy */ }
+  const LS = window.LemonSqueezy;
+  if (LS?.Setup) {
+    LS.Setup({ eventHandler: (e) => { if (e?.event === "Checkout.Success") onSuccess(); } });
+  }
+  if (LS?.Url?.Open) {
+    LS.Url.Open(url);
+  } else {
+    window.location.href = url; // no overlay available → hosted checkout
+  }
+}
 
 /** Map an ApiError from /intent to a localized message. */
 function mapPayError(err, t) {
@@ -41,7 +78,7 @@ function mapPayError(err, t) {
       return t("pay_username_taken");
     case "phone_taken":
       return t("pay_phone_taken");
-    case "stripe_not_configured":
+    case "lemonsqueezy_not_configured":
       return t("pay_not_configured");
     default:
       return t("pay_error_generic");
@@ -54,12 +91,12 @@ export function PayPage({ t, lang, setLang }) {
   const [username, setUsername] = useState("");
   const [phone, setPhone] = useState("");
   const [avail, setAvail] = useState(null); // null | "checking" | true | false
-  const [clientSecret, setClientSecret] = useState("");
-  const [intentBusy, setIntentBusy] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [paid, setPaid] = useState(false);
 
-  const stripePromise = useMemo(() => (PUB_KEY ? loadStripe(PUB_KEY) : null), []);
+  // Warm up the Lemon.js script so the overlay opens instantly on Pay.
+  useEffect(() => { loadLemon(); }, []);
 
   // Resolve the token once on load.
   useEffect(() => {
@@ -86,43 +123,29 @@ export function PayPage({ t, lang, setLang }) {
     return () => { alive = false; clearTimeout(id); };
   }, [username]);
 
-  // Stripe redirect-return handling: a payment method that requires a full-page
-  // redirect comes back to /pay/:token with ?payment_intent_client_secret=…. On
-  // that fresh mount, retrieve the intent and show the success screen if it
-  // already succeeded (otherwise the user would see the form again).
-  useEffect(() => {
-    const cs = new URLSearchParams(window.location.search).get("payment_intent_client_secret");
-    if (!cs || !stripePromise) return;
-    let alive = true;
-    stripePromise
-      .then((stripe) => stripe?.retrievePaymentIntent(cs))
-      .then((res) => {
-        const st = res?.paymentIntent?.status;
-        if (alive && (st === "succeeded" || st === "processing")) setPaid(true);
-      })
-      .catch(() => {});
-    return () => { alive = false; };
-  }, [stripePromise]);
-
   const usernameValid = USERNAME_RE.test(username.trim().toLowerCase());
   const phoneValid = isCompletePhone(phone);
-  const canContinue = usernameValid && avail === true && phoneValid && !intentBusy;
+  const canPay = usernameValid && avail === true && phoneValid && !busy;
 
-  const continueToPayment = async () => {
+  const pay = async () => {
     setError("");
-    setIntentBusy(true);
+    setBusy(true);
     try {
-      const data = await createPaymentIntent(token, {
+      const data = await createCheckout(token, {
         username: username.trim().toLowerCase(),
         phoneE164: phone.trim(),
         lang,
       });
-      setClientSecret(data.clientSecret);
+      await openLemonOverlay(data.checkoutUrl, () => setPaid(true));
+      // Keep the button disabled while the overlay is open so a stray click can't
+      // mint a second checkout. On success the Checkout.Success handler flips
+      // `paid` (replacing the form with the success screen); if the groom dismisses
+      // the overlay without paying, they reload the page to retry. busy is reset
+      // only on error (below).
     } catch (err) {
-      logErr("createPaymentIntent", err);
+      logErr("createCheckout", err);
       setError(mapPayError(err, t));
-    } finally {
-      setIntentBusy(false);
+      setBusy(false);
     }
   };
 
@@ -190,103 +213,45 @@ export function PayPage({ t, lang, setLang }) {
             </div>
           </div>
 
-          {!clientSecret ? (
-            <>
-              {/* Username */}
-              <div style={{ marginBottom: 6, fontSize: 12, color: C.goldDim }}>{t("pay_username")} *</div>
-              <input className="input-field" type="text" placeholder={t("pay_username_ph")}
-                     value={username}
-                     onChange={(e) => setUsername(e.target.value.replace(/\s+/g, ""))}
-                     style={{ marginBottom: 6, direction: "ltr", textAlign: "left" }} />
-              <div style={{ minHeight: 18, marginBottom: 12, fontSize: 11, fontWeight: 700 }}>
-                {username.trim() && !usernameValid && (
-                  <span style={{ color: C.dim }}>{t("pay_username_format")}</span>
-                )}
-                {usernameValid && avail === "checking" && (
-                  <span style={{ color: C.dim }}>{t("pay_username_checking")}</span>
-                )}
-                {usernameValid && avail === true && (
-                  <span style={{ color: "#4cc97a" }}>{t("pay_username_available")}</span>
-                )}
-                {usernameValid && avail === false && (
-                  <span style={{ color: C.red }}>{t("pay_username_taken")}</span>
-                )}
-              </div>
+          {/* Username */}
+          <div style={{ marginBottom: 6, fontSize: 12, color: C.goldDim }}>{t("pay_username")} *</div>
+          <input data-testid="field-pay-username" className="input-field" type="text" placeholder={t("pay_username_ph")}
+                 value={username}
+                 onChange={(e) => setUsername(e.target.value.replace(/\s+/g, ""))}
+                 style={{ marginBottom: 6, direction: "ltr", textAlign: "left" }} />
+          <div style={{ minHeight: 18, marginBottom: 12, fontSize: 11, fontWeight: 700 }}>
+            {username.trim() && !usernameValid && (
+              <span style={{ color: C.dim }}>{t("pay_username_format")}</span>
+            )}
+            {usernameValid && avail === "checking" && (
+              <span style={{ color: C.dim }}>{t("pay_username_checking")}</span>
+            )}
+            {usernameValid && avail === true && (
+              <span style={{ color: "#4cc97a" }}>{t("pay_username_available")}</span>
+            )}
+            {usernameValid && avail === false && (
+              <span style={{ color: C.red }}>{t("pay_username_taken")}</span>
+            )}
+          </div>
 
-              {/* Phone */}
-              <div style={{ marginBottom: 6, fontSize: 12, color: C.goldDim }}>{t("pay_phone")} *</div>
-              <div style={{ marginBottom: 6 }}>
-                <PhoneInput value={phone} onChange={setPhone} t={t} lang={lang} />
-              </div>
-              <div style={{ fontSize: 11, color: C.dim, marginBottom: 16, lineHeight: 1.6 }}>
-                {t("pay_phone_hint")}
-              </div>
+          {/* Phone */}
+          <div style={{ marginBottom: 6, fontSize: 12, color: C.goldDim }}>{t("pay_phone")} *</div>
+          <div style={{ marginBottom: 6 }}>
+            <PhoneInput value={phone} onChange={setPhone} t={t} lang={lang} inputId="field-pay-phone" />
+          </div>
+          <div style={{ fontSize: 11, color: C.dim, marginBottom: 16, lineHeight: 1.6 }}>
+            {t("pay_phone_hint")}
+          </div>
 
-              {error && (
-                <div style={{ color: C.red, fontSize: 12, marginBottom: 12, textAlign: "center" }}>{error}</div>
-              )}
-              {!PUB_KEY && (
-                <div style={{ color: C.red, fontSize: 12, marginBottom: 12, textAlign: "center" }}>
-                  {t("pay_not_configured")}
-                </div>
-              )}
-
-              <button className="gold-btn" style={{ width: "100%" }}
-                      onClick={continueToPayment} disabled={!canContinue || !PUB_KEY}>
-                {intentBusy ? t("pay_processing") : t("pay_button")}
-              </button>
-            </>
-          ) : (
-            <Elements stripe={stripePromise} options={{ clientSecret, appearance: { theme: "night" } }}>
-              <div style={{ marginBottom: 6, fontSize: 12, color: C.goldDim }}>{t("pay_card")}</div>
-              <CheckoutForm
-                t={t}
-                onPaid={() => setPaid(true)}
-                onError={(m) => setError(m)}
-              />
-              {error && (
-                <div style={{ color: C.red, fontSize: 12, marginTop: 12, textAlign: "center" }}>{error}</div>
-              )}
-            </Elements>
+          {error && (
+            <div style={{ color: C.red, fontSize: 12, marginBottom: 12, textAlign: "center" }}>{error}</div>
           )}
+
+          <button data-testid="btn-pay-submit" className="gold-btn" style={{ width: "100%" }} onClick={pay} disabled={!canPay}>
+            {busy ? t("pay_processing") : t("pay_button")}
+          </button>
         </div>
       </div>
-    </div>
-  );
-}
-
-/** Card-entry + confirm. Must render inside <Elements> to use the Stripe hooks. */
-function CheckoutForm({ t, onPaid, onError }) {
-  const stripe = useStripe();
-  const elements = useElements();
-  const [busy, setBusy] = useState(false);
-
-  const pay = async () => {
-    if (!stripe || !elements) return;
-    setBusy(true);
-    onError("");
-    const { error, paymentIntent } = await stripe.confirmPayment({
-      elements,
-      confirmParams: { return_url: window.location.href },
-      redirect: "if_required",
-    });
-    setBusy(false);
-    if (error) {
-      onError(error.message || t("pay_error_generic"));
-      return;
-    }
-    if (paymentIntent && (paymentIntent.status === "succeeded" || paymentIntent.status === "processing")) {
-      onPaid();
-    }
-  };
-
-  return (
-    <div style={{ marginTop: 4 }}>
-      <PaymentElement />
-      <button className="gold-btn" style={{ width: "100%", marginTop: 18 }}
-              onClick={pay} disabled={!stripe || busy}>
-        {busy ? t("pay_processing") : t("pay_button")}
-      </button>
     </div>
   );
 }

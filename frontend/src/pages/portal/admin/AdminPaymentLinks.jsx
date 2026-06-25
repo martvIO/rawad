@@ -102,7 +102,7 @@ export function AdminPaymentLinks() {
           })}
         </div>
 
-        <button className="gold-btn" style={{ width: "100%" }} onClick={create} disabled={busy || !packageId}>
+        <button data-testid="btn-paylink-create" className="gold-btn" style={{ width: "100%" }} onClick={create} disabled={busy || !packageId}>
           {busy ? "…" : t("admin_paylinks_make")}
         </button>
       </div>

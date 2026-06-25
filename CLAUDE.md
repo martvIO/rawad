@@ -302,8 +302,8 @@ The server is pre-configured. If it is not running, start it separately before a
 | `VITE_API_BASE_URL` | Dev only | REST API base URL. In prod, same-origin `/api` via Firebase Hosting rewrite. |
 | `VITE_INVITE_BASE_URL` | Optional | Base URL for per-guest invite links. |
 | `VITE_RECAPTCHA_V2_SITE_KEY` | For OTP | reCAPTCHA v2 site key for phone-OTP password reset. |
-| `VITE_STRIPE_PUBLISHABLE_KEY` | For paid signup | Stripe publishable key (`pk_test_…`/`pk_live_…`) for the `/pay/:token` Elements card form. Backend holds `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET`; the Stripe webhook event to subscribe is `payment_intent.succeeded`. Unset → the pay page shows "payments not configured". |
 | `VITE_USE_EMULATORS` | Dev | Set `1` to connect Firebase SDK to emulators. |
+| `LEMONSQUEEZY_API_KEY` / `LEMONSQUEEZY_STORE_ID` / `LEMONSQUEEZY_WEBHOOK_SECRET` / `LS_VARIANT_ID_PREMIUM` / `LS_VARIANT_ID_VIP` | Cloud Functions, for paid signup | Lemon Squeezy paid-signup checkout (`/pay/:token` overlay). API key + ILS store id + webhook signing secret (event `order_created`) + one variant id per package (price set tax-inclusive in the LS dashboard). The frontend needs NO key (the overlay loads the public lemon.js script). Unset → the pay endpoints return 503 and the pay page shows "payments not configured". |
 | `WEB_API_KEY` | Cloud Functions | Firebase Web API key. Set in Functions environment, never in `VITE_*`. |
 | `ALLOWED_ORIGINS` | Cloud Functions | Comma-separated CORS allowed origins. Empty = allow all (dev-friendly). |
 | `PASSWORD_ENC_PRIVATE_KEY` | Optional (prod) | RSA-2048 PKCS8 PEM private key for the password-encryption layer. Generate with `node backend/scripts/gen-password-keypair.cjs`; set as a secret like `WEB_API_KEY`. Unset in prod → layer disabled (clients send plaintext over TLS); the emulator auto-generates an ephemeral key. The public key is served at `GET /api/auth/pubkey`. |

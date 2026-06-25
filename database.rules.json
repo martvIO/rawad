@@ -274,7 +274,6 @@
         "expiresAt":        { ".validate": "newData.isNumber()" },
         "claimedAt":        { ".validate": "!newData.exists() || newData.isNumber()" },
         "createdBy":        { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 64)" },
-        "paymentIntentId":  { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 128)" },
         "reservedUsername": { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 60)" },
         "reservedPhoneE164":{ ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 30)" },
         "lang":             { ".validate": "!newData.exists() || newData.val() === 'ar' || newData.val() === 'he'" },
@@ -341,15 +340,16 @@
       ".indexOn": ["uid", "paidAt"],
       "$token": {
         ".validate": "newData.hasChildren(['uid','packageId','amountIls','paidAt'])",
-        "uid":             { ".validate": "newData.isString() && newData.val().length <= 64" },
-        "packageId":       { ".validate": "newData.isString() && newData.val().length <= 64" },
-        "amountIls":       { ".validate": "newData.isNumber()" },
-        "currency":        { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 8)" },
-        "token":           { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 64)" },
-        "paymentIntentId": { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 128)" },
-        "status":          { ".validate": "!newData.exists() || newData.val() === 'paid'" },
-        "paidAt":          { ".validate": "newData.isNumber()" },
-        "$other":          { ".validate": false }
+        "uid":            { ".validate": "newData.isString() && newData.val().length <= 64" },
+        "packageId":      { ".validate": "newData.isString() && newData.val().length <= 64" },
+        "amountIls":      { ".validate": "newData.isNumber()" },
+        "amountPaidCents":{ ".validate": "!newData.exists() || newData.isNumber()" },
+        "currency":       { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 8)" },
+        "token":          { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 64)" },
+        "orderId":        { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 128)" },
+        "status":         { ".validate": "!newData.exists() || newData.val() === 'paid'" },
+        "paidAt":         { ".validate": "newData.isNumber()" },
+        "$other":         { ".validate": false }
       }
     },
 

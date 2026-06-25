@@ -1,12 +1,12 @@
-// Payments service — paid groom signup via Stripe Elements.
+// Payments service — paid groom signup via Lemon Squeezy (overlay checkout).
 //
 // Two audiences:
 //   • Admin: list packages, mint a single-use payment link, list created links.
 //   • Public (the /pay/:token page): resolve a link, check username availability,
-//     create a PaymentIntent (server returns a clientSecret for Stripe.js).
+//     create a Lemon Squeezy checkout (server returns a checkoutUrl for the overlay).
 //
-// The card itself is confirmed client-side by Stripe.js; the account is created
-// by the backend webhook on payment_intent.succeeded — there is no client polling.
+// The card is entered in the Lemon Squeezy overlay; the account is created by the
+// backend webhook on `order_created` — there is no client polling.
 import { api } from "../utils/apiClient.js";
 
 // ─── Admin ──────────────────────────────────────────────────────────────────
@@ -49,12 +49,12 @@ export async function checkUsernameAvailable(username) {
 }
 
 /**
- * Reserve the chosen username + create a Stripe PaymentIntent for this link.
- * Returns `{ clientSecret }` for Stripe.js `confirmPayment`. Throws ApiError with
+ * Reserve the chosen username/phone + create a Lemon Squeezy checkout for this
+ * link. Returns `{ checkoutUrl }` to open in the LS overlay. Throws ApiError with
  * body.error in { token_not_found, already_used, token_expired, username_taken,
- * phone_taken, package_unavailable, stripe_not_configured, ... }.
+ * phone_taken, package_unavailable, lemonsqueezy_not_configured, lemonsqueezy_error }.
  */
-export async function createPaymentIntent(token, { username, phoneE164, lang }) {
+export async function createCheckout(token, { username, phoneE164, lang }) {
   return api.post(
     `/payments/links/${encodeURIComponent(token)}/intent`,
     { username, phoneE164, lang },

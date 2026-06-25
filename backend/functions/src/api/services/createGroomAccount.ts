@@ -39,7 +39,7 @@ export interface CreateGroomAccountInput {
   password: string;
   /** Permission flags from the purchased package. */
   features: PackageFeatures;
-  /** Stamped into /users/{uid}/createdBy (e.g. "stripe"). */
+  /** Stamped into /users/{uid}/createdBy (e.g. "lemonsqueezy"). */
   createdBy: string;
   /** Extra fields merged into the /users/{uid} profile object
    *  (e.g. paymentPackageId, mustChangePassword). */

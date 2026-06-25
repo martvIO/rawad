@@ -1,31 +1,34 @@
-// Paid groom signup via Stripe Elements.
+// Paid groom signup via Lemon Squeezy (overlay checkout).
 //
 // The admin mints a SINGLE-USE payment link for a package (price tier). The
 // groom opens the branded /pay/:token page on our own site, picks a username +
-// phone, and pays with Stripe Elements (the card form is ours; Stripe.js
-// tokenizes the card in-browser). On `payment_intent.succeeded` the webhook
-// auto-creates the groom account, stamps the purchase, stores the generated
-// password (admin-only, auto-purged on first change) and WhatsApps the
-// credentials. The groom is then forced to change the password on first login.
+// phone, and pays via the Lemon Squeezy checkout OVERLAY (LS is a Merchant of
+// Record, so the card form is theirs; everything around it is ours). On the
+// `order_created` webhook the backend auto-creates the groom account, stamps the
+// purchase, stores the generated password (admin-only, auto-purged on first
+// change) and WhatsApps the credentials. The groom is then forced to change the
+// password on first login.
 //
-//   POST /payments/webhook              Stripe → provision account (sig-verified).
+//   POST /payments/webhook              LS → provision account (X-Signature verified).
 //   GET  /payments/packages             public: price list for the pay page.
 //   GET  /payments/username-available   public: live username check on the pay page.
 //   GET  /payments/links/:token         public: resolve a link (projected fields).
 //   POST /payments/links                admin: mint a single-use link.
-//   POST /payments/links/:token/intent  public: reserve username + create PaymentIntent.
+//   POST /payments/links/:token/intent  public: reserve username/phone + create LS checkout.
 //   GET  /payments/links                admin: list links + statuses (+ generated pw).
 //
 // Route order matters: /webhook and the static /packages /username-available /links
 // routes are declared before "/links/:token" so the param route can't capture them.
 //
 // CONFIG (test mode now, real payout later — no code change to go live):
-//   STRIPE_SECRET_KEY      sk_test_… (later sk_live_…)
-//   STRIPE_WEBHOOK_SECRET  whsec_… (from the Stripe webhook endpoint; event
-//                          subscription = payment_intent.succeeded)
-// Until set, the endpoints return 503 stripe_not_configured — nothing else breaks.
-// No Stripe SDK: REST API via fetch (mirrors auth.ts); webhook signature verified
-// with Node crypto. Amounts come from config/packages.ts (server-authoritative).
+//   LEMONSQUEEZY_API_KEY        LS API key (Settings → API)
+//   LEMONSQUEEZY_STORE_ID       numeric store id (ILS store)
+//   LEMONSQUEEZY_WEBHOOK_SECRET signing secret of the LS webhook (event: order_created)
+//   LS_VARIANT_ID_<PACKAGEID>   the LS variant id per package (see config/packages.ts)
+// Until set, the endpoints return 503 lemonsqueezy_not_configured — nothing else breaks.
+// No LS SDK: REST API via fetch (mirrors auth.ts/whatsapp); webhook signature verified
+// with Node crypto. The variant per package is server-chosen, so the buyer cannot
+// tamper with the amount (we re-verify the order's variant in the webhook).
 
 import { Router, Response, Request } from "express";
 import { createHmac, timingSafeEqual, randomBytes } from "crypto";
@@ -41,6 +44,7 @@ import { errorMessage } from "../errorDetail";
 import {
   getPackage,
   publicPackages,
+  variantIdFor,
   PAYMENT_LINK_TTL_MS,
   RESERVATION_TTL_MS,
 } from "../../config/packages";
@@ -51,37 +55,39 @@ import { getWhatsAppConfig, isConfigured } from "../../whatsappConfig";
 import { sendWhatsAppTemplate } from "../../whatsapp";
 import { inviteLocale } from "../../whatsappInvite";
 
-const STRIPE_API = "https://api.stripe.com/v1";
+const LS_API = "https://api.lemonsqueezy.com/v1";
 const CURRENCY = "ils";
-// Reject webhook events whose timestamp is older than this (replay protection).
-const WEBHOOK_TOLERANCE_S = 5 * 60;
 // A token stuck in "provisioning" (a delivery that died mid-flight) becomes
-// reclaimable by a later Stripe retry after this long.
+// reclaimable by a later webhook retry after this long.
 const PROVISIONING_STALE_MS = 2 * 60 * 1000;
 // Link origin for the pay/login URLs we hand back + WhatsApp (shared w/ invites).
 const PUBLIC_BASE_URL = (process.env.PUBLIC_BASE_URL || "https://dawa-aa793.web.app").replace(/\/+$/, "");
 
 export const paymentsRouter = Router();
 
-function stripeKey(): string | null {
-  return process.env.STRIPE_SECRET_KEY || null;
+function lsApiKey(): string | null {
+  return process.env.LEMONSQUEEZY_API_KEY || null;
 }
-function webhookSecret(): string | null {
-  return process.env.STRIPE_WEBHOOK_SECRET || null;
+function lsStoreId(): string | null {
+  return process.env.LEMONSQUEEZY_STORE_ID || null;
+}
+function lsWebhookSecret(): string | null {
+  return process.env.LEMONSQUEEZY_WEBHOOK_SECRET || null;
 }
 
-/** POST a form-encoded body to the Stripe REST API; returns parsed JSON. */
-async function stripePost(path: string, params: Record<string, string>, key: string) {
-  const res = await fetch(`${STRIPE_API}${path}`, {
+/** POST a JSON:API body to the Lemon Squeezy REST API; returns parsed JSON. */
+async function lsPost(path: string, body: unknown, key: string) {
+  const res = await fetch(`${LS_API}${path}`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${key}`,
-      "Content-Type": "application/x-www-form-urlencoded",
+      Accept: "application/vnd.api+json",
+      "Content-Type": "application/vnd.api+json",
     },
-    body: new URLSearchParams(params).toString(),
+    body: JSON.stringify(body),
   });
-  const data = (await res.json()) as Record<string, unknown>;
-  return { ok: res.ok, data };
+  const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+  return { ok: res.ok, status: res.status, data };
 }
 
 /**
@@ -105,76 +111,83 @@ async function releaseReservation(
     .catch(() => undefined);
 }
 
-// ─── POST /payments/webhook — Stripe → provision account (sig-verified) ─────────
+// ─── POST /payments/webhook — Lemon Squeezy → provision account (sig-verified) ──
 // MUST be registered before the "/links/:token" routes below.
 
 paymentsRouter.post("/webhook", async (req: Request, res: Response) => {
-  const secret = webhookSecret();
+  const secret = lsWebhookSecret();
   if (!secret) {
-    res.status(503).json({ error: "stripe_not_configured" });
+    res.status(503).json({ error: "lemonsqueezy_not_configured" });
     return;
   }
   // Firebase populates req.rawBody (the original bytes); signature verification
   // REQUIRES the raw bytes (express.json already parsed a copy).
   const raw = (req as unknown as { rawBody?: Buffer }).rawBody;
-  const sig = req.header("stripe-signature") || "";
+  const sig = req.header("x-signature") || "";
   if (!raw || !sig) {
     res.status(400).json({ error: "bad_signature" });
     return;
   }
-  if (!verifyStripeSignature(raw, sig, secret)) {
+  if (!verifyLemonSignature(raw, sig, secret)) {
     res.status(400).json({ error: "bad_signature" });
     return;
   }
 
-  let event: { type?: string; data?: { object?: Record<string, unknown> } };
+  let body: LsWebhookBody;
   try {
-    event = JSON.parse(raw.toString("utf8"));
+    body = JSON.parse(raw.toString("utf8"));
   } catch {
     res.status(400).json({ error: "bad_payload" });
     return;
   }
 
   try {
-    if (event.type === "payment_intent.succeeded") {
-      const pi = event.data?.object ?? {};
-      await provisionPaidIntent(pi);
+    if (body?.meta?.event_name === "order_created") {
+      await provisionPaidOrder(body);
     }
     // Any other event type is acked without work (no retry storm).
     res.json({ received: true });
   } catch (err) {
     // A genuine processing failure (e.g. a transient RTDB/Auth outage while
-    // provisioning). Do NOT ack 200 — that tells Stripe the event is handled
-    // and it never re-delivers, silently losing a paid signup. Return 5xx so
-    // Stripe retries; provisioning is idempotent (token status guard), so
-    // re-processing the same event is safe.
+    // provisioning). Do NOT ack 200 — that tells LS the event is handled and it
+    // never re-delivers, silently losing a paid signup. Return 5xx so LS retries;
+    // provisioning is idempotent (atomic token claim), so re-processing is safe.
     console.error("[payments] webhook handling error", err);
     res.status(500).json({ error: "processing_failed" });
   }
 });
 
+interface LsWebhookBody {
+  meta?: { event_name?: string; custom_data?: Record<string, unknown> };
+  data?: { id?: string | number; attributes?: Record<string, unknown> };
+}
+
 /**
- * Provision (or idempotently skip) the groom account for a succeeded
- * PaymentIntent. Throws only on an infrastructure failure that warrants a Stripe
- * retry; all "expected" terminal outcomes (missing/used token, amount mismatch,
- * username collision) mark the token and return so the webhook acks 200.
+ * Provision (or idempotently skip) the groom account for a paid LS order. Throws
+ * only on an infrastructure failure that warrants an LS retry; all "expected"
+ * terminal outcomes (missing/used token, wrong variant, username collision) mark
+ * the token and return so the webhook acks 200.
  */
-async function provisionPaidIntent(pi: Record<string, unknown>): Promise<void> {
-  const metadata = (pi.metadata ?? {}) as Record<string, unknown>;
-  const token = typeof metadata.token === "string" ? metadata.token : "";
+async function provisionPaidOrder(body: LsWebhookBody): Promise<void> {
+  const custom = (body.meta?.custom_data ?? {}) as Record<string, unknown>;
+  const token = typeof custom.token === "string" ? custom.token : "";
   if (!token || !TOKEN_HEX_RE.test(token)) return;
+
+  const order = body.data ?? {};
+  const attrs = (order.attributes ?? {}) as Record<string, unknown>;
+  // Only provision on a fully-PAID order (ignore pending/failed/refunded states).
+  if (attrs.status !== "paid") return;
 
   const db = getDatabase();
   const tokenRef = db.ref(`paymentTokens/${token}`);
 
-  // Atomically CLAIM the token before doing any provisioning work. Stripe
-  // delivers at-least-once and can deliver/retry the same event concurrently; a
-  // plain read-then-write idempotency check would let two deliveries both
-  // provision. Only the delivery whose transaction commits a transition to
-  // "provisioning" proceeds — losers (already paid/delivered, or another
-  // delivery actively provisioning) abort and the webhook acks 200. A stale
-  // "provisioning" claim (a process that died mid-flight) is reclaimable after
-  // PROVISIONING_STALE_MS so a later retry can still recover.
+  // Atomically CLAIM the token before any provisioning work. LS delivers
+  // at-least-once and can re-deliver the same event concurrently; a plain
+  // read-then-write idempotency check would let two deliveries both provision.
+  // Only the delivery whose transaction commits a transition to "provisioning"
+  // proceeds — losers (already paid/delivered, or another delivery actively
+  // provisioning) abort and the webhook acks 200. A stale "provisioning" claim
+  // is reclaimable after PROVISIONING_STALE_MS so a later retry can recover.
   const claimNow = Date.now();
   const claim = await tokenRef.transaction((cur) => {
     const r = cur as Record<string, unknown> | null;
@@ -195,41 +208,49 @@ async function provisionPaidIntent(pi: Record<string, unknown>): Promise<void> {
   const pkg = getPackage(rec.packageId);
   if (!pkg) {
     await tokenRef.update({ status: "amount_mismatch" });
-    await writeAudit("stripe", "payment_package_missing", { token, packageId: rec.packageId });
+    await writeAudit("lemonsqueezy", "payment_package_missing", { token, packageId: rec.packageId });
     return;
   }
 
-  // Amount tampering guard: the PaymentIntent amount is set server-side, but
-  // re-verify against the authoritative price before creating any account.
-  const amount = typeof pi.amount === "number" ? pi.amount : Number(pi.amount);
-  const currency = typeof pi.currency === "string" ? pi.currency : "";
-  if (amount !== pkg.amountIls * 100 || currency !== CURRENCY) {
+  // Amount-tampering guard. We create the checkout for a server-chosen variant,
+  // so the buyer can't change the price — re-verify the paid order is for the
+  // variant we expect for this package.
+  const expectedVariant = variantIdFor(pkg.id);
+  const firstItem = (attrs.first_order_item ?? {}) as Record<string, unknown>;
+  const orderVariant = firstItem.variant_id != null ? String(firstItem.variant_id) : "";
+  if (!expectedVariant || orderVariant !== expectedVariant) {
     await tokenRef.update({ status: "amount_mismatch" });
-    await writeAudit("stripe", "payment_amount_mismatch", {
+    await writeAudit("lemonsqueezy", "payment_variant_mismatch", {
       token,
-      expected: pkg.amountIls * 100,
-      got: amount,
-      currency,
+      expected: expectedVariant,
+      got: orderVariant,
     });
     return;
   }
 
+  // Prefer the SERVER-stored reservation over the buyer-echoed custom_data: the
+  // token record is the single source of truth, and a groom who re-submitted with
+  // a different username then paid an OLD checkout tab (carrying stale custom_data)
+  // must still be provisioned as the currently-reserved identity, not the abandoned
+  // one (whose reservation no longer protects it). Fall back to custom_data only
+  // when the reservation is somehow absent.
   const username =
-    (typeof metadata.username === "string" && metadata.username) ||
     (typeof rec.reservedUsername === "string" && rec.reservedUsername) ||
+    (typeof custom.username === "string" && custom.username) ||
     "";
   const phoneE164 =
-    (typeof metadata.phoneE164 === "string" && metadata.phoneE164) ||
     (typeof rec.reservedPhoneE164 === "string" && rec.reservedPhoneE164) ||
+    (typeof custom.phone === "string" && custom.phone) ||
     "";
   if (!isUsername(username) || !isE164(phoneE164)) {
     await tokenRef.update({ status: "account_conflict", deliveryError: "invalid_account_fields" });
-    await writeAudit("stripe", "payment_invalid_account_fields", { token });
+    await writeAudit("lemonsqueezy", "payment_invalid_account_fields", { token });
     return;
   }
   const phoneIdx = phoneIndexKey(phoneE164);
 
-  const paymentIntentId = typeof pi.id === "string" ? pi.id : null;
+  const orderId = order.id != null ? String(order.id) : null;
+  const amountPaidCents = typeof attrs.total === "number" ? attrs.total : Number(attrs.total) || null;
   const password = generateStrongPassword();
   const lang = inviteLocale(rec.lang);
   const paidAt = Date.now();
@@ -243,12 +264,12 @@ async function provisionPaidIntent(pi: Record<string, unknown>): Promise<void> {
       phoneE164,
       password,
       features: pkg.features,
-      createdBy: "stripe",
+      createdBy: "lemonsqueezy",
       extraProfile: {
         mustChangePassword: true,
         paymentPackageId: pkg.id,
         // Legacy revenue fields the analytics aggregator (composeRevenue) reads —
-        // keeps the admin Revenue dashboard counting Stripe-provisioned grooms.
+        // keeps the admin Revenue dashboard counting provisioned grooms.
         paymentStatus: "paid",
         paymentPlan: pkg.id,
         paymentAmountIls: pkg.amountIls,
@@ -261,9 +282,11 @@ async function provisionPaidIntent(pi: Record<string, unknown>): Promise<void> {
           uid: newUid,
           packageId: pkg.id,
           amountIls: pkg.amountIls,
+          // The ACTUAL amount LS charged (cents), in case the display value drifts.
+          amountPaidCents,
           currency: CURRENCY,
           token,
-          paymentIntentId,
+          orderId,
           status: "paid",
           paidAt,
         },
@@ -280,16 +303,16 @@ async function provisionPaidIntent(pi: Record<string, unknown>): Promise<void> {
       // Username/phone was taken out from under the reservation (very rare).
       // The groom paid but no account could be created — flag for the admin.
       await tokenRef.update({ status: "account_conflict", deliveryError: err.code });
-      await writeAudit("stripe", "payment_account_conflict", { token, code: err.code });
+      await writeAudit("lemonsqueezy", "payment_account_conflict", { token, code: err.code });
       return;
     }
-    // Infrastructure failure: release our "provisioning" claim so the Stripe
-    // retry can re-attempt instead of being aborted by the stale-claim guard.
+    // Infrastructure failure: release our "provisioning" claim so the LS retry
+    // can re-attempt instead of being aborted by the stale-claim guard.
     await tokenRef.update({ status: "reserved", claimedAt: null }).catch(() => undefined);
-    throw err; // → 5xx → Stripe retries
+    throw err; // → 5xx → LS retries
   }
 
-  await writeAudit("stripe", "payment_paid", { token, uid, packageId: pkg.id });
+  await writeAudit("lemonsqueezy", "payment_paid", { token, uid, packageId: pkg.id, orderId });
 
   // Deliver the credentials over WhatsApp (best-effort; the account already
   // exists and the admin can read the password as a fallback if this fails).
@@ -300,7 +323,7 @@ async function provisionPaidIntent(pi: Record<string, unknown>): Promise<void> {
  * Send the new groom their login credentials over WhatsApp (Meta-approved
  * template per language) and stamp the token delivered / delivery_failed.
  * Never throws — a delivery failure must not 5xx the webhook (which would make
- * Stripe re-deliver and re-provision is already short-circuited).
+ * LS re-deliver, and re-provision is already short-circuited).
  */
 async function deliverCredentials(
   token: string,
@@ -413,8 +436,8 @@ paymentsRouter.get(
       const rec = snap.val() as Record<string, unknown>;
       const pkg = getPackage(rec.packageId);
       // Project ONLY the public fields — never expose createdBy / reserved* /
-      // paymentIntentId / generated password. Pair with the RTDB rule
-      // paymentTokens.read:false so the path can't be read directly either.
+      // generated password. Pair with the RTDB rule paymentTokens.read:false so
+      // the path can't be read directly either.
       res.json({
         status: rec.status,
         expiresAt: rec.expiresAt,
@@ -465,7 +488,7 @@ paymentsRouter.post(
   },
 );
 
-// ─── POST /payments/links/:token/intent — public: reserve + create PaymentIntent ─
+// ─── POST /payments/links/:token/intent — public: reserve + create LS checkout ──
 
 paymentsRouter.post(
   "/links/:token/intent",
@@ -477,9 +500,10 @@ paymentsRouter.post(
     RATE.PAY_INTENT_IP_BACKSTOP.limit,
   ),
   async (req: Request, res: Response) => {
-    const key = stripeKey();
-    if (!key) {
-      res.status(503).json({ error: "stripe_not_configured" });
+    const key = lsApiKey();
+    const storeId = lsStoreId();
+    if (!key || !storeId) {
+      res.status(503).json({ error: "lemonsqueezy_not_configured" });
       return;
     }
     const { token } = req.params;
@@ -525,6 +549,12 @@ paymentsRouter.post(
         res.status(409).json({ error: "package_unavailable" });
         return;
       }
+      const variantId = variantIdFor(pkg.id);
+      if (!variantId) {
+        // The package has no LS variant configured (operator setup incomplete).
+        res.status(503).json({ error: "lemonsqueezy_not_configured" });
+        return;
+      }
 
       // Account-level uniqueness checks before taking money.
       if ((await db.ref(`usernameIndex/${username}`).get()).exists()) {
@@ -561,33 +591,42 @@ paymentsRouter.post(
         return;
       }
 
-      // Create the PaymentIntent. Amount is AUTHORITATIVE from the package config.
-      const pi = await stripePost(
-        "/payment_intents",
+      // Create the LS checkout for this package's variant. The variant fixes the
+      // price (server-chosen), and custom_data round-trips to the webhook.
+      const checkout = await lsPost(
+        "/checkouts",
         {
-          amount: String(pkg.amountIls * 100),
-          currency: CURRENCY,
-          "metadata[token]": token,
-          "metadata[username]": username,
-          "metadata[phoneE164]": phoneE164,
-          "metadata[packageId]": pkg.id,
-          "automatic_payment_methods[enabled]": "true",
+          data: {
+            type: "checkouts",
+            attributes: {
+              checkout_data: {
+                custom: { token, username, phone: phoneE164, package_id: pkg.id },
+              },
+              checkout_options: { embed: true },
+              product_options: { redirect_url: `${PUBLIC_BASE_URL}/pay/${token}` },
+            },
+            relationships: {
+              store: { data: { type: "stores", id: String(storeId) } },
+              variant: { data: { type: "variants", id: String(variantId) } },
+            },
+          },
         },
         key,
       );
-      if (!pi.ok || !pi.data.client_secret || !pi.data.id) {
+      const checkoutUrl = readCheckoutUrl(checkout.data);
+      if (!checkout.ok || !checkoutUrl) {
         // Release our just-made reservations (ownership-checked) so nothing sticks.
         await releaseReservation(db, `usernameReservations/${username}`, token);
         await releaseReservation(db, `phoneReservations/${phoneIdx}`, token);
-        console.error("[payments] payment_intent create failed", pi.data);
-        res.status(502).json({ error: "stripe_error" });
+        console.error("[payments] LS checkout create failed", checkout.status, checkout.data);
+        res.status(502).json({ error: "lemonsqueezy_error" });
         return;
       }
 
       // Re-submit cleanup: if this token previously reserved a DIFFERENT
       // username/phone (groom changed their mind), release those stale
-      // reservations and cancel the now-orphaned PaymentIntent so a stale intent
-      // in an old tab can't provision the wrong identity.
+      // reservations. (LS checkouts need no cancellation — an unused checkout URL
+      // never charges anything.)
       const prevUsername = typeof rec.reservedUsername === "string" ? rec.reservedUsername : "";
       if (prevUsername && prevUsername !== username) {
         await releaseReservation(db, `usernameReservations/${prevUsername}`, token);
@@ -596,25 +635,27 @@ paymentsRouter.post(
       if (prevPhone && phoneIndexKey(prevPhone) !== phoneIdx) {
         await releaseReservation(db, `phoneReservations/${phoneIndexKey(prevPhone)}`, token);
       }
-      const prevPI = typeof rec.paymentIntentId === "string" ? rec.paymentIntentId : "";
-      if (prevPI && prevPI !== pi.data.id) {
-        await stripePost(`/payment_intents/${prevPI}/cancel`, {}, key).catch(() => undefined);
-      }
 
       await tokenRef.update({
         status: "reserved",
-        paymentIntentId: pi.data.id as string,
         reservedUsername: username,
         reservedPhoneE164: phoneE164,
         lang,
       });
 
-      res.json({ clientSecret: pi.data.client_secret as string });
+      res.json({ checkoutUrl });
     } catch (err) {
       res.status(500).json({ error: "intent_failed", detail: errorMessage(err) });
     }
   },
 );
+
+/** Pull the hosted checkout URL out of an LS `POST /checkouts` JSON:API response. */
+function readCheckoutUrl(body: Record<string, unknown>): string | null {
+  const data = body?.data as { attributes?: { url?: unknown } } | undefined;
+  const url = data?.attributes?.url;
+  return typeof url === "string" && url ? url : null;
+}
 
 // ─── GET /payments/links — admin list (status + generated password fallback) ────
 
@@ -662,38 +703,23 @@ paymentsRouter.get(
   },
 );
 
-// ─── Stripe webhook signature verification (no SDK) ─────────────────────────────
+// ─── Lemon Squeezy webhook signature verification (no SDK) ──────────────────────
 
 /**
- * Verify a Stripe `Stripe-Signature` header against the raw body.
- * Header shape: `t=<unix>,v1=<hexHmac>[,v1=<hexHmac>...]`. The signed payload is
- * `${t}.${rawBody}`, HMAC-SHA256 with the endpoint secret. Exported for tests.
+ * Verify Lemon Squeezy's `X-Signature` header against the raw body: it is the hex
+ * HMAC-SHA256 of the raw request body using the webhook's signing secret. Exact,
+ * timing-safe compare. Exported for tests. (LS does not sign a timestamp, so there
+ * is no replay window to check — idempotency is enforced by the atomic token claim.)
  */
-export function verifyStripeSignature(raw: Buffer, header: string, secret: string): boolean {
-  const parts = header.split(",").map((p) => p.trim());
-  let t = "";
-  const v1: string[] = [];
-  for (const p of parts) {
-    const [k, v] = p.split("=");
-    if (k === "t") t = v;
-    else if (k === "v1" && v) v1.push(v);
+export function verifyLemonSignature(raw: Buffer, header: string, secret: string): boolean {
+  if (!header || !secret) return false;
+  const expected = createHmac("sha256", secret).update(raw).digest("hex");
+  const got = Buffer.from(header, "utf8");
+  const want = Buffer.from(expected, "utf8");
+  if (got.length !== want.length) return false;
+  try {
+    return timingSafeEqual(got, want);
+  } catch {
+    return false;
   }
-  if (!t || v1.length === 0) return false;
-
-  // Replay protection: reject very old timestamps.
-  const ts = Number(t);
-  if (Number.isFinite(ts)) {
-    const ageS = Math.abs(Date.now() / 1000 - ts);
-    if (ageS > WEBHOOK_TOLERANCE_S) return false;
-  }
-
-  const expected = createHmac("sha256", secret)
-    .update(`${t}.${raw.toString("utf8")}`, "utf8")
-    .digest("hex");
-  const expectedBuf = Buffer.from(expected, "utf8");
-  // Constant-time compare against each provided signature.
-  return v1.some((sig) => {
-    const sigBuf = Buffer.from(sig, "utf8");
-    return sigBuf.length === expectedBuf.length && timingSafeEqual(sigBuf, expectedBuf);
-  });
 }

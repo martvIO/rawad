@@ -76,6 +76,21 @@ export function getPackage(id: unknown): Package | null {
   return Object.prototype.hasOwnProperty.call(PACKAGES, id) ? PACKAGES[id] : null;
 }
 
+/**
+ * The Lemon Squeezy variant id for a package, read from env
+ * `LS_VARIANT_ID_<PACKAGEID>` (e.g. LS_VARIANT_ID_PREMIUM). Kept in env (not this
+ * file) because variant ids are environment-specific (test vs live store) and
+ * must be swappable without a code change. Returns "" when unset.
+ *
+ * NOTE: the LS variant's PRICE is the source of truth for what the groom is
+ * charged; `amountIls` above is the display/record value and must be kept in
+ * sync with the variant price in the LS dashboard by hand.
+ */
+export function variantIdFor(packageId: string): string {
+  const raw = process.env[`LS_VARIANT_ID_${packageId.toUpperCase()}`];
+  return typeof raw === "string" ? raw.trim() : "";
+}
+
 /** Public projection for the pay page + admin selector — strips `features`. */
 export function publicPackages(): PublicPackage[] {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
