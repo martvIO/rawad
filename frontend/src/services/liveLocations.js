@@ -4,10 +4,12 @@
 //   POST /api/live-locations/clear     driver stops sharing
 //   GET  /api/live-locations/:groomUid/stream  Server-Sent Events stream
 //
-// The SSE endpoint pushes the full /liveLocationsByGroom/{groomUid} value
-// on every RTDB change. EventSource cannot set custom Authorization headers,
-// so we attach the idToken via `?token=` query string. The TLS layer keeps
-// it confidential in transit; the token never appears in non-SSE URLs.
+// The SSE endpoint pushes the full /liveLocationsByGroom/{groomUid} value on
+// every RTDB change. EventSource cannot set Authorization headers, so the auth
+// token rides in the URL — we use a SHORT-LIVED (~5-min) stream token minted via
+// POST /:groomUid/stream-token instead of the long-lived idToken, and re-mint
+// shortly before it expires, so a URL leak is bounded to minutes + one groom's
+// read-only GPS (the stream is GET-only — a leaked token can't change anything).
 
 import { api } from "../utils/apiClient.js";
 import { peekIdToken } from "../utils/tokenManager.js";
@@ -67,41 +69,78 @@ export function subscribeDriversForGroom(groomUid, cb) {
     queueMicrotask(() => cb({}));
     return () => {};
   }
-  const token = peekIdToken();
-  if (!token) {
-    // No session — surface empty and don't bother opening the stream.
+  if (!peekIdToken()) {
+    // No session — surface empty and don't bother minting / opening the stream.
     queueMicrotask(() => cb({}));
     return () => {};
   }
-  // Direct Cloud Run URL (NOT same-origin /api) — Hosting buffers SSE so the
-  // stream never connects through the rewrite. See SSE_BASE_URL in config.
-  const url = `${SSE_BASE_URL}/live-locations/${groomUid}/stream?token=${encodeURIComponent(token)}`;
-  let es;
-  try {
-    es = new EventSource(url);
-  } catch (err) {
-    logErr("subscribeDriversForGroom:open", err);
-    queueMicrotask(() => cb({}));
-    return () => {};
-  }
-  es.onmessage = (evt) => {
+
+  let es = null;
+  let refreshTimer = null;
+  let closed = false;
+
+  const teardownEs = () => {
+    if (es) {
+      try { es.close(); } catch { /* noop */ }
+      es = null;
+    }
+  };
+
+  // Mint a fresh short-lived stream token, (re)open the EventSource with it, and
+  // schedule a re-mint shortly before it expires so the auto-reconnect never
+  // hits a 401 with a dead token.
+  const openWithFreshToken = async () => {
+    if (closed) return;
+    let streamToken;
+    let expiresInMs = 5 * 60_000;
     try {
-      const parsed = JSON.parse(evt.data);
-      cb(parsed && typeof parsed === "object" ? parsed : {});
+      const res = await api.post(`/live-locations/${groomUid}/stream-token`, {});
+      streamToken = res?.streamToken;
+      expiresInMs = Number(res?.expiresInMs) || expiresInMs;
     } catch (err) {
-      logErr("subscribeDriversForGroom:parse", err);
+      logErr("subscribeDriversForGroom:mint", err);
+      queueMicrotask(() => cb({}));
+      // Retry minting later (e.g. transient network) unless torn down.
+      if (!closed) refreshTimer = setTimeout(openWithFreshToken, 30_000);
+      return;
     }
-  };
-  es.onerror = (err) => {
-    // The browser auto-reconnects on transient failures. We log but don't
-    // notify the caller — they keep their last-known snapshot.
-    logErr("subscribeDriversForGroom:error", err);
-  };
-  return function unsubscribe() {
+    if (closed) return;
+    if (!streamToken) { queueMicrotask(() => cb({})); return; }
+
+    teardownEs();
+    // Direct Cloud Run URL (NOT same-origin /api) — Hosting buffers SSE so the
+    // stream never connects through the rewrite. See SSE_BASE_URL in config.
+    const url = `${SSE_BASE_URL}/live-locations/${groomUid}/stream?streamToken=${encodeURIComponent(streamToken)}`;
     try {
-      es.close();
-    } catch {
-      // noop
+      es = new EventSource(url);
+    } catch (err) {
+      logErr("subscribeDriversForGroom:open", err);
+      queueMicrotask(() => cb({}));
+      return;
     }
+    es.onmessage = (evt) => {
+      try {
+        const parsed = JSON.parse(evt.data);
+        cb(parsed && typeof parsed === "object" ? parsed : {});
+      } catch (err) {
+        logErr("subscribeDriversForGroom:parse", err);
+      }
+    };
+    es.onerror = (err) => {
+      // The browser auto-reconnects on transient failures. We log but don't
+      // notify the caller — they keep their last-known snapshot.
+      logErr("subscribeDriversForGroom:error", err);
+    };
+
+    if (refreshTimer) clearTimeout(refreshTimer);
+    refreshTimer = setTimeout(openWithFreshToken, Math.max(30_000, expiresInMs - 30_000));
+  };
+
+  openWithFreshToken();
+
+  return function unsubscribe() {
+    closed = true;
+    if (refreshTimer) { clearTimeout(refreshTimer); refreshTimer = null; }
+    teardownEs();
   };
 }

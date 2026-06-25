@@ -10,7 +10,8 @@
 // guests live in digitalInvitations/{uid}/guests with status pending|attending|absent.
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { getFirestore } from "firebase-admin/firestore";
-import { isWhatsAppConfigured, sendWhatsAppText } from "./whatsapp";
+import { sendWhatsAppText } from "./whatsapp";
+import { getWhatsAppConfig, isConfigured } from "./whatsappConfig";
 import { DAY_MS } from "./constants/time";
 
 /** Days before the wedding to send the reminder. */
@@ -68,10 +69,12 @@ export function reminderText(locale: unknown, name?: unknown): string {
 export const sendRsvpReminders = onSchedule(
   { schedule: "0 9 * * *", timeZone: "Asia/Jerusalem", region: "us-central1" },
   async () => {
-    if (!isWhatsAppConfigured()) {
+    const cfg = await getWhatsAppConfig();
+    if (!isConfigured(cfg)) {
       console.log("[reminders] WhatsApp not configured — skipping run");
       return;
     }
+    const creds = { token: cfg.token, phoneId: cfg.phoneId };
     const db = getFirestore();
     const now = Date.now();
     let sent = 0;
@@ -93,7 +96,7 @@ export const sendRsvpReminders = onSchedule(
         if (!guestNeedsReminder(gd)) continue;
         considered++;
         const text = reminderText(gd.locale, gd.name);
-        const r = await sendWhatsAppText(gd.phone as string, text);
+        const r = await sendWhatsAppText(gd.phone as string, text, creds);
         if (r.ok) {
           await g.ref.update({ reminderSentAt: now });
           sent++;

@@ -1,7 +1,8 @@
 ﻿// Login screen — shown until the user authenticates.
-// زرّ «استعادة كلمة المرور عبر SMS» أُزيل لأنّ كثيراً من المستخدمين بدون
-// أرقام هواتف؛ تُعاد كلمة المرور للمستخدم من قِبل الأدمن عبر صفحة إدارة
-// الحسابات (زرّ ✎ تعديل → كلمة مرور جديدة).
+// «استعادة كلمة المرور عبر SMS» متاحة عبر الرابط أدناه (/portal/forgot-password):
+// يتحقّق الخادم أنّ اسم المستخدم ورقم الهاتف يطابقان حساباً قبل إرسال الرمز، فمن
+// لا رقم هاتف لديه يُوجَّه للإدارة. (لا يزال بإمكان الأدمن إعادة التعيين يدوياً.)
+import { Link } from "react-router-dom";
 import { BrandLogo } from "../../components/BrandLogo.jsx";
 import { LangSwitcher } from "../../components/LangSwitcher.jsx";
 import { usePortal } from "../../context/PortalContext.jsx";
@@ -46,6 +47,12 @@ export function LoginScreen() {
                   onClick={handleLogin} disabled={loginLoading}>
             {loginLoading ? <span className="spinner" /> : t("login_submit")}
           </button>
+          <div style={{ textAlign: "center", marginTop: 14 }}>
+            <Link data-testid="link-forgot-password" to="/portal/forgot-password"
+                  style={{ color: C.goldDim, fontSize: 12, textDecoration: "none" }}>
+              {t("fr_link")}
+            </Link>
+          </div>
           <div style={{ marginTop: 18, padding: "12px 14px", borderRadius: 10,
             background: "rgba(255,255,255,.03)", border: "1px solid rgba(255,255,255,.06)",
             textAlign: "center", color: C.dim, fontSize: 12, lineHeight: 1.9 }}>

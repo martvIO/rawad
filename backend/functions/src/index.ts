@@ -79,6 +79,10 @@ export { reclusterDirtyGalleries } from "./faceIndex/clusterJob";
 // data ~30 days after the wedding (the privacy commitment shown to guests).
 export { purgeExpiredFaces } from "./faceIndex/purge";
 
+// Hourly finaliser for groom cancellations: flips cancel_pending → cancelled
+// once the grace window elapses (soft freeze; data retained, never deleted).
+export { finalizeWeddingCancellations } from "./lifecycleFinalize";
+
 // Daily disaster-recovery snapshot of the Realtime Database to a GCS backup
 // bucket (RTDB has no native scheduled export). No-op until BACKUP_BUCKET is
 // configured — see backend/scripts/setup-backups.sh + docs/RUNBOOK.md.

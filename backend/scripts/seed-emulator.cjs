@@ -67,6 +67,10 @@ async function ensureUser({ username, password, role, displayName, phone }) {
     username, role, displayName, phoneE164: phone, createdAt: Date.now(),
   });
   await rtdb.ref(`usernameIndex/${username}`).set(user.uid);
+  // Mirror production userStore: phoneIndex is written in lock-step with
+  // usernameIndex. The phone-OTP password reset (/auth/reset-password) resolves
+  // the account via phoneIndex/{digits}, so without this the reset 404s.
+  await rtdb.ref(`phoneIndex/${phone.replace(/^\+/, "")}`).set(user.uid);
   return user.uid;
 }
 

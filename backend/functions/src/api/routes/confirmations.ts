@@ -19,7 +19,6 @@
 //     submittedName/phone/address, but groomUid/groomUsername stay immutable.
 
 import { Router, Response } from "express";
-import { getDatabase } from "firebase-admin/database";
 import { AuthRequest, requireAuth, requireAdmin } from "../middleware/auth";
 import { uidRateLimit, keyedRateLimit } from "../middleware/rateLimit";
 import {
@@ -31,6 +30,10 @@ import {
 import { MAX_LEN } from "../../constants/limits";
 import { HOUR_MS } from "../../constants/time";
 import { RATE } from "../../constants/rateLimits";
+import { firebaseConfirmationStore } from "../../domain/confirmations/firebaseConfirmationStore";
+import { firebaseGuestStore } from "../../domain/guests/firebaseGuestStore";
+import { firebaseUserIndex } from "../../domain/users/firebaseUserIndex";
+import { isGroomFrozen } from "../../lifecycle/gate";
 
 // ─── Schema constants (mirror database.rules.json /confirmations) ─────────────
 
@@ -85,14 +88,7 @@ confirmationsRouter.get(
   requireAdmin,
   async (_req: AuthRequest, res: Response) => {
     try {
-      const snap = await getDatabase().ref("confirmations").get();
-      const out: ConfirmationRecord[] = [];
-      snap.forEach((c) => {
-        const id = c.key;
-        if (!id) return;
-        out.push({ id, ...(c.val() as Record<string, unknown>) });
-      });
-      res.json(out);
+      res.json(await firebaseConfirmationStore().listAll());
     } catch (err) {
       res.status(500).json({ error: "read_failed", detail: errorMessage(err) });
     }
@@ -125,13 +121,13 @@ confirmationsRouter.patch(
       return;
     }
     try {
-      const ref = getDatabase().ref(`confirmations/${id}`);
-      const existing = await ref.get();
-      if (!existing.exists()) {
+      const store = firebaseConfirmationStore();
+      const existing = await store.get(id);
+      if (!existing) {
         res.status(404).json({ error: "not_found" });
         return;
       }
-      await ref.update(sanitized.value);
+      await store.patch(id, sanitized.value);
       res.json({ ok: true });
     } catch (err) {
       res.status(500).json({ error: "write_failed", detail: errorMessage(err) });
@@ -179,25 +175,33 @@ confirmationsRouter.post(
     const submission = parsed.value;
 
     try {
-      const db = getDatabase();
-      const groomUidSnap = await db
-        .ref(`usernameIndex/${submission.groomUsername}`)
-        .get();
-      if (!groomUidSnap.exists()) {
+      const groomUid = await firebaseUserIndex().resolveUidByUsername(
+        submission.groomUsername
+      );
+      if (!groomUid) {
         res.status(404).json({ error: "unknown_groom" });
         return;
       }
-      const groomUid = groomUidSnap.val() as string;
 
-      const confRef = db.ref("confirmations").push();
-      await confRef.set(buildConfirmationRecord(groomUid, submission));
+      // Freeze: reject new confirmations for a cancelled / postponed wedding so
+      // no replies pile up under a frozen event. The form already shows the
+      // notice (GET /lifecycle/public/:username); this is the server-side guard.
+      if (await isGroomFrozen(groomUid)) {
+        res.status(403).json({ error: "event_unavailable" });
+        return;
+      }
+
+      const store = firebaseConfirmationStore();
+      const created = await store.create(
+        buildConfirmationRecord(groomUid, submission)
+      );
 
       const attachedGuestId = await tryAutoAttach(groomUid, submission);
       if (attachedGuestId) {
-        await confRef.update({ attachedGuestId });
+        await store.patch(created.id, { attachedGuestId });
       }
 
-      res.json({ ok: true, id: confRef.key, attachedGuestId });
+      res.json({ ok: true, id: created.id, attachedGuestId });
     } catch (err) {
       res.status(500).json({ error: "write_failed", detail: errorMessage(err) });
     }
@@ -241,19 +245,14 @@ confirmationsRouter.post(
     }
 
     try {
-      const db = getDatabase();
-      const confSnap = await db.ref(`confirmations/${confirmationId}`).get();
-      if (!confSnap.exists()) {
+      const confStore = firebaseConfirmationStore();
+      const conf = await confStore.get(confirmationId);
+      if (!conf) {
         res.status(404).json({ error: "confirmation_not_found" });
         return;
       }
-      const conf = confSnap.val() as {
-        groomUid?: string;
-        lat?: unknown;
-        lng?: unknown;
-        locationAccuracy?: unknown;
-      };
-      if (!conf?.groomUid) {
+      const groomUid = conf.groomUid;
+      if (typeof groomUid !== "string" || !groomUid) {
         res.status(409).json({ error: "confirmation_has_no_groom" });
         return;
       }
@@ -262,9 +261,9 @@ confirmationsRouter.post(
         return;
       }
 
-      const guestRef = db.ref(`guestsByGroom/${conf.groomUid}/${guestId}`);
-      const guestSnap = await guestRef.get();
-      if (!guestSnap.exists()) {
+      const guestStore = firebaseGuestStore();
+      const guest = await guestStore.get(groomUid, guestId);
+      if (!guest) {
         res.status(404).json({ error: "guest_not_found" });
         return;
       }
@@ -278,10 +277,8 @@ confirmationsRouter.post(
       if (typeof conf.locationAccuracy === "number") {
         guestPatch.locationAccuracy = conf.locationAccuracy;
       }
-      await guestRef.update(guestPatch);
-      await db
-        .ref(`confirmations/${confirmationId}`)
-        .update({ attachedGuestId: guestId });
+      await guestStore.patch(groomUid, guestId, guestPatch);
+      await confStore.patch(confirmationId, { attachedGuestId: guestId });
 
       res.json({ ok: true, attachedGuestId: guestId });
     } catch (err) {
@@ -352,23 +349,19 @@ async function tryAutoAttach(
     const target = normalisePhoneForMatching(s.submittedPhone);
     if (!target) return null;
 
-    const db = getDatabase();
-    const guestsSnap = await db.ref(`guestsByGroom/${groomUid}`).get();
-    const matches: string[] = [];
-    guestsSnap.forEach((g) => {
-      const v = g.val() as { phone?: string } | null;
-      if (v && normalisePhoneForMatching(v.phone ?? "") === target) {
-        if (g.key) matches.push(g.key);
-      }
-      return false;
+    const guestStore = firebaseGuestStore();
+    const guests = await guestStore.listByGroom(groomUid);
+    const matches = guests.filter((g) => {
+      const phone = typeof g.phone === "string" ? g.phone : "";
+      return normalisePhoneForMatching(phone) === target;
     });
     if (matches.length !== 1) return null;
 
-    const guestId = matches[0];
+    const guestId = matches[0].id;
     const now = Date.now();
     const guestPatch: Record<string, unknown> = { confirmedAt: now };
     if (s.companions !== null) guestPatch.companions = s.companions;
-    await db.ref(`guestsByGroom/${groomUid}/${guestId}`).update(guestPatch);
+    await guestStore.patch(groomUid, guestId, guestPatch);
     return guestId;
   } catch (err) {
     // NOTE: Auto-attach is best-effort; surface to logs but never propagate.
@@ -619,10 +612,6 @@ function validatePatchField(key: string, value: unknown): PatchField {
  */
 function clampStr(v: unknown, max: number): string {
   return (typeof v === "string" ? v.trim() : "").slice(0, max);
-}
-
-interface ConfirmationRecord extends Record<string, unknown> {
-  id: string;
 }
 
 // errorMessage (suppress-by-default 5xx detail) is now shared — see ../errorDetail.

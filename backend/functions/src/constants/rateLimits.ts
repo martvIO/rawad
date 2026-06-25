@@ -25,6 +25,20 @@ export const RATE = Object.freeze({
   SET_PASSWORD_PER_ADMIN: perHour(30),
   ATTACH_LOC_PER_ADMIN: perHour(30),
   UPDATE_USER_PER_ADMIN: perHour(60),
+  /** Admin minting a paid-signup payment link (matches the legacy 20/hr). */
+  CREATE_PAYMENT_LINK_PER_ADMIN: perHour(20),
+  /** Self-service password change (per caller UID) — incl. the forced first-login change. */
+  CHANGE_PASSWORD_PER_USER: perHour(10),
+  /** Public pay page: username-availability checks (per IP). */
+  PAY_USERNAME_CHECK_PER_IP: perHour(240),
+  /** Public pay page: package list reads (per IP). */
+  PAY_PACKAGES_PER_IP: perHour(240),
+  /** Public pay page: token resolves, per token with an IP backstop. */
+  PAY_RESOLVE_PER_TOKEN: perHour(120),
+  PAY_RESOLVE_IP_BACKSTOP: perHour(600),
+  /** Public pay page: PaymentIntent creation, per token with an IP backstop. */
+  PAY_INTENT_PER_TOKEN: perHour(30),
+  PAY_INTENT_IP_BACKSTOP: perHour(120),
   /** Invite-mint per caller (groom/admin). */
   CREATE_INVITE_PER_USER: perHour(60),
   /** Guest invite submission — anonymous public endpoint. */

@@ -1,7 +1,10 @@
 // Shared password-strength validation. Used by every form that lets a user
 // set a password (admin create-user, admin edit-user, self-service reset).
-// The server enforces the same rules in functions/src/helpers.ts → isStrongPassword;
-// keep the two in lock-step when changing the policy.
+// The server enforces the same rules in functions/src/helpers.ts → isStrongPassword.
+// The single source of truth for the RULE is the shared fixture
+// shared/passwordPolicy.cases.mjs: both packages' parity tests assert their
+// isStrongPassword against it, so the two can't drift without CI failing
+// (see __tests__/utils/passwordPolicyParity.test.js). Edit all three together.
 
 // Rule definitions. `id` doubles as the i18n key suffix (`pwd_rule_<id>`).
 export const PASSWORD_RULES = [

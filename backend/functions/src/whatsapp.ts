@@ -32,13 +32,25 @@ export function isYourPhotosTemplateConfigured(): boolean {
 export type WhatsAppSendResult = { ok: boolean; id?: string; error?: string };
 
 /**
+ * Optional sender credentials. When omitted, the access token and phone-number
+ * id fall back to env (WHATSAPP_TOKEN / WHATSAPP_PHONE_ID). Callers that resolve
+ * config from the admin DB (see whatsappConfig.ts) pass the resolved phone id
+ * here while the token still comes from env.
+ */
+export type WhatsAppCreds = { token?: string; phoneId?: string };
+
+/**
  * Send a plain-text WhatsApp message via the Cloud API. `toPhone` may be in any
  * format; we reduce it to digits (international, no +). Returns { ok, id } or
  * { ok:false, error }. Never throws.
  */
-export async function sendWhatsAppText(toPhone: string, body: string): Promise<WhatsAppSendResult> {
-  const token = process.env.WHATSAPP_TOKEN;
-  const phoneId = process.env.WHATSAPP_PHONE_ID;
+export async function sendWhatsAppText(
+  toPhone: string,
+  body: string,
+  creds?: WhatsAppCreds,
+): Promise<WhatsAppSendResult> {
+  const token = creds?.token || process.env.WHATSAPP_TOKEN;
+  const phoneId = creds?.phoneId || process.env.WHATSAPP_PHONE_ID;
   if (!token || !phoneId) return { ok: false, error: "not_configured" };
   const to = String(toPhone || "").replace(/[^0-9]/g, "");
   if (!to) return { ok: false, error: "invalid_phone" };
@@ -77,9 +89,10 @@ export async function sendWhatsAppTemplate(
   templateName: string,
   languageCode: string,
   components: unknown[],
+  creds?: WhatsAppCreds,
 ): Promise<WhatsAppSendResult> {
-  const token = process.env.WHATSAPP_TOKEN;
-  const phoneId = process.env.WHATSAPP_PHONE_ID;
+  const token = creds?.token || process.env.WHATSAPP_TOKEN;
+  const phoneId = creds?.phoneId || process.env.WHATSAPP_PHONE_ID;
   if (!token || !phoneId) return { ok: false, error: "not_configured" };
   if (!templateName) return { ok: false, error: "no_template" };
   const to = String(toPhone || "").replace(/[^0-9]/g, "");
@@ -117,11 +130,15 @@ export async function sendWhatsAppTemplate(
  * only when the token matches our configured WHATSAPP_VERIFY_TOKEN; otherwise
  * return null and the caller responds 403. Exported pure for tests.
  */
-export function verifyWebhookChallenge(query: Record<string, unknown>): string | null {
+export function verifyWebhookChallenge(
+  query: Record<string, unknown>,
+  expectedToken?: string,
+): string | null {
   const mode = query["hub.mode"];
   const token = query["hub.verify_token"];
   const challenge = query["hub.challenge"];
-  const expected = process.env.WHATSAPP_VERIFY_TOKEN;
+  // The admin-set verify token (from config) wins; env is the fallback.
+  const expected = expectedToken || process.env.WHATSAPP_VERIFY_TOKEN;
   if (mode === "subscribe" && expected && token === expected && typeof challenge === "string") {
     return challenge;
   }

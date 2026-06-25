@@ -1,15 +1,29 @@
 // Unit tests for poller — the createPoller() factory that replaces RTDB
 // onValue subscriptions. Tests use fake timers to drive the polling loop.
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { createPoller } from "../../utils/poller.js";
+import { createPoller, applyJitter } from "../../utils/poller.js";
 import { ApiError } from "../../utils/apiClient.js";
 
 beforeEach(() => {
   vi.useFakeTimers();
+  // Pin Math.random to 0.5 so applyJitter is a no-op (factor === 1) and the
+  // exact-interval timing assertions below stay deterministic. The ±15% spread
+  // itself is covered by the applyJitter test.
+  vi.spyOn(Math, "random").mockReturnValue(0.5);
 });
 
 afterEach(() => {
   vi.useRealTimers();
+  vi.restoreAllMocks();
+});
+
+describe("applyJitter", () => {
+  it("spreads a delay by ±15% based on rand, never negative", () => {
+    expect(applyJitter(1000, () => 0.5)).toBe(1000); // centre → unchanged
+    expect(applyJitter(1000, () => 0)).toBe(850);    // -15%
+    expect(applyJitter(1000, () => 0.999999)).toBe(1150); // ≈+15%
+    expect(applyJitter(0, () => 0)).toBe(0);
+  });
 });
 
 describe("createPoller — argument validation", () => {

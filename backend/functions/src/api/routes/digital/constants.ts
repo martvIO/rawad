@@ -122,6 +122,7 @@ const DESIGN_FIELDS = new Set([
   "rsvpMealEnabled",
   "rsvpSongEnabled",
   "heroMediaEnabled",
+  "immersive3d",
 ]);
 
 // Guest-facing field allowlist for the UNAUTHENTICATED public invitation read

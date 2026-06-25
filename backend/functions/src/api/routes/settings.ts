@@ -15,8 +15,8 @@
 // client gets a clear 400 instead of a cryptic RTDB rejection.
 
 import { Router, Response } from "express";
-import { getDatabase } from "firebase-admin/database";
 import { requireAuth, requireAdmin, AuthRequest } from "../middleware/auth";
+import { firebaseSettingsStore } from "../../domain/settings/firebaseSettingsStore";
 
 // ─── Schema constants ─────────────────────────────────────────────────────────
 
@@ -63,8 +63,7 @@ export const settingsRouter = Router();
  */
 settingsRouter.get("/", requireAuth, async (_req: AuthRequest, res: Response) => {
   try {
-    const snap = await getDatabase().ref("adminSettings").get();
-    res.json(snap.val() ?? {});
+    res.json(await firebaseSettingsStore().read());
   } catch (err) {
     res.status(500).json({ error: "read_failed", detail: errorMessage(err) });
   }
@@ -79,8 +78,7 @@ settingsRouter.get("/", requireAuth, async (_req: AuthRequest, res: Response) =>
  */
 settingsRouter.get("/public", async (_req: AuthRequest, res: Response) => {
   try {
-    const snap = await getDatabase().ref("adminSettings").get();
-    const s = (snap.val() ?? {}) as Record<string, unknown>;
+    const s = await firebaseSettingsStore().read();
     // Short cache: the marketing site can pick up a contact change within a
     // minute without a redeploy, but we don't hammer RTDB on every page view.
     res.set("Cache-Control", "public, max-age=60");
@@ -114,9 +112,9 @@ settingsRouter.patch(
     }
 
     try {
-      await getDatabase().ref("adminSettings").update(validation.patch);
-      const snap = await getDatabase().ref("adminSettings").get();
-      res.json(snap.val() ?? {});
+      const store = firebaseSettingsStore();
+      await store.patch(validation.patch);
+      res.json(await store.read());
     } catch (err) {
       res.status(500).json({ error: "write_failed", detail: errorMessage(err) });
     }

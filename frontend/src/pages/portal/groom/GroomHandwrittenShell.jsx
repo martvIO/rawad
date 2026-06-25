@@ -14,6 +14,8 @@ import { GroomAddGuest } from "./GroomAddGuest.jsx";
 import { GroomProofs } from "./GroomProofs.jsx";
 import { GroomLiveMap } from "./GroomLiveMap.jsx";
 import { GroomGuestsMap } from "./GroomGuestsMap.jsx";
+import { GroomManage } from "./GroomManage.jsx";
+import { GroomLifecycleBanner } from "../../../components/GroomLifecycleBanner.jsx";
 import { C } from "../../../styles/theme.js";
 import { STORAGE_KEYS } from "../../../constants/storageKeys.js";
 
@@ -60,6 +62,7 @@ export function GroomHandwrittenShell() {
             <NavLink data-testid="nav-groom-add"       to="/portal/groom/handwritten/add"       className={navClass} style={navStyle}>{t("tab_add")}</NavLink>
             <NavLink data-testid="nav-groom-proofs"    to="/portal/groom/handwritten/proofs"    className={navClass} style={navStyle}>{t("tab_proofs")}</NavLink>
             <NavLink data-testid="nav-groom-map"       to="/portal/groom/handwritten/map"       className={navClass} style={navStyle}>{t("tab_guest_map")}</NavLink>
+            <NavLink data-testid="nav-groom-manage"    to="/portal/groom/handwritten/manage"    className={navClass} style={navStyle}>{t("lc_tab")}</NavLink>
           </div>
           <div className="dawa-phead-ctrl">
             <button
@@ -85,6 +88,8 @@ export function GroomHandwrittenShell() {
 
       <TermsNotice t={t} />
 
+      <GroomLifecycleBanner t={t} managePath="/portal/groom/handwritten/manage" />
+
       <div style={{ maxWidth: 900, margin: "0 auto", padding: "20px 16px 80px" }}>
         <Routes>
           <Route index            element={<Navigate to="dashboard" replace />} />
@@ -94,6 +99,7 @@ export function GroomHandwrittenShell() {
           <Route path="proofs"    element={<GroomProofs />} />
           <Route path="map"       element={<GroomGuestsMap />} />
           <Route path="live"      element={<GroomLiveMap />} />
+          <Route path="manage"    element={<GroomManage />} />
           <Route path="*"         element={<Navigate to="dashboard" replace />} />
         </Routes>
       </div>

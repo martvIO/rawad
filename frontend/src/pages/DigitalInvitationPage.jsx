@@ -8,6 +8,7 @@ import { subscribeInviteToken, submitDigitalWish, getApprovedWishes } from "../s
 import { getDigitalInvitationPublic, submitDigitalGuestInvite, pingDigitalInviteOpened } from "../services/digitalInvitation.js";
 import { logErr } from "../utils/logger.js";
 import { DigitalInvitationView } from "../components/digital/DigitalInvitationView.jsx";
+import { EventUnavailableNotice } from "../components/EventUnavailableNotice.jsx";
 import { C } from "../styles/theme.js";
 import { Icon } from "../components/icons/Icon.jsx";
 import { SAMPLE_STORY, SAMPLE_DETAILS, SAMPLE_HOTELS, SAMPLE_WISHES, DEFAULT_MEAL_OPTIONS } from "../data/digitalInviteDefaults.js";
@@ -60,7 +61,7 @@ export function DigitalInvitationPage({ t, lang, setLang }) {
   );
 }
 
-function DigitalLandingMain({ lang, setLang }) {
+function DigitalLandingMain({ t, lang, setLang }) {
   const { token } = useParams();
   const navigate = useNavigate();
   const [search] = useSearchParams();
@@ -185,6 +186,10 @@ function DigitalLandingMain({ lang, setLang }) {
         </h1>
       </CenteredMessage>
     );
+  }
+  // Wedding cancelled / postponed → neutral notice instead of the invitation.
+  if (!isDemo && tokenRec.eventStatus && tokenRec.eventStatus !== "active" && !done) {
+    return <EventUnavailableNotice state={tokenRec.eventStatus} t={t} lang={lang} />;
   }
   if (tokenRec.expiresAt && Date.now() > tokenRec.expiresAt) {
     return (

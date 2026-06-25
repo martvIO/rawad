@@ -134,12 +134,12 @@ describe("auth.forceRefreshToken", () => {
 });
 
 describe("auth.sendPasswordResetCode", () => {
-  it("POSTs /auth/send-otp with phone + recaptcha token (public)", async () => {
+  it("POSTs /auth/send-otp with username + phone + recaptcha token (public)", async () => {
     api.post.mockResolvedValueOnce({ sessionInfo: "sess123" });
-    await auth.sendPasswordResetCode("+972500000001", "containerId", "rcap-token");
+    await auth.sendPasswordResetCode("groom1", "+972500000001", "rcap-token");
     expect(api.post).toHaveBeenCalledWith(
       "/auth/send-otp",
-      { phoneE164: "+972500000001", recaptchaToken: "rcap-token" },
+      { username: "groom1", phoneE164: "+972500000001", recaptchaToken: "rcap-token" },
       { skipAuth: true },
     );
   });
@@ -502,7 +502,8 @@ describe("liveLocations", () => {
     expect(typeof stop).toBe("function");
   });
 
-  it("subscribeDriversForGroom opens an EventSource with ?token=...", async () => {
+  it("mints a short-lived stream token, then opens an EventSource with ?streamToken=", async () => {
+    api.post.mockResolvedValueOnce({ streamToken: "stok-123", expiresInMs: 300000 });
     const evts = [];
     class FakeEventSource {
       constructor(url) { this.url = url; evts.push(this); }
@@ -511,8 +512,11 @@ describe("liveLocations", () => {
     vi.stubGlobal("EventSource", FakeEventSource);
     const cb = vi.fn();
     const stop = liveLocations.subscribeDriversForGroom("g1", cb);
-    expect(evts.length).toBe(1);
-    expect(evts[0].url).toContain("/live-locations/g1/stream?token=peek.token");
+    // Minting is async — the EventSource opens once the token resolves.
+    await vi.waitFor(() => expect(evts.length).toBe(1));
+    expect(api.post).toHaveBeenCalledWith("/live-locations/g1/stream-token", {});
+    expect(evts[0].url).toContain("/live-locations/g1/stream?streamToken=stok-123");
+    expect(evts[0].url).not.toContain("token=peek.token"); // long-lived idToken no longer in the URL
     // Simulate a server message.
     evts[0].onmessage({ data: JSON.stringify({ driverA: { lat: 1, lng: 2 } }) });
     expect(cb).toHaveBeenCalledWith({ driverA: { lat: 1, lng: 2 } });

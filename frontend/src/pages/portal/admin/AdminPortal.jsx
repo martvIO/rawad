@@ -11,12 +11,16 @@ import { Toast } from "../../../components/Toast.jsx";
 import { EditConfirmationModal } from "../../../components/EditConfirmationModal.jsx";
 import { usePortal } from "../../../context/PortalContext.jsx";
 import { AdminUserManager } from "./AdminUserManager.jsx";
+import { AdminPaymentLinks } from "./AdminPaymentLinks.jsx";
 import { AdminSendTab } from "./AdminSendTab.jsx";
 import { AdminSettingsTab } from "./AdminSettingsTab.jsx";
+import { AdminWhatsAppSetupTab } from "./AdminWhatsAppSetupTab.jsx";
+import { AdminMessageTemplatesTab } from "./AdminMessageTemplatesTab.jsx";
 import { AdminConfirmationsTab } from "./AdminConfirmationsTab.jsx";
 import { AdminDesigns } from "./AdminDesigns.jsx";
 import { AdminGallery } from "./AdminGallery.jsx";
 import { AdminAuditTab } from "./AdminAuditTab.jsx";
+import { AdminLifecycleTab } from "./AdminLifecycleTab.jsx";
 import { Num } from "../../../components/Num.jsx";
 import { C } from "../../../styles/theme.js";
 
@@ -78,11 +82,15 @@ export function AdminPortal() {
         <div style={{ display: "flex", gap: 6, marginBottom: 18, flexWrap: "wrap" }}>
           <NavLink data-testid="nav-admin-analytics"     to="/portal/admin/analytics"     style={tabStyle}>📊 {lang === "he" ? "אנליטיקה" : "التحليلات"}</NavLink>
           <NavLink data-testid="nav-admin-users"         to="/portal/admin/users"         style={tabStyle}>👥 {t("admin_tab_users")}</NavLink>
+          <NavLink data-testid="nav-admin-paylinks"      to="/portal/admin/payment-links" style={tabStyle}>💳 {t("admin_paylinks_tab")}</NavLink>
           <NavLink data-testid="nav-admin-send"          to="/portal/admin/send"          style={tabStyle}>📨 {t("admin_tab_send")}</NavLink>
           <NavLink data-testid="nav-admin-confirmations" to="/portal/admin/confirmations" style={tabStyle}>✓ {t("admin_tab_confirmations")}{confirmations.length ? <> (<Num>{confirmations.length}</Num>)</> : ""}</NavLink>
           <NavLink data-testid="nav-admin-designs"       to="/portal/admin/designs"       style={tabStyle}>🎨 {lang === "he" ? "עיצובים" : "التصاميم"}</NavLink>
           <NavLink data-testid="nav-admin-gallery"       to="/portal/admin/gallery"       style={tabStyle}>📸 {lang === "he" ? "גלריה" : "المعرض"}</NavLink>
           <NavLink data-testid="nav-admin-settings"      to="/portal/admin/settings"      style={tabStyle}>⚙ {t("admin_tab_settings")}</NavLink>
+          <NavLink data-testid="nav-admin-whatsapp"      to="/portal/admin/whatsapp"      style={tabStyle}>📱 {t("admin_tab_whatsapp")}</NavLink>
+          <NavLink data-testid="nav-admin-templates"     to="/portal/admin/templates"     style={tabStyle}>📝 {t("admin_tab_templates")}</NavLink>
+          <NavLink data-testid="nav-admin-lifecycle"     to="/portal/admin/lifecycle"     style={tabStyle}>🚫 {t("adm_lc_tab")}</NavLink>
           <NavLink data-testid="nav-admin-audit"         to="/portal/admin/audit"         style={tabStyle}>📜 {lang === "he" ? "יומן" : "السجل"}</NavLink>
         </div>
 
@@ -91,11 +99,15 @@ export function AdminPortal() {
             <Route index                  element={<Navigate to="users" replace />} />
             <Route path="analytics"       element={<AdminAnalytics />} />
             <Route path="users"           element={<AdminUserManager />} />
+            <Route path="payment-links"   element={<AdminPaymentLinks />} />
             <Route path="send"            element={<AdminSendTab />} />
             <Route path="confirmations"   element={<AdminConfirmationsTab />} />
             <Route path="designs"         element={<AdminDesigns />} />
             <Route path="gallery"         element={<AdminGallery lang={lang} />} />
             <Route path="settings"        element={<AdminSettingsTab />} />
+            <Route path="whatsapp"        element={<AdminWhatsAppSetupTab />} />
+            <Route path="templates"       element={<AdminMessageTemplatesTab />} />
+            <Route path="lifecycle"       element={<AdminLifecycleTab />} />
             <Route path="audit"           element={<AdminAuditTab />} />
             <Route path="*"               element={<Navigate to="users" replace />} />
           </Routes>

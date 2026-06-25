@@ -58,6 +58,20 @@ export const CONTACT = {
   EMAIL:    import.meta.env?.VITE_CONTACT_EMAIL ?? "",
 };
 
+// ─── Feature flags (build-time) ──────────────────────────────────────────────
+//
+// Flip a value here, then rebuild + redeploy hosting, to turn a feature on or
+// off for EVERYONE. These are compile-time gates — there is intentionally no
+// runtime/admin toggle.
+export const FEATURES = {
+  /**
+   * Handwritten / driver-delivery ("physical") track — the whole driver portal,
+   * proof photos, GPS, and the groom "Handwritten" option. BETA: default OFF.
+   * Set to `true` (then rebuild + redeploy) to activate it for all grooms.
+   */
+  physical: false,
+};
+
 // ─── Polling intervals ───────────────────────────────────────────────────────
 
 /**

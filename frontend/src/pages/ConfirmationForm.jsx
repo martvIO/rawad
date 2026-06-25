@@ -3,7 +3,7 @@
 // validates the input and rate-limits per IP. Guests can optionally attach
 // their GPS location so drivers and grooms see them on the map view; the
 // city/street/house fields remain available as the manual fallback.
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { BrandLogo } from "../components/BrandLogo.jsx";
 import { LangSwitcher } from "../components/LangSwitcher.jsx";
@@ -11,15 +11,27 @@ import { CityField } from "../components/CityField.jsx";
 import { PhoneInput } from "../components/PhoneInput.jsx";
 import { CompanionsStepper } from "../components/CompanionsStepper.jsx";
 import { submitConfirmation } from "../services/confirmations.js";
+import { getPublicEventState } from "../services/lifecycle.js";
 import { getCurrentFix } from "../utils/geo.js";
 import { logErr } from "../utils/logger.js";
 import { localizeApiError } from "../utils/apiError.js";
 import { ConsentNotice } from "../components/ConsentNotice.jsx";
+import { EventUnavailableNotice } from "../components/EventUnavailableNotice.jsx";
 import { Icon } from "../components/icons/Icon.jsx";
 import { C } from "../styles/theme.js";
 
 export function ConfirmationForm({ t, lang, setLang }) {
   const { groomUsername } = useParams();
+  // Wedding availability: undefined = loading, otherwise { available, state, pausedNewDate }.
+  // On any error we fail-open (treat as available) so a status hiccup never blocks RSVP.
+  const [eventState, setEventState] = useState(undefined);
+  useEffect(() => {
+    let active = true;
+    getPublicEventState((groomUsername || "").toLowerCase())
+      .then((r) => { if (active) setEventState(r || { available: true, state: "active" }); })
+      .catch(() => { if (active) setEventState({ available: true, state: "active" }); });
+    return () => { active = false; };
+  }, [groomUsername]);
   const [name, setName]     = useState("");
   const [phone, setPhone]   = useState("");
   const [city, setCity]     = useState("");
@@ -76,6 +88,19 @@ export function ConfirmationForm({ t, lang, setLang }) {
       setBusy(false);
     }
   };
+
+  // While availability is loading, show a minimal placeholder so the form
+  // doesn't flash before a possible cancelled/postponed notice replaces it.
+  if (eventState === undefined) {
+    return (
+      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+        <div style={{ color: C.dim, fontSize: 14 }}>…</div>
+      </div>
+    );
+  }
+  if (eventState && eventState.available === false) {
+    return <EventUnavailableNotice state={eventState.state} t={t} lang={lang} pausedNewDate={eventState.pausedNewDate} />;
+  }
 
   if (done) {
     return (

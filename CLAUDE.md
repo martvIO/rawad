@@ -293,12 +293,17 @@ The server is pre-configured. If it is not running, start it separately before a
 
 ## Environment variables
 
+> **Full configuration reference** — every env var (frontend, functions, loadtest, CI), the
+> admin-editable `/adminSettings`, code constants, and infra files, with where each is read and
+> set: [CONFIGURATION.md](CONFIGURATION.md). The table below is a quick subset.
+
 | Variable | Required | Description |
 |---|---|---|
 | `VITE_API_BASE_URL` | Dev only | REST API base URL. In prod, same-origin `/api` via Firebase Hosting rewrite. |
 | `VITE_INVITE_BASE_URL` | Optional | Base URL for per-guest invite links. |
 | `VITE_RECAPTCHA_V2_SITE_KEY` | For OTP | reCAPTCHA v2 site key for phone-OTP password reset. |
 | `VITE_USE_EMULATORS` | Dev | Set `1` to connect Firebase SDK to emulators. |
+| `LEMONSQUEEZY_API_KEY` / `LEMONSQUEEZY_STORE_ID` / `LEMONSQUEEZY_WEBHOOK_SECRET` / `LS_VARIANT_ID_PREMIUM` / `LS_VARIANT_ID_VIP` | Cloud Functions, for paid signup | Lemon Squeezy paid-signup checkout (`/pay/:token` overlay). API key + ILS store id + webhook signing secret (event `order_created`) + one variant id per package (price set tax-inclusive in the LS dashboard). The frontend needs NO key (the overlay loads the public lemon.js script). Unset → the pay endpoints return 503 and the pay page shows "payments not configured". |
 | `WEB_API_KEY` | Cloud Functions | Firebase Web API key. Set in Functions environment, never in `VITE_*`. |
 | `ALLOWED_ORIGINS` | Cloud Functions | Comma-separated CORS allowed origins. Empty = allow all (dev-friendly). |
 | `PASSWORD_ENC_PRIVATE_KEY` | Optional (prod) | RSA-2048 PKCS8 PEM private key for the password-encryption layer. Generate with `node backend/scripts/gen-password-keypair.cjs`; set as a secret like `WEB_API_KEY`. Unset in prod → layer disabled (clients send plaintext over TLS); the emulator auto-generates an ephemeral key. The public key is served at `GET /api/auth/pubkey`. |
@@ -488,6 +493,43 @@ page — just report what changed.
 **Always update `wiki/index.md`** when you create or rename a wiki page.
 **Cross-link aggressively.** `[[Page Name]]` Obsidian syntax. A page with
 no inbound links is a dead-end.
+
+## Grilling + Wiki-Brain
+
+Whenever a **grilling session** runs — `/grilling`, `/grill-me`, `/grill-with-docs`,
+the `decision-mapping` skill, or the model auto-invoking grilling to stress-test a
+plan — wrap it with the wiki-brain. (grill-me / grill-with-docs / decision-mapping
+all delegate to `/grilling`, so this rule keys off "a grilling session is happening.")
+
+**Before grilling (read — context dump).** Load relevant wiki context so the
+interview is grounded. Use `graphify query "<topic>"` if the CLI is available;
+otherwise read `wiki/index.md` and open the pages whose titles/summaries match the
+topic (the SessionStart hook already prints the index + recent `log.md`). This is a
+passive context load — no skip logic, no contradiction guard; the pages are simply
+available while grilling.
+
+**After grilling (write — route by topic).** When grilling reaches shared
+understanding — or, in plan mode, immediately after the plan is approved (the first
+allowed write point) — file the durable output back into the wiki, routed by subject:
+- **Architectural decisions** → append a bullet to `wiki/Architecture-Decisions.md`
+  (line + rationale + `[[links]]`), so it isn't re-litigated later.
+- **Feature / domain decisions** → update the relevant topical page
+  (e.g. `wiki/Payments.md`), or create a new page if none fits.
+- **Unresolved questions** → add to `wiki/Tasks-Backlog.md`. If they're many and
+  need multiple sessions to resolve, hand off to the `decision-mapping` skill.
+- Always update `wiki/index.md` when a page is created/renamed, and cross-link with
+  `[[Page Name]]`.
+
+**Two write checkpoints.**
+1. **At grilling conclusion** — write/update the wiki page(s) + `index.md`
+   immediately, while decisions are fresh, so any implementation that follows
+   references them.
+2. **At session end** — the existing Wiki-Brain Session Rules refresh the pages and
+   append the single `log.md` line (which should name the grilling). One log line
+   per session — checkpoint 1 does NOT add its own log line.
+
+Use repo-relative wiki paths (`wiki/`, `log.md`) — the live wiki is in this repo,
+not the `C:\Users\martv\…` path referenced in the Context Navigation section.
 
 ## Wiki-Brain Commands Available
 

@@ -15,6 +15,14 @@
 // only the resulting FaceId is stored in Firestore (guestFaces). The face row
 // carries expireAt = the token's expiry; a Firestore TTL policy garbage-
 // collects it, and DELETE /enroll erases both the AWS face and the row.
+//
+// SEAM NOTE: unlike the digital CRUD routers (guests/wishes/designs/workflow,
+// now behind FirestorePort), this route DELIBERATELY stays on direct SDK calls.
+// Its work is AWS Rekognition (liveness/enroll/search) + Cloud Storage (zip
+// streaming) + multipart parsing, with only incidental Firestore reads — routing
+// it through a Firestore port would abstract the wrong layer. The same call
+// applies to the other Storage/AWS/WhatsApp routers (digital media, gallery,
+// photographer, photoShare, galleryAccess): their adapter calls are intentional.
 
 import { Router, Request, Response } from "express";
 import { getDatabase } from "firebase-admin/database";

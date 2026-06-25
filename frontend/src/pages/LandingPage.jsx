@@ -2,13 +2,40 @@
 // No top nav: the page reads as a pure editorial composition.
 // Language toggle floats as a discreet chip top-right.
 // Portal CTA is woven through hero / showcase / pricing / CTA / footer.
-import { useState, useEffect } from "react";
+import { useState, useEffect, lazy, Suspense } from "react";
 import { useNavigate } from "react-router-dom";
 import { BrandLogo } from "../components/BrandLogo.jsx";
 import { Icon } from "../components/icons/Icon.jsx";
 import { C } from "../styles/theme.js";
 import { fetchPublicSettings } from "../services/publicSettings.js";
 import { resolveContact, buildWhatsAppUrl, mailtoUrl } from "../utils/contact.js";
+import { useDeviceCapability } from "../hooks/useDeviceCapability.js";
+import { getDigitalTheme } from "../styles/digitalThemes.js";
+import { celDowngraded, markCelDowngraded } from "../components/digital/celestial/downgradeStore.js";
+
+// Shared celestial particle engine, reused as the marketing hero backdrop.
+// Lazy so the three.js chunk only loads for capable visitors (and never on the
+// pages that don't use it). Falls back to nothing — the CSS hero is complete.
+const LazyCelestialCanvas = lazy(() => import("../components/digital/celestial/CelestialCanvas.jsx"));
+
+function HeroCelestial() {
+  const cap = useDeviceCapability();
+  // Share the session downgrade flag with the invite path, so a device already
+  // proven too slow doesn't re-mount the WebGL world on every return to "/".
+  const [dead, setDead] = useState(celDowngraded);
+  if (cap.tier < 1 || dead) return null;
+  return (
+    <Suspense fallback={null}>
+      <LazyCelestialCanvas
+        theme={getDigitalTheme("gold")}
+        mode="landing"
+        fixed={false}
+        tier={cap.tier}
+        onFpsDowngrade={() => { markCelDowngraded(); setDead(true); }}
+      />
+    </Suspense>
+  );
+}
 
 // ── Scroll position hook ────────────────────────────────────────────────────
 function useScrollPos() {
@@ -335,6 +362,7 @@ function HeroSection({ t, lang, onEnterPortal, onContact, openSample, scrollY })
           "radial-gradient(ellipse 70% 55% at 50% 30%, rgba(201,168,76,.14) 0%, transparent 60%)," +
           "radial-gradient(ellipse 60% 50% at 50% 90%, rgba(201,168,76,.06) 0%, transparent 70%)",
       }} />
+      <HeroCelestial />
       {[260, 420, 600, 820, 1040].map((s, i) => (
         <div key={i} aria-hidden="true" style={{
           position: "absolute", width: s, height: s, borderRadius: "50%",

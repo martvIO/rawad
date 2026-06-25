@@ -7,6 +7,8 @@
   "scripts": {
     "dev": "npm --prefix frontend run dev",
     "dev:emulator": "npm --prefix frontend run dev:emulator",
+    "ports:free": "node backend/scripts/free-emulator-ports.cjs",
+    "predev:full": "node backend/scripts/free-emulator-ports.cjs",
     "dev:full": "concurrently -k -n EMU,VITE -c blue,green \"npm:emulators:build\" \"npm:dev:emulator\"",
     "emulators": "firebase emulators:start --only auth,database,firestore,storage,functions,hosting --project dawa-aa793",
     "emulators:build": "node backend/scripts/build-functions.cjs && npm run emulators",

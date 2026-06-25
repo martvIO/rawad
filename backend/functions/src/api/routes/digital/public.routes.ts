@@ -2,6 +2,7 @@ import { Request,Response } from "express";
 import { parentDoc,designDoc,resolveDefaultDesignId } from "./firestore";
 import { projectPublicDoc,safeDetail } from "./project";
 import { Router } from "express";
+import { isGroomFrozen } from "../../../lifecycle/gate";
 
 export function registerPublicRoutes(router: Router): void {
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -19,6 +20,13 @@ router.get(
   async (req: Request, res: Response) => {
     try {
       const uid = req.params.uid;
+      // Freeze: a cancelled / postponed wedding hides its live invitation. Sent
+      // links still render from the token's immutable snapshot, but the live
+      // public fallback returns null so the page shows the cancelled notice.
+      if (await isGroomFrozen(uid)) {
+        res.json(null);
+        return;
+      }
       // BOTH public paths are approved-only — an unauthenticated caller who
       // knows (or guesses) a groom uid must never read a draft/pending/rejected
       // invitation. Sent links render from the token's immutable designSnapshot,

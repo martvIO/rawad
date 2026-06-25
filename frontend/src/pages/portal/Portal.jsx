@@ -13,7 +13,9 @@ import { PortalProvider, usePortal } from "../../context/PortalContext.jsx";
 import { RoleGuard } from "../../components/RoleGuard.jsx";
 import { BrandLogo } from "../../components/BrandLogo.jsx";
 import { LoginScreen } from "./LoginScreen.jsx";
+import { ForgotPasswordPage } from "./ForgotPasswordPage.jsx";
 import { LogoutPage } from "./LogoutPage.jsx";
+import { PasswordChangeScreen } from "./PasswordChangeScreen.jsx";
 
 // Role dashboards are code-split per role: a signed-in user only downloads the
 // bundle for their own role instead of all three. Same lazy() idiom used for
@@ -50,7 +52,7 @@ function AuthLoadingScreen() {
 
 // Picks which view to render — must run inside <PortalProvider>.
 function PortalRouter() {
-  const { authed, authReady, userType } = usePortal();
+  const { authed, authReady, userType, mustChangePassword } = usePortal();
   // While the auth subscription resolves the session, show a branded
   // splash — avoids a blank screen and a login-flash for active sessions.
   if (!authReady) return <AuthLoadingScreen />;
@@ -65,8 +67,20 @@ function PortalRouter() {
   if (!authed) {
     return (
       <Routes>
-        <Route path="login" element={<LoginScreen />} />
-        <Route path="*"     element={<Navigate to="/portal/login" replace />} />
+        <Route path="login"           element={<LoginScreen />} />
+        <Route path="forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="*"               element={<Navigate to="/portal/login" replace />} />
+      </Routes>
+    );
+  }
+
+  // Forced first-login password change (auto-provisioned groom). Block every
+  // role dashboard until the temporary password is changed.
+  if (mustChangePassword) {
+    return (
+      <Routes>
+        <Route path="logout" element={<LogoutPage />} />
+        <Route path="*" element={<PasswordChangeScreen />} />
       </Routes>
     );
   }

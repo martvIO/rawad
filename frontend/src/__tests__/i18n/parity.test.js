@@ -29,13 +29,14 @@ describe("i18n parity", () => {
 });
 
 describe("price drift guard", () => {
-  // Mirrors backend PLAN_AMOUNTS_ILS ({ premium: 1500, vip: 2000 }). If a price
-  // changes anywhere, this fails so all five sources are updated together.
+  // Marketing price copy on the LandingPage. The authoritative charge amounts now
+  // live in backend config/packages.ts (the pay page reads them from the API, so
+  // there is no admin-side price string to drift). These two stay as a check that
+  // the landing-page marketing copy matches the published Premium ₪1,500 / VIP
+  // ₪2,000 — keep them in sync with config/packages.ts by hand.
   it.each([
     ["price_pkg1_price", "1,500"],
     ["price_pkg2_price", "2,000"],
-    ["admin_pay_premium", "1,500"],
-    ["admin_pay_vip", "2,000"],
   ])("%s contains %s in both languages", (key, amount) => {
     expect(ar[key]).toContain(amount);
     expect(he[key]).toContain(amount);

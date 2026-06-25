@@ -35,9 +35,20 @@ export async function submitGuestInvite(input) {
 
 /**
  * Mint a digital invite token. Body: `{ groomUid, guestId }`.
+ * Pass `{ deliver: "whatsapp", messageBody }` to also auto-send over the
+ * WhatsApp Cloud API; the response then carries `send: { ok, id?, error? }`.
  */
 export async function createDigitalGuestInvite(input) {
   return api.post("/invites/digital", input);
+}
+
+/**
+ * Send a DIGITAL guest a free-form WhatsApp text with NO link (the "no design /
+ * message only" option). Body: `{ groomUid, guestId, message }`.
+ * @returns {Promise<{ send: { ok: boolean, id?: string, error?: string } }>}
+ */
+export async function notifyDigitalGuest(input) {
+  return api.post("/invites/notify", input);
 }
 
 /**

@@ -10,12 +10,16 @@
 //           now; per-send outcome tracking lands with the reminder scheduler.
 import { onRequest } from "firebase-functions/v2/https";
 import { verifyWebhookChallenge, isWebhookSignatureEnforced, verifyWebhookSignature } from "./whatsapp";
+import { extractStatusUpdates, applyStatusUpdates } from "./whatsappInvite";
+import { getWhatsAppConfig } from "./whatsappConfig";
 
 export const whatsappWebhook = onRequest(
   { region: "us-central1", cors: false },
-  (req, res) => {
+  async (req, res) => {
     if (req.method === "GET") {
-      const challenge = verifyWebhookChallenge(req.query as Record<string, unknown>);
+      // Verify token comes from admin config (DB) with env fallback.
+      const cfg = await getWhatsAppConfig();
+      const challenge = verifyWebhookChallenge(req.query as Record<string, unknown>, cfg.verifyToken);
       if (challenge !== null) {
         res.status(200).send(challenge);
         return;
@@ -43,7 +47,15 @@ export const whatsappWebhook = onRequest(
       } catch {
         /* ignore log serialization errors */
       }
-      // Always 200 quickly so Meta doesn't retry; processing is best-effort.
+      // Map delivery/read/failed receipts onto the matching guest records
+      // (inviteWaStatus). Best-effort — a tracking hiccup must never make Meta
+      // retry, so we swallow errors and still 200.
+      try {
+        await applyStatusUpdates(extractStatusUpdates(req.body));
+      } catch (err) {
+        console.warn("[whatsapp] applyStatusUpdates failed:", err);
+      }
+      // Always 200 so Meta doesn't retry; processing above is best-effort.
       res.status(200).send("ok");
       return;
     }

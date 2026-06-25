@@ -115,10 +115,8 @@ export function usePortalUsers({ authed, isAdmin, currentUid, userType, driverSe
   // في القائمة قبل أن يلتقطه subscribeUsers الحي. النتيجة المُعادة تُمكّن
   // الصفحة من القفز للتبويب الموافق للدور.
   //
-  // ملاحظة: الـ Cloud Function المنشورة حالياً ما زالت تشترط رقم هاتف
-  // E.164 صالحاً (تمرّره إلى Firebase Auth التي تستخدم libphonenumber).
-  // لا يوجد بادئة وهميّة آمنة 100%، فالهاتف مطلوب حتى ينشر الأدمن النسخة
-  // الجديدة من الدالّة.
+  // الهاتف اختياري: الخادم (route ‎/users‎ + userStore) ينشئ الحساب بلا رقم
+  // هاتف عند غيابه — لا phoneNumber في Auth، ولا قيد في phoneIndex.
   const addUser = async (opts = {}) => {
     if (!newUserName.trim() || !newUserPass.trim()) { showToast(t("admin_required")); return null; }
     if (!isStrongPassword(newUserPass)) { showToast(t("pwd_weak")); return null; }
@@ -129,17 +127,16 @@ export function usePortalUsers({ authed, isAdmin, currentUid, userType, driverSe
     const canUsePhotographer = opts.canUsePhotographer !== false;
     // بطاقة المحفظة — افتراضاً متوقّفة (يفعّلها الأدمن لكل عريس).
     const canUseBoardingPass = opts.canUseBoardingPass === true;
-    // الهاتف اختياري في الواجهة. إذا تُرك فارغاً نُولِّد رقماً وهمياً
-    // بنطاق +1202555XXXX (محجوز رسمياً للاستخدام الاختباري في NANP؛
-    // تقبله libphonenumber / Firebase Auth كصيغة E.164 صالحة).
-    // يُحذف هذا التحايل بعد نشر Cloud Function الجديدة التي لا تشترط الهاتف.
+    // الهاتف اختياري: إذا تُرك فارغاً لا نُرسل phoneE164 إطلاقاً (لا بادئة
+    // وهميّة مثل +1202555…) — الخادم ينشئ الحساب بلا هاتف.
     const typedPhone = newUserPhone.trim();
-    const phoneE164  = typedPhone ||
-      ("+1202555" + (Date.now() % 10000).toString().padStart(4, "0"));
+    const payload = { username, password: newUserPass, role, canSeeAttendance, canUsePhotographer, canUseBoardingPass };
+    if (typedPhone) payload.phoneE164 = typedPhone;
     try {
-      const result = await createPortalUser({ username, password: newUserPass, role, phoneE164, canSeeAttendance, canUsePhotographer, canUseBoardingPass });
+      const result = await createPortalUser(payload);
       const uid = result?.uid;
-      const newRow = { uid, id: uid, username, role, phoneE164, canSeeAttendance, canUsePhotographer, canUseBoardingPass };
+      const newRow = { uid, id: uid, username, role, canSeeAttendance, canUsePhotographer, canUseBoardingPass };
+      if (typedPhone) newRow.phoneE164 = typedPhone;
       if (uid) {
         setOptimisticUsers(prev => [...prev, newRow]);
         // إذا كان دور الحساب الجديد "عريس" نكتب سجله في /groomProfiles مباشرةً
