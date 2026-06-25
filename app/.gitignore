@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+
+# Vite build output (copied into native projects by `cap sync`)
+dist/
+
+# Capacitor / native build artifacts
+android/app/build/
+android/build/
+android/.gradle/
+android/local.properties
+android/app/release/
+ios/App/Pods/
+ios/App/build/
+ios/DerivedData/
+*.keystore
+*.jks
+
+# Env
+.env.local
+.env.*.local
+
+# Logs / OS
+*.log
+.DS_Store
