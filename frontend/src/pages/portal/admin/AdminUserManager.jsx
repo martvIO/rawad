@@ -18,9 +18,6 @@ import { C } from "../../../styles/theme.js";
 import { useListFilter } from "../../../utils/searchFilter.js";
 import { SearchBar } from "../../../components/SearchBar.jsx";
 import { SkeletonList } from "../../../components/Skeleton.jsx";
-import { createPaymentLink } from "../../../services/payments.js";
-import { buildWhatsAppUrl } from "../../../utils/contact.js";
-import { localizeApiError } from "../../../utils/apiError.js";
 
 // ── حقول البحث النصّي + حقول الهاتف (ثابتة على مستوى الوحدة) ──────────
 const USERS_FIELDS = ["username", "displayName", (u) => u.role];
@@ -218,9 +215,6 @@ function EditModal({ user, onSave, onCancel, t, lang }) {
           </div>
         )}
 
-        {/* الدفع (Stripe) — للعرسان فقط */}
-        {role === "groom" && <PaymentSection user={user} t={t} lang={lang} />}
-
         {/* صلاحيات العريس — للعرسان فقط */}
         {role === "groom" && (
           <div style={{ marginBottom: 18 }}>
@@ -262,78 +256,6 @@ function EditModal({ user, onSave, onCancel, t, lang }) {
           </button>
         </div>
       </div>
-    </div>
-  );
-}
-
-// ── Payment section (Stripe) inside the edit modal — grooms only ──────
-// Admin picks a plan, creates a Stripe payment link, then copies it or sends
-// it to the groom over WhatsApp. The groom is marked paid by the Stripe webhook
-// (paymentStatus flows back through the live /users subscription).
-function PaymentSection({ user, t, lang }) {
-  const { showToast } = usePortal();
-  const uid = user.uid ?? user.id;
-  const [plan, setPlan] = useState(user.paymentPlan === "vip" ? "vip" : "premium");
-  const [busy, setBusy] = useState(false);
-  const [link, setLink] = useState(user.paymentLinkUrl || "");
-  const status = user.paymentStatus || "none";
-  const statusColor = status === "paid" ? "#3fbf6f" : status === "pending" ? C.gold : C.dim;
-
-  const create = async () => {
-    setBusy(true);
-    try {
-      const res = await createPaymentLink(uid, plan);
-      setLink(res?.url || "");
-      showToast(t("admin_payment_created"));
-    } catch (e) {
-      if (e?.body?.error === "stripe_not_configured") showToast(t("admin_payment_not_configured"));
-      else showToast(localizeApiError(e, lang));
-    } finally {
-      setBusy(false);
-    }
-  };
-  const copy = async () => {
-    if (!link) return;
-    try { await navigator.clipboard.writeText(link); showToast(t("admin_payment_copied")); } catch { /* noop */ }
-  };
-  const waUrl = link ? buildWhatsAppUrl(user.phoneE164, `${t("admin_payment_wa_msg")}\n${link}`) : "";
-
-  return (
-    <div style={{
-      marginTop: 4, marginBottom: 18, padding: 14, borderRadius: 12,
-      background: "rgba(201,168,76,.05)", border: "1px solid rgba(201,168,76,.18)",
-    }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-        <span style={{ fontSize: 13, fontWeight: 800, color: C.goldLight }}>{t("admin_payment_title")}</span>
-        <span style={{ fontSize: 12, fontWeight: 800, color: statusColor }}>{t(`admin_payment_status_${status}`)}</span>
-      </div>
-      <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-        {["premium", "vip"].map(p => (
-          <button key={p} onClick={() => setPlan(p)} disabled={busy} style={{
-            flex: 1, padding: "8px 4px", borderRadius: 9, cursor: "pointer",
-            fontSize: 11, fontWeight: 800, fontFamily: "inherit",
-            background: plan === p ? "rgba(201,168,76,.18)" : "rgba(255,255,255,.04)",
-            border: `1px solid ${plan === p ? "rgba(201,168,76,.5)" : "rgba(255,255,255,.08)"}`,
-            color: plan === p ? C.gold : C.dim,
-          }}>{t(p === "vip" ? "admin_pay_vip" : "admin_pay_premium")}</button>
-        ))}
-      </div>
-      <button className="gold-btn" style={{ width: "100%" }} onClick={create} disabled={busy}>
-        {busy ? t("admin_saving") : t("admin_payment_create")}
-      </button>
-      {link && (
-        <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
-          <button className="ghost-btn" style={{ flex: 1, fontSize: 12 }} onClick={copy}>
-            {t("admin_payment_copy")}
-          </button>
-          {waUrl && (
-            <a href={waUrl} target="_blank" rel="noopener noreferrer" className="gold-btn"
-               style={{ flex: 1, fontSize: 12, textAlign: "center", textDecoration: "none" }}>
-              {t("admin_payment_send_wa")}
-            </a>
-          )}
-        </div>
-      )}
     </div>
   );
 }

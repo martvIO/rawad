@@ -24,7 +24,7 @@ import { getDatabase } from "firebase-admin/database";
 import { isStrongPassword, phoneIndexKey, syntheticEmail } from "../../helpers";
 import { writeAudit } from "../../audit";
 import { AuthRequest, requireAuth } from "../middleware/auth";
-import { ipRateLimit, ipRateLimitPersistent } from "../middleware/rateLimit";
+import { ipRateLimit, ipRateLimitPersistent, uidRateLimit } from "../middleware/rateLimit";
 // Security-critical auth limiters (login/OTP/reset/lockout) are PERSISTENT
 // (cross-instance) so a cold start can't reset brute-force protection.
 import {
@@ -88,6 +88,7 @@ const REFRESH_RATE_PER_HOUR = 60;
 const OTP_RATE_PER_HOUR = 5;
 const VERIFY_OTP_RATE_PER_HOUR = 5;
 const RESET_PASSWORD_MAX_PER_HOUR_PER_PHONE = RATE.RESET_PER_PHONE.limit;
+const CHANGE_PASSWORD_MAX_PER_HOUR_PER_USER = RATE.CHANGE_PASSWORD_PER_USER.limit;
 
 /**
  * Mapping of Firebase Auth REST API error codes to our app-level codes.
@@ -217,6 +218,9 @@ authRouter.post(
       canSeeAttendance: profile?.canSeeAttendance !== false,
       canUsePhotographer: profile?.canUsePhotographer !== false,
       canUseBoardingPass: profile?.canUseBoardingPass === true,
+      // Drives the forced first-login password-change gate (Portal.jsx). Included
+      // on login so the gate triggers without waiting for the first /auth/me poll.
+      mustChangePassword: profile?.mustChangePassword === true,
     });
   }
 );
@@ -312,6 +316,7 @@ authRouter.get("/me", requireAuth, async (req: AuthRequest, res: Response) => {
     canSeeAttendance: profile?.canSeeAttendance !== false,
     canUsePhotographer: profile?.canUsePhotographer !== false,
     canUseBoardingPass: profile?.canUseBoardingPass === true,
+    mustChangePassword: profile?.mustChangePassword === true,
     claims,
   });
 });
@@ -321,7 +326,9 @@ authRouter.get("/me", requireAuth, async (req: AuthRequest, res: Response) => {
 /**
  * Send an SMS verification code for the password-reset flow.
  *
- * Body:    `{ phoneE164: string, recaptchaToken: string }`
+ * Body:    `{ username: string, phoneE164: string, recaptchaToken: string }`
+ *           The username+phone pair must match an existing account or we
+ *           reject with a generic `account_phone_mismatch` before any SMS.
  * Returns: `{ sessionInfo: string }` (an opaque token from Firebase to be
  *           paired with the user-entered code on /auth/verify-otp).
  *
@@ -333,9 +340,65 @@ authRouter.post(
   "/send-otp",
   ipRateLimitPersistent("otp", OTP_RATE_PER_HOUR, ONE_HOUR_MS),
   async (req, res) => {
-    const { phoneE164, recaptchaToken } = req.body ?? {};
-    if (typeof phoneE164 !== "string" || typeof recaptchaToken !== "string") {
+    const { username, phoneE164, recaptchaToken } = req.body ?? {};
+    if (
+      typeof username !== "string" ||
+      typeof phoneE164 !== "string" ||
+      typeof recaptchaToken !== "string"
+    ) {
       res.status(400).json({ error: "missing_fields" });
+      return;
+    }
+
+    const acct = username.trim().toLowerCase();
+    // Per-username throttle on TOP of the per-IP limiter. The per-IP limit alone
+    // doesn't stop a distributed attacker who, knowing one username, brute-forces
+    // its phone across rotating IPs (each match returns a distinguishable 200, so
+    // send-otp is a phone-discovery oracle for a known username). Capping attempts
+    // per username — regardless of source IP — closes that. (allowPersistent
+    // sanitises the key, so an odd username can't corrupt the RTDB path.)
+    if (
+      acct &&
+      !(await allowPersistent(
+        rtdbPort(),
+        `otp_acct:${acct}`,
+        OTP_RATE_PER_HOUR,
+        ONE_HOUR_MS
+      ))
+    ) {
+      res.status(429).json({ error: "too_many_requests", scope: "account" });
+      return;
+    }
+
+    // Username + phone must match an existing account before we spend an SMS.
+    // This blocks SMS-bombing arbitrary numbers AND makes the reset deliberate
+    // (a phone-less account can never match a real number, so those users are
+    // steered to the admin instead). We return ONE generic error for both
+    // "no such username" and "phone doesn't match" so this endpoint can't be
+    // used as a username-enumeration / phone-probing oracle. Lookups are
+    // wrapped so an illegal-key username can't 500 (RTDB keys reject .#$[]/).
+    let ownerUid: string | null = null;
+    try {
+      const db = getDatabase();
+      for (const key of [acct, username.trim()]) {
+        if (!key) continue;
+        const snap = await db.ref(`usernameIndex/${key}`).get();
+        if (snap.exists()) {
+          ownerUid = snap.val() as string;
+          break;
+        }
+      }
+      if (ownerUid) {
+        const storedPhone = (
+          await db.ref(`users/${ownerUid}/phoneE164`).get()
+        ).val();
+        if (storedPhone !== phoneE164) ownerUid = null;
+      }
+    } catch {
+      ownerUid = null;
+    }
+    if (!ownerUid) {
+      res.status(400).json({ error: "account_phone_mismatch" });
       return;
     }
 
@@ -491,18 +554,112 @@ authRouter.post(
       const auth = getAuth();
       await auth.updateUser(targetUid, { password: newPassword });
       await auth.revokeRefreshTokens(targetUid);
-      // Best-effort cleanup of the throw-away phone-auth user. Failure here
-      // does not block the password reset — the reset already succeeded.
-      try {
-        await auth.deleteUser(phoneAuthUid);
-      } catch {
-        // noop
+      // Best-effort cleanup of the throw-away phone-auth user — but ONLY when it
+      // is genuinely a separate identity. Portal users created WITH a phone carry
+      // that number as their Firebase Auth `phoneNumber` (see userStore/
+      // createGroomAccount), so `signInWithPhoneNumber` signs into the portal
+      // user itself and `phoneAuthUid === targetUid`. Deleting it here would wipe
+      // the very account we just reset. Only delete when the phone-auth session
+      // is a distinct throw-away user. Failure never blocks the (already-done) reset.
+      if (phoneAuthUid !== targetUid) {
+        try {
+          await auth.deleteUser(phoneAuthUid);
+        } catch {
+          // noop
+        }
       }
       await writeAudit(targetUid, "resetPassword", { via: "phone" });
 
       res.json({ ok: true });
     } catch (err) {
       res.status(500).json({ error: "reset_failed", detail: errorMessage(err) });
+    }
+  }
+);
+
+// ─── POST /auth/change-password ───────────────────────────────────────────────
+
+/**
+ * Self-service password change for the signed-in user. Used by the forced
+ * first-login change (post-payment signup) AND any user changing their own
+ * password. Verifies the current password (so a stolen, still-valid ID token
+ * can't silently rotate the password), then updates it and clears the
+ * mustChangePassword flag + the admin-visible generated password.
+ *
+ * Body:    `{ currentPassword, newPassword }` (both decrypted by
+ *           decryptPasswordFields ahead of this router).
+ * Returns: `{ ok: true }`. The caller's refresh tokens are revoked, so the
+ *           frontend must re-login afterward.
+ */
+authRouter.post(
+  "/change-password",
+  requireAuth,
+  uidRateLimit("changePassword", CHANGE_PASSWORD_MAX_PER_HOUR_PER_USER, ONE_HOUR_MS),
+  async (req: AuthRequest, res: Response) => {
+    const uid = req.caller!.uid;
+    const claims = req.caller!.claims as Record<string, unknown>;
+    const currentPassword = (req.body?.currentPassword ?? "").toString();
+    const newPassword = (req.body?.newPassword ?? "").toString();
+
+    if (!isStrongPassword(newPassword)) {
+      res.status(400).json({ error: "weak_password" });
+      return;
+    }
+    if (newPassword === currentPassword) {
+      res.status(400).json({ error: "password_unchanged" });
+      return;
+    }
+
+    const apiKey = effectiveApiKey();
+    if (!apiKey) {
+      res.status(500).json({ error: "server_misconfigured" });
+      return;
+    }
+
+    // Resolve the username to rebuild the synthetic email for the credential
+    // check (claims first, RTDB profile as fallback).
+    let username = typeof claims.username === "string" ? (claims.username as string) : "";
+    if (!username) {
+      const profile = await loadUserProfile(uid);
+      username = profile?.username ?? "";
+    }
+    if (!username) {
+      res.status(400).json({ error: "no_username" });
+      return;
+    }
+
+    // Verify the CURRENT password against Firebase Auth.
+    const verifyRes = await fetch(
+      `${IDENTITY_TOOLKIT_BASE}:signInWithPassword?key=${apiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: syntheticEmail(username),
+          password: currentPassword,
+          returnSecureToken: false,
+        }),
+      }
+    );
+    if (!verifyRes.ok) {
+      res.status(401).json({ error: "invalid_credentials" });
+      return;
+    }
+
+    try {
+      const auth = getAuth();
+      await auth.updateUser(uid, { password: newPassword });
+      // Clear the forced-change flag AND purge the admin-visible generated
+      // password (its only purpose was first-login delivery fallback).
+      await getDatabase().ref().update({
+        [`users/${uid}/mustChangePassword`]: null,
+        [`generatedPasswords/${uid}`]: null,
+      });
+      await auth.revokeRefreshTokens(uid);
+      await writeAudit(uid, "changePassword", { via: "self" });
+      res.json({ ok: true });
+    } catch (err) {
+      res.status(500).json({ error: "change_failed", detail: errorMessage(err) });
     }
   }
 );
@@ -521,6 +678,7 @@ interface UserProfile {
   canSeeAttendance?: boolean;
   canUsePhotographer?: boolean;
   canUseBoardingPass?: boolean;
+  mustChangePassword?: boolean;
 }
 
 /**

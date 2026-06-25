@@ -55,8 +55,18 @@ export async function signIn(username, password) {
     username: data.username,
     displayName: data.displayName ?? null,
     phoneE164: data.phoneE164 ?? null,
+    mustChangePassword: data.mustChangePassword === true,
     claims: { role: data.role, username: data.username },
   };
+}
+
+/**
+ * Change the signed-in user's password. Used by the forced first-login change
+ * (post-payment signup) and any self-service change. The backend verifies the
+ * current password and revokes refresh tokens, so the caller must re-login after.
+ */
+export async function changePassword(currentPassword, newPassword) {
+  return api.post("/auth/change-password", { currentPassword, newPassword });
 }
 
 /**
@@ -142,6 +152,7 @@ export function subscribeAuth(cb) {
         canSeeAttendance: value.canSeeAttendance !== false,
         canUsePhotographer: value.canUsePhotographer !== false,
         canUseBoardingPass: value.canUseBoardingPass === true,
+        mustChangePassword: value.mustChangePassword === true,
         claims: value.claims ?? {},
       });
     },
@@ -152,27 +163,21 @@ export function subscribeAuth(cb) {
 // ─── Password reset (Phone OTP) ───────────────────────────────────────────────
 
 /**
- * Step 1 of password reset — send an SMS code. The frontend renders a
- * reCAPTCHA v2 widget; pass the resulting token here. Returns the
- * opaque `sessionInfo` needed for confirm.
+ * Step 1 of password reset — verify the username+phone match an account and
+ * send an SMS code to that phone. The frontend renders a reCAPTCHA v2 widget;
+ * pass the resulting token here. Returns the opaque `sessionInfo` needed for
+ * confirm. The server rejects with `account_phone_mismatch` (HTTP 400) when
+ * the username/phone don't match a real account — before any SMS is spent.
  *
- * Signature kept identical to legacy `sendPasswordResetCode` except for
- * an extra `recaptchaToken` argument (the SDK obtained it transparently
- * via RecaptchaVerifier, but the REST endpoint can't).
- *
- * @param {string} phoneE164
- * @param {string} _containerIdUnused  kept for backwards compat with callers
- * @param {string} recaptchaToken      v2 token from grecaptcha.getResponse()
+ * @param {string} username        portal username that must own `phoneE164`
+ * @param {string} phoneE164       E.164 phone on file for that account
+ * @param {string} recaptchaToken  v2 token from grecaptcha.getResponse()
  * @returns {Promise<{sessionInfo: string}>}
  */
-export async function sendPasswordResetCode(
-  phoneE164,
-  _containerIdUnused,
-  recaptchaToken,
-) {
+export async function sendPasswordResetCode(username, phoneE164, recaptchaToken) {
   return api.post(
     "/auth/send-otp",
-    { phoneE164, recaptchaToken },
+    { username, phoneE164, recaptchaToken },
     { skipAuth: true },
   );
 }

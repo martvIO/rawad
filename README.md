@@ -96,6 +96,8 @@ npm run test:coverage
 
 ## Environment variables
 
+> **Full configuration reference** — every env var, admin setting, code constant, and infra file, with where each is read and set: [CONFIGURATION.md](CONFIGURATION.md). The table below is a quick subset.
+
 | Variable | Required | Description |
 |---|---|---|
 | `VITE_API_BASE_URL` | Dev only | REST API base URL. In prod, same-origin `/api` via Firebase Hosting rewrite. |

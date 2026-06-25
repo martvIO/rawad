@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { usePortal } from "../../../context/PortalContext.jsx";
 import { C } from "../../../styles/theme.js";
 import { STORAGE_KEYS } from "../../../constants/storageKeys.js";
+import { FEATURES } from "../../../config/index.js";
 
 export function GroomTypeSelect() {
   const { lang, onBack } = usePortal();
@@ -49,15 +50,23 @@ export function GroomTypeSelect() {
 
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
 
-            {/* Handwritten */}
+            {/* Handwritten — gated behind the physical beta flag (FEATURES.physical) */}
+            {FEATURES.physical && (
             <button data-testid="btn-type-handwritten"
               onClick={() => pick("handwritten")}
               style={{
+                position: "relative",
                 padding: "28px 24px", borderRadius: 18, textAlign: "right", fontFamily: "inherit",
                 border: "2px solid rgba(201,168,76,.35)", background: "rgba(201,168,76,.04)",
                 cursor: "pointer", transition: "border-color .2s, background .2s",
               }}
             >
+              <span style={{
+                position: "absolute", top: 12, insetInlineEnd: 12,
+                fontSize: 10, fontWeight: 800, letterSpacing: ".5px",
+                padding: "3px 8px", borderRadius: 8,
+                background: "rgba(201,168,76,.16)", color: C.gold,
+              }}>{lang === "he" ? "בטא" : "تجريبي"}</span>
               <div style={{ fontSize: 48, marginBottom: 10 }}>📜</div>
               <div style={{ fontSize: 20, fontWeight: 900, color: C.gold, marginBottom: 8 }}>
                 {lang === "he" ? "הזמנה כתובה ידנית" : "مكتوب يدوي"}
@@ -68,6 +77,7 @@ export function GroomTypeSelect() {
                   : "توزيع مكاتيب ورقية مع متابعة حية لكل مكتوب لحظة بلحظة"}
               </div>
             </button>
+            )}
 
             {/* Digital */}
             <button data-testid="btn-type-digital"

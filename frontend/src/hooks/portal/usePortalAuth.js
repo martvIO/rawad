@@ -45,6 +45,9 @@ export function usePortalAuth({ t, lang, navigate }) {
   const canUsePhotographer = authUser?.canUsePhotographer !== false;
   // Boarding-pass / wallet feature defaults OFF — admin enables per groom.
   const canUseBoardingPass = authUser?.canUseBoardingPass === true;
+  // Forced first-login password change (auto-provisioned groom). Drives the gate
+  // in PortalRouter that blocks every role dashboard until the password changes.
+  const mustChangePassword = authUser?.mustChangePassword === true;
 
   // ── Login form (transient) ──────────────────────────────────────────────────
   const [loginUser, setLoginUser] = useState("");
@@ -108,7 +111,7 @@ export function usePortalAuth({ t, lang, navigate }) {
   return {
     authUser,
     authed, authReady, userType, currentUid, currentUsername, isAdmin,
-    canSeeAttendance, canUsePhotographer, canUseBoardingPass,
+    canSeeAttendance, canUsePhotographer, canUseBoardingPass, mustChangePassword,
     loginUser, setLoginUser, loginPass, setLoginPass,
     loginError, setLoginError, loginLoading,
     handleLogin,

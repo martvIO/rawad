@@ -293,11 +293,16 @@ The server is pre-configured. If it is not running, start it separately before a
 
 ## Environment variables
 
+> **Full configuration reference** — every env var (frontend, functions, loadtest, CI), the
+> admin-editable `/adminSettings`, code constants, and infra files, with where each is read and
+> set: [CONFIGURATION.md](CONFIGURATION.md). The table below is a quick subset.
+
 | Variable | Required | Description |
 |---|---|---|
 | `VITE_API_BASE_URL` | Dev only | REST API base URL. In prod, same-origin `/api` via Firebase Hosting rewrite. |
 | `VITE_INVITE_BASE_URL` | Optional | Base URL for per-guest invite links. |
 | `VITE_RECAPTCHA_V2_SITE_KEY` | For OTP | reCAPTCHA v2 site key for phone-OTP password reset. |
+| `VITE_STRIPE_PUBLISHABLE_KEY` | For paid signup | Stripe publishable key (`pk_test_…`/`pk_live_…`) for the `/pay/:token` Elements card form. Backend holds `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET`; the Stripe webhook event to subscribe is `payment_intent.succeeded`. Unset → the pay page shows "payments not configured". |
 | `VITE_USE_EMULATORS` | Dev | Set `1` to connect Firebase SDK to emulators. |
 | `WEB_API_KEY` | Cloud Functions | Firebase Web API key. Set in Functions environment, never in `VITE_*`. |
 | `ALLOWED_ORIGINS` | Cloud Functions | Comma-separated CORS allowed origins. Empty = allow all (dev-friendly). |
@@ -488,6 +493,43 @@ page — just report what changed.
 **Always update `wiki/index.md`** when you create or rename a wiki page.
 **Cross-link aggressively.** `[[Page Name]]` Obsidian syntax. A page with
 no inbound links is a dead-end.
+
+## Grilling + Wiki-Brain
+
+Whenever a **grilling session** runs — `/grilling`, `/grill-me`, `/grill-with-docs`,
+the `decision-mapping` skill, or the model auto-invoking grilling to stress-test a
+plan — wrap it with the wiki-brain. (grill-me / grill-with-docs / decision-mapping
+all delegate to `/grilling`, so this rule keys off "a grilling session is happening.")
+
+**Before grilling (read — context dump).** Load relevant wiki context so the
+interview is grounded. Use `graphify query "<topic>"` if the CLI is available;
+otherwise read `wiki/index.md` and open the pages whose titles/summaries match the
+topic (the SessionStart hook already prints the index + recent `log.md`). This is a
+passive context load — no skip logic, no contradiction guard; the pages are simply
+available while grilling.
+
+**After grilling (write — route by topic).** When grilling reaches shared
+understanding — or, in plan mode, immediately after the plan is approved (the first
+allowed write point) — file the durable output back into the wiki, routed by subject:
+- **Architectural decisions** → append a bullet to `wiki/Architecture-Decisions.md`
+  (line + rationale + `[[links]]`), so it isn't re-litigated later.
+- **Feature / domain decisions** → update the relevant topical page
+  (e.g. `wiki/Payments.md`), or create a new page if none fits.
+- **Unresolved questions** → add to `wiki/Tasks-Backlog.md`. If they're many and
+  need multiple sessions to resolve, hand off to the `decision-mapping` skill.
+- Always update `wiki/index.md` when a page is created/renamed, and cross-link with
+  `[[Page Name]]`.
+
+**Two write checkpoints.**
+1. **At grilling conclusion** — write/update the wiki page(s) + `index.md`
+   immediately, while decisions are fresh, so any implementation that follows
+   references them.
+2. **At session end** — the existing Wiki-Brain Session Rules refresh the pages and
+   append the single `log.md` line (which should name the grilling). One log line
+   per session — checkpoint 1 does NOT add its own log line.
+
+Use repo-relative wiki paths (`wiki/`, `log.md`) — the live wiki is in this repo,
+not the `C:\Users\martv\…` path referenced in the Context Navigation section.
 
 ## Wiki-Brain Commands Available
 

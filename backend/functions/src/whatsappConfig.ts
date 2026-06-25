@@ -23,6 +23,9 @@ export interface WhatsAppConfig {
   autoSendEnabled: boolean; // db (default true)
   dailyCap: number; // db (default 250)
   templates: Record<InviteSlot, string>; // db ?? env (slot → approved template name)
+  // Approved template names for the post-payment account-credentials message
+  // (username + password + login link). db ?? env, per language.
+  credentialsTemplates: { ar: string; he: string };
   fallbackText: { ar: string; he: string }; // db ?? built-in default
 }
 
@@ -71,6 +74,10 @@ export function resolveWhatsAppConfig(
       physical_he: pick(db.waTemplatePhysicalHe, env.WHATSAPP_INVITE_TEMPLATE_PHYSICAL_HE),
       digital_ar: pick(db.waTemplateDigitalAr, env.WHATSAPP_INVITE_TEMPLATE_DIGITAL_AR),
       digital_he: pick(db.waTemplateDigitalHe, env.WHATSAPP_INVITE_TEMPLATE_DIGITAL_HE),
+    },
+    credentialsTemplates: {
+      ar: pick(db.waTemplateCredentialsAr, env.WHATSAPP_CREDENTIALS_TEMPLATE_AR),
+      he: pick(db.waTemplateCredentialsHe, env.WHATSAPP_CREDENTIALS_TEMPLATE_HE),
     },
     fallbackText: {
       ar: pick(db.waFallbackTextAr) || DEFAULT_FALLBACK_AR,

@@ -30,6 +30,10 @@
         "paymentCreatedAt": { ".validate": "!newData.exists() || newData.isNumber()" },
         "paymentPaidAt":    { ".validate": "!newData.exists() || newData.isNumber()" },
         "paymentMode":      { ".validate": "!newData.exists() || newData.val() === 'test' || newData.val() === 'live'" },
+        // Paid-signup flow: which package the groom bought + the forced
+        // first-login password-change flag (cleared on change). See payments.ts.
+        "paymentPackageId":   { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 64)" },
+        "mustChangePassword": { ".validate": "!newData.exists() || newData.isBoolean()" },
         "lifecycleStatus":   { ".validate": "!newData.exists() || newData.val() === 'active' || newData.val() === 'cancel_pending' || newData.val() === 'cancelled' || newData.val() === 'paused'" },
         "cancelRequestedAt": { ".validate": "!newData.exists() || newData.isNumber()" },
         "cancelGraceEndsAt": { ".validate": "!newData.exists() || newData.isNumber()" },
@@ -190,6 +194,8 @@
       "waTemplatePhysicalHe": { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 128)" },
       "waTemplateDigitalAr":  { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 128)" },
       "waTemplateDigitalHe":  { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 128)" },
+      "waTemplateCredentialsAr": { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 128)" },
+      "waTemplateCredentialsHe": { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 128)" },
       "$other":         { ".validate": false }
     },
 
@@ -248,6 +254,102 @@
           "expiresAt": { ".validate": "newData.isNumber()" },
           "$other":    { ".validate": false }
         }
+      }
+    },
+
+    "paymentTokens": {
+      // Paid-signup links. Function-only: minted + read ONLY through the
+      // admin-gated server endpoints (POST/GET /payments/links[/:token]) and the
+      // Stripe webhook, all via the Admin SDK which bypasses these rules. Closing
+      // both sides keeps a client from minting paid-signup tokens or reading
+      // reserved usernames / PaymentIntent ids. Same pattern as inviteTokens.
+      ".read": false,
+      ".write": false,
+      "$token": {
+        ".validate": "!newData.exists() || newData.hasChildren(['role','packageId','status','createdAt','expiresAt'])",
+        "role":             { ".validate": "newData.val() === 'groom'" },
+        "packageId":        { ".validate": "newData.isString() && newData.val().length <= 64" },
+        "status":           { ".validate": "newData.val() === 'pending' || newData.val() === 'reserved' || newData.val() === 'provisioning' || newData.val() === 'paid' || newData.val() === 'delivered' || newData.val() === 'delivery_failed' || newData.val() === 'amount_mismatch' || newData.val() === 'account_conflict'" },
+        "createdAt":        { ".validate": "newData.isNumber()" },
+        "expiresAt":        { ".validate": "newData.isNumber()" },
+        "claimedAt":        { ".validate": "!newData.exists() || newData.isNumber()" },
+        "createdBy":        { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 64)" },
+        "paymentIntentId":  { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 128)" },
+        "reservedUsername": { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 60)" },
+        "reservedPhoneE164":{ ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 30)" },
+        "lang":             { ".validate": "!newData.exists() || newData.val() === 'ar' || newData.val() === 'he'" },
+        "paidAt":           { ".validate": "!newData.exists() || newData.isNumber()" },
+        "createdUid":       { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 64)" },
+        "deliveredAt":      { ".validate": "!newData.exists() || newData.isNumber()" },
+        "deliveryError":    { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 240)" },
+        "$other":           { ".validate": false }
+      }
+    },
+
+    "usernameReservations": {
+      // Function-only soft reservations: a username held while a groom completes
+      // a Stripe payment, so account creation at the webhook can't collide. Admin
+      // SDK only; clients never read/write. TTL'd by expiresAt (checked in code).
+      ".read": false,
+      ".write": false,
+      "$username": {
+        ".validate": "!newData.exists() || newData.hasChildren(['token','expiresAt'])",
+        "token":         { ".validate": "newData.isString() && newData.val().length <= 64" },
+        "expiresAt":     { ".validate": "newData.isNumber()" },
+        "phoneIndexKey": { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 30)" },
+        "$other":        { ".validate": false }
+      }
+    },
+
+    "phoneReservations": {
+      // Function-only soft reservations on the phone number — the symmetric twin
+      // of usernameReservations, so two distinct paid links can't both provision
+      // an account on the same phone. Admin SDK only; TTL'd by expiresAt.
+      ".read": false,
+      ".write": false,
+      "$phoneIdx": {
+        ".validate": "!newData.exists() || newData.hasChildren(['token','expiresAt'])",
+        "token":     { ".validate": "newData.isString() && newData.val().length <= 64" },
+        "expiresAt": { ".validate": "newData.isNumber()" },
+        "$other":    { ".validate": false }
+      }
+    },
+
+    "generatedPasswords": {
+      // Admin-visible fallback password for an auto-provisioned groom, kept ONLY
+      // until the groom's forced first-login change purges it. Function-only: the
+      // admin reads it through GET /payments/links (Admin SDK join), NEVER a
+      // direct client RTDB listener — so a plaintext password is never exposed to
+      // a client subscription. Same Function-only pattern as galleryGrants.
+      ".read": false,
+      ".write": false,
+      "$uid": {
+        "password":  { ".validate": "newData.isString() && newData.val().length <= 128" },
+        "createdAt": { ".validate": "newData.isNumber()" },
+        "token":     { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 64)" },
+        "$other":    { ".validate": false }
+      }
+    },
+
+    "purchases": {
+      // Append-only ledger of completed package purchases, keyed by the link
+      // token (one purchase per single-use link → idempotent on webhook retry).
+      // Admin-read for the payments dashboard; Function-write only (Admin SDK
+      // bypasses rules).
+      ".read": "auth != null && auth.token.role === 'admin'",
+      ".write": false,
+      ".indexOn": ["uid", "paidAt"],
+      "$token": {
+        ".validate": "newData.hasChildren(['uid','packageId','amountIls','paidAt'])",
+        "uid":             { ".validate": "newData.isString() && newData.val().length <= 64" },
+        "packageId":       { ".validate": "newData.isString() && newData.val().length <= 64" },
+        "amountIls":       { ".validate": "newData.isNumber()" },
+        "currency":        { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 8)" },
+        "token":           { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 64)" },
+        "paymentIntentId": { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 128)" },
+        "status":          { ".validate": "!newData.exists() || newData.val() === 'paid'" },
+        "paidAt":          { ".validate": "newData.isNumber()" },
+        "$other":          { ".validate": false }
       }
     },
 

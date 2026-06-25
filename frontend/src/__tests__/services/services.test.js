@@ -134,12 +134,12 @@ describe("auth.forceRefreshToken", () => {
 });
 
 describe("auth.sendPasswordResetCode", () => {
-  it("POSTs /auth/send-otp with phone + recaptcha token (public)", async () => {
+  it("POSTs /auth/send-otp with username + phone + recaptcha token (public)", async () => {
     api.post.mockResolvedValueOnce({ sessionInfo: "sess123" });
-    await auth.sendPasswordResetCode("+972500000001", "containerId", "rcap-token");
+    await auth.sendPasswordResetCode("groom1", "+972500000001", "rcap-token");
     expect(api.post).toHaveBeenCalledWith(
       "/auth/send-otp",
-      { phoneE164: "+972500000001", recaptchaToken: "rcap-token" },
+      { username: "groom1", phoneE164: "+972500000001", recaptchaToken: "rcap-token" },
       { skipAuth: true },
     );
   });

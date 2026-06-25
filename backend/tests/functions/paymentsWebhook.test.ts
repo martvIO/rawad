@@ -97,15 +97,18 @@ describe("POST /webhook ack semantics", () => {
 
   const nowS = () => Math.floor(Date.now() / 1000);
 
-  it("returns 5xx (so Stripe retries) when the paid-status write fails", async () => {
-    // A paid checkout that WILL reach the db write — which throws in this env.
+  const HEX_TOKEN = "a".repeat(32); // valid TOKEN_HEX_RE
+
+  it("returns 5xx (so Stripe retries) when provisioning hits the db (unavailable here)", async () => {
+    // A succeeded PaymentIntent carrying a valid token reaches the token read in
+    // provisionPaidIntent — getDatabase() is unavailable in this unit env, so it
+    // throws, standing in for a real transient RTDB failure in prod.
     const raw = JSON.stringify({
-      type: "checkout.session.completed",
-      data: { object: { payment_link: "plink_test", payment_status: "paid" } },
+      type: "payment_intent.succeeded",
+      data: { object: { id: "pi_test", amount: 150000, currency: "ils", metadata: { token: HEX_TOKEN } } },
     });
     const { status } = await postWebhook(raw, sign(raw, SECRET, nowS()));
-    // Pre-fix: the handler swallowed the error and returned 200 received:true,
-    // so Stripe never retried and the payment was lost. Must be 5xx now.
+    // Must be 5xx so Stripe re-delivers (provisioning is idempotent on retry).
     expect(status).toBeGreaterThanOrEqual(500);
   });
 
@@ -119,10 +122,10 @@ describe("POST /webhook ack semantics", () => {
     expect(json.received).toBe(true);
   });
 
-  it("acks 200 for a completed-but-unpaid session (nothing to write)", async () => {
+  it("acks 200 for a succeeded intent with no token metadata (nothing to provision)", async () => {
     const raw = JSON.stringify({
-      type: "checkout.session.completed",
-      data: { object: { payment_link: "plink_test", payment_status: "unpaid" } },
+      type: "payment_intent.succeeded",
+      data: { object: { id: "pi_x", amount: 150000, currency: "ils", metadata: {} } },
     });
     const { status, json } = await postWebhook(raw, sign(raw, SECRET, nowS()));
     expect(status).toBe(200);
@@ -131,8 +134,8 @@ describe("POST /webhook ack semantics", () => {
 
   it("rejects a forged signature with 400 (never reaches processing)", async () => {
     const raw = JSON.stringify({
-      type: "checkout.session.completed",
-      data: { object: { payment_link: "plink_test", payment_status: "paid" } },
+      type: "payment_intent.succeeded",
+      data: { object: { id: "pi_test", amount: 150000, currency: "ils", metadata: { token: HEX_TOKEN } } },
     });
     const { status } = await postWebhook(raw, "t=123,v1=deadbeef");
     expect(status).toBe(400);
