@@ -79,6 +79,37 @@ export function loadStoredTokens() {
 }
 
 /**
+ * Async variant of loadStoredTokens for platforms whose storage adapter is
+ * asynchronous (React Native / expo-secure-store). Awaits each read so the
+ * in-memory state is fully hydrated before the first authed request.
+ *
+ * Web keeps using the sync loadStoredTokens(); native callers MUST await this
+ * once at boot (before any service import that reads tokens) and must NOT also
+ * call the sync variant (which would read Promises off the async adapter).
+ */
+export async function loadStoredTokensAsync() {
+  try {
+    const s = getStorage();
+    const [idToken, refreshToken, expiresAtRaw, uid] = await Promise.all([
+      s.getItem(STORAGE_KEY_ID_TOKEN),
+      s.getItem(STORAGE_KEY_REFRESH_TOKEN),
+      s.getItem(STORAGE_KEY_EXPIRES_AT),
+      s.getItem(STORAGE_KEY_UID),
+    ]);
+    memoryState = {
+      idToken: idToken || null,
+      refreshToken: refreshToken || null,
+      expiresAt: parseInt(expiresAtRaw || "0", 10) || 0,
+      uid: uid || null,
+    };
+    log("tokenManager: loaded stored tokens (async)", { uid: memoryState.uid });
+    if (memoryState.refreshToken) scheduleRefresh();
+  } catch (err) {
+    logErr("tokenManager.loadStoredTokensAsync", err);
+  }
+}
+
+/**
  * Persist a token set after login or refresh. The expiresAt is computed
  * once and reused on every subsequent getIdToken() check — never trust
  * the locally-cached idToken past expiresAt.
