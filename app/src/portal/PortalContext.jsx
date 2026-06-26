@@ -34,6 +34,10 @@ function normalizeUser(u) {
     displayName: u.displayName ?? null,
     phoneE164: u.phoneE164 ?? null,
     mustChangePassword: u.mustChangePassword === true,
+    // Feature flags (default ON when the server omits them), matching the web
+    // auth service. Dashboard stats + the Guests status-badge lock gate on these.
+    canSeeAttendance: u.canSeeAttendance !== false,
+    canUsePhotographer: u.canUsePhotographer !== false,
     claims: u.claims ?? { role: u.role, username: u.username },
   };
 }
