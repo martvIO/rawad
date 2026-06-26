@@ -2,40 +2,13 @@
 // No top nav: the page reads as a pure editorial composition.
 // Language toggle floats as a discreet chip top-right.
 // Portal CTA is woven through hero / showcase / pricing / CTA / footer.
-import { useState, useEffect, lazy, Suspense } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { BrandLogo } from "../components/BrandLogo.jsx";
 import { Icon } from "../components/icons/Icon.jsx";
 import { C } from "../styles/theme.js";
 import { fetchPublicSettings } from "../services/publicSettings.js";
 import { resolveContact, buildWhatsAppUrl, mailtoUrl } from "../utils/contact.js";
-import { useDeviceCapability } from "../hooks/useDeviceCapability.js";
-import { getDigitalTheme } from "../styles/digitalThemes.js";
-import { celDowngraded, markCelDowngraded } from "../components/digital/celestial/downgradeStore.js";
-
-// Shared celestial particle engine, reused as the marketing hero backdrop.
-// Lazy so the three.js chunk only loads for capable visitors (and never on the
-// pages that don't use it). Falls back to nothing — the CSS hero is complete.
-const LazyCelestialCanvas = lazy(() => import("../components/digital/celestial/CelestialCanvas.jsx"));
-
-function HeroCelestial() {
-  const cap = useDeviceCapability();
-  // Share the session downgrade flag with the invite path, so a device already
-  // proven too slow doesn't re-mount the WebGL world on every return to "/".
-  const [dead, setDead] = useState(celDowngraded);
-  if (cap.tier < 1 || dead) return null;
-  return (
-    <Suspense fallback={null}>
-      <LazyCelestialCanvas
-        theme={getDigitalTheme("gold")}
-        mode="landing"
-        fixed={false}
-        tier={cap.tier}
-        onFpsDowngrade={() => { markCelDowngraded(); setDead(true); }}
-      />
-    </Suspense>
-  );
-}
 
 // ── Scroll position hook ────────────────────────────────────────────────────
 function useScrollPos() {
@@ -203,7 +176,6 @@ const PageStyles = () => (
     @keyframes dawa-hero-rise   { from { opacity: 0; transform: translateY(28px); } to { opacity: 1; transform: none; } }
     @keyframes dawa-hero-shimmer { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
     @keyframes dawa-float-y { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
-    @keyframes dawa-phone-float { 0%,100% { transform: translateY(0) rotate(0); } 50% { transform: translateY(-8px) rotate(-.5deg); } }
     @keyframes dawa-shimmer { 0% { background-position: -240px 0; } 100% { background-position: 240px 0; } }
 
     @media (prefers-reduced-motion: reduce) {
@@ -362,24 +334,6 @@ function HeroSection({ t, lang, onEnterPortal, onContact, openSample, scrollY })
           "radial-gradient(ellipse 70% 55% at 50% 30%, rgba(201,168,76,.14) 0%, transparent 60%)," +
           "radial-gradient(ellipse 60% 50% at 50% 90%, rgba(201,168,76,.06) 0%, transparent 70%)",
       }} />
-      <HeroCelestial />
-      {[260, 420, 600, 820, 1040].map((s, i) => (
-        <div key={i} aria-hidden="true" style={{
-          position: "absolute", width: s, height: s, borderRadius: "50%",
-          border: "1px solid rgba(201,168,76,.05)",
-          top: "50%", left: "50%", transform: "translate(-50%,-50%)",
-          opacity, animation: `dawa-hero-fade-in 1.${i + 4}s ease both`,
-        }} />
-      ))}
-
-      <div aria-hidden="true" style={{
-        position: "absolute", top: "22%", insetInlineEnd: "10%",
-        opacity: opacity * 0.55,
-        animation: "dawa-float-y 6s 1s ease-in-out infinite",
-      }}>
-        <span style={{ fontSize: 36, color: "#c9a84c" }}>✦</span>
-      </div>
-
       <div style={{ position: "relative", transform: `translateY(${-parallax * 0.4}px)`, opacity }}>
         <div style={{
           fontSize: 11, color: "#f0c84c", fontWeight: 800,
@@ -854,7 +808,6 @@ function ShowcaseSection({ t, openSample }) {
               "0 40px 80px -20px rgba(0,0,0,.7), " +
               "0 0 0 1px rgba(201,168,76,.22), " +
               "0 0 80px rgba(201,168,76,.20)",
-            animation: "dawa-phone-float 6s ease-in-out infinite",
           }}>
             <div style={{
               width: "100%", height: "100%",

@@ -9,7 +9,7 @@
 // component owns no token / auth state — that lives in the route wrapper.
 import { useEffect,useMemo,useRef } from "react";
 import { getDigitalTheme, getDigitalFont } from "../../styles/digitalThemes.js";
-import { DEFAULT_EYEBROW, DEFAULT_MEAL_OPTIONS } from "../../data/digitalInviteDefaults.js";
+import { DEFAULT_EYEBROW, DEFAULT_BLESSING, DEFAULT_WELCOME, DEFAULT_MEAL_OPTIONS } from "../../data/digitalInviteDefaults.js";
 import { localize, localizeItems, localizeList } from "../../utils/localize.js";
 import { ensureDigitalFonts } from "../../utils/digitalFonts.js";
 import { LangToggle, SorekButton } from "./inviteShared.jsx";
@@ -129,6 +129,18 @@ export function DigitalInvitationView({
     : "";
   const venueLine = [venue, venueCity].filter(Boolean).join(" · ");
 
+  // ── Envelope-card content ────────────────────────────────────────────────
+  // The cinematic card shows the couple's names in BOTH scripts (it's the
+  // universal element), with the blessing + welcome + date in the guest's
+  // current language. Names join groom-first with the "و" / "ו" connective,
+  // matching the hero + 2D fallback.
+  const namesAr = [localize(design?.groomDisplayName, "ar"), localize(design?.brideName, "ar")]
+    .map((s) => s.trim()).filter(Boolean).join(" و ");
+  const namesHe = [localize(design?.groomDisplayName, "he"), localize(design?.brideName, "he")]
+    .map((s) => s.trim()).filter(Boolean).join(" ו");
+  const blessing = localize(design?.blessing, lang).trim() || (lang === "he" ? DEFAULT_BLESSING.he : DEFAULT_BLESSING.ar);
+  const welcome = localize(design?.welcome, lang).trim() || (lang === "he" ? DEFAULT_WELCOME.he : DEFAULT_WELCOME.ar);
+
   // Scroll-reveal: animate `.dawa-inv-reveal` blocks in as they enter view on
   // the public page. In preview (or without IntersectionObserver) reveal them
   // all immediately so nothing is ever stuck hidden behind the editor.
@@ -190,6 +202,12 @@ export function DigitalInvitationView({
         groomName={groomName}
         brideName={brideName}
         monogram={monogram}
+        namesAr={namesAr}
+        namesHe={namesHe}
+        eyebrow={eyebrow}
+        blessing={blessing}
+        welcome={welcome}
+        dateText={dateText}
       />
 
       <Hero

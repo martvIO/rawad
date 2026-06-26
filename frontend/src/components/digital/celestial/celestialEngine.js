@@ -14,6 +14,13 @@ import { buildEnvelope } from "./envelopeMesh.js";
 
 const easeInOut = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 
+// The premium envelope reveal is framed with a telephoto fov for an intimate,
+// cinematic look; the scene resumes the wide fov as the camera glides back into
+// the starfield. The reveal maps t∈[0,1] onto OPEN_DURATION "seconds".
+const SCENE_FOV = 62;
+const ENV_FOV = 34;
+const OPEN_DURATION = 4.8;
+
 // Particle count + pixel-ratio cap + base mote size per capability tier.
 const TIERS = {
   1: { count: 1700, dpr: 1, size: 1.0 },
@@ -59,13 +66,25 @@ export function createCelestialWorld(canvas, opts = {}) {
   const renderer = new THREE.WebGLRenderer({
     canvas,
     alpha: true, // composite over the existing DOM background + damask
-    antialias: false,
+    // AA only when the premium PBR envelope will play (crisp foil edges + card);
+    // off on the common particle-only path to save fill-rate.
+    antialias: !!envelope,
     premultipliedAlpha: false,
     powerPreference: tier >= 3 ? "high-performance" : "default",
     failIfMajorPerformanceCaveat: false,
   });
   renderer.setClearColor(0x000000, 0);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, cfg.dpr));
+  if ("outputColorSpace" in renderer && THREE.SRGBColorSpace) renderer.outputColorSpace = THREE.SRGBColorSpace;
+  // ACES filmic tone-mapping ONLY while a premium envelope is present — it gives
+  // the wax/foil speculars their highlight rolloff. The particle ShaderMaterial
+  // is toneMapped:false (set below) so it is unaffected either way; non-envelope
+  // pages stay byte-identical (NoToneMapping). Set once at construction — never
+  // toggled at runtime (that would force a material recompile hitch).
+  if (envelope && THREE.ACESFilmicToneMapping !== undefined) {
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.0;
+  }
   // During the envelope intro the canvas paints an OPAQUE themed background (and
   // is elevated above the DOM hero by the host) so the sealed envelope covers
   // the page like the old 2D overlay; on hand-off it fades back to transparent
@@ -73,7 +92,7 @@ export function createCelestialWorld(canvas, opts = {}) {
   const bgColor = new THREE.Color().setRGB(...startUniforms.bg);
 
   const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(62, 1, 0.1, 400);
+  const camera = new THREE.PerspectiveCamera(SCENE_FOV, 1, 0.1, 400);
   camera.position.set(0, 0, 60);
 
   const material = new THREE.ShaderMaterial({
@@ -91,10 +110,15 @@ export function createCelestialWorld(canvas, opts = {}) {
     depthWrite: false,
     depthTest: false,
     blending: startUniforms.isLight ? THREE.NormalBlending : THREE.AdditiveBlending,
+    // The FRAG writes gl_FragColor directly (no tonemapping chunk), so ACES never
+    // touches the motes — pin it so a future chunk-based refactor can't change that.
+    toneMapped: false,
   });
 
   const geometry = buildGeometry(cfg.count);
   const points = new THREE.Points(geometry, material);
+  // Always paint the particle field first; the depth-tested envelope draws over it.
+  points.renderOrder = -10;
   scene.add(points);
 
   // ── live input read by the loop ──────────────────────────────────────────
@@ -116,8 +140,9 @@ export function createCelestialWorld(canvas, opts = {}) {
   // mode: "scroll" (normal scene) | "envelope" (sealed, framed) | "opening"
   // (animating open) | "glide" (camera pulls back into the scene). The scroll
   // ref is IGNORED unless mode === "scroll", so the two camera drivers never
-  // fight. The envelope (z=0) is framed from ~14 units away.
-  const ENV_FRAME_Z = 14;
+  // fight. While framing/opening, the camera pose comes from the envelope itself
+  // (env.framePose / env.setOpen return {y,z,lookAtY}); the engine just applies
+  // it (and a telephoto fov). On glide it blends back to the wide scene pose.
   let mode = "scroll";
   let env = null;
   let openT = 0;
@@ -126,6 +151,8 @@ export function createCelestialWorld(canvas, opts = {}) {
   let holdUntil = 0;
   let onRevealCb = null;
   let onCompleteCb = null;
+  let lastLookY = 0;
+  let glideFrom = { z: 60, y: 0, lookY: 0, fov: ENV_FOV };
 
   // FPS guard: degrade one step, then fall back to the 2D floor entirely.
   // QA/automation can set window.__DAWA_CEL_NOGUARD to keep the world mounted
@@ -165,6 +192,10 @@ export function createCelestialWorld(canvas, opts = {}) {
     const fps = (frames * 1000) / elapsed;
     frames = 0;
     windowStart = now;
+    // Never degrade/fall back during the envelope reveal — the heavy PBR + bursts
+    // are expected, and the tier≥2 gate upstream already protects weak devices.
+    // (A genuine GPU context-loss still bails via onContextLost, independently.)
+    if (mode !== "scroll") { lowStreak = 0; return; }
     // Only judge FPS when this tab is the active, FOREGROUND render target.
     // Occluded / blurred / battery-throttled tabs run rAF slowly without the
     // GPU being the bottleneck — counting those would wrongly demote a capable
@@ -201,16 +232,22 @@ export function createCelestialWorld(canvas, opts = {}) {
     }
   }
 
-  function advanceOpen(now, dt) {
-    openT = Math.min(1, openT + dt * 0.6);
-    if (env) env.setOpen(openT);
-    if (!revealFired && openT >= 0.62) {
+  // openT is advanced in frame() (it needs dt + drives the pose). This only
+  // handles the reveal-fire (fade the sealed DOM hint) and the hold → glide
+  // hand-off, capturing the camera pose to blend FROM as the glide starts.
+  function advanceOpen(now) {
+    const revealAt = env && env.REVEAL_AT != null ? env.REVEAL_AT : 0.18;
+    if (!revealFired && openT >= revealAt) {
       revealFired = true;
       if (onRevealCb) onRevealCb();
     }
     if (openT >= 1) {
-      if (holdUntil === 0) holdUntil = now + 850; // hold on the reveal, then glide
-      else if (now >= holdUntil) { mode = "glide"; glideT = 0; }
+      if (holdUntil === 0) holdUntil = now + 320; // brief hold on the light, then glide
+      else if (now >= holdUntil) {
+        glideFrom = { z: cam.z, y: cam.y, lookY: lastLookY, fov: ENV_FOV };
+        mode = "glide";
+        glideT = 0;
+      }
     }
   }
 
@@ -226,44 +263,57 @@ export function createCelestialWorld(canvas, opts = {}) {
 
     const driftX = Math.sin(t * 0.18) * 2.2;
     const driftY = Math.cos(t * 0.13) * 1.6;
-    let px = interactive ? input.pointerRef.current[0] * 7 + input.tiltRef.current[0] * 9 : 0;
-    let py = interactive ? input.pointerRef.current[1] * 7 + input.tiltRef.current[1] * 9 : 0;
+    const px = interactive ? input.pointerRef.current[0] * 7 + input.tiltRef.current[0] * 9 : 0;
+    const py = interactive ? input.pointerRef.current[1] * 7 + input.tiltRef.current[1] * 9 : 0;
+    const asp = camera.aspect || 1;
 
-    let camTargetZ;
-    let lookAtZ;
+    // Per-mode camera target: position (tx,ty,tz), lookAt (lx,ly,lz), fov, clearA.
+    let tx, ty, tz, lx, ly, lz, fov, clearA, posEase;
+
     if (mode === "scroll") {
       // Normal scene: scroll flies forward; ambient drift + parallax keep it alive.
-      camTargetZ = interactive ? 60 - input.scrollRef.current * 72 : 56 + Math.sin(t * 0.1) * 4;
-      lookAtZ = null; // → cam.z - 45
+      tz = interactive ? 60 - input.scrollRef.current * 72 : 56 + Math.sin(t * 0.1) * 4;
+      tx = driftX + px; ty = driftY + py;
+      lx = cam.x * 0.25; ly = cam.y * 0.25; lz = cam.z - 45;
+      fov = SCENE_FOV; clearA = 0; posEase = 0.06;
     } else {
-      // Envelope framing (scroll ignored). Gentler parallax while framed.
-      px *= 0.4;
-      py *= 0.4;
-      if (mode === "opening") advanceOpen(now, dt);
+      // Envelope framing (scroll ignored). Gentle parallax while framed.
+      const gpx = px * 0.25, gpy = py * 0.25;
       if (mode === "glide") {
-        glideT = Math.min(1, glideT + dt * 0.55);
+        glideT = Math.min(1, glideT + dt * 0.5);
+        const g = easeInOut(glideT);
+        tz = glideFrom.z + (60 - glideFrom.z) * g;
+        tx = driftX * g + gpx;
+        ty = glideFrom.y * (1 - g) + (driftY + gpy) * g;
+        lx = cam.x * 0.25 * g;
+        ly = glideFrom.lookY * (1 - g) + cam.y * 0.25 * g;
+        lz = (cam.z - 45) * g;
+        fov = glideFrom.fov + (SCENE_FOV - glideFrom.fov) * g;
+        clearA = 1 - g; posEase = 0.1;
         if (glideT >= 1) finishGlide();
+      } else {
+        // "envelope" (sealed) or "opening" — the pose comes from the envelope.
+        if (mode === "opening") openT = Math.min(1, openT + dt / OPEN_DURATION);
+        const pose = mode === "opening"
+          ? env.setOpen(openT, ENV_FOV, asp)
+          : env.framePose(ENV_FOV, asp);
+        tz = pose.z; tx = gpx; ty = pose.y + gpy;
+        lx = cam.x * 0.1; ly = pose.lookAtY; lz = 0;
+        fov = ENV_FOV; clearA = 1; posEase = mode === "opening" ? 0.2 : 0.12;
+        if (mode === "opening") advanceOpen(now);
       }
-      const g = easeInOut(glideT); // 0 while framing/opening, ramps during glide
-      camTargetZ = ENV_FRAME_Z + (60 - ENV_FRAME_Z) * g;
-      lookAtZ = 0 * (1 - g) + (camTargetZ - 45) * g;
+      lastLookY = ly;
     }
 
-    const ease = mode === "scroll" ? 0.06 : 0.08;
-    cam.x += (driftX + px - cam.x) * 0.045;
-    cam.y += (driftY + py - cam.y) * 0.045;
-    cam.z += (camTargetZ - cam.z) * ease;
+    const exy = mode === "scroll" ? 0.045 : posEase;
+    cam.x += (tx - cam.x) * exy;
+    cam.y += (ty - cam.y) * exy;
+    cam.z += (tz - cam.z) * posEase;
     camera.position.set(cam.x, cam.y, cam.z);
-    camera.lookAt(cam.x * 0.25, cam.y * 0.25, lookAtZ === null ? cam.z - 45 : lookAtZ);
+    camera.lookAt(lx, ly, lz);
+    if (Math.abs(camera.fov - fov) > 0.01) { camera.fov = fov; camera.updateProjectionMatrix(); }
 
-    // Opaque themed background while framing/opening the envelope; fade to
-    // transparent across the glide so the DOM hero shows through; fully
-    // transparent in the normal scene.
-    let clearA = 0;
-    if (mode === "envelope" || mode === "opening") clearA = 1;
-    else if (mode === "glide") clearA = 1 - easeInOut(glideT);
     renderer.setClearColor(bgColor, clearA);
-
     renderer.render(scene, camera);
     checkFps(now);
   }
@@ -275,11 +325,17 @@ export function createCelestialWorld(canvas, opts = {}) {
 
   function finishGlide() {
     mode = "scroll";
+    camera.fov = SCENE_FOV;
+    camera.updateProjectionMatrix();
     if (env) {
       scene.remove(env.group);
       env.dispose();
       env = null;
     }
+    // Re-prime the FPS window so the heavy reveal isn't blamed on the steady scene.
+    windowStart = performance.now();
+    frames = 0;
+    lowStreak = 0;
     if (onCompleteCb) {
       const cb = onCompleteCb;
       onCompleteCb = null;
@@ -289,14 +345,28 @@ export function createCelestialWorld(canvas, opts = {}) {
 
   function enterEnvelope() {
     if (!envelope || env || disposed) return;
-    env = buildEnvelope({ colors: envelope.colors, monogram: envelope.monogram });
+    env = buildEnvelope({
+      colors: envelope.colors,
+      monogram: envelope.monogram,
+      content: envelope.content,
+    });
     env.group.position.set(0, 0, 0);
     scene.add(env.group);
     mode = "envelope";
     openT = 0;
     revealFired = false;
     holdUntil = 0;
-    cam = { x: 0, y: 0, z: ENV_FRAME_Z }; // snap to the framing pose (no flash)
+    // Snap the camera + telephoto fov to the sealed framing pose (no flash).
+    camera.fov = ENV_FOV;
+    camera.updateProjectionMatrix();
+    const pose = env.framePose(ENV_FOV, camera.aspect || 1);
+    cam = { x: 0, y: pose.y, z: pose.z };
+    lastLookY = pose.lookAtY;
+    // Re-bake the card calligraphy once the wedding fonts finish loading (canvas
+    // text silently falls back to a default face until then).
+    if (env.refreshCard && typeof document !== "undefined" && document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(() => { if (env && env.refreshCard) env.refreshCard(); }).catch(() => {});
+    }
   }
 
   function openEnvelope(cbs) {

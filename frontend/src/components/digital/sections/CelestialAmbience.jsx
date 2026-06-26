@@ -4,7 +4,7 @@ import { EnvelopeIntro } from "./EnvelopeIntro.jsx";
 import { CelestialEnvelopeOverlay } from "./CelestialEnvelopeOverlay.jsx";
 import { useDeviceCapability } from "../../../hooks/useDeviceCapability.js";
 import { celDowngraded, markCelDowngraded } from "../celestial/downgradeStore.js";
-import { themeToUniforms } from "../../../utils/themeToUniforms.js";
+import { themeToEnvelopePalette } from "../../../utils/themeToEnvelopePalette.js";
 
 // Single owner of the invitation's backdrop AND intro envelope. It decides,
 // per device capability and the groom's flags:
@@ -25,6 +25,7 @@ function markOpened() {
 export function CelestialAmbience({
   theme, font, lang, mode = "public", fixed = true, immersive3d = true,
   showEnvelope = false, guestName = "", groomName = "", brideName = "", monogram = "",
+  blessing = "", welcome = "", namesAr = "", namesHe = "", eyebrow = "", dateText = "",
 }) {
   const cap = useDeviceCapability();
   const [downgraded, setDowngraded] = useState(celDowngraded);
@@ -45,7 +46,10 @@ export function CelestialAmbience({
   }, []);
 
   const wantWebGL = immersive3d && cap.tier >= 1 && !downgraded && !reduceMotion;
-  const doEnvelope = !!showEnvelope && !opened && wantWebGL;
+  // The PREMIUM 3D envelope reveal is heavy (PBR + AA + bursts) — gate it to
+  // capable devices (tier ≥ 2). Tier-1 keeps the particle backdrop but gets the
+  // lighter 2D envelope; no-WebGL / reduced-motion get the 2D floor + 2D envelope.
+  const doEnvelope = !!showEnvelope && !opened && wantWebGL && cap.tier >= 2;
 
   // Latch "this mount is running the 3D envelope" at first render. `opened` flips
   // true on hand-off (for future visits), so we must NOT key the overlay/elevated
@@ -55,13 +59,17 @@ export function CelestialAmbience({
   const envActive = envActiveRef.current && phase !== "gone";
 
   // Lock page scroll while the 3D envelope is on screen, so the scroll-driven
-  // camera (resumed after hand-off) can't be desynced mid-sequence.
+  // camera (resumed after hand-off) can't be desynced mid-sequence. Also gate on
+  // `wantWebGL`: if it flips false mid-reveal (mid-session reduced-motion toggle,
+  // or a GPU context-loss → downgrade), the WebGL path unmounts and `phase`
+  // freezes — so we must release the lock here rather than wait for a "gone" that
+  // can never arrive, or the page would stay permanently unscrollable.
   useEffect(() => {
-    if (!envActive) return undefined;
+    if (!envActive || !wantWebGL) return undefined;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = prev; };
-  }, [envActive]);
+  }, [envActive, wantWebGL]);
 
   // After the hand-off completes, fade the overlay out then unmount it.
   useEffect(() => {
@@ -86,6 +94,13 @@ export function CelestialAmbience({
   };
 
   if (wantWebGL) {
+    const envelopePayload = envActiveRef.current
+      ? {
+          colors: themeToEnvelopePalette(theme),
+          monogram,
+          content: { namesAr, namesHe, blessing, welcome, eyebrow, date: dateText },
+        }
+      : null;
     return (
       <>
         <Suspense fallback={<Ambience theme={theme} fixed={fixed} />}>
@@ -95,7 +110,7 @@ export function CelestialAmbience({
             fixed={fixed}
             tier={cap.tier}
             onFpsDowngrade={onFpsDowngrade}
-            envelope={envActiveRef.current ? { colors: themeToUniforms(theme), monogram } : null}
+            envelope={envelopePayload}
             onReady={(w) => { worldRef.current = w; }}
             elevated={envActive}
           />
@@ -112,6 +127,21 @@ export function CelestialAmbience({
             onOpen={onOpen}
           />
         )}
+        {/* Tier-1 capable of the particle world but NOT the premium reveal → the
+            lighter 2D wax-seal envelope rides over the particle backdrop. */}
+        {showEnvelope && !opened && !envActiveRef.current && (
+          <EnvelopeIntro
+            guestName={guestName}
+            groomName={groomName}
+            brideName={brideName}
+            monogram={monogram}
+            blessing={blessing}
+            welcome={welcome}
+            theme={theme}
+            font={font}
+            lang={lang}
+          />
+        )}
       </>
     );
   }
@@ -126,6 +156,8 @@ export function CelestialAmbience({
           groomName={groomName}
           brideName={brideName}
           monogram={monogram}
+          blessing={blessing}
+          welcome={welcome}
           theme={theme}
           font={font}
           lang={lang}

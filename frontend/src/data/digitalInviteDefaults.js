@@ -4,6 +4,15 @@
 
 export const DEFAULT_EYEBROW = { ar: "دعوة شخصية", he: "הזמנה אישית" };
 
+// Shown on the cinematic envelope card (and the 2D fallback envelope): a short
+// blessing line above the couple's names, and a warm welcome line below them.
+// Both are localized {ar, he} and fully editable by the groom.
+export const DEFAULT_BLESSING = { ar: "على بركة الله", he: "בשעה טובה ומוצלחת" };
+export const DEFAULT_WELCOME = {
+  ar: "بكل الحبّ، ندعوكم لمشاركتنا فرحنا",
+  he: "באהבה רבה, אנו מזמינים אתכם לחגוג איתנו",
+};
+
 export const DEFAULT_MEAL_OPTIONS = {
   ar: ["لحم", "دجاج", "سمك", "نباتي"],
   he: ["בשר", "עוף", "דג", "צמחוני"],
