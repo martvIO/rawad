@@ -35,6 +35,12 @@ const MAX_RANK_ITEMS = 32;
 const MAX_RANK_LEN = 60;
 const CYCLE = ["pending", "attending", "absent"];
 
+// Upload progress uses XMLHttpRequest.upload (the apiClient XHR path), which is
+// unreliable on RN/Android. Default OFF → the robust `fetch` path (no progress)
+// + the pending-tile spinner. Flip to true AFTER verifying xhr.upload progress
+// fires on a real Android + iOS device (the on-device upload spike).
+const ENABLE_UPLOAD_PROGRESS = false;
+
 export function guestStatus(g) {
   return g?.status === "attending" || g?.status === "absent" ? g.status : "pending";
 }
@@ -231,7 +237,10 @@ export function DigitalProvider({ children }) {
           addInvitationMedia(
             uid,
             { uri: f.uri, name: f.name || `upload_${i}.jpg`, type: f.type || "image/jpeg" },
-            { signal: ctrl.signal, onProgress: onFileProgress(i) },
+            {
+              signal: ctrl.signal,
+              ...(ENABLE_UPLOAD_PROGRESS ? { onProgress: onFileProgress(i) } : {}),
+            },
           ),
         ),
       );

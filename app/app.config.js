@@ -24,7 +24,18 @@ export default {
       backgroundColor: "#07070a",
       adaptiveIcon: { backgroundColor: "#07070a" },
     },
-    plugins: ["expo-router", "expo-secure-store", "expo-font"],
+    plugins: [
+      "expo-router",
+      "expo-secure-store",
+      "expo-font",
+      [
+        "expo-image-picker",
+        {
+          photosPermission:
+            "تتيح لك دعوة اختيار صور وفيديوهات من معرض هاتفك لرفعها إلى دعوتك.",
+        },
+      ],
+    ],
     experiments: { typedRoutes: false },
     extra: {
       // Absolute Cloud Run URLs (native fetch sends no Origin, so CORS passes).
