@@ -7,7 +7,7 @@ import { webcrypto } from "node:crypto";
 // Mock tokenManager BEFORE importing apiClient so the apiClient picks up the
 // mocked exports. The mock returns a fresh object that the tests reach into
 // via the imported handles below.
-vi.mock("../../utils/tokenManager.js", () => ({
+vi.mock("@dawa/core/utils/tokenManager.js", () => ({
   getIdToken: vi.fn(),
   refreshIdToken: vi.fn(),
   clearTokens: vi.fn(),
@@ -16,13 +16,13 @@ vi.mock("../../utils/tokenManager.js", () => ({
 
 // Pin the API base so assertions don't depend on whatever VITE_API_BASE_URL
 // happens to be in the developer's .env (vitest loads it like Vite does).
-vi.mock("../../config/index.js", async (importOriginal) => {
+vi.mock("@dawa/core/config/index.js", async (importOriginal) => {
   const actual = await importOriginal();
   return { ...actual, API_BASE_URL: "/api" };
 });
 
 import { api, ApiError, buildApiUrl, setAuthChangeCallback } from "../../utils/apiClient.js";
-import * as tokenMgr from "../../utils/tokenManager.js";
+import * as tokenMgr from "@dawa/core/utils/tokenManager.js";
 import { resetPublicKeyCache } from "../../utils/passwordCrypto.js";
 
 function jsonResponse(status, body) {
