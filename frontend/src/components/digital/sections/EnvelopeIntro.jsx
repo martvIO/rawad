@@ -1,9 +1,11 @@
 import { useState } from "react";
+import { BRAND_ICON_SVG } from "../../../assets/brandSvg.js";
 
 // 2D wax-seal envelope — the fallback intro for devices that don't run the 3D
 // WebGL envelope (weak GPU / no WebGL / reduced-motion / immersive3d off). Tap
 // cracks the seal and reveals the couple's names, then fades into the hero.
-function EnvelopeIntro({ guestName, groomName = "", brideName = "", monogram = "", blessing = "", welcome = "", theme, font, lang }) {
+// The seal carries the gold دعوة brand emblem (parity with the 3D envelope).
+function EnvelopeIntro({ guestName, groomName = "", brideName = "", blessing = "", welcome = "", theme, font, lang }) {
   const [opened, setOpened] = useState(() => {
     try { return localStorage.getItem("dawa-invite-opened") === "1"; } catch { return false; }
   });
@@ -39,7 +41,9 @@ function EnvelopeIntro({ guestName, groomName = "", brideName = "", monogram = "
             onClick={onOpen}
             onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onOpen()}
           >
-            <div className="dawa-inv-wax" aria-hidden="true">{monogram || "د"}</div>
+            <div className="dawa-inv-wax" aria-hidden="true">
+              <span className="dawa-inv-wax-logo" dangerouslySetInnerHTML={{ __html: BRAND_ICON_SVG }} />
+            </div>
           </div>
           <div className="dawa-inv-env-hint">— {lang === "he" ? "לחץ לפתיחת ההזמנה" : "اضغط لفتح الدعوة"} —</div>
           {blessing && (

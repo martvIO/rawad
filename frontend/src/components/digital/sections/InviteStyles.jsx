@@ -1,5 +1,3 @@
-import { ON_GOLD } from "../inviteShared.jsx";
-
 // ── Scoped styles (all under .dawa-inv so other surfaces are untouched) ─────────
 function ViewStyles({ theme, fixed }) {
   return (
@@ -195,9 +193,11 @@ function ViewStyles({ theme, fixed }) {
     /* Envelope */
     .dawa-inv .dawa-inv-env-overlay { position: fixed; inset: 0; z-index: 1000; background: radial-gradient(ellipse 80% 60% at 50% 35%, ${theme.accentMuted}, transparent 60%), ${theme.bg}; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 32px; transition: opacity 1.2s, transform 1.4s cubic-bezier(.2,.95,.25,1.1); }
     .dawa-inv .dawa-inv-env-overlay.is-opening { opacity: 0; transform: scale(1.05); pointer-events: none; }
-    .dawa-inv .dawa-inv-env { position: relative; width: 320px; max-width: 80vw; aspect-ratio: 1.5/1; border-radius: 14px; cursor: pointer; background: ${theme.cardBg}; border: 1px solid ${theme.accentLine}; box-shadow: 0 30px 80px -20px rgba(0,0,0,.7), 0 0 60px ${theme.accentMuted}; transition: transform .6s cubic-bezier(.2,.95,.25,1.1); }
+    .dawa-inv .dawa-inv-env { position: relative; width: 320px; max-width: 80vw; aspect-ratio: 1.5/1; border-radius: 14px; cursor: pointer; background: ${theme.cardBg}; border: 1.5px solid ${theme.accent}; box-shadow: inset 0 0 0 1px ${theme.accentLine}, inset 0 0 36px ${theme.accentMuted}, 0 30px 80px -20px rgba(0,0,0,.7), 0 0 60px ${theme.accentMuted}; transition: transform .6s cubic-bezier(.2,.95,.25,1.1); }
     .dawa-inv .dawa-inv-env:hover { transform: translateY(-6px) scale(1.02); }
-    .dawa-inv .dawa-inv-wax { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); width: 86px; height: 86px; border-radius: 50%; background: radial-gradient(circle at 30% 30%, ${theme.gradientStops[1]} 0%, ${theme.accent} 60%); display: flex; align-items: center; justify-content: center; color: ${ON_GOLD}; font-weight: 900; font-size: 36px; box-shadow: 0 8px 26px ${theme.accentMuted}, 0 0 32px ${theme.accentMuted}; animation: dawa-inv-wax 3s ease-in-out infinite; }
+    .dawa-inv .dawa-inv-wax { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); width: 92px; height: 92px; border-radius: 50%; background: radial-gradient(circle at 32% 28%, ${theme.accent} 0%, ${theme.accentLine} 55%, ${theme.bg} 100%); border: 2px solid ${theme.accent}; display: flex; align-items: center; justify-content: center; box-shadow: inset 0 1px 1px rgba(255,255,255,.25), inset 0 -2px 6px rgba(0,0,0,.5), 0 8px 26px ${theme.accentMuted}, 0 0 32px ${theme.accentMuted}; animation: dawa-inv-wax 3s ease-in-out infinite; }
+    .dawa-inv .dawa-inv-wax-logo { width: 58%; height: 58%; display: flex; align-items: center; justify-content: center; filter: drop-shadow(0 1px 1px rgba(0,0,0,.55)); }
+    .dawa-inv .dawa-inv-wax-logo svg { width: 100%; height: 100%; display: block; }
     .dawa-inv .dawa-inv-env-overlay.is-opening .dawa-inv-wax { animation: dawa-inv-crack 1s cubic-bezier(.2,.95,.25,1.1) forwards; }
     .dawa-inv .dawa-inv-env-hint { margin-top: 34px; color: ${theme.accent}; font-size: 13px; letter-spacing: 3px; text-transform: uppercase; font-style: italic; animation: dawa-inv-cue 2.6s ease-in-out infinite; }
     .dawa-inv .dawa-inv-env-name { margin-top: 22px; font-weight: 900; font-size: clamp(28px,5vw,44px); color: ${theme.text}; }

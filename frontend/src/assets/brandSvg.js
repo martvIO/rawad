@@ -1,5 +1,9 @@
 // Brand logo SVG markup. Source paths re-filled with a gold gradient matching the
 // site palette. Two variants: icon-only and icon-with-text.
+//
+// `BRAND_ICON_PATHS` exposes the icon mark's raw SVG path `d` strings so consumers
+// can draw the mark natively with Path2D (e.g. stamping it into the 3D wax-seal
+// CanvasTexture) — no <img> load and no canvas-taint risk for the WebGL upload.
 
 export const BRAND_ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg"
 	 viewBox="0 0 480 384">
@@ -520,6 +524,14 @@ M294.871155,106.413635
 	C297.891113,103.082626 305.621490,102.500732 308.552948,105.056114 
 	C310.434570,106.696358 310.923950,108.862984 309.467682,110.854660 
 	C307.367889,113.726463 305.489410,117.424210 301.110107,116.911514 
-	C297.535095,116.492966 294.856445,111.842094 294.871155,106.413635 
+	C297.535095,116.492966 294.856445,111.842094 294.871155,106.413635
 z"/>
 </svg>`;
+
+// Icon mark drawing data for native Path2D consumers (the 3D wax seal).
+export const BRAND_ICON_VIEWBOX = { w: 480, h: 384 };
+// Every `d="…"` in BRAND_ICON_SVG (the icon has no other `d` attributes), in order.
+export const BRAND_ICON_PATHS = Array.from(
+  BRAND_ICON_SVG.matchAll(/\sd="([^"]*)"/g),
+  (m) => m[1].trim(),
+);

@@ -1,14 +1,15 @@
 // Premium 3D wedding-envelope reveal, REBUILT to live inside the shared
 // celestial particle scene (one renderer — the engine owns the camera + RAF).
 // Ported from the "ultra-premium studio reveal" design (envelope3d.js): a
-// matte fiber-dyed cardstock envelope, a glossy wax seal with the couple's
-// monogram, a triangular flap that pivots 180°, and a cream gold-foil
+// jewel-tone fiber-dyed cardstock envelope with a gold-foil arabesque flap, a
+// glossy jewel-wax seal stamped with the gold دعوة brand emblem, a satin ribbon
+// band, a triangular flap that pivots 180°, and a cream gold-foil
 // invitation card (Arabic + Hebrew calligraphy baked into a CanvasTexture)
 // that rises out of the V-pocket as two gold-spark/shockwave bursts fire and
 // the structure dissolves into light.
 //
 // Contract (the engine drives the clock + applies the camera pose):
-//   const env = buildEnvelope({ colors, monogram, content })  // colors = themeToEnvelopePalette()
+//   const env = buildEnvelope({ colors, content })  // colors = themeToEnvelopePalette()
 //   scene.add(env.group)
 //   const pose = env.setOpen(t, fov, aspect)   // t∈[0,1] → all sub-easings + bursts; returns {y,z,lookAtY}
 //   const pose = env.framePose(fov, aspect)    // sealed framing (visual stays at t=0)
@@ -22,6 +23,7 @@
 // depth (depthTest/Write true) so the flap occludes the body and the card the
 // flap; the additive bursts are depthWrite:false at a high renderOrder.
 import * as THREE from "three";
+import { BRAND_ICON_PATHS, BRAND_ICON_VIEWBOX } from "../../../assets/brandSvg.js";
 
 const clamp01 = (t) => Math.max(0, Math.min(1, t));
 // Smooth ease-out used across the reveal sub-windows.
@@ -61,10 +63,10 @@ function triPanel(pts, depth, mat) {
   return new THREE.Mesh(g, mat);
 }
 
-export function buildEnvelope({ colors, monogram, content } = {}) {
+export function buildEnvelope({ colors, content } = {}) {
   const pal = {
-    foil: "#d4a07a", foilBright: "#f4d4c4", paper: "#0f0d0b",
-    wax: "#0d0d11", cardPaper: "#f9f6f0", cardInk: "#3a2412",
+    foil: "#d4a07a", foilBright: "#f4d4c4", paper: "#2a211a",
+    wax: "#4c3a2e", cardPaper: "#f9f6f0", cardInk: "#3a2412",
     ...(colors || {}),
   };
   const text = {
@@ -87,10 +89,11 @@ export function buildEnvelope({ colors, monogram, content } = {}) {
     c.width = 48; c.height = 256;
     const x = c.getContext("2d");
     const gr = x.createLinearGradient(0, 0, 0, 256);
-    gr.addColorStop(0.0, "#fff4d8"); gr.addColorStop(0.18, "#cdb079");
-    gr.addColorStop(0.5, "#1c1814"); gr.addColorStop(1.0, "#040404");
+    gr.addColorStop(0.0, "#fff7e6"); gr.addColorStop(0.16, "#e8c88e");
+    gr.addColorStop(0.40, "#3a2c1e"); gr.addColorStop(0.66, "#140f0a"); gr.addColorStop(1.0, "#030303");
     x.fillStyle = gr; x.fillRect(0, 0, 48, 256);
-    x.fillStyle = "rgba(255,250,232,0.95)"; x.fillRect(0, 22, 48, 14); // key-light streak
+    x.fillStyle = "rgba(255,250,232,0.96)"; x.fillRect(0, 20, 48, 14);  // key-light streak
+    x.fillStyle = "rgba(255,238,200,0.32)"; x.fillRect(0, 120, 48, 8);  // soft secondary catch-light
     const t = new THREE.CanvasTexture(c);
     t.mapping = THREE.EquirectangularReflectionMapping;
     setSRGB(t);
@@ -98,16 +101,23 @@ export function buildEnvelope({ colors, monogram, content } = {}) {
     return t;
   })();
 
-  // ── fine paper-grain roughness map ──
+  // ── woven-linen paper-grain roughness map ──
   const grain = (() => {
     const sz = 256, c = document.createElement("canvas");
     c.width = c.height = sz; const x = c.getContext("2d");
-    x.fillStyle = "#dadada"; x.fillRect(0, 0, sz, sz);
-    const img = x.getImageData(0, 0, sz, sz), d = img.data;
-    // Deterministic value noise (no Math.random — keeps the build replay-safe).
-    for (let i = 0, p = 0; i < d.length; i += 4, p++) {
-      const n = ((Math.sin(p * 12.9898) * 43758.5453) % 1) * 26 - 13;
-      d[i] += n; d[i + 1] += n; d[i + 2] += n;
+    const img = x.createImageData(sz, sz), d = img.data;
+    // Deterministic (no Math.random — keeps the build replay-safe): two crossed
+    // sine gratings give a tactile woven-linen weave; fine value noise breaks up
+    // the banding so it reads as high-end laid cardstock, not corduroy.
+    for (let yy = 0; yy < sz; yy++) {
+      for (let xx = 0; xx < sz; xx++) {
+        const i = (yy * sz + xx) * 4;
+        const weave = (Math.sin(xx * 0.55) + Math.sin(yy * 0.55)) * 8;
+        const p = yy * sz + xx;
+        const n = ((Math.sin(p * 12.9898) * 43758.5453) % 1) * 16 - 8;
+        const v = Math.max(0, Math.min(255, 206 + weave + n));
+        d[i] = d[i + 1] = d[i + 2] = v; d[i + 3] = 255;
+      }
     }
     x.putImageData(img, 0, 0);
     const t = new THREE.CanvasTexture(c);
@@ -125,15 +135,48 @@ export function buildEnvelope({ colors, monogram, content } = {}) {
     color: col(pal.paper, "#0f0d0b").clone().offsetHSL(0, 0, 0.03), metalness: 0.05, roughness: 1.0,
     roughnessMap: grain, envMap: env, envMapIntensity: 0.06, side: THREE.DoubleSide, transparent: true, depthWrite: true,
   });
-  const liningMat = new THREE.MeshStandardMaterial({
-    color: col(pal.foil, "#b3a384").clone().lerp(new THREE.Color("#000"), 0.25), metalness: 0.0, roughness: 0.85,
-    envMap: env, envMapIntensity: 0.3, side: THREE.FrontSide, transparent: true, depthWrite: true,
+  // Flap face — deep jewel cardstock carrying a tone-on-tone gold-foil arabesque
+  // (the foil lattice is the smooth metallic part via metalness/roughness maps).
+  const flapArab = makeArabesque({
+    bg: pal.paper, line: pal.foil, alpha: 0.34, lineW: 2.6, cells: 2, repeat: [0.5, 0.62], withMetal: true,
   });
-  const sealTex = makeSealTex(monogram, pal);
+  disposables.push(flapArab.color, flapArab.metal, flapArab.rough);
+  const flapMat = new THREE.MeshStandardMaterial({
+    color: 0xffffff, map: flapArab.color, metalnessMap: flapArab.metal, roughnessMap: flapArab.rough,
+    metalness: 1.0, roughness: 1.0, envMap: env, envMapIntensity: 0.55,
+    side: THREE.DoubleSide, transparent: true, depthWrite: true,
+  });
+
+  // Flap lining — rich satin silk in a deep contrasting tone with a faint gold
+  // arabesque; the luxury "lined envelope" reveal as the flap pivots open.
+  const silkColor = col(pal.foil, "#b3a384").clone().lerp(new THREE.Color("#15100a"), 0.5);
+  const liningArab = makeArabesque({
+    bg: "#" + silkColor.getHexString(), line: pal.foilBright, alpha: 0.16, lineW: 2.0, cells: 2, repeat: [0.55, 0.6],
+  });
+  disposables.push(liningArab.color);
+  const liningMat = new THREE.MeshPhysicalMaterial({
+    color: 0xffffff, map: liningArab.color, metalness: 0.0, roughness: 0.42,
+    sheen: 1.0, sheenColor: col(pal.foilBright, "#f4d4c4"), sheenRoughness: 0.5,
+    clearcoat: 0.25, clearcoatRoughness: 0.4, envMap: env, envMapIntensity: 0.55,
+    side: THREE.FrontSide, transparent: true, depthWrite: true,
+  });
+
+  const sealTex = makeSealTex(pal);
   disposables.push(sealTex);
+  // color:0xffffff — the jewel-tone wax is ALREADY baked into sealTex's gradient;
+  // a white base avoids double-multiplying pal.wax (which would crush the disc
+  // back toward black). Matches the cardMat/flapMat baked-map pattern.
   const waxMat = new THREE.MeshPhysicalMaterial({
-    color: col(pal.wax, "#0d0d11"), metalness: 0.0, roughness: 0.16, clearcoat: 1.0, clearcoatRoughness: 0.08,
-    envMap: env, envMapIntensity: 1.35, transparent: true, depthWrite: true, map: sealTex,
+    color: 0xffffff, metalness: 0.0, roughness: 0.16, clearcoat: 1.0, clearcoatRoughness: 0.08,
+    envMap: env, envMapIntensity: 1.5, transparent: true, depthWrite: true, map: sealTex,
+  });
+
+  // Satin ribbon band wrapping the envelope under the seal — dissolves on open.
+  const ribbonMat = new THREE.MeshPhysicalMaterial({
+    color: col(pal.foil, "#b08d5a").clone().lerp(new THREE.Color("#000"), 0.35),
+    metalness: 0.0, roughness: 0.36, sheen: 1.0, sheenColor: col(pal.foilBright, "#f4d4c4"),
+    sheenRoughness: 0.45, clearcoat: 0.4, clearcoatRoughness: 0.32,
+    envMap: env, envMapIntensity: 0.7, transparent: true, depthWrite: true,
   });
 
   const cardMaps = makeCardTextures(pal, text);
@@ -188,14 +231,32 @@ export function buildEnvelope({ colors, monogram, content } = {}) {
   const flapPivot = new THREE.Group();
   flapPivot.position.set(0, HH, Z_FLAP);
   group.add(flapPivot);
-  const flapOuter = triPanel([[-HW, 0], [HW, 0], [0, -HH]], 0.028, paperMat2);
+  const flapOuter = triPanel([[-HW, 0], [HW, 0], [0, -HH]], 0.028, flapMat);
   flapPivot.add(flapOuter);
   addEdge(flapOuter, flapOuter.geometry, 0.62);
+  // refined inset gold border framing the flap face (fades with the structure)
+  const flapBorder = new THREE.LineLoop(
+    new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(-HW * 0.86, -0.07, 0.032),
+      new THREE.Vector3(HW * 0.86, -0.07, 0.032),
+      new THREE.Vector3(0, -HH * 0.82, 0.032),
+    ]),
+    new THREE.LineBasicMaterial({ color: col(pal.foil, "#f0c84c"), transparent: true, opacity: 0.5, depthWrite: false }),
+  );
+  flapBorder.material.userData.base = 0.5; flapBorder.renderOrder = 2;
+  flapPivot.add(flapBorder); goldEdges.push(flapBorder);
   const liningShape = new THREE.Shape();
   liningShape.moveTo(-HW + 0.04, -0.04); liningShape.lineTo(HW - 0.04, -0.04); liningShape.lineTo(0, -HH + 0.06); liningShape.closePath();
   const lining = new THREE.Mesh(new THREE.ShapeGeometry(liningShape), liningMat);
   lining.position.z = -0.02; lining.rotation.y = Math.PI;
   flapPivot.add(lining);
+
+  // satin ribbon band (vertical) wrapping under the seal — in front of the flap,
+  // behind the seal; fades + slides away as the seal fractures.
+  const ribbon = new THREE.Mesh(new THREE.BoxGeometry(0.36, HH * 2 + 0.55, 0.014), ribbonMat);
+  ribbon.position.set(0, 0, Z_SEAL - 0.11);
+  ribbon.renderOrder = 2;
+  group.add(ribbon);
 
   // wax seal — two half-discs split along the flap/body seam
   const sealTop = new THREE.Mesh(new THREE.CircleGeometry(SEAL_R, 64, 0, Math.PI), waxMat);
@@ -209,10 +270,12 @@ export function buildEnvelope({ colors, monogram, content } = {}) {
   // direction-only so the group's scale doesn't affect them; the point lights
   // use decay:1 (legacy-like linear falloff) so the design's intensity numbers
   // read, with their cutoff distance scaled by S to reach the scaled geometry.
-  group.add(new THREE.AmbientLight(0x14110c, 0.14));
-  const key = new THREE.DirectionalLight(0xfff1d8, 0.92); key.position.set(5, 6.5, 5.5); group.add(key);
-  const top = new THREE.DirectionalLight(0xfff2dd, 0.1); top.position.set(0, 8, 3); group.add(top);
-  const fill = new THREE.DirectionalLight(0x4a3a28, 0.06); fill.position.set(-4, -3, 4); group.add(fill);
+  group.add(new THREE.AmbientLight(0x16130d, 0.16));
+  const key = new THREE.DirectionalLight(0xfff1d8, 1.0); key.position.set(5, 6.5, 5.5); group.add(key);
+  const top = new THREE.DirectionalLight(0xfff2dd, 0.12); top.position.set(0, 8, 3); group.add(top);
+  const fill = new THREE.DirectionalLight(0x4a3a28, 0.07); fill.position.set(-4, -3, 4); group.add(fill);
+  // warm back-rim in the theme's foil colour — lifts the gold filigree + jewel paper
+  const backRim = new THREE.DirectionalLight(col(pal.foilBright, "#f4d4c4"), 0.20); backRim.position.set(-3, 2, -5); group.add(backRim);
   const rim = new THREE.PointLight(col(pal.foilBright, "#f0c84c"), 0.0, 24 * S, 1); rim.position.set(0, 0.2, 2.4); group.add(rim);
   const sealGlow = new THREE.PointLight(col(pal.foilBright, "#f0c84c"), 0.0, 6 * S, 1); sealGlow.position.set(0, 0, 0.9); group.add(sealGlow);
 
@@ -237,6 +300,13 @@ export function buildEnvelope({ colors, monogram, content } = {}) {
     sealBot.position.y = -0.05 * frac;
     sealBot.rotation.z = 0.18 * frac;
 
+    // ribbon releases mid seal-fracture and is gone (~T=0.37) just as the flap
+    // pivot begins (T=0.35), so a translucent band never overlaps the opening flap.
+    const ribbonFade = 1 - ease(clamp01((T - 0.02) / 0.33));
+    ribbonMat.opacity = ribbonFade;
+    ribbon.position.y = -0.18 * frac;
+    ribbon.visible = ribbonFade > 0.01;
+
     cardPivot.position.y = CARD_BASE_Y + RISE * rise;
     cardPivot.position.z = 0.6 * rise;
 
@@ -245,7 +315,7 @@ export function buildEnvelope({ colors, monogram, content } = {}) {
 
     cardMat.opacity = 1 - fade;
     const ef = 1 - structFade;
-    paperMat.opacity = ef; paperMat2.opacity = ef; liningMat.opacity = ef; waxMat.opacity = ef;
+    paperMat.opacity = ef; paperMat2.opacity = ef; flapMat.opacity = ef; liningMat.opacity = ef; waxMat.opacity = ef;
     for (const e of goldEdges) e.material.opacity = (e.material.userData.base || 0.3) * ef;
 
     sealGlow.intensity = 0.5 * (1 - clamp01(T / 0.5));
@@ -323,17 +393,91 @@ export function buildEnvelope({ colors, monogram, content } = {}) {
   };
 }
 
-// ── seal texture: glossy dark wax, raised rim, debossed compass + monogram ──
-function makeSealTex(monogram, pal) {
+// ── arabesque foil pattern: an allover 8-point-star girih lattice, tone-on-tone.
+// Returns aligned color (+ optional metalness/roughness) CanvasTextures so the
+// foil lines can be the smooth metallic part of a PBR material over matte stock.
+// Deterministic (no Math.random) — keeps the build replay-safe. ──
+function makeArabesque({ bg, line, alpha = 0.3, lineW = 2.4, cells = 2, repeat = [1, 1], withMetal = false }) {
+  const s = 512;
+  const mk = () => { const c = document.createElement("canvas"); c.width = c.height = s; return c; };
+  const cc = mk(); const xc = cc.getContext("2d");
+  const mc = withMetal ? mk() : null; const xm = mc ? mc.getContext("2d") : null;
+  const rc = withMetal ? mk() : null; const xr = rc ? rc.getContext("2d") : null;
+  if (bg) { xc.fillStyle = bg; xc.fillRect(0, 0, s, s); }
+  if (xm) { xm.fillStyle = "#000"; xm.fillRect(0, 0, s, s); }          // matte (non-metal) ground
+  if (xr) { xr.fillStyle = "#e6e6e6"; xr.fillRect(0, 0, s, s); }       // rough ground
+
+  const star = (ctx, ox, oy, r, stroke, a, lw) => {
+    ctx.save();
+    ctx.globalAlpha = a; ctx.strokeStyle = stroke; ctx.lineWidth = lw;
+    ctx.lineJoin = "round"; ctx.lineCap = "round";
+    ctx.beginPath();
+    for (let i = 0; i < 16; i++) {                  // outer 8-point star
+      const ang = (i * Math.PI) / 8 - Math.PI / 2;
+      const rr = i % 2 === 0 ? r : r * 0.45;
+      const px = ox + Math.cos(ang) * rr, py = oy + Math.sin(ang) * rr;
+      i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+    }
+    ctx.closePath(); ctx.stroke();
+    ctx.beginPath();
+    for (let i = 0; i < 8; i++) {                   // inner octagon
+      const ang = (i * Math.PI) / 4;
+      const px = ox + Math.cos(ang) * r * 0.4, py = oy + Math.sin(ang) * r * 0.4;
+      i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+    }
+    ctx.closePath(); ctx.stroke();
+    ctx.restore();
+  };
+  // One motif drawn into every aligned map at once: foil on the colour map, white
+  // on the metal map (foil = metallic), dark on the rough map (foil = smooth).
+  const motif = (ox, oy, r, a, lw) => {
+    star(xc, ox, oy, r, line, a, lw);
+    if (xm) star(xm, ox, oy, r, "#fff", Math.min(1, a * 2.6), lw);
+    if (xr) star(xr, ox, oy, r, "#3a3a3a", Math.min(1, a * 2.4), lw);
+  };
+
+  const u = s / cells;
+  // Lattice nodes on the grid corners tile seamlessly under RepeatWrapping;
+  // smaller accent stars at the cell centres add density.
+  for (let gy = 0; gy <= cells; gy++) {
+    for (let gx = 0; gx <= cells; gx++) motif(gx * u, gy * u, u * 0.5, alpha, lineW);
+  }
+  for (let gy = 0; gy < cells; gy++) {
+    for (let gx = 0; gx < cells; gx++) motif(gx * u + u / 2, gy * u + u / 2, u * 0.24, alpha * 0.85, lineW * 0.8);
+  }
+
+  const tex = (canvas, srgb) => {
+    const t = new THREE.CanvasTexture(canvas);
+    if (srgb) setSRGB(t);
+    t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(repeat[0], repeat[1]);
+    return t;
+  };
+  return {
+    color: tex(cc, true),
+    metal: mc ? tex(mc, false) : null,
+    rough: rc ? tex(rc, false) : null,
+  };
+}
+
+// ── seal texture: glossy jewel-tone wax, raised rim, debossed compass + the
+// gold-foil دعوة brand emblem (drawn natively via Path2D — no <img>, no taint) ──
+function makeSealTex(pal) {
   const s = 512, c = document.createElement("canvas");
   c.width = c.height = s; const x = c.getContext("2d");
   const cx = s / 2, cy = s / 2, R = s / 2 - 6;
+  // Disc colour derived from the theme's jewel-tone wax: a lit centre falling to
+  // a darkened rim, so it reads as rich coloured sealing-wax, not a black puck.
+  const waxC = col(pal.wax, "#6c5240");
+  const cCenter = waxC.clone().lerp(new THREE.Color("#ffffff"), 0.46).getStyle();
+  const cMid = waxC.clone().lerp(new THREE.Color("#ffffff"), 0.08).getStyle();
+  const cRim = waxC.clone().lerp(new THREE.Color("#000000"), 0.42).getStyle();
   const rg = x.createRadialGradient(cx - R * 0.3, cy - R * 0.34, R * 0.05, cx, cy, R * 1.05);
-  rg.addColorStop(0, "#2c2c33"); rg.addColorStop(0.45, "#161619"); rg.addColorStop(1, "#050507");
+  rg.addColorStop(0, cCenter); rg.addColorStop(0.45, cMid); rg.addColorStop(1, cRim);
   x.fillStyle = rg; x.beginPath(); x.arc(cx, cy, R, 0, 7); x.fill();
-  x.lineWidth = 12; x.strokeStyle = "rgba(150,150,160,0.18)"; x.beginPath(); x.arc(cx, cy, R - 9, 0, 7); x.stroke();
-  x.lineWidth = 7; x.strokeStyle = "rgba(0,0,0,0.6)"; x.beginPath(); x.arc(cx, cy, R - 22, 0, 7); x.stroke();
-  // faint debossed four-point compass behind the monogram
+  // raised rim rings (warm catch-light + inner shadow)
+  x.lineWidth = 12; x.strokeStyle = "rgba(255,248,224,0.16)"; x.beginPath(); x.arc(cx, cy, R - 9, 0, 7); x.stroke();
+  x.lineWidth = 7; x.strokeStyle = "rgba(0,0,0,0.55)"; x.beginPath(); x.arc(cx, cy, R - 22, 0, 7); x.stroke();
+  // faint debossed compass behind the emblem
   const star = (rot, scale, fill) => {
     x.save(); x.translate(cx, cy); x.rotate(rot); x.beginPath();
     for (let i = 0; i < 8; i++) {
@@ -342,14 +486,32 @@ function makeSealTex(monogram, pal) {
     }
     x.closePath(); x.fillStyle = fill; x.fill(); x.restore();
   };
-  star(0, 1.0, "rgba(0,0,0,0.5)");
-  star(0, 0.96, "rgba(150,150,160,0.08)");
-  // monogram, embossed in foil
-  const mono = (monogram || "د").toString().slice(0, 4);
-  x.textAlign = "center"; x.textBaseline = "middle";
-  x.font = `900 ${Math.round(R * 0.7)}px Amiri, "Frank Ruhl Libre", Cairo, serif`;
-  x.fillStyle = "rgba(0,0,0,0.55)"; x.fillText(mono, cx, cy + R * 0.05);          // deboss shadow
-  x.fillStyle = pal.foilBright || "#f4d4c4"; x.fillText(mono, cx, cy + R * 0.03); // foil face
+  star(0, 1.0, "rgba(0,0,0,0.45)");
+  star(0, 0.96, "rgba(255,248,224,0.06)");
+
+  // The دعوة brand mark, stamped in gold foil — a dark deboss shadow under a
+  // vertically graded foil face — drawn from the icon's raw SVG paths via Path2D
+  // (no <img> load, so the canvas stays origin-clean for the WebGL texture upload).
+  const vb = BRAND_ICON_VIEWBOX;
+  const paths = BRAND_ICON_PATHS.map((d) => new Path2D(d));
+  const lw = R * 1.32, sc = lw / vb.w, lh = vb.h * sc;
+  const stampShadow = (dx, dy) => {
+    x.save(); x.translate(cx - lw / 2 + dx, cy - lh / 2 + dy); x.scale(sc, sc);
+    x.fillStyle = "rgba(0,0,0,0.5)";
+    for (const p of paths) x.fill(p);
+    x.restore();
+  };
+  stampShadow(R * 0.016, R * 0.024);
+  x.save();                                              // foil face
+  x.translate(cx - lw / 2, cy - lh / 2); x.scale(sc, sc);
+  const fg = x.createLinearGradient(0, 0, 0, vb.h);
+  fg.addColorStop(0, pal.foilBright || "#f4d4c4");
+  fg.addColorStop(0.5, pal.foil || "#d4a07a");
+  fg.addColorStop(1, pal.foilBright || "#f4d4c4");
+  x.fillStyle = fg;
+  for (const p of paths) x.fill(p);
+  x.restore();
+
   const t = new THREE.CanvasTexture(c); setSRGB(t); return t;
 }
 
@@ -490,12 +652,12 @@ function makeBurst(group, origin, N, speedScale, dotSize, palette, disposables) 
   const flash = new THREE.PointLight(0xfff0c8, 0, 18 * 3.2, 1); flash.position.set(origin.x, origin.y, origin.z + 0.5); group.add(flash);
 
   const shock = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({
-    map: ringTex, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+    map: ringTex, color: palette[0].clone(), transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
   }));
   shock.position.set(origin.x, origin.y + 0.05, origin.z + 0.02); shock.visible = false; shock.renderOrder = 10; group.add(shock);
 
   const flare = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({
-    map: glowTex, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending,
+    map: glowTex, color: palette[0].clone(), transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending,
   }));
   flare.position.set(origin.x, origin.y + 0.05, origin.z + 0.05); flare.visible = false; flare.renderOrder = 10; group.add(flare);
 
