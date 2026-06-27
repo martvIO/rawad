@@ -12,12 +12,14 @@
  * shared and cached by WhatsApp as "no image" won't recover in place (WhatsApp
  * has no public re-scrape) — re-send that one under a brand-new link.
  *
- * Auth (production): GOOGLE_APPLICATION_CREDENTIALS = repo-root service-account key.
- * Usage:
- *   GOOGLE_APPLICATION_CREDENTIALS=./dawa-aa793-firebase-adminsdk-*.json \
- *     node backend/scripts/backfill-og-cache.cjs [--base=https://invite.dawa.to] [--dry]
+ * Auth (production): uses the gitignored repo-root service-account key, like the
+ * other backend/scripts. Usage:
+ *   node backend/scripts/backfill-og-cache.cjs [--base=https://invite.dawa.to] [--dry]
  */
-const admin = require("firebase-admin");
+const path = require("path");
+// firebase-admin lives in the functions package; the key is at the repo root.
+const admin = require(path.join(__dirname, "..", "functions", "node_modules", "firebase-admin"));
+const key = require(path.join(__dirname, "..", "..", "dawa-aa793-firebase-adminsdk-fbsvc-e42554a05c.json"));
 
 const PROJECT_ID = "dawa-aa793";
 const PROD_DATABASE_URL = "https://dawa-aa793-default-rtdb.firebaseio.com";
@@ -28,16 +30,8 @@ const BASE =
 const DRY = process.argv.includes("--dry");
 const CONCURRENCY = 4;
 
-if (!process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-  console.error(
-    "[og-backfill] ERROR: set GOOGLE_APPLICATION_CREDENTIALS to the repo-root " +
-      "service-account key before running (the key is gitignored)."
-  );
-  process.exit(1);
-}
-
 admin.initializeApp({
-  credential: admin.credential.applicationDefault(),
+  credential: admin.credential.cert(key),
   projectId: PROJECT_ID,
   databaseURL: PROD_DATABASE_URL,
 });

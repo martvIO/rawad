@@ -9,28 +9,22 @@
  * Non-destructive: reads the bucket's existing lifecycle rules and only appends
  * ours when it isn't already present, so any other rules are preserved.
  *
- * Auth (production): set GOOGLE_APPLICATION_CREDENTIALS to the repo-root
- * service-account key (the gitignored dawa-aa793-firebase-adminsdk-*.json), then:
- *   GOOGLE_APPLICATION_CREDENTIALS=./dawa-aa793-firebase-adminsdk-*.json \
- *     node backend/scripts/set-og-cache-lifecycle.cjs
+ * Auth (production): uses the gitignored repo-root service-account key, exactly
+ * like the other backend/scripts. Just run:
+ *   node backend/scripts/set-og-cache-lifecycle.cjs
  */
-const admin = require("firebase-admin");
+const path = require("path");
+// firebase-admin lives in the functions package; the key is at the repo root.
+const admin = require(path.join(__dirname, "..", "functions", "node_modules", "firebase-admin"));
+const key = require(path.join(__dirname, "..", "..", "dawa-aa793-firebase-adminsdk-fbsvc-e42554a05c.json"));
 
 const PROJECT_ID = "dawa-aa793";
 const BUCKET = "dawa-aa793.firebasestorage.app"; // NOT .appspot.com — the default bucket
 const AGE_DAYS = 14;
 const PREFIX = "og-cache/";
 
-if (!process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-  console.error(
-    "[og-lifecycle] ERROR: set GOOGLE_APPLICATION_CREDENTIALS to the repo-root " +
-      "service-account key before running (the key is gitignored)."
-  );
-  process.exit(1);
-}
-
 admin.initializeApp({
-  credential: admin.credential.applicationDefault(),
+  credential: admin.credential.cert(key),
   projectId: PROJECT_ID,
   storageBucket: BUCKET,
 });
