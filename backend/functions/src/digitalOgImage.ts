@@ -9,7 +9,10 @@
 import { onRequest } from "firebase-functions/v2/https";
 import { getDatabase } from "firebase-admin/database";
 import { getFirestore } from "firebase-admin/firestore";
-import { createCanvas, loadImage, GlobalFonts } from "@napi-rs/canvas";
+import { getStorage } from "firebase-admin/storage";
+import { createHash } from "crypto";
+import type { Response } from "express";
+import type { SKRSContext2D, Image } from "@napi-rs/canvas";
 import * as fs from "fs";
 import * as path from "path";
 import { TOKEN_HEX_RE } from "./constants/tokens";
@@ -54,9 +57,11 @@ function hexA(hex: string, a: number): string {
   return `rgba(${r},${g},${b},${a})`;
 }
 
-// Register Amiri once per cold start.
+// Register Amiri once per cold start. GlobalFonts is passed in from the lazy
+// canvas import so this module never loads the native binary just to declare it.
+type GlobalFontsLike = { registerFromPath(path: string, nameAlias?: string): unknown };
 let fontsReady = false;
-function ensureFonts(): void {
+function ensureFonts(GlobalFonts: GlobalFontsLike): void {
   if (fontsReady) return;
   const dirs = [
     path.resolve(__dirname, "..", "assets", "fonts"),
@@ -78,8 +83,8 @@ function ensureFonts(): void {
 
 // Draw an image as object-fit: cover into WxH.
 function drawCover(
-  ctx: ReturnType<ReturnType<typeof createCanvas>["getContext"]>,
-  img: Awaited<ReturnType<typeof loadImage>>,
+  ctx: SKRSContext2D,
+  img: Image,
 ): void {
   const ir = img.width / img.height;
   const cr = W / H;
@@ -98,7 +103,12 @@ function drawCover(
  *                   WhatsApp preview is personalised to whoever received it.
  */
 export async function renderOgImage(design: DesignLike | null, guestName = ""): Promise<Buffer> {
-  ensureFonts();
+  // Lazy-load the heavy Skia/canvas native binary ONLY when we actually render.
+  // The hot path (serving a pre-rendered cache hit) never touches it, so a cold
+  // start that just streams the cached JPEG stays fast — which is what keeps the
+  // WhatsApp link-preview crawler inside its few-second fetch budget.
+  const { createCanvas, loadImage, GlobalFonts } = await import("@napi-rs/canvas");
+  ensureFonts(GlobalFonts);
   const lang = "ar";
   const groom = localize(design?.groomDisplayName, lang);
   const bride = localize(design?.brideName, lang);
@@ -262,47 +272,125 @@ export async function renderOgImage(design: DesignLike | null, guestName = ""): 
   return canvas.encode("jpeg", 90);
 }
 
+// ─── Persistent Storage cache ────────────────────────────────────────────────
+// Pre-rendered OG images live at og-cache/{token}.jpg. They are written by the
+// inviteTokens onCreate trigger (cacheInviteOgImage) the moment a link is minted
+// — so the image is a ready static object BEFORE the link is ever shared — and
+// re-written here on any cache miss. A bucket lifecycle rule deletes them ~14
+// days after creation (backend/scripts/set-og-cache-lifecycle.cjs); a later
+// share simply re-renders + re-caches on the miss below.
+const OG_CACHE_PREFIX = "og-cache/";
+const ogCachePath = (token: string): string => `${OG_CACHE_PREFIX}${token}.jpg`;
+
+async function readOgCache(token: string): Promise<Buffer | null> {
+  try {
+    const file = getStorage().bucket().file(ogCachePath(token));
+    const [exists] = await file.exists();
+    if (!exists) return null;
+    const [buf] = await file.download();
+    return buf;
+  } catch (e) {
+    console.warn("[digitalOgImage] cache read failed", token, e);
+    return null;
+  }
+}
+
+async function writeOgCache(token: string, buf: Buffer): Promise<void> {
+  try {
+    await getStorage().bucket().file(ogCachePath(token)).save(buf, {
+      contentType: "image/jpeg",
+      resumable: false,
+      metadata: { cacheControl: "public, max-age=86400" },
+    });
+  } catch (e) {
+    console.warn("[digitalOgImage] cache write failed", token, e);
+  }
+}
+
+// Resolve the design + guest name a token's OG card renders from. Digital tokens
+// carry an immutable designSnapshot; physical/legacy tokens fall back to the
+// groom's (assigned/default) design so the couple names still appear.
+async function loadDesignForToken(
+  token: string,
+): Promise<{ design: DesignLike | null; guestName: string }> {
+  const snap = await getDatabase().ref(`inviteTokens/${token}`).get();
+  if (!snap.exists()) return { design: null, guestName: "" };
+  const tk = snap.val() as {
+    designSnapshot?: DesignLike;
+    guestName?: string;
+    groomUid?: string;
+    designId?: string;
+  };
+  const guestName = (tk?.guestName ?? "").toString();
+  let design = (tk?.designSnapshot ?? null) as DesignLike | null;
+  if (!design && tk?.groomUid) {
+    try {
+      const fsdb = getFirestore();
+      const parentSnap = await fsdb.doc(`digitalInvitations/${tk.groomUid}`).get();
+      const parent = (parentSnap.exists ? parentSnap.data() : {}) as Record<string, unknown>;
+      const did = (tk.designId as string) || (parent.defaultDesignId as string) || "";
+      if (did) {
+        const dSnap = await fsdb.doc(`digitalInvitations/${tk.groomUid}/designs/${did}`).get();
+        if (dSnap.exists) design = dSnap.data() as DesignLike;
+      } else if (parentSnap.exists) {
+        design = parent as DesignLike;
+      }
+    } catch { /* no design — render the branded card without couple names */ }
+  }
+  return { design, guestName };
+}
+
+/**
+ * Render a token's OG card AND persist it to og-cache/{token}.jpg. Called by the
+ * onCreate trigger (pre-generate at mint) and as the cache-miss path below.
+ */
+export async function renderAndCacheOgForToken(token: string): Promise<Buffer> {
+  const { design, guestName } = await loadDesignForToken(token);
+  const buf = await renderOgImage(design, guestName);
+  await writeOgCache(token, buf);
+  return buf;
+}
+
+// Send a JPEG with caching + a content-hash ETag, so a stale/failed CDN entry
+// can be conditionally revalidated (304) instead of pinned for the full s-maxage.
+function sendJpeg(
+  req: { get(name: string): string | undefined },
+  res: Response,
+  buf: Buffer,
+): void {
+  const etag = `"${createHash("sha1").update(buf).digest("hex")}"`;
+  res.set("Content-Type", "image/jpeg");
+  res.set("Cache-Control", "public, max-age=86400, s-maxage=604800");
+  res.set("ETag", etag);
+  if ((req.get("if-none-match") || "") === etag) {
+    res.status(304).end();
+    return;
+  }
+  res.status(200).send(buf);
+}
+
 export const digitalOgImage = onRequest(
-  { region: "us-central1", memory: "512MiB", timeoutSeconds: 30 },
+  // 1 GiB → more vCPU, so the cache-miss render + cold start are as fast as
+  // possible; maxInstances caps the cost blast-radius (mirrors `api`).
+  { region: "us-central1", memory: "1GiB", timeoutSeconds: 30, maxInstances: 10 },
   async (req, res) => {
     try {
       // Path shape: /og/{token}.jpg  (or /og/{token})
       const last = (req.path.split("/").filter(Boolean).pop() || "").replace(/\.(jpe?g|png)$/i, "");
-      let design: DesignLike | null = null;
-      let guestName = "";
       if (last && TOKEN_HEX_RE.test(last)) {
-        const snap = await getDatabase().ref(`inviteTokens/${last}`).get();
-        if (snap.exists()) {
-          const tk = snap.val() as {
-            designSnapshot?: DesignLike;
-            guestName?: string;
-            groomUid?: string;
-            designId?: string;
-          };
-          guestName = (tk?.guestName ?? "").toString();
-          design = (tk?.designSnapshot ?? null) as DesignLike | null;
-          // Physical / legacy tokens carry no embedded snapshot — fetch the
-          // groom's design so the couple names still appear on the card.
-          if (!design && tk?.groomUid) {
-            try {
-              const fsdb = getFirestore();
-              const parentSnap = await fsdb.doc(`digitalInvitations/${tk.groomUid}`).get();
-              const parent = (parentSnap.exists ? parentSnap.data() : {}) as Record<string, unknown>;
-              const did = (tk.designId as string) || (parent.defaultDesignId as string) || "";
-              if (did) {
-                const dSnap = await fsdb.doc(`digitalInvitations/${tk.groomUid}/designs/${did}`).get();
-                if (dSnap.exists) design = dSnap.data() as DesignLike;
-              } else if (parentSnap.exists) {
-                design = parent as DesignLike;
-              }
-            } catch { /* no design — render the branded card without couple names */ }
-          }
-        }
+        // Fast path: stream the pre-rendered cache (the lazy canvas binary is
+        // never even loaded), so a cold start here is sub-second.
+        const cached = await readOgCache(last);
+        if (cached) { sendJpeg(req, res, cached); return; }
+        // Miss — the trigger hasn't finished yet, it's a physical/legacy token,
+        // or the 14-day entry expired: render on demand and re-populate.
+        const buf = await renderAndCacheOgForToken(last);
+        sendJpeg(req, res, buf);
+        return;
       }
-      const buf = await renderOgImage(design, guestName);
-      res.set("Content-Type", "image/jpeg");
-      res.set("Cache-Control", "public, max-age=86400, s-maxage=604800");
-      res.status(200).send(buf);
+      // No / malformed token — branded fallback card (not worth caching).
+      const buf = await renderOgImage(null, "");
+      sendJpeg(req, res, buf);
     } catch (e) {
       console.error("[digitalOgImage]", e);
       res.status(500).send("og image error");

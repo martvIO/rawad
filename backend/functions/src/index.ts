@@ -57,6 +57,12 @@ export { digitalInvitePreview } from "./digitalInvitePreview";
 // its own hosting rewrite (`/og/**`) and cache strategy.
 export { digitalOgImage } from "./digitalOgImage";
 
+// RTDB onCreate trigger: pre-renders + caches the OG preview image at mint time
+// (og-cache/{token}.jpg) so the very first WhatsApp share shows the large image
+// instead of timing out on a cold render. Own function so the heavy canvas
+// runtime never touches the `api` cold start.
+export { cacheInviteOgImage } from "./cacheInviteOgImage";
+
 // Firestore trigger: maintains the face-descriptor index over photographer
 // photos (digitalInvitations/{uid}/photoFaces). Separate function so its
 // 2 GiB memory + tfjs runtime never affect the `api` function; the heavy
