@@ -11,7 +11,7 @@ import {
   Alert,
   StyleSheet,
 } from "react-native";
-import * as FileSystem from "expo-file-system";
+import { File, Paths } from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import { ScreenHeader } from "../../src/ui/ScreenHeader.jsx";
 import { usePortal } from "../../src/portal/PortalContext.jsx";
@@ -136,10 +136,11 @@ export default function Guests() {
         Array.isArray(g.ranks) ? g.ranks.join(" | ") : "",
       ]);
       const csv = "﻿" + toCsv(headers, rows); // BOM so Excel renders Arabic
-      const uri = FileSystem.cacheDirectory + "dawa-guests.csv";
-      await FileSystem.writeAsStringAsync(uri, csv, { encoding: FileSystem.EncodingType.UTF8 });
+      // expo-file-system SDK 54+ object API (legacy cacheDirectory/writeAsStringAsync removed).
+      const file = new File(Paths.cache, "dawa-guests.csv");
+      file.write(csv); // UTF-8, create-or-overwrite (synchronous)
       if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(uri, {
+        await Sharing.shareAsync(file.uri, {
           mimeType: "text/csv",
           UTI: "public.comma-separated-values-text",
         });
