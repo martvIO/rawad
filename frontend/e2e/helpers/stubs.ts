@@ -87,11 +87,16 @@ export async function lemonSqueezyOrderCreated(
   });
 }
 
-/** Block real third-party network calls so a run stays offline + deterministic.
- * Lets same-origin + the functions emulator through; short-circuits the rest. */
+/** Block real third-party network calls so a run stays offline + deterministic,
+ * AND abort never-closing SSE streams (live-location EventSource) which otherwise
+ * pile up across a long crawl and exhaust the dev server's connections
+ * (ERR_INSUFFICIENT_RESOURCES → cascading page.goto timeouts). Same-origin +
+ * functions-emulator traffic otherwise passes through. */
 export async function blockThirdParty(page: Page): Promise<void> {
   await page.route("**/*", (route) => {
     const url = route.request().url();
+    // Long-lived SSE streams never close on navigation within one context.
+    if (/\/live-locations\/[^/]+\/stream/.test(url)) return route.abort();
     const allow =
       url.startsWith("http://localhost") ||
       url.startsWith("http://127.0.0.1") ||

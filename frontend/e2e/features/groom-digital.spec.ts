@@ -24,6 +24,7 @@ test.describe("Groom — digital track", () => {
     await loginAsGroom(page);
     if (page.url().includes("type-select")) {
       await page.getByTestId("btn-type-digital").click();
+      await page.waitForURL(/\/portal\/groom\/digital\//, { timeout: 15_000 });
     }
     await expect(page).toHaveURL(/\/portal\/groom\/digital\//, { timeout: 15_000 });
     await expect(page.locator("body")).not.toBeEmpty();

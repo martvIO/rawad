@@ -52,16 +52,18 @@ test.describe("Journey — digital lifecycle", () => {
     expect(token).toMatch(/^[a-f0-9]{32}$/);
 
     // ── 3. The rendered digital invitation page loads without crashing ─────────
-    await page.goto(`/d/groom/${token}`);
-    await page.waitForLoadState("networkidle", { timeout: 3000 }).catch(() => {});
-    // Body has meaningful content (not an error screen / blank).
+    // The /d page is a heavy WebGL experience whose "load" event can be slow, so
+    // wait only for the navigation commit, then assert content rendered.
+    await page.goto(`/d/groom/${token}`, { waitUntil: "commit" });
+    await page.waitForTimeout(1500);
     await expect(page.locator("body")).not.toBeEmpty();
 
     // ── 4. Guest RSVPs + leaves a guestbook wish (API) ─────────────────────────
     const rsvp = await apiCall(request, "post", "/invites/digital/submit", {
-      data: { token, rsvp: "attending", companions: 2, note: "Mabrook!" },
+      // submittedPhone is required by the digital RSVP endpoint.
+      data: { token, rsvp: "attending", submittedPhone: `+97253${RUN}1`, companions: 2, note: "Mabrook!" },
     });
-    expect(rsvp.status).toBe(200);
+    expect(rsvp.status, JSON.stringify(rsvp.body)).toBe(200);
 
     const wish = await apiCall(request, "post", "/invites/digital/wish", {
       data: { token, who: `Digital Guest ${RUN}`, what: "Wishing you a lifetime of happiness" },

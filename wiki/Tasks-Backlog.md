@@ -24,12 +24,12 @@ Prioritized work for [[Dawa]] (full list in `TASKS.md`).
 - ~~**TASK-003** — audit/remove `face-api.js`~~ **OBSOLETE**: `face-api.js` is now load-bearing for [[Face Matching]] (browser descriptor extraction); the server uses `@vladmandic/face-api`. Keep both pinned — version bumps break descriptor compatibility.
 - **TASK-004** — delete unused `re.js` from root
 - **TASK-005** — remove stale legacy callable Cloud Functions, clean `index.ts` exports
-- **TASK-006** — write REST API route tests (`auth`, `users`, `guests`, `confirmations`) — see [[API Contracts]]
+- ~~**TASK-006** — write REST API route tests (`auth`, `users`, `guests`, `confirmations`)~~ **DONE** (2026-06-29): `backend/tests/api/*` (38 tests, role-guards + validation + token states), `npm run test:api`. See [[Comprehensive-Test-Harness]].
 - **TASK-007** — document `seed-emulator.cjs`
 - **TASK-008** — rotate/remove service-account JSON key from repo root (security — see [[Security Model]])
 
 ## Low
 - **TASK-009** — code-split portal by route (`React.lazy`); bundle ~775 KB
 - **TASK-010** — GitHub Actions CI (lint + tests, block merge on failure)
-- **TASK-011** — automate `SMOKE_TEST.md` as Playwright script
+- ~~**TASK-011** — automate `SMOKE_TEST.md` as Playwright script~~ **DONE** (2026-06-29): `npm run test:full` (crawler + journeys + visual + i18n/a11y) + `npm run test:full:prod` read-only prod smoke (`@prodsafe`). See [[Comprehensive-Test-Harness]].
 - **TASK-012** — update outdated "Current State" in root `CLAUDE.md` to reflect REST migration

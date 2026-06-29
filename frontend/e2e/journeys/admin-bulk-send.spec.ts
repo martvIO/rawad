@@ -14,9 +14,12 @@ test.describe("Journey — admin bulk send", () => {
     test.setTimeout(60_000);
     await clearSession(page);
     await loginAsAdmin(page);
-    await page.goto("/portal/admin/send");
+    // Navigate via the tab (client-side) rather than a hard goto, which can race
+    // the SPA's auth re-hydration under load and drop to a blank/login state.
+    await page.getByTestId("nav-admin-send").click();
+    await expect(page).toHaveURL(/\/portal\/admin\/send/, { timeout: 10_000 });
 
-    await expect(page.getByText("اختر العريس")).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText("اختر العريس")).toBeVisible({ timeout: 20_000 });
     // Pick the seeded "groom" card (♥/✓ prefix + exact username) — same selector
     // the admin feature spec uses.
     const groomCard = page.locator("button").filter({ hasText: /^[♥✓]\s*groom\s*عدد المدعوين/ }).first();

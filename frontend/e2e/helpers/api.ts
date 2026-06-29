@@ -23,8 +23,12 @@ function decodeJwt(token: string): Record<string, any> {
   }
 }
 
+// API calls go through the emulator, which can briefly stall under suite load;
+// use a generous per-request timeout (the global 8s actionTimeout is too tight).
+const API_TIMEOUT = 30_000;
+
 export async function apiLogin(request: APIRequestContext, username: string, password: string): Promise<Session> {
-  const res = await request.post(`${API}/auth/login`, { data: { username, password } });
+  const res = await request.post(`${API}/auth/login`, { data: { username, password }, timeout: API_TIMEOUT });
   if (!res.ok()) throw new Error(`login ${username} failed: ${res.status()} ${await res.text()}`);
   const json = await res.json();
   const claims = decodeJwt(json.idToken);
@@ -39,7 +43,7 @@ export async function apiCall(
 ) {
   const headers: Record<string, string> = {};
   if (opts.token) headers.Authorization = `Bearer ${opts.token}`;
-  const res = await request[method](`${API}${path}`, { headers, data: opts.data as any });
+  const res = await request[method](`${API}${path}`, { headers, data: opts.data as any, timeout: API_TIMEOUT });
   let body: any = null;
   try {
     body = await res.json();
