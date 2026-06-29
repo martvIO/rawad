@@ -8,7 +8,7 @@ function VenueSection({ venue, venueCity, venueAddress, accessNote, hotels, them
   // Waze is the dominant navigation app in Israel — offer it alongside Google Maps.
   const wazeHref = `https://waze.com/ul?q=${encodeURIComponent(venueQuery)}`;
   return (
-    <section className="dawa-inv-section">
+    <section className="dawa-inv-section" id="inv-venue">
       <SectionHead
         eyebrow={lang === "he" ? "המקום" : "المكان"}
         title={lang === "he" ? "היכן נחגוג" : "حيث سنحتفل"}

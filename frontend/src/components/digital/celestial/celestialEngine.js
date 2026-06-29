@@ -223,6 +223,7 @@ export function createCelestialWorld(canvas, opts = {}) {
 
     const t = now * 0.001;
     material.uniforms.uTime.value = t;
+    if (env) env.update(t); // drift the envelope's silk sheen
 
     const driftX = Math.sin(t * 0.18) * 2.2;
     const driftY = Math.cos(t * 0.13) * 1.6;

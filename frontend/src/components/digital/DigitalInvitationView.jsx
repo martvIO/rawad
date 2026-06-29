@@ -23,6 +23,7 @@ import { RSVPSection } from "./sections/InviteRsvp.jsx";
 import { GiftSection } from "./sections/InviteGift.jsx";
 import { GuestbookSection } from "./sections/InviteGuestbook.jsx";
 import { InviteFooter, FloatingDock } from "./sections/InviteFooterDock.jsx";
+import { InviteNavMenu } from "./sections/InviteNavMenu.jsx";
 import { CelestialAmbience } from "./sections/CelestialAmbience.jsx";
 import { ViewStyles } from "./sections/InviteStyles.jsx";
 import { WalletButton } from "./WalletButton.jsx";
@@ -129,6 +130,23 @@ export function DigitalInvitationView({
     : "";
   const venueLine = [venue, venueCity].filter(Boolean).join(" · ");
 
+  // Section list for the floating nav menu — built in render order from the same
+  // show* flags, so it always matches exactly the sections that are on screen.
+  const navItems = useMemo(() => {
+    const L = (ar, he) => (lang === "he" ? he : ar);
+    return [
+      { id: "inv-top", label: L("الأعلى", "למעלה"), show: true },
+      { id: "inv-story", label: L("القصة", "הסיפור"), show: showStory },
+      { id: "inv-gallery", label: L("الصور", "התמונות"), show: showGallery },
+      { id: "inv-details", label: L("التفاصيل", "הפרטים"), show: showDetails },
+      { id: "inv-venue", label: L("المكان", "המקום"), show: showVenue },
+      { id: "inv-countdown", label: L("العدّ التنازلي", "ספירה לאחור"), show: showCountdown },
+      { id: "rsvp", label: L("تأكيد الحضور", "אישור הגעה"), show: true },
+      { id: "inv-gift", label: L("هدية", "מתנה"), show: showGift },
+      { id: "inv-guestbook", label: L("التهاني", "ברכות"), show: showGuestbook },
+    ].filter((it) => it.show);
+  }, [lang, showStory, showGallery, showDetails, showVenue, showCountdown, showGift, showGuestbook]);
+
   // Scroll-reveal: animate `.dawa-inv-reveal` blocks in as they enter view on
   // the public page. In preview (or without IntersectionObserver) reveal them
   // all immediately so nothing is ever stuck hidden behind the editor.
@@ -198,7 +216,7 @@ export function DigitalInvitationView({
         brideName={brideName}
         monogram={monogram}
         eyebrow={eyebrow}
-        dateText={dateText}
+        dateText={/* under countdown by default; hero shows it only as a fallback when the countdown is hidden */ showCountdown ? "" : dateText}
         venueLine={venueLine}
         heroMedia={showHeroMedia ? heroMedia : []}
         theme={theme}
@@ -221,7 +239,7 @@ export function DigitalInvitationView({
           lang={lang}
         />
       )}
-      {showCountdown && <CountdownSection weddingDate={weddingDate} theme={theme} font={font} lang={lang} />}
+      {showCountdown && <CountdownSection weddingDate={weddingDate} dateText={dateText} theme={theme} font={font} lang={lang} />}
 
       <RSVPSection
         theme={theme}
@@ -273,6 +291,8 @@ export function DigitalInvitationView({
           musicUrl={musicUrl}
         />
       )}
+
+      <InviteNavMenu items={navItems} theme={theme} font={font} lang={lang} fixed={isPublic} />
 
       {mode === "preview" && (
         <div

@@ -72,9 +72,10 @@ export function buildEnvelope({ colors, monogram }) {
   rim.position.z = -0.04;
   group.add(rim);
 
-  // Envelope body (paper panel).
+  // Envelope body (paper panel). Light themes read as a clean creamy white (fine
+  // wedding stationery); dark themes stay tinted from the accent.
   const bodyColor = isLight
-    ? col([0.97, 0.94, 0.88])
+    ? col([0.985, 0.965, 0.93])
     : col([colors.accent[0] * 0.34 + 0.03, colors.accent[1] * 0.34 + 0.03, colors.accent[2] * 0.34 + 0.03]);
   const body = new THREE.Mesh(new THREE.PlaneGeometry(W, H), basicMat(bodyColor, isLight ? 0.97 : 0.92, THREE.NormalBlending));
   group.add(body);
@@ -88,12 +89,59 @@ export function buildEnvelope({ colors, monogram }) {
     "position",
     new THREE.BufferAttribute(new Float32Array([-W / 2, 0, 0, W / 2, 0, 0, 0, -H / 2, 0]), 3),
   );
+  // On light themes the flap is held ≈ the body colour so the closed envelope
+  // reads as ONE seamless sheet — the centre crease only resolves as the flap
+  // lifts open (the "soften the line" treatment). Dark themes keep the contrast.
   const flapColor = isLight
-    ? col([0.92, 0.88, 0.79])
+    ? col([0.978, 0.955, 0.92])
     : col([colors.accent[0] * 0.5 + 0.04, colors.accent[1] * 0.5 + 0.04, colors.accent[2] * 0.5 + 0.04]);
   const flap = new THREE.Mesh(flapGeo, basicMat(flapColor, isLight ? 0.98 : 0.95, THREE.NormalBlending));
   flapPivot.add(flap);
   group.add(flapPivot);
+
+  // Silk sheen — a soft highlight band that slowly drifts diagonally across the
+  // whole envelope face, like light moving over satin/watered silk. Sits above
+  // the flap (z) so it sweeps the entire face, below the seal so it never washes
+  // the monogram out. Additive + subtle; fades out as the flap opens.
+  const SHEEN_OPACITY = isLight ? 0.16 : 0.12;
+  const sheenMat = new THREE.ShaderMaterial({
+    uniforms: {
+      uTime: { value: 0 },
+      uColor: { value: isLight ? col([1, 1, 1]) : col(colors.glow) },
+      uOpacity: { value: SHEEN_OPACITY },
+    },
+    vertexShader: `
+      varying vec2 vUv;
+      void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }
+    `,
+    fragmentShader: `
+      precision mediump float;
+      varying vec2 vUv;
+      uniform float uTime;
+      uniform vec3 uColor;
+      uniform float uOpacity;
+      void main() {
+        // Diagonal coordinate 0..1 across the face; a slow wrapping sweep position.
+        float diag = (vUv.x + vUv.y) * 0.5;
+        float sweep = fract(uTime * 0.06);
+        float d = abs(diag - sweep);
+        d = min(d, 1.0 - d);                 // wrap so the band is continuous
+        float band = exp(-(d * d) / 0.012);  // narrow, soft gaussian highlight
+        // Feather the edges so the band never clips the paper border.
+        float edge = smoothstep(0.0, 0.16, vUv.x) * smoothstep(0.0, 0.16, 1.0 - vUv.x)
+                   * smoothstep(0.0, 0.16, vUv.y) * smoothstep(0.0, 0.16, 1.0 - vUv.y);
+        gl_FragColor = vec4(uColor, band * edge * uOpacity);
+      }
+    `,
+    transparent: true,
+    depthTest: false,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    side: THREE.DoubleSide,
+  });
+  const sheen = new THREE.Mesh(new THREE.PlaneGeometry(W, H), sheenMat);
+  sheen.position.z = 0.1;
+  group.add(sheen);
 
   // Wax seal with the monogram, where the flap apex meets the body centre.
   const sealTex = makeSealTexture(monogram, colors);
@@ -131,8 +179,16 @@ export function buildEnvelope({ colors, monogram }) {
     const letterT = easeOut(clamp((t - 0.22) / 0.6, 0, 1));
     letterMat.opacity = letterT;
     letter.position.y = LETTER_Y0 + letterT * LETTER_RISE;
+
+    // The silk sheen belongs to the closed/sealed paper — fade it out as it opens.
+    sheenMat.uniforms.uOpacity.value = SHEEN_OPACITY * (1 - flapT);
   }
   setOpen(0);
+
+  // Per-frame tick driven by the engine loop — advances the drifting silk sheen.
+  function update(t) {
+    sheenMat.uniforms.uTime.value = t;
+  }
 
   function dispose() {
     group.traverse((o) => {
@@ -144,5 +200,5 @@ export function buildEnvelope({ colors, monogram }) {
     });
   }
 
-  return { group, setOpen, dispose };
+  return { group, setOpen, update, dispose };
 }

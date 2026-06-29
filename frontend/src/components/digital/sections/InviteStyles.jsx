@@ -6,6 +6,11 @@ function ViewStyles({ theme, fixed }) {
     <style>{`
     .dawa-inv ::selection { background: ${theme.accentMuted}; }
 
+    /* Subtle global letter-spacing — opens the Arabic/Hebrew text a touch for a
+     * more elegant, airy feel. Kept tiny (.4px) so the cursive Arabic joins stay
+     * intact; per-element rules below override where more spacing is wanted. */
+    .dawa-inv { letter-spacing: .4px; }
+
     /* Faint damask lattice — a barely-there ornamental texture over the whole
      * invitation. Tinted with the live accent so it adapts to every palette; kept
      * at ~4% so it reads as luxury paper grain, never noise. Robust everywhere
@@ -39,7 +44,7 @@ function ViewStyles({ theme, fixed }) {
     }
 
     /* Section shell */
-    .dawa-inv .dawa-inv-section { position: relative; padding: 96px 24px; max-width: 1080px; margin: 0 auto; z-index: 6; }
+    .dawa-inv .dawa-inv-section { position: relative; padding: 64px 24px; max-width: 1080px; margin: 0 auto; z-index: 6; }
     .dawa-inv .dawa-inv-eyebrow { font-size: 11.5px; letter-spacing: 4px; text-transform: uppercase; font-style: italic; display: inline-flex; align-items: center; gap: 14px; margin-bottom: 16px; }
     .dawa-inv .dawa-inv-title { font-weight: 900; font-size: clamp(30px,5vw,48px); line-height: 1.35; margin-bottom: 16px; padding-block: 6px; }
     .dawa-inv .dawa-inv-sub { font-style: italic; font-size: 14px; max-width: 540px; margin: 0 auto; line-height: 1.85; }
@@ -82,7 +87,7 @@ function ViewStyles({ theme, fixed }) {
     /* Story timeline */
     .dawa-inv .dawa-inv-timeline { position: relative; padding: 20px 0; }
     .dawa-inv .dawa-inv-timeline::before { content: ""; position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: linear-gradient(180deg, transparent, var(--line) 15%, var(--line) 85%, transparent); }
-    .dawa-inv .dawa-inv-story { position: relative; width: calc(50% - 56px); padding: 8px 4px; margin-bottom: 52px; }
+    .dawa-inv .dawa-inv-story { position: relative; width: calc(50% - 56px); padding: 8px 4px; margin-bottom: 36px; }
     .dawa-inv .dawa-inv-story.is-left { margin-inline-start: auto; padding-inline-start: 32px; }
     .dawa-inv .dawa-inv-story.is-right { margin-inline-end: auto; padding-inline-end: 32px; }
     .dawa-inv .dawa-inv-story-node { position: absolute; top: 14px; width: 9px; height: 9px; border-radius: 50%; }
@@ -113,7 +118,7 @@ function ViewStyles({ theme, fixed }) {
     .dawa-inv .dawa-inv-lightbox-close:hover { transform: rotate(90deg); }
 
     /* Details */
-    .dawa-inv .dawa-inv-details { display: grid; gap: 56px 40px; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
+    .dawa-inv .dawa-inv-details { display: grid; gap: 40px 36px; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
     .dawa-inv .dawa-inv-detail { transition: transform .5s cubic-bezier(.2,.95,.25,1.1); }
     .dawa-inv .dawa-inv-detail:hover { transform: translateY(-3px); }
     .dawa-inv .dawa-inv-detail-icon { font-size: 28px; margin-bottom: 16px; opacity: .9; }
@@ -140,6 +145,7 @@ function ViewStyles({ theme, fixed }) {
     .dawa-inv .dawa-inv-cd-num { font-weight: 900; font-size: clamp(40px,8vw,72px); line-height: 1.35; font-variant-numeric: tabular-nums; margin-bottom: 10px; display: inline-block; padding-block: 6px; }
     .dawa-inv .dawa-inv-cd-num.is-flip { animation: dawa-inv-flip .65s cubic-bezier(.2,.95,.25,1.1); }
     .dawa-inv .dawa-inv-cd-lbl { font-style: italic; font-size: 11px; letter-spacing: 3px; text-transform: uppercase; opacity: .9; }
+    .dawa-inv .dawa-inv-cd-date { text-align: center; margin-top: 22px; font-size: clamp(15px,2.8vw,20px); font-weight: 700; letter-spacing: .5px; }
 
     /* RSVP + guestbook cards */
     .dawa-inv .dawa-inv-rsvp { max-width: 580px; margin: 0 auto; }

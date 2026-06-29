@@ -10,7 +10,7 @@ function GallerySection({ items, theme, font, lang }) {
     return () => window.removeEventListener("keydown", esc);
   }, []);
   return (
-    <section className="dawa-inv-section">
+    <section className="dawa-inv-section" id="inv-gallery">
       <SectionHead
         eyebrow={lang === "he" ? "גלריה" : "معرض الصور"}
         title={lang === "he" ? "רגעים ששמרנו" : "لحظات نحتفظ بها"}

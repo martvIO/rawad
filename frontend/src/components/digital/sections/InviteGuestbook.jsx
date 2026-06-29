@@ -39,7 +39,7 @@ function GuestbookSection({ wishes, approvedWishes = [], onSubmitWish, theme, fo
   };
 
   return (
-    <section className="dawa-inv-section">
+    <section className="dawa-inv-section" id="inv-guestbook">
       <SectionHead
         eyebrow={lang === "he" ? "ספר ברכות" : "دفتر التهاني"}
         title={lang === "he" ? "שתפו אותנו במילה" : "شاركونا كلمة"}
