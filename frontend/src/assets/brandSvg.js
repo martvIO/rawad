@@ -523,3 +523,11 @@ M294.871155,106.413635
 	C297.535095,116.492966 294.856445,111.842094 294.871155,106.413635 
 z"/>
 </svg>`;
+
+// Icon mark drawing data for native Path2D consumers (the 3D wax seal).
+export const BRAND_ICON_VIEWBOX = { w: 480, h: 384 };
+// Every `d="…"` in BRAND_ICON_SVG (the icon has no other `d` attributes), in order.
+export const BRAND_ICON_PATHS = Array.from(
+  BRAND_ICON_SVG.matchAll(/\sd="([^"]*)"/g),
+  (m) => m[1].trim(),
+);

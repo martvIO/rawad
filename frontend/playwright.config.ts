@@ -9,12 +9,26 @@ export default defineConfig({
   testDir: "./e2e",
   outputDir: "./e2e-results",
   timeout: 30_000,
-  expect: { timeout: 8_000 },
   retries: process.env.CI ? 2 : 1,
   fullyParallel: false,
-  reporter: [["list"], ["html", { outputFolder: "playwright-report", open: "never" }]],
+  reporter: [
+    ["list"],
+    ["html", { outputFolder: "playwright-report", open: "never" }],
+    // Consolidated feedback: harvests findings + visual diffs into results.json,
+    // which scripts/build-report.cjs renders to HTML/markdown and
+    // scripts/file-issues.cjs turns into deduped GitHub issues.
+    ["./e2e/reporters/consolidated.ts"],
+  ],
   globalSetup: "./e2e/global-setup.ts",
   globalTeardown: "./e2e/global-teardown.ts",
+  // Visual-regression stabilization. Animations are disabled at the snapshot
+  // boundary; the celestial WebGL canvas, Leaflet maps, and the live countdown
+  // are masked / clock-frozen per-spec (see e2e/visual/). maxDiffPixelRatio gives
+  // a small tolerance for anti-aliasing across OSes without hiding real drift.
+  expect: {
+    timeout: 8_000,
+    toHaveScreenshot: { animations: "disabled", caret: "hide", maxDiffPixelRatio: 0.01, scale: "css" },
+  },
   use: {
     baseURL: process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:5173",
     trace: "retain-on-failure",

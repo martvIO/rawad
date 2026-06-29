@@ -38,6 +38,22 @@ export default defineConfig({
         },
       },
       {
+        // REST API route tests — hit the Express app served by the Functions
+        // emulator over HTTP (the same boundary the browser uses). Needs the
+        // FULL emulator suite (auth+db+firestore+storage+functions) AND the
+        // seed accounts, so it's EXCLUDED from `test:unit` / `npm test` and run
+        // via the root `npm run test:api` (emulators:exec + build + seed).
+        // fileParallelism off → deterministic shared-emulator-data ordering.
+        test: {
+          name: "api",
+          include: ["tests/api/**/*.test.{js,ts}"],
+          environment: "node",
+          testTimeout: 30000,
+          hookTimeout: 30000,
+          fileParallelism: false,
+        },
+      },
+      {
         // Real-AWS Rekognition accuracy tests over the facerec_examples
         // fixtures. EXCLUDED from `test:unit` and `npm test` (CI) — they call
         // the live service, need AWS creds, and cost a few cents. Run locally

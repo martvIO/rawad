@@ -1,0 +1,88 @@
+# Security scanning — SAST, dependency review, and CodeQL on every PR + push to
+# main. Complements the gitleaks secret-scan in ci.yml (which reads .gitleaks.toml).
+#
+# WHY: the 2026-06-29 audit (docs/security/audit-2026-06-29.md) confirmed the app
+# is clean on injection / XSS / auth-crypto, but there was no *standing* gate to
+# keep it that way as AI-assisted commits land. These jobs are that gate.
+#
+# Baselines at audit time: Semgrep 0 findings, CodeQL n/a. npm audit had known
+# transitive vulns (finding F-1) — so the npm-audit job is advisory
+# (continue-on-error) until F-1 is remediated, then drop continue-on-error to
+# make it blocking.
+name: Security
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  # Static analysis for injection, XSS, weak-crypto, unsafe-auth, hardcoded
+  # secrets. Runs the same rulesets used in the audit. --error => fails the job
+  # on any finding (baseline is 0). To make advisory, drop --error.
+  semgrep:
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep
+    steps:
+      - uses: actions/checkout@v4
+      - name: Semgrep scan (OWASP + JS/TS + React + secrets)
+        run: |
+          semgrep scan \
+            --config p/owasp-top-ten \
+            --config p/javascript \
+            --config p/typescript \
+            --config p/react \
+            --config p/secrets \
+            --error --metrics=off \
+            frontend/src backend/functions/src
+
+  # Blocks a PR that introduces a NEW known-vulnerable dependency (diffs the PR's
+  # manifest changes; does not fail on pre-existing vulns). PR-only.
+  dependency-review:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+
+  # Full npm audit of frontend + backend production deps. As of 2026-06-29 the
+  # backend is clean (0 vulns); the frontend still carries Amplify-pinned aws-sdk
+  # advisories (audit finding F-1, tracked for an aws-amplify upgrade PR), so this
+  # job stays advisory (continue-on-error) until that lands — then make it blocking.
+  npm-audit:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install deps
+        run: |
+          npm install --no-audit --no-fund --prefix frontend
+          npm install --no-audit --no-fund --prefix backend/functions
+      - name: Audit frontend (prod)
+        run: npm audit --omit=dev --audit-level=high --prefix frontend
+      - name: Audit backend functions (prod)
+        run: npm audit --omit=dev --audit-level=high --prefix backend/functions
+
+  # GitHub-native dataflow SAST for JS/TS — results land in the repo Security tab.
+  codeql:
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+          queries: security-and-quality
+      - uses: github/codeql-action/analyze@v3
