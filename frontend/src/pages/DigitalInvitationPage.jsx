@@ -215,6 +215,7 @@ function DigitalLandingMain({ t, lang, setLang }) {
       onSubmitWish={handleSubmitWish}
       onOpenSorek={() => navigate("photos")}
       showEnvelope={true}
+      demo={isDemo}
       alreadyAnswered={!!tokenRec.usedAt && !done}
       rsvpDone={done}
       boardingPassEnabled={!!tokenRec.boardingPassEnabled}

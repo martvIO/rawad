@@ -1,5 +1,3 @@
-import { ON_GOLD } from "../inviteShared.jsx";
-
 // ── Scoped styles (all under .dawa-inv so other surfaces are untouched) ─────────
 function ViewStyles({ theme, fixed }) {
   return (
@@ -198,16 +196,6 @@ function ViewStyles({ theme, fixed }) {
     .dawa-inv .dawa-inv-dock-btn:hover { transform: scale(1.06); }
     .dawa-inv .dawa-inv-dock-pulse { position: absolute; inset: -2px; border-radius: 50%; border: 1px solid; animation: dawa-inv-dockpulse 1.8s ease-out infinite; }
 
-    /* Envelope */
-    .dawa-inv .dawa-inv-env-overlay { position: fixed; inset: 0; z-index: 1000; background: radial-gradient(ellipse 80% 60% at 50% 35%, ${theme.accentMuted}, transparent 60%), ${theme.bg}; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 32px; transition: opacity 1.2s, transform 1.4s cubic-bezier(.2,.95,.25,1.1); }
-    .dawa-inv .dawa-inv-env-overlay.is-opening { opacity: 0; transform: scale(1.05); pointer-events: none; }
-    .dawa-inv .dawa-inv-env { position: relative; width: 320px; max-width: 80vw; aspect-ratio: 1.5/1; border-radius: 14px; cursor: pointer; background: ${theme.cardBg}; border: 1px solid ${theme.accentLine}; box-shadow: 0 30px 80px -20px rgba(0,0,0,.7), 0 0 60px ${theme.accentMuted}; transition: transform .6s cubic-bezier(.2,.95,.25,1.1); }
-    .dawa-inv .dawa-inv-env:hover { transform: translateY(-6px) scale(1.02); }
-    .dawa-inv .dawa-inv-wax { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); width: 86px; height: 86px; border-radius: 50%; background: radial-gradient(circle at 30% 30%, ${theme.gradientStops[1]} 0%, ${theme.accent} 60%); display: flex; align-items: center; justify-content: center; color: ${ON_GOLD}; font-weight: 900; font-size: 36px; box-shadow: 0 8px 26px ${theme.accentMuted}, 0 0 32px ${theme.accentMuted}; animation: dawa-inv-wax 3s ease-in-out infinite; }
-    .dawa-inv .dawa-inv-env-overlay.is-opening .dawa-inv-wax { animation: dawa-inv-crack 1s cubic-bezier(.2,.95,.25,1.1) forwards; }
-    .dawa-inv .dawa-inv-env-hint { margin-top: 34px; color: ${theme.accent}; font-size: 13px; letter-spacing: 3px; text-transform: uppercase; font-style: italic; animation: dawa-inv-cue 2.6s ease-in-out infinite; }
-    .dawa-inv .dawa-inv-env-name { margin-top: 22px; font-weight: 900; font-size: clamp(28px,5vw,44px); color: ${theme.text}; }
-
     /* Petals + sparkles */
     .dawa-inv .dawa-inv-petals { inset: 0; pointer-events: none; z-index: 5; overflow: hidden; }
     .dawa-inv .dawa-inv-petal { position: absolute; top: -40px; border-radius: 60% 40% 60% 40% / 70% 60% 40% 30%; opacity: .55; filter: blur(.4px); animation: dawa-inv-petal linear infinite; }
@@ -261,8 +249,6 @@ function ViewStyles({ theme, fixed }) {
     @keyframes dawa-inv-route { to { stroke-dashoffset: 0; } }
     @keyframes dawa-inv-flip { 0% { transform: translateY(0); } 50% { transform: translateY(-14px); opacity: .4; filter: blur(2px); } 100% { transform: translateY(0); } }
     @keyframes dawa-inv-seal { 0% { transform: scale(0) rotate(-90deg); } 60% { transform: scale(1.15) rotate(8deg); } 100% { transform: scale(1) rotate(0); } }
-    @keyframes dawa-inv-wax { 0%,100% { transform: translate(-50%,-50%) scale(1); } 50% { transform: translate(-50%,-50%) scale(1.05); } }
-    @keyframes dawa-inv-crack { 0% { transform: translate(-50%,-50%) scale(1) rotate(0); } 30% { transform: translate(-50%,-50%) scale(1.25) rotate(-12deg); } 100% { transform: translate(-50%,-50%) scale(0) rotate(180deg); opacity: 0; } }
     @keyframes dawa-inv-dockpulse { 0% { opacity: .9; transform: scale(.95); } 100% { opacity: 0; transform: scale(1.4); } }
     @keyframes dawa-inv-petal { 0% { transform: translateY(0) rotate(0) translateX(0); opacity: 0; } 5% { opacity: .5; } 50% { transform: translateY(45vh) rotate(180deg) translateX(40px); } 95% { opacity: .5; } 100% { transform: translateY(105vh) rotate(420deg) translateX(-30px); opacity: 0; } }
     @keyframes dawa-inv-sparkle { 0%,100% { opacity: 0; transform: scale(.5); } 50% { opacity: 1; transform: scale(1.6); } }

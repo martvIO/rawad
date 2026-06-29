@@ -1,6 +1,5 @@
 import { lazy, Suspense, useState, useEffect, useRef } from "react";
 import { Ambience } from "./InviteAmbience.jsx";
-import { EnvelopeIntro } from "./EnvelopeIntro.jsx";
 import { CelestialEnvelopeOverlay } from "./CelestialEnvelopeOverlay.jsx";
 import { useDeviceCapability } from "../../../hooks/useDeviceCapability.js";
 import { celDowngraded, markCelDowngraded } from "../celestial/downgradeStore.js";
@@ -24,11 +23,13 @@ function markOpened() {
 
 export function CelestialAmbience({
   theme, font, lang, mode = "public", fixed = true, immersive3d = true,
-  showEnvelope = false, guestName = "", groomName = "", brideName = "", monogram = "",
+  showEnvelope = false, demo = false, guestName = "", groomName = "", brideName = "", monogram = "",
 }) {
   const cap = useDeviceCapability();
   const [downgraded, setDowngraded] = useState(celDowngraded);
-  const [opened, setOpened] = useState(readOpened);
+  // The demo is a showcase: always replay the envelope, and never write the
+  // global "opened" flag (so visiting the demo can't suppress a real invite).
+  const [opened, setOpened] = useState(() => (demo ? false : readOpened()));
   // Envelope reveal phases: sealed → opening → revealing → done → gone.
   const [phase, setPhase] = useState("sealed");
   const worldRef = useRef(null);
@@ -81,7 +82,7 @@ export function CelestialAmbience({
     setPhase("opening");
     w.openEnvelope({
       onReveal: () => setPhase("revealing"),
-      onComplete: () => { markOpened(); setOpened(true); setPhase("done"); },
+      onComplete: () => { if (!demo) markOpened(); setOpened(true); setPhase("done"); },
     });
   };
 
@@ -116,22 +117,8 @@ export function CelestialAmbience({
     );
   }
 
-  // No WebGL → the 2D floor, plus the 2D wax-seal envelope (now reveals the
-  // couple names) for reduced-motion / weak / immersive3d-off devices.
-  return (
-    <>
-      {showEnvelope && !opened && (
-        <EnvelopeIntro
-          guestName={guestName}
-          groomName={groomName}
-          brideName={brideName}
-          monogram={monogram}
-          theme={theme}
-          font={font}
-          lang={lang}
-        />
-      )}
-      <Ambience theme={theme} fixed={fixed} />
-    </>
-  );
+  // No WebGL (reduced-motion / data-saver / no WebGL / immersive3d off) → just
+  // the 2D CSS ambience floor behind the content. The envelope intro is now
+  // WebGL-only: incapable devices land straight on the invitation, no envelope.
+  return <Ambience theme={theme} fixed={fixed} />;
 }

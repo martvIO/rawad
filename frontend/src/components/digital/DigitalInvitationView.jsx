@@ -40,6 +40,7 @@ export function DigitalInvitationView({
   onSubmitWish,
   onOpenSorek,
   showEnvelope = false,
+  demo = false,
   alreadyAnswered = false,
   rsvpDone = false,
   boardingPassEnabled = false,
@@ -204,6 +205,7 @@ export function DigitalInvitationView({
         fixed={isPublic}
         immersive3d={on(design?.immersive3d)}
         showEnvelope={showEnvelopeNow}
+        demo={demo}
         guestName={guestName}
         groomName={groomName}
         brideName={brideName}

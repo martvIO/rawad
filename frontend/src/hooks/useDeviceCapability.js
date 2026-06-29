@@ -1,8 +1,11 @@
 import { useMemo } from "react";
 
 // Decides whether a device should run the immersive WebGL world, and at what
-// quality tier. The guiding rule of the whole feature: a guest must NEVER get a
-// broken or janky invite, so anything uncertain falls back to the 2D CSS floor.
+// quality tier. Policy: lean INTO the 3D — only an explicit reduced-motion /
+// data-saver opt-in or a total lack of WebGL drops to tier 0 (the 2D CSS floor
+// + no envelope). Software GPUs and in-app browsers still ATTEMPT the 3D at the
+// lowest tier; the runtime FPS guard is the real safety net for anything the
+// heuristics get wrong.
 //
 //   tier 0 → no WebGL, render the existing 2D ambience (the guaranteed floor)
 //   tier 1 → low    (≈2.6k motes, dpr 1)
@@ -48,8 +51,10 @@ function detect() {
   }
 
   const ua = navigator.userAgent || "";
-  // Known social in-app browsers mis-render WebGL despite reporting support;
-  // they're also the worst-performing contexts. Default them straight to 2D.
+  // Known social in-app browsers can mis-render WebGL and are the worst-
+  // performing contexts; they now still ATTEMPT the 3D at the lowest quality
+  // tier (capped below) rather than being forced off it — the FPS guard +
+  // context-loss handler are the safety net.
   const hardInApp = /(FBAN|FBAV|Instagram|Line\/|Twitter|Snapchat|Pinterest|KAKAOTALK|MicroMessenger)/i.test(ua);
   // Generic Android WebView (incl. WhatsApp on Android) — capable but unknown;
   // allow 3D but cap quality and lean on the FPS guard.
@@ -57,7 +62,10 @@ function detect() {
 
   const softwareGpu = /SwiftShader|llvmpipe|Software|Microsoft Basic|ANGLE \(Google/i.test(renderer);
 
-  if (reducedMotion || saveData || !webgl || hardInApp || softwareGpu) {
+  // Only hard-stops force the no-envelope / 2D-floor path now: an explicit
+  // reduced-motion or data-saver opt-in, or no WebGL at all. Software GPUs and
+  // in-app browsers are allowed onto the 3D path (capped to tier 1 below).
+  if (reducedMotion || saveData || !webgl) {
     return { tier: 0, webgl, reducedMotion, saveData, inApp: hardInApp || genericWebView };
   }
 
@@ -70,9 +78,10 @@ function detect() {
   if (typeof mem === "number" && mem < 4) tier = Math.min(tier, 1);
   if (typeof mem === "number" && mem < 2) tier = 0;
   if (cores && cores <= 4) tier = Math.min(tier, coarse ? 1 : 2);
-  if (genericWebView) tier = Math.min(tier, 1);
+  // Risky-but-allowed contexts run at the lowest quality and lean on the guard.
+  if (genericWebView || hardInApp || softwareGpu) tier = Math.min(tier, 1);
 
-  return { tier, webgl, reducedMotion, saveData, inApp: genericWebView };
+  return { tier, webgl, reducedMotion, saveData, inApp: genericWebView || hardInApp };
 }
 
 export function useDeviceCapability() {
