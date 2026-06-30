@@ -1,5 +1,7 @@
 # Expo / React Native
 node_modules/
+# Renamed/broken node_modules left over from an install mishap (kept on disk).
+.node_modules_root_broken/
 .expo/
 dist/
 web-build/
