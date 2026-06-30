@@ -287,7 +287,7 @@ export function DigitalInvitationView({
           only (every wedding reaches 100-600 in-market guests). Links back to
           the marketing site with a referral param. Hidden in the editor preview. */}
       {isPublic && (
-        <div style={{ textAlign: "center", padding: "16px 16px 96px" }}>
+        <div style={{ textAlign: "center", padding: "16px 16px 72px" }}>
           <a href="/?ref=invite" target="_blank" rel="noopener noreferrer"
              style={{ color: theme.accent, textDecoration: "none", opacity: 0.7, fontSize: 12, fontWeight: 700 }}>
             {lang === "he" ? "נוצר עם דעוה — צרו את ההזמנה שלכם ←" : "صُنعت بواسطة دعوة — اصنع دعوتك ←"}

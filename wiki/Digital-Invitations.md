@@ -61,6 +61,26 @@ The invitation's opening ceremony is a procedural **three.js** envelope inside a
 - **Wedding date moved under the countdown** (`InviteCountdown` gains a `dateText` prop); the Hero chip shows venue only, falling back to the date when the countdown is hidden.
 - **Floating section-nav menu** (`sections/InviteNavMenu.jsx`) — a collapsed pill expanding to the enabled sections (same `show*` flags) with smooth-scroll + IntersectionObserver scroll-spy; hidden until the guest scrolls past the hero. Every section gained an `id` anchor.
 
+## Round-two spacing tightening + central tokens (2026-06-30)
+A second pass to make the public scroll meaningfully shorter — most on mobile, where ~all
+guests open it. Three cross-cutting spacing levers were lifted out of scattered literals into
+**central CSS custom properties on `.dawa-inv`** (the first spacing *tokens* in the invite):
+- `--inv-sec-pad: clamp(30px, 5vw, 48px)` — section vertical padding (was a flat `64px`). The
+  `clamp()` makes the between-section rhythm **fluid**: ~30px on a 390px phone → 48px on desktop,
+  matching the existing fluid-font pattern. Used by `.dawa-inv-section` **and** the footer top.
+- `--inv-head-gap: clamp(20px, 3.5vw, 28px)` — `SectionHead` bottom margin (was `36px`, inline in
+  `inviteShared.jsx`, now `var(--inv-head-gap)`).
+- `--inv-foot-bottom: 64px` — footer bottom (was `96px`).
+
+Plus in-place Compact trims to the one-off internal gaps (details grid `40→28`, story item
+`36→26`, venue `32→24`) and the growth byline bottom (`96→72`, still clears the fixed dock). The
+**hero** kept its full-bleed cover but switched `min-height: 100vh → 100svh` (so it's exactly one
+*visible* screen on mobile instead of overflowing below the chrome-hidden viewport) with padding
+`60→48`. Tune density centrally via the three `--inv-*` vars. Files:
+`sections/InviteStyles.jsx`, `inviteShared.jsx`, `DigitalInvitationView.jsx`. Verified via
+Playwright MCP at 390px + 1280px (tokens resolve 30/48px; no cramping or dock overlap). See
+[[Visual-Design-System]], [[Architecture-Decisions]].
+
 **Fallback policy (unchanged) — see [[Architecture Decisions]]:**
 - The envelope is **WebGL-only** (the old 2D wax-seal `EnvelopeIntro` was deleted). `useDeviceCapability`: only reduced-motion / data-saver / no-WebGL force tier 0 (→ **no envelope**, straight to content over the CSS ambience floor); **software GPUs and in-app browsers attempt the 3D** at capped tier 1. The envelope **never downgrades during the reveal** (the FPS guard is skipped while `mode !== "scroll"`); a genuine WebGL context-loss still bails to the CSS floor.
 - **Demo** (`?demo=1`) always replays and never persists the global `dawa-invite-opened` flag (threaded via a `demo` prop `DigitalInvitationPage → DigitalInvitationView → CelestialAmbience`); demo default theme is `ivorygold` (override via `?theme=`). The shared gate also enriches the landing hero ([[Visual Design System]]).

@@ -6,7 +6,7 @@ const ON_GOLD = "#2a0f00"; // dark ink for text sitting on the gold gradient
 // ── Shared section header ────────────────────────────────────────────────────
 function SectionHead({ eyebrow, title, sub, theme, font }) {
   return (
-    <div className="dawa-inv-reveal" style={{ textAlign: "center", marginBottom: 36 }}>
+    <div className="dawa-inv-reveal" style={{ textAlign: "center", marginBottom: "var(--inv-head-gap)" }}>
       <div className="dawa-inv-secflourish">
         <FloralFlourish theme={theme} width={156} />
       </div>
