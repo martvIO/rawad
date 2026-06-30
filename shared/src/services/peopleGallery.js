@@ -13,8 +13,13 @@ export async function requestGalleryOtp(username, phoneE164, recaptchaToken) {
   return api.post(`/digital/gallery/${enc(username)}/request-otp`, { phoneE164, recaptchaToken }, { skipAuth: true });
 }
 
-export async function verifyGalleryOtp(username, sessionInfo, code) {
-  return api.post(`/digital/gallery/${enc(username)}/verify-otp`, { sessionInfo, code }, { skipAuth: true });
+export async function verifyGalleryOtp(username, sessionInfo, code, consent) {
+  // The server rejects the grant without affirmative biometric consent.
+  return api.post(
+    `/digital/gallery/${enc(username)}/verify-otp`,
+    { sessionInfo, code, consent: consent === true },
+    { skipAuth: true },
+  );
 }
 
 export async function fetchGalleryPeople(username, galleryToken) {

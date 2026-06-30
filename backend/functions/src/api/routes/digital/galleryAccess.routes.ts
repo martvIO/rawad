@@ -130,7 +130,14 @@ export function registerGalleryAccessRoutes(router: Router): void {
     async (req: Request, res: Response) => {
       const sessionInfo = String(req.body?.sessionInfo ?? "");
       const code = String(req.body?.code ?? "");
+      const consent = req.body?.consent;
       if (!sessionInfo || !code) { res.status(400).json({ error: "missing_fields" }); return; }
+      // The viewer must affirm they understand the gallery uses face
+      // recognition before we mint a grant that lets them browse matched faces.
+      if (consent !== true && consent !== "true") {
+        res.status(400).json({ error: "consent_required" });
+        return;
+      }
       try {
         const uid = await resolveUid(req.params.groomUsername);
         if (!uid || !galleryLive(await readGalleryConfig(uid))) {
@@ -156,6 +163,7 @@ export function registerGalleryAccessRoutes(router: Router): void {
         await db().ref(`galleryGrants/${uid}/${sha(galleryToken)}`).set({
           phoneE164: fbData.phoneNumber,
           expiresAt,
+          consent: { biometric: true, version: "biometric-gallery-v1", at: Date.now() },
         });
         res.json({ galleryToken, expiresAt });
       } catch (err) {

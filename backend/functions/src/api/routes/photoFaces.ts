@@ -100,6 +100,7 @@ photoFacesRouter.post("/enroll", enrollLimiter, async (req: Request, res: Respon
   let token = (req.query?.token ?? "").toString();
   let phone: string | undefined;
   let livenessSessionId: string | undefined;
+  let consent: unknown;
   let uploadedBytes: Buffer | null = null;
 
   try {
@@ -108,6 +109,7 @@ photoFacesRouter.post("/enroll", enrollLimiter, async (req: Request, res: Respon
       token = token || (parsed.fields.token ?? "");
       phone = parsed.fields.phone;
       livenessSessionId = parsed.fields.livenessSessionId;
+      consent = parsed.fields.consent;
       if (parsed.file && !parsed.file.truncated && parsed.file.buffer.length) {
         uploadedBytes = parsed.file.buffer;
       } else if (parsed.file?.truncated) {
@@ -118,6 +120,7 @@ photoFacesRouter.post("/enroll", enrollLimiter, async (req: Request, res: Respon
       token = token || (req.body?.token ?? "").toString();
       phone = req.body?.phone;
       livenessSessionId = req.body?.livenessSessionId;
+      consent = req.body?.consent;
     }
   } catch {
     res.status(400).json({ error: "invalid_multipart" });
@@ -130,6 +133,14 @@ photoFacesRouter.post("/enroll", enrollLimiter, async (req: Request, res: Respon
   try {
     if (!(await isPhotographerPublished(tk.groomUid))) {
       res.status(409).json({ error: "not_published" });
+      return;
+    }
+
+    // Affirmative biometric consent is required before we enroll the guest's
+    // face. The page shows the disclosure; the client must send consent:true
+    // (boolean over JSON, "true" string over multipart).
+    if (consent !== true && consent !== "true") {
+      res.status(400).json({ error: "consent_required" });
       return;
     }
 
@@ -170,6 +181,12 @@ photoFacesRouter.post("/enroll", enrollLimiter, async (req: Request, res: Respon
       guestId: tk.guestId ?? null,
       guestName: tk.guestName ?? null,
       consentAt: now,
+      consent: {
+        biometric: true,
+        version: "biometric-selfie-v1",
+        at: now,
+        source: "selfie_search",
+      },
       createdAt: now,
       expireAt: Timestamp.fromMillis(tk.expiresAt),
       provider: "rekognition",

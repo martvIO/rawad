@@ -42,6 +42,7 @@ export function DigitalYourPhotos({ lang, setLang }) {
   const [matches, setMatches] = useState([]);
   const [expiresAt, setExpiresAt] = useState(null);
   const [phone, setPhone] = useState("");
+  const [consentChecked, setConsentChecked] = useState(false); // biometric consent gate
   const [session, setSession] = useState(null); // { sessionId, region }
   const [confirmDelete, setConfirmDelete] = useState(false); // delete-data modal
   const [deleting, setDeleting] = useState(false);
@@ -108,7 +109,7 @@ export function DigitalYourPhotos({ lang, setLang }) {
   const onLivenessComplete = async () => {
     setStage("enrolling");
     try {
-      const resp = await enrollWithLiveness(token, session?.sessionId, phone.trim());
+      const resp = await enrollWithLiveness(token, session?.sessionId, phone.trim(), consentChecked);
       if (cancelledRef.current) return;
       setMatches(resp?.matches ?? []);
       if (resp?.expiresAt) setExpiresAt(resp.expiresAt);
@@ -224,6 +225,25 @@ export function DigitalYourPhotos({ lang, setLang }) {
               <div>{tt(lang, "🗑 يمكنك حذف بصمة وجهك في أي وقت.", "🗑 ניתן למחוק את חתימת הפנים בכל עת.")}</div>
             </div>
 
+            <label style={{
+              display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer",
+              fontSize: 12.5, color: C.dim, lineHeight: 1.7, marginBottom: 16,
+            }}>
+              <input
+                type="checkbox"
+                checked={consentChecked}
+                onChange={(e) => setConsentChecked(e.target.checked)}
+                style={{ marginTop: 3, flexShrink: 0, width: 16, height: 16, accentColor: C.gold, cursor: "pointer" }}
+              />
+              <span>{tt(lang,
+                "أوافق على التقاط صورة حيّة ومعالجتها عبر خدمة التعرف على الوجه (AWS) للعثور على صوري في صور الحفل.",
+                "אני מסכים לצילום חי ולעיבודו בשירות זיהוי הפנים (AWS) כדי למצוא את התמונות שלי באירוע.")}{" "}
+                <a href="/terms" target="_blank" rel="noopener noreferrer" style={{ color: C.gold }}>
+                  {tt(lang, "سياسة الخصوصية", "מדיניות הפרטיות")}
+                </a>
+              </span>
+            </label>
+
             <label style={{ fontSize: 12, color: C.dim, display: "block", marginBottom: 6 }}>
               {tt(lang, "📱 رقم هاتفك (لإرسال رابط صورك)", "📱 מספר הטלפון שלך (לקבלת קישור התמונות)")}
             </label>
@@ -240,8 +260,8 @@ export function DigitalYourPhotos({ lang, setLang }) {
                 <button
                   className="gold-btn"
                   onClick={startLiveness}
-                  disabled={!isCompletePhone(phone)}
-                  style={{ opacity: isCompletePhone(phone) ? 1 : 0.5, cursor: isCompletePhone(phone) ? "pointer" : "not-allowed" }}
+                  disabled={!isCompletePhone(phone) || !consentChecked}
+                  style={{ opacity: (isCompletePhone(phone) && consentChecked) ? 1 : 0.5, cursor: (isCompletePhone(phone) && consentChecked) ? "pointer" : "not-allowed" }}
                 >
                   {tt(lang, "📷 افتح الكاميرا للبحث عن صورك", "📷 פתח מצלמה כדי למצוא את התמונות שלך")}
                 </button>

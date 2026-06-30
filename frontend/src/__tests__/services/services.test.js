@@ -689,6 +689,15 @@ describe("digitalInvitation — media", () => {
     });
   });
 
+  it("setPhotographerPublished includes photographerAck only when ack is true", async () => {
+    api.patch.mockResolvedValueOnce({ ok: true });
+    await digital.setPhotographerPublished("g1", true, true);
+    expect(api.patch).toHaveBeenCalledWith("/digital/g1/media/settings", {
+      photographerPublished: true,
+      photographerAck: true,
+    });
+  });
+
   it("setGuestRanks PATCHes with safe array fallback", async () => {
     api.patch.mockResolvedValueOnce({ ok: true });
     await digital.setGuestRanks("g1", "not-an-array");

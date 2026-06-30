@@ -32,6 +32,7 @@ export function PeopleGallery({ lang, setLang }) {
   const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
   const [sessionInfo, setSessionInfo] = useState("");
+  const [consentChecked, setConsentChecked] = useState(false); // biometric consent gate
   const [busy, setBusy] = useState(false);
 
   const [token, setToken] = useState(() => sessionStorage.getItem(grantKey(groomUsername)) || "");
@@ -112,7 +113,7 @@ export function PeopleGallery({ lang, setLang }) {
     if (!code.trim()) return;
     setBusy(true); setError("");
     try {
-      const r = await verifyGalleryOtp(groomUsername, sessionInfo, code.trim());
+      const r = await verifyGalleryOtp(groomUsername, sessionInfo, code.trim(), consentChecked);
       sessionStorage.setItem(grantKey(groomUsername), r.galleryToken);
       setToken(r.galleryToken);
       await loadPeople(r.galleryToken);
@@ -168,16 +169,40 @@ export function PeopleGallery({ lang, setLang }) {
           <div style={{ fontSize: 16, fontWeight: 800, textAlign: "center", color: theme.accent, marginBottom: 8 }}>
             {tt(lang, "ألبوم صور الحفل", "אלבום תמונות האירוע")}
           </div>
-          <div style={{ fontSize: 13, opacity: 0.8, textAlign: "center", lineHeight: 1.8, marginBottom: 16 }}>
+          <div style={{ fontSize: 13, opacity: 0.8, textAlign: "center", lineHeight: 1.8, marginBottom: 12 }}>
             {tt(lang, "للدخول، أدخل رقم هاتفك المسجّل في الدعوة وسنرسل لك رمز تحقق.",
                       "להיכנס, הזן את מספר הטלפון שלך מההזמנה ונשלח קוד אימות.")}
           </div>
+          <div style={{ fontSize: 12, opacity: 0.75, textAlign: "start", lineHeight: 1.7, marginBottom: 12 }}>
+            {tt(lang,
+              "🔎 يستخدم هذا الألبوم التعرف على الوجه (AWS) لتجميع الصور حسب الأشخاص. تُحفظ توقيعات رقمية للوجوه — لا الصور — وتُحذف تلقائياً بعد الحفل.",
+              "🔎 אלבום זה משתמש בזיהוי פנים (AWS) לקיבוץ התמונות לפי אנשים. נשמרות חתימות מספריות — לא התמונות — והן נמחקות אוטומטית אחרי האירוע.")}
+          </div>
+          <label style={{
+            display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer",
+            fontSize: 12.5, opacity: 0.9, lineHeight: 1.7, marginBottom: 14, textAlign: "start",
+          }}>
+            <input
+              type="checkbox"
+              checked={consentChecked}
+              onChange={(e) => setConsentChecked(e.target.checked)}
+              style={{ marginTop: 3, flexShrink: 0, width: 16, height: 16, accentColor: theme.accent, cursor: "pointer" }}
+            />
+            <span>{tt(lang,
+              "أوافق على استخدام التعرف على الوجه لعرض صور الحفل المنظَّمة حسب الأشخاص.",
+              "אני מסכים לשימוש בזיהוי פנים להצגת תמונות האירוע מאורגנות לפי אנשים.")}{" "}
+              <a href="/terms" target="_blank" rel="noopener noreferrer" style={{ color: theme.accent }}>
+                {tt(lang, "سياسة الخصوصية", "מדיניות הפרטיות")}
+              </a>
+            </span>
+          </label>
           <input value={phone} onChange={(e) => setPhone(e.target.value)} inputMode="tel" placeholder="05X-XXXXXXX"
                  style={inputStyle(theme)} />
           {SITE_KEY ? <div ref={recaptchaElRef} style={{ display: "flex", justifyContent: "center", margin: "12px 0" }} />
                     : <div style={{ fontSize: 11, opacity: 0.6, textAlign: "center", margin: "10px 0" }}>{tt(lang, "(التحقق غير مُهيّأ)", "(אימות לא מוגדר)")}</div>}
           {error && <div style={{ color: "#e07070", fontSize: 12, textAlign: "center", marginBottom: 8 }}>{error}</div>}
-          <button onClick={onRequestOtp} disabled={busy} style={btnStyle(theme)}>
+          <button onClick={onRequestOtp} disabled={busy || !consentChecked}
+                  style={{ ...btnStyle(theme), opacity: (busy || !consentChecked) ? 0.5 : 1, cursor: (busy || !consentChecked) ? "not-allowed" : "pointer" }}>
             {busy ? "…" : tt(lang, "أرسل رمز التحقق", "שלח קוד אימות")}
           </button>
         </div>

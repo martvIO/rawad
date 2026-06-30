@@ -69,11 +69,20 @@ describe("enrollSelfieUpload", () => {
 });
 
 describe("enrollWithLiveness", () => {
-  it("POSTs token + livenessSessionId + phone as JSON", async () => {
+  it("POSTs token + livenessSessionId + phone + consent:false by default", async () => {
     await enrollWithLiveness(TOKEN, "sess-1", "0501234567");
     expect(api.post).toHaveBeenCalledWith(
       "/digital/photos/enroll",
-      { token: TOKEN, livenessSessionId: "sess-1", phone: "0501234567" },
+      { token: TOKEN, livenessSessionId: "sess-1", phone: "0501234567", consent: false },
+      { skipAuth: true },
+    );
+  });
+
+  it("sends consent:true only when the guest has affirmed", async () => {
+    await enrollWithLiveness(TOKEN, "sess-1", "0501234567", true);
+    expect(api.post).toHaveBeenCalledWith(
+      "/digital/photos/enroll",
+      { token: TOKEN, livenessSessionId: "sess-1", phone: "0501234567", consent: true },
       { skipAuth: true },
     );
   });

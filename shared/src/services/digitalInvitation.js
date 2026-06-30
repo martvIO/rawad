@@ -196,10 +196,13 @@ export async function setWeddingDate(groomUid, epochMs) {
   });
 }
 
-export async function setPhotographerPublished(groomUid, published) {
+export async function setPhotographerPublished(groomUid, published, ack) {
   const uid = resolveUid(groomUid);
   return api.patch(`/digital/${uid}/media/settings`, {
     photographerPublished: !!published,
+    // The first publish flip requires the groom's biometric-indexing
+    // acknowledgment; the server returns 409 ack_required without it.
+    ...(ack === true ? { photographerAck: true } : {}),
   });
 }
 
@@ -362,6 +365,34 @@ export async function getDigitalInvitationPublic(groomUid) {
   if (!groomUid) return null;
   try {
     return await api.get(`/digital/${groomUid}/public`, { skipAuth: true });
+  } catch {
+    return null;
+  }
+}
+
+// ── Admin-editable public demo ────────────────────────────────────────────
+// The editable demo design lives under a reserved synthetic uid; the existing
+// per-design services (subscribeDesign/patchDesignById/addDesignMedia/…) accept
+// it as their groomUid, so admin edits route to /digital/__demo__/designs/demo.
+// Must match DEMO_UID in backend constants.ts. NOT wrapped in double underscores
+// — Firestore reserves document IDs matching /^__.*__$/.
+export const DEMO_DESIGN_UID = "demo-design";
+export const DEMO_DESIGN_ID = "demo";
+
+/** Admin: ensure the (blank) editable demo design doc exists. */
+export async function ensureDemoDesign() {
+  return api.post("/digital/demo/ensure", {});
+}
+
+/** Admin: snapshot the current draft into the public demo. */
+export async function publishDemoDesign() {
+  return api.post("/digital/demo/publish", {});
+}
+
+/** Public: the published demo snapshot, or null if nothing is published yet. */
+export async function getDemoDesignPublic() {
+  try {
+    return await api.get("/digital/demo/public", { skipAuth: true });
   } catch {
     return null;
   }

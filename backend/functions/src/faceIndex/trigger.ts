@@ -27,6 +27,18 @@ import { isRekognitionConfigured, activeIndexVersion } from "./config";
 /** Mirrors engine.MAX_DECODE_BYTES without importing the heavy module. */
 const MAX_DECODE_BYTES = 80 * 1024 * 1024;
 
+/**
+ * True when biometric indexing must be DEFERRED because the wedding has not
+ * opened its consent gate. Indexing is allowed once the groom publishes the
+ * gallery with acknowledgment (`indexingConsentGate`), or for any wedding that
+ * was already published before the gate existed (`photographerPublished`).
+ * Exported for unit testing the gate matrix without the Firestore handler.
+ */
+export function indexingDeferred(parentData: Record<string, unknown> | undefined): boolean {
+  const d = parentData ?? {};
+  return d.indexingConsentGate !== true && d.photographerPublished !== true;
+}
+
 export const indexPhotographerFile = onDocumentWritten(
   {
     document: "digitalInvitations/{uid}/photographerFiles/{fileId}",
@@ -104,6 +116,22 @@ export const indexPhotographerFile = onDocumentWritten(
         ...(error ? { error: error.slice(0, 500) } : {}),
       });
     };
+
+    // Consent gate: do not index ANYONE's biometric data until the wedding has
+    // opted in. Publishing the gallery sets `indexingConsentGate` (the groom
+    // affirms guests were notified — see media.routes.ts), which is the DPIA
+    // lawful basis for indexing every face visible in the photos. A wedding
+    // already published predates this gate and keeps indexing. Until the gate
+    // opens we persist a `deferred_no_consent` status row — no AWS call, no
+    // face vectors stored — so index-status stays accurate; the publish
+    // backfill (touchUnindexedPhotographerFiles) re-touches these files and
+    // they index then. Placed after the idempotency return so an already-"ok"
+    // row from a published wedding is never clobbered.
+    const parent = await fs.doc(`digitalInvitations/${uid}`).get();
+    if (indexingDeferred(parent.data())) {
+      await writeRow("deferred_no_consent", []);
+      return;
+    }
 
     try {
       const file = getStorage().bucket().file(storagePath);

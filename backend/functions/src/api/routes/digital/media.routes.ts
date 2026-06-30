@@ -171,8 +171,37 @@ router.patch(
         publishFlippedOn =
           !before.exists || before.data()?.photographerPublished !== true;
       }
+      // Publishing turns on biometric face indexing for EVERY guest visible in
+      // the photographer's photos. The first publish requires the groom to
+      // affirm guests were notified (DPIA lawful-basis gate); that same flip
+      // opens `indexingConsentGate`, which faceIndex/trigger.ts checks before
+      // indexing any face. Refuse the flip (no write) if the ack is missing.
+      if (publishFlippedOn) {
+        if (req.body?.photographerAck !== true) {
+          res.status(409).json({ error: "ack_required" });
+          return;
+        }
+        patch.indexingConsentGate = true;
+      }
       await parentDoc(req.params.uid).set(patch, { merge: true });
       if (publishFlippedOn) {
+        // Persist the acknowledgment to the server-only galleryConfig subdoc so
+        // it is auditable but never exposed on the public-read parent doc.
+        await fs()
+          .doc(`digitalInvitations/${req.params.uid}/galleryConfig/config`)
+          .set(
+            {
+              photographerAck: {
+                at: Date.now(),
+                byUid: req.caller?.uid ?? null,
+                version: "photog-ack-v1",
+                notifiedGuests: true,
+              },
+            },
+            { merge: true },
+          )
+          .catch((err) => console.error("[digital] ack persist failed", err));
+
         // Best-effort: a backfill hiccup must never fail the settings write.
         // Awaited (not fire-and-forget) because Cloud Functions may freeze
         // the instance right after the response is sent.

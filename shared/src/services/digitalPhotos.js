@@ -58,10 +58,11 @@ export async function createLivenessSession(token) {
  * @param {string} [phone]   E.164-ish phone to receive the link
  * @returns {Promise<{ok:boolean, expiresAt:number, matches:Array}>}
  */
-export async function enrollSelfieUpload(token, file, phone) {
+export async function enrollSelfieUpload(token, file, phone, consent) {
   const fd = new FormData();
   fd.append("token", token);
   if (phone) fd.append("phone", phone);
+  if (consent) fd.append("consent", "true");
   fd.append("selfie", file, file.name || "selfie.jpg");
   // token also in the query so the server-side rate limiter can key on it.
   return api.upload(`/digital/photos/enroll?token=${encodeURIComponent(token)}`, fd, {
@@ -71,12 +72,13 @@ export async function enrollSelfieUpload(token, file, phone) {
 
 /**
  * Enroll via a completed Face Liveness session (camera path). The verified
- * reference image is fetched server-side from AWS.
+ * reference image is fetched server-side from AWS. `consent` must be true —
+ * the server rejects enrollment without affirmative biometric consent.
  */
-export async function enrollWithLiveness(token, livenessSessionId, phone) {
+export async function enrollWithLiveness(token, livenessSessionId, phone, consent) {
   return api.post(
     "/digital/photos/enroll",
-    { token, livenessSessionId, phone },
+    { token, livenessSessionId, phone, consent: consent === true },
     { skipAuth: true },
   );
 }

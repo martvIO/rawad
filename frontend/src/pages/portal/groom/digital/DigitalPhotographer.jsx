@@ -67,6 +67,8 @@ export function DigitalPhotographer() {
   const [editName,   setEditName]   = useState("");
   const [published,  setPublished]  = useState(false);
   const [publishBusy, setPublishBusy] = useState(false);
+  const [ackOpen,    setAckOpen]    = useState(false); // biometric-indexing ack modal
+  const [ackChecked, setAckChecked] = useState(false);
   // Auto-send "your photos are ready" WhatsApp link to every guest on publish.
   const [autoSend,    setAutoSend]    = useState(false);
   const [autoSendBusy, setAutoSendBusy] = useState(false);
@@ -143,12 +145,21 @@ export function DigitalPhotographer() {
   }, [currentUid, storageFiles, files]);
 
   const togglePublish = async () => {
+    // Publishing turns on biometric face indexing for EVERYONE visible in the
+    // photos (including non-registered guests) — require an explicit
+    // acknowledgment first. Un-publishing needs no ack.
+    if (!published) { setAckChecked(false); setAckOpen(true); return; }
+    await applyPublish(false, false);
+  };
+
+  const applyPublish = async (next, ack) => {
     setPublishBusy(true);
     try {
-      await setPhotographerPublished(currentUid, !published);
-      showToast(!published
+      await setPhotographerPublished(currentUid, next, ack);
+      showToast(next
         ? (lang === "he" ? "✓ הצילומים פורסמו" : "✓ تم نشر الصور")
         : (lang === "he" ? "הצילומים נמחקו מהפרסום" : "تم إلغاء نشر الصور"));
+      setAckOpen(false);
     } catch (err) {
       logErr("setPhotographerPublished", err);
       showToast(localizeApiError(err, lang));
@@ -470,6 +481,51 @@ export function DigitalPhotographer() {
               : (lang === "he" ? "📢 פרסם" : "📢 أنشر الصور"))}
         </button>
       </div>
+
+      {/* ── Biometric-indexing acknowledgment (DPIA lawful-basis gate) ──── */}
+      {ackOpen && (
+        <div onClick={() => !publishBusy && setAckOpen(false)} style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,.6)", zIndex: 1000,
+          display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
+        }}>
+          <div onClick={(e) => e.stopPropagation()} style={{
+            background: "#15131a", border: "1px solid rgba(201,168,76,.35)", borderRadius: 16,
+            padding: 24, maxWidth: 440, width: "100%",
+          }}>
+            <div style={{ fontSize: 32, textAlign: "center", marginBottom: 8 }}>🪪</div>
+            <div style={{ fontSize: 15, fontWeight: 800, color: C.gold, textAlign: "center", marginBottom: 12 }}>
+              {lang === "he" ? "פרסום מפעיל זיהוי פנים" : "النشر يُفعّل التعرف على الوجوه"}
+            </div>
+            <div style={{ fontSize: 12.5, color: C.dim, lineHeight: 1.9, marginBottom: 16 }}>
+              {lang === "he"
+                ? "פרסום הצילומים מנתח את כל הפנים הנראות בתמונות (כולל אורחים שאינם רשומים) באמצעות זיהוי פנים (AWS) כדי לאפשר חיפוש לפי אדם. החתימות נמחקות אוטומטית אחרי האירוע."
+                : "نشر الصور يحلّل كل الوجوه الظاهرة في الصور (بما في ذلك ضيوف غير مسجّلين) عبر التعرف على الوجه (AWS) لتمكين البحث حسب الشخص. تُحذف التواقيع تلقائياً بعد الحفل."}
+            </div>
+            <label style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer", fontSize: 12.5, color: C.dim, lineHeight: 1.7, marginBottom: 18 }}>
+              <input type="checkbox" checked={ackChecked} onChange={(e) => setAckChecked(e.target.checked)}
+                     style={{ marginTop: 3, flexShrink: 0, width: 16, height: 16, accentColor: C.gold, cursor: "pointer" }} />
+              <span>{lang === "he"
+                ? "אני מאשר שהמוזמנים יודעו שכל הפנים בתמונות מנותחות לצורך חיפוש."
+                : "أؤكّد أن المعازيم أُبلغوا بأن كل الوجوه في الصور تُحلَّل لغرض البحث."}</span>
+            </label>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={() => setAckOpen(false)} disabled={publishBusy} style={{
+                flex: 1, padding: "10px 14px", borderRadius: 10, border: "1px solid rgba(255,255,255,.15)",
+                background: "none", color: C.dim, cursor: "pointer", fontWeight: 700, fontSize: 13,
+              }}>
+                {lang === "he" ? "ביטול" : "إلغاء"}
+              </button>
+              <button onClick={() => applyPublish(true, true)} disabled={!ackChecked || publishBusy} style={{
+                flex: 1, padding: "10px 14px", borderRadius: 10, border: "none", fontWeight: 800, fontSize: 13,
+                background: "linear-gradient(135deg,#4cc97a,#2da85a)", color: "#fff",
+                opacity: (!ackChecked || publishBusy) ? 0.5 : 1, cursor: (!ackChecked || publishBusy) ? "not-allowed" : "pointer",
+              }}>
+                {publishBusy ? "..." : (lang === "he" ? "📢 פרסם" : "📢 أنشر")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Auto-send photos to guests on publish ──────────────────────── */}
       <div style={{
