@@ -1,4 +1,4 @@
-import { MAX_DESIGN_TITLE_LEN,MAX_GUEST_NAME_LEN,MAX_GUEST_PHONE_LEN,MAX_GUEST_RANK_LEN,MAX_GUEST_NOTE_LEN,MAX_BRIDE_NAME_LEN,MAX_VENUE_LEN,MAX_VENUE_ADDR_LEN,MAX_CUSTOM_MSG_LEN,MAX_STORY_LEN,MAX_EVENT_TITLE_LEN,MAX_EVENT_TIME_LEN,MAX_EVENT_VENUE_LEN,MAX_EVENT_ADDR_LEN,MAX_MAP_URL_LEN,MAX_GIFT_IBAN_LEN,MAX_GIFT_NOTE_LEN,MAX_MUSIC_URL_LEN,MAX_EVENT_ICON_LEN,MAX_EVENTS,MAX_RANK_ITEMS,MAX_EYEBROW_LEN,MAX_MONOGRAM_LEN,MAX_VENUE_CITY_LEN,MAX_ACCESS_NOTE_LEN,MAX_DRESS_CODE_LEN,MAX_BLESSING_LEN,MAX_WELCOME_LEN,MAX_STORY_WHEN_LEN,MAX_STORY_TITLE_LEN,MAX_STORY_BODY_LEN,MAX_STORY_ITEMS,MAX_DETAIL_META_LEN,MAX_DETAIL_TITLE_LEN,MAX_DETAIL_BODY_LEN,MAX_DETAIL_ITEMS,MAX_HOTEL_NAME_LEN,MAX_HOTEL_WALK_LEN,MAX_HOTEL_ITEMS,MAX_WISH_WHO_LEN,MAX_WISH_WHAT_LEN,MAX_WISH_ITEMS,MAX_MEAL_OPTION_LEN,MAX_MEAL_OPTIONS,MAX_CAPTION_LEN,MAX_CAPTION_ENTRIES,MAX_GUEST_STATUSES,THEME_COLORS,FONT_FAMILIES } from "./constants";
+import { MAX_DESIGN_TITLE_LEN,MAX_GUEST_NAME_LEN,MAX_GUEST_PHONE_LEN,MAX_GUEST_RANK_LEN,MAX_GUEST_NOTE_LEN,MAX_BRIDE_NAME_LEN,MAX_VENUE_LEN,MAX_VENUE_ADDR_LEN,MAX_CUSTOM_MSG_LEN,MAX_STORY_LEN,MAX_EVENT_TITLE_LEN,MAX_EVENT_TIME_LEN,MAX_EVENT_VENUE_LEN,MAX_EVENT_ADDR_LEN,MAX_MAP_URL_LEN,MAX_GIFT_IBAN_LEN,MAX_GIFT_NOTE_LEN,MAX_MUSIC_URL_LEN,MAX_EVENT_ICON_LEN,MAX_EVENTS,MAX_RANK_ITEMS,MAX_EYEBROW_LEN,MAX_MONOGRAM_LEN,MAX_VENUE_CITY_LEN,MAX_ACCESS_NOTE_LEN,MAX_DRESS_CODE_LEN,MAX_BLESSING_LEN,MAX_WELCOME_LEN,MAX_STORY_WHEN_LEN,MAX_STORY_TITLE_LEN,MAX_STORY_BODY_LEN,MAX_STORY_ITEMS,MAX_DETAIL_META_LEN,MAX_DETAIL_TITLE_LEN,MAX_DETAIL_BODY_LEN,MAX_DETAIL_ITEMS,MAX_HOTEL_NAME_LEN,MAX_HOTEL_WALK_LEN,MAX_HOTEL_ITEMS,MAX_WISH_WHO_LEN,MAX_WISH_WHAT_LEN,MAX_WISH_ITEMS,MAX_MEAL_OPTION_LEN,MAX_MEAL_OPTIONS,MAX_CAPTION_LEN,MAX_CAPTION_ENTRIES,MAX_GUEST_STATUSES,HEX_COLOR_RE,ENVELOPE_COLOR_KEYS,STAR_DENSITY_MIN,STAR_DENSITY_MAX,STAR_INTENSITY_MIN,STAR_INTENSITY_MAX,THEME_COLORS,FONT_FAMILIES } from "./constants";
 
 // ─── Sanitizers ───────────────────────────────────────────────────────────────
 
@@ -230,6 +230,18 @@ interface MediaSettings {
   rsvpSongEnabled?: boolean;
   heroMediaEnabled?: boolean;
   title?: Localized;
+  envelope?: EnvelopeSettings;
+}
+
+interface EnvelopeSettings {
+  paper?: string;
+  wax?: string;
+  foil?: string;
+  cardPaper?: string;
+  cardInk?: string;
+  stars?: boolean;
+  starDensity?: number;
+  starIntensity?: number;
 }
 
 function sanitizeMediaSettings(body: unknown): Sanitized<MediaSettings> {
@@ -488,6 +500,13 @@ function sanitizeMediaSettings(body: unknown): Sanitized<MediaSettings> {
     out.mediaCaptions = cleaned;
   }
 
+  // ── 3D envelope colour/star overrides ────────────────────────────────────
+  if (data.envelope !== undefined) {
+    const env = sanitizeEnvelope(data.envelope);
+    if (!env.ok) return env;
+    out.envelope = env.value;
+  }
+
   const boolKeys: (keyof MediaSettings)[] = [
     "storyEnabled",
     "eventsEnabled",
@@ -513,6 +532,46 @@ function sanitizeMediaSettings(body: unknown): Sanitized<MediaSettings> {
       }
       (out as Record<string, unknown>)[key] = data[key];
     }
+  }
+  return { ok: true, value: out };
+}
+
+function clampRange(v: number, min: number, max: number): number {
+  return v < min ? min : v > max ? max : v;
+}
+
+/**
+ * Sanitize the 3D-envelope override object: validate hex colours, clamp the star
+ * sliders (clamp, never reject), and drop empty/absent overrides so partial
+ * overrides persist cleanly with set({merge:true}). `null` / `{}` ⇒ reset all
+ * overrides back to the theme/baseline defaults.
+ */
+function sanitizeEnvelope(v: unknown): Sanitized<EnvelopeSettings> {
+  if (v === null) return { ok: true, value: {} };
+  if (typeof v !== "object" || Array.isArray(v)) {
+    return { ok: false, error: "invalid_envelope", field: "envelope" };
+  }
+  const o = v as Record<string, unknown>;
+  const out: EnvelopeSettings = {};
+  for (const key of ENVELOPE_COLOR_KEYS) {
+    const raw = o[key];
+    if (raw === undefined || raw === "") continue; // unset → fall back to default
+    if (typeof raw !== "string" || !HEX_COLOR_RE.test(raw)) {
+      return { ok: false, error: "invalid_envelope_color", field: `envelope.${key}` };
+    }
+    out[key] = raw.toLowerCase();
+  }
+  if (o.stars !== undefined) {
+    if (typeof o.stars !== "boolean") {
+      return { ok: false, error: "invalid_toggle", field: "envelope.stars" };
+    }
+    out.stars = o.stars;
+  }
+  if (typeof o.starDensity === "number" && Number.isFinite(o.starDensity)) {
+    out.starDensity = Math.round(clampRange(o.starDensity, STAR_DENSITY_MIN, STAR_DENSITY_MAX));
+  }
+  if (typeof o.starIntensity === "number" && Number.isFinite(o.starIntensity)) {
+    out.starIntensity = clampRange(o.starIntensity, STAR_INTENSITY_MIN, STAR_INTENSITY_MAX);
   }
   return { ok: true, value: out };
 }

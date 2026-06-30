@@ -226,6 +226,7 @@ export function DigitalInvitationView({
         blessing={blessing}
         welcome={welcome}
         dateText={dateText}
+        envelopeOverrides={design?.envelope && typeof design.envelope === "object" ? design.envelope : null}
       />
 
       <Hero

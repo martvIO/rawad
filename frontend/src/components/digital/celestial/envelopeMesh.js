@@ -66,9 +66,18 @@ function triPanel(pts, depth, mat) {
 export function buildEnvelope({ colors, content } = {}) {
   const pal = {
     foil: "#d4a07a", foilBright: "#f4d4c4", paper: "#2a211a",
-    wax: "#4c3a2e", cardPaper: "#f9f6f0", cardInk: "#3a2412",
+    wax: "#f4ece0", cardPaper: "#f9f6f0", cardInk: "#3a2412",
     ...(colors || {}),
   };
+  // Star (arabesque) options — one coherent system across the flap + shell.
+  // They ride on the same `colors` object from resolveEnvelopePalette().
+  const starsEnabled = colors?.starsEnabled !== false;            // default ON
+  const starDensity = Number.isFinite(colors?.starDensity) ? colors.starDensity : 2;
+  const starIntensity = (typeof colors?.starIntensity === "number" && Number.isFinite(colors.starIntensity))
+    ? colors.starIntensity : null;                                // null → per-surface defaults
+  const densF = starDensity / 2;                                  // density 2 = baseline 1×
+  const flapAlpha = starIntensity != null ? starIntensity : 0.34; // flap is the focal surface
+  const shellAlpha = starIntensity != null ? starIntensity * 0.65 : 0.22; // back/V-pocket subtler
   const text = {
     eyebrow: "دعوة شخصية · הזמנה אישית",
     blessing: "",
@@ -127,25 +136,49 @@ export function buildEnvelope({ colors, content } = {}) {
   })();
 
   // ── materials ──
-  const paperMat = new THREE.MeshStandardMaterial({
-    color: col(pal.paper, "#0f0d0b"), metalness: 0.05, roughness: 1.0, roughnessMap: grain,
-    envMap: env, envMapIntensity: 0.06, side: THREE.DoubleSide, transparent: true, depthWrite: true,
-  });
-  const paperMat2 = new THREE.MeshStandardMaterial({
-    color: col(pal.paper, "#0f0d0b").clone().offsetHSL(0, 0, 0.03), metalness: 0.05, roughness: 1.0,
-    roughnessMap: grain, envMap: env, envMapIntensity: 0.06, side: THREE.DoubleSide, transparent: true, depthWrite: true,
-  });
-  // Flap face — deep jewel cardstock carrying a tone-on-tone gold-foil arabesque
-  // (the foil lattice is the smooth metallic part via metalness/roughness maps).
-  const flapArab = makeArabesque({
-    bg: pal.paper, line: pal.foil, alpha: 0.34, lineW: 2.6, cells: 2, repeat: [0.5, 0.62], withMetal: true,
-  });
-  disposables.push(flapArab.color, flapArab.metal, flapArab.rough);
-  const flapMat = new THREE.MeshStandardMaterial({
-    color: 0xffffff, map: flapArab.color, metalnessMap: flapArab.metal, roughnessMap: flapArab.rough,
-    metalness: 1.0, roughness: 1.0, envMap: env, envMapIntensity: 0.55,
+  // Plain matte cardstock (used when stars are OFF, and as the foil-arabesque
+  // base colour when ON). DoubleSide so the body reads from behind as the flap pivots.
+  const plainPaper = (lighten) => new THREE.MeshStandardMaterial({
+    color: lighten ? col(pal.paper, "#0f0d0b").clone().offsetHSL(0, 0, 0.03) : col(pal.paper, "#0f0d0b"),
+    metalness: 0.05, roughness: 1.0, roughnessMap: grain, envMap: env, envMapIntensity: 0.06,
     side: THREE.DoubleSide, transparent: true, depthWrite: true,
   });
+  // A tone-on-tone gold-foil arabesque material: the foil lattice is the smooth
+  // metallic part via metalness/roughness maps over the matte paper colour (the
+  // colour is baked into the map, so the material base stays white — matches the
+  // card/flap baked-map pattern).
+  const arabMat = (arab, envI) => new THREE.MeshStandardMaterial({
+    color: 0xffffff, map: arab.color, metalnessMap: arab.metal, roughnessMap: arab.rough,
+    metalness: 1.0, roughness: 1.0, envMap: env, envMapIntensity: envI,
+    side: THREE.DoubleSide, transparent: true, depthWrite: true,
+  });
+  // One arabesque map set. `repeat` chosen per surface so the star SCALE matches
+  // across geometries: triPanel/flap use ExtrudeGeometry (design-unit UVs) so they
+  // share the flap repeat; the back wall is a BoxGeometry (0..1 face UVs) so it
+  // needs a larger repeat to land at the same on-screen star size.
+  const mkArab = (alpha, lineW, repeat) => {
+    const a = makeArabesque({ bg: pal.paper, line: pal.foil, alpha, lineW, cells: 2, repeat, withMetal: true });
+    disposables.push(a.color, a.metal, a.rough);
+    return a;
+  };
+
+  // Back wall (BoxGeometry) + V-pocket panels (ExtrudeGeometry) — the exterior
+  // shell now carries the same gold-star arabesque as the flap (subtler alpha so
+  // the flap stays the focal point). When stars are OFF, plain matte cardstock.
+  let paperMat, paperMat2;
+  if (starsEnabled) {
+    paperMat = arabMat(mkArab(shellAlpha, 2.2, [1.7 * densF, 1.4 * densF]), 0.4);   // back wall
+    paperMat2 = arabMat(mkArab(shellAlpha, 2.2, [0.5 * densF, 0.62 * densF]), 0.4); // V-pocket
+  } else {
+    paperMat = plainPaper(false);
+    paperMat2 = plainPaper(true);
+  }
+
+  // Flap face — same star system; falls back to plain jewel cardstock when off so
+  // "stars off" removes the decoration everywhere.
+  const flapMat = starsEnabled
+    ? arabMat(mkArab(flapAlpha, 2.6, [0.5 * densF, 0.62 * densF]), 0.55)
+    : plainPaper(false);
 
   // Flap lining — rich satin silk in a deep contrasting tone with a faint gold
   // arabesque; the luxury "lined envelope" reveal as the flap pivots open.

@@ -3,7 +3,7 @@ import { Ambience } from "./InviteAmbience.jsx";
 import { CelestialEnvelopeOverlay } from "./CelestialEnvelopeOverlay.jsx";
 import { useDeviceCapability } from "../../../hooks/useDeviceCapability.js";
 import { celDowngraded, markCelDowngraded } from "../celestial/downgradeStore.js";
-import { themeToEnvelopePalette } from "../../../utils/themeToEnvelopePalette.js";
+import { resolveEnvelopePalette } from "../../../utils/themeToEnvelopePalette.js";
 
 // Single owner of the invitation's backdrop AND intro envelope. It decides,
 // per device capability and the groom's flags:
@@ -25,6 +25,7 @@ export function CelestialAmbience({
   theme, font, lang, mode = "public", fixed = true, immersive3d = true,
   showEnvelope = false, demo = false, guestName = "", monogram = "",
   namesAr = "", namesHe = "", eyebrow = "", blessing = "", welcome = "", dateText = "",
+  envelopeOverrides = null,
 }) {
   const cap = useDeviceCapability();
   const [downgraded, setDowngraded] = useState(celDowngraded);
@@ -98,7 +99,7 @@ export function CelestialAmbience({
             tier={cap.tier}
             onFpsDowngrade={onFpsDowngrade}
             envelope={envActiveRef.current ? {
-              colors: themeToEnvelopePalette(theme),
+              colors: resolveEnvelopePalette(theme, envelopeOverrides),
               monogram,
               content: { namesAr, namesHe, blessing, welcome, eyebrow, date: dateText },
             } : null}

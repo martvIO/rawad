@@ -2,7 +2,7 @@
 // the luxury invitation — text, dates, photos, story timeline, details, venue,
 // guestbook, RSVP options — sees a live preview, then submits for admin
 // approval. Section toggles let the groom hide any part of the design.
-import { useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { usePortal } from "../../../../context/PortalContext.jsx";
 import { localizeApiError } from "../../../../utils/apiError.js";
 import {
@@ -22,8 +22,13 @@ import {
 import { logErr } from "../../../../utils/logger.js";
 import { ensureDigitalFonts } from "../../../../utils/digitalFonts.js";
 import { C } from "../../../../styles/theme.js";
-import { DIGITAL_THEMES, DIGITAL_FONTS, DIGITAL_THEME_KEYS, DIGITAL_FONT_KEYS } from "../../../../styles/digitalThemes.js";
+import { DIGITAL_THEMES, DIGITAL_FONTS, DIGITAL_THEME_KEYS, DIGITAL_FONT_KEYS, getDigitalTheme } from "../../../../styles/digitalThemes.js";
+import { resolveEnvelopePalette } from "../../../../utils/themeToEnvelopePalette.js";
 import { DigitalInvitationView } from "../../../../components/digital/DigitalInvitationView.jsx";
+
+// Lazy WebGL host for the dedicated sealed-envelope preview (pulls `three` only
+// when the design editor's envelope section mounts).
+const CelestialCanvas = lazy(() => import("../../../../components/digital/celestial/CelestialCanvas.jsx"));
 import {
   DEFAULT_EYEBROW,
   DEFAULT_BLESSING,
@@ -241,7 +246,7 @@ function DesignSwitcher({ designs, selectedId, lang, busy, onSelect, onCreate, o
 
 // The editor body, bound to ONE design (groomUid + designId). Wrapped by the
 // DigitalDesignManager below, which lets the groom switch between designs.
-function DesignEditorBody({ groomUid, designId }) {
+export function DesignEditorBody({ groomUid, designId, adminDemoMode = false, onPublish, publishing = false }) {
   const { lang, showToast } = usePortal();
   const currentUid = groomUid;
   const langKey = lang === "he" ? "he" : "ar";
@@ -307,6 +312,7 @@ function DesignEditorBody({ groomUid, designId }) {
         ARRAY_KEYS.forEach((k) => apply(k, Array.isArray(next[k]) ? next[k] : []));
         TOGGLE_KEYS.forEach((k) => apply(k, next[k] !== false));
         apply("mediaCaptions", next.mediaCaptions && typeof next.mediaCaptions === "object" ? next.mediaCaptions : {});
+        apply("envelope", next.envelope && typeof next.envelope === "object" ? next.envelope : {});
         apply("themeColor", next.themeColor || "gold");
         apply("fontFamily", next.fontFamily || "amiri");
         return merged;
@@ -319,13 +325,19 @@ function DesignEditorBody({ groomUid, designId }) {
   // instantly (optimistic), before the background save round-trips.
   const themeColor = f.themeColor || doc?.themeColor || "gold";
   const fontFamily = f.fontFamily || doc?.fontFamily || "amiri";
+  // 3D-envelope overrides (one buffered nested object, like mediaCaptions) and the
+  // theme-derived defaults shown in the swatches when an override is unset.
+  const envOverrides = f.envelope && typeof f.envelope === "object" ? f.envelope : {};
+  const envDefaults = useMemo(() => resolveEnvelopePalette(getDigitalTheme(themeColor)), [themeColor]);
   const media = Array.isArray(doc?.media) ? doc.media : [];
   const heroMedia = Array.isArray(doc?.heroMedia) ? doc.heroMedia : [];
 
   // Draft & rejected are directly editable; pending is read-only (awaiting admin).
   // Approved is LOCKED until the groom deliberately presses "تعديل التصميم"
   // (editUnlocked) — then the first field edit demotes it to draft (server-side).
-  const editable = status === "draft" || status === "rejected" || (status === "approved" && editUnlocked);
+  // Demo mode (admin): always editable — the demo design is a perpetual draft;
+  // it goes live only via the explicit "Publish to demo" button, never approval.
+  const editable = adminDemoMode || status === "draft" || status === "rejected" || (status === "approved" && editUnlocked);
 
   // The live design that drives the preview: saved doc + buffered overrides.
   const previewDesign = useMemo(
@@ -376,6 +388,7 @@ function DesignEditorBody({ groomUid, designId }) {
       if (ARRAY_KEYS.includes(key)) return { ...prev, [key]: Array.isArray(cur[key]) ? cur[key] : [] };
       if (TOGGLE_KEYS.includes(key)) return { ...prev, [key]: cur[key] !== false };
       if (key === "mediaCaptions") return { ...prev, mediaCaptions: cur.mediaCaptions || {} };
+      if (key === "envelope") return { ...prev, envelope: cur.envelope || {} };
       if (key === "themeColor") return { ...prev, themeColor: cur.themeColor || "gold" };
       if (key === "fontFamily") return { ...prev, fontFamily: cur.fontFamily || "amiri" };
       return { ...prev, [key]: cur[key] || "" };
@@ -421,6 +434,37 @@ function DesignEditorBody({ groomUid, designId }) {
     if (!editable || fontFamily === key) return;
     setField("fontFamily", key);
     flush("fontFamily", key);
+  };
+
+  // ── Envelope (3D) overrides ──────────────────────────────────────────────
+  // The whole envelope config lives in one buffered nested object. A sub-key set
+  // to null/"" is removed → that property falls back to the theme/baseline default.
+  const nextEnv = (subKey, value) => {
+    const n = { ...envOverrides };
+    if (value == null || value === "") delete n[subKey];
+    else n[subKey] = value;
+    return n;
+  };
+  // Immediate persist (colours, preset chips, reset, stars toggle) — optimistic
+  // like onPickTheme: update the buffer (preview re-renders) then save in the bg.
+  const setEnvField = (subKey, value) => {
+    if (!editable) return;
+    const n = nextEnv(subKey, value);
+    setField("envelope", n);
+    flush("envelope", n);
+  };
+  const resetEnvField = (subKey) => setEnvField(subKey, null);
+  // Sliders: buffer live while dragging (preview updates), persist once on commit
+  // (pointer-up / keyboard) so we don't PATCH on every pixel.
+  const bufferEnvField = (subKey, value) => {
+    if (!editable) return;
+    setField("envelope", nextEnv(subKey, value));
+  };
+  const commitEnvField = (subKey, value) => {
+    if (!editable) return;
+    const n = nextEnv(subKey, value);
+    setField("envelope", n);
+    flush("envelope", n);
   };
 
   // One-click: start from the full sample design for any sections still empty.
@@ -623,8 +667,10 @@ function DesignEditorBody({ groomUid, designId }) {
         />
       </div>
 
-      <StatusBanner status={status} doc={doc} lang={lang} onCancel={onCancelSubmission} busy={busy}
-        editUnlocked={editUnlocked} onEditApproved={onEditApproved} />
+      {!adminDemoMode && (
+        <StatusBanner status={status} doc={doc} lang={lang} onCancel={onCancelSubmission} busy={busy}
+          editUnlocked={editUnlocked} onEditApproved={onEditApproved} />
+      )}
 
       {/* Guestbook wish moderation — guest "شاركونا" messages; approve to publish to all. */}
       {wishes.length > 0 && (() => {
@@ -1029,6 +1075,37 @@ function DesignEditorBody({ groomUid, designId }) {
           <ToggleRow label={tt(lang, "شريط الأدوات العائم (مشاركة / تقويم)", "סרגל צף (שיתוף / יומן)")} checked={tog("footerDockEnabled")} disabled={!editable} testid="design-toggle-footer" onChange={(c) => toggle("footerDockEnabled", c)} />
         </Section>
 
+        {/* Envelope (3D) customization */}
+        <Section title={tt(lang, "المظروف ثلاثي الأبعاد", "מעטפה תלת-ממדית")}>
+          <div style={{ fontSize: 11, color: C.dim, marginBottom: 12, lineHeight: 1.6 }}>
+            {tt(lang, "خصّص ألوان المظروف والنجوم. اترك أي لون فارغاً لاستخدام لون القالب.", "התאם את צבעי המעטפה והכוכבים. השאר צבע ריק כדי להשתמש בצבע הערכה.")}
+          </div>
+          <EnvColorRow testid="design-env-paper" label={tt(lang, "لون الورق", "צבע הנייר")} value={envOverrides.paper} defaultHex={envDefaults.paper} presets={["#2a211a", "#1a1f2e", "#f9f6f0", "#2a1a1a"]} disabled={!editable} onPick={(hex) => setEnvField("paper", hex)} onReset={() => resetEnvField("paper")} />
+          <EnvColorRow testid="design-env-wax" label={tt(lang, "لون الختم (الدائرة)", "צבע החותם (העיגול)")} value={envOverrides.wax} defaultHex={envDefaults.wax} presets={["#f4ece0", "#b3232a", "#1f3b2e", "#caa14e"]} disabled={!editable} onPick={(hex) => setEnvField("wax", hex)} onReset={() => resetEnvField("wax")} />
+          <EnvColorRow testid="design-env-foil" label={tt(lang, "لون النجوم والذهب", "צבע הכוכבים והזהב")} value={envOverrides.foil} defaultHex={envDefaults.foil} presets={["#caa14e", "#c0c0c0", "#e8b4b8", "#d4af37"]} disabled={!editable} onPick={(hex) => setEnvField("foil", hex)} onReset={() => resetEnvField("foil")} />
+          <EnvColorRow testid="design-env-card" label={tt(lang, "لون البطاقة الداخلية", "צבע הכרטיס הפנימי")} value={envOverrides.cardPaper} defaultHex={envDefaults.cardPaper} presets={["#f9f6f0", "#f4ece0", "#f7f0e6", "#efe6d8"]} disabled={!editable} onPick={(hex) => setEnvField("cardPaper", hex)} onReset={() => resetEnvField("cardPaper")} />
+          <EnvColorRow testid="design-env-ink" label={tt(lang, "لون الحبر", "צבע הדיו")} value={envOverrides.cardInk} defaultHex={envDefaults.cardInk} presets={["#3a2412", "#1a1a1a", "#2a1a3a", "#1f3b2e"]} disabled={!editable} onPick={(hex) => setEnvField("cardInk", hex)} onReset={() => resetEnvField("cardInk")} />
+
+          <div style={{ marginTop: 12 }}>
+            <ToggleRow label={tt(lang, "نجوم على كامل المظروف", "כוכבים על כל המעטפה")} checked={envOverrides.stars !== false} disabled={!editable} testid="design-env-stars" onChange={(c) => setEnvField("stars", c)} />
+          </div>
+          <RangeRow testid="design-env-density" label={tt(lang, "كثافة النجوم", "צפיפות הכוכבים")} min={1} max={4} step={1} value={envOverrides.starDensity ?? 2} disabled={!editable || envOverrides.stars === false} onInput={(v) => bufferEnvField("starDensity", v)} onCommit={(v) => commitEnvField("starDensity", v)} />
+          <RangeRow testid="design-env-intensity" label={tt(lang, "وضوح النجوم", "עוצמת הכוכבים")} min={0} max={1} step={0.05} value={envOverrides.starIntensity ?? 0.22} disabled={!editable || envOverrides.stars === false} onInput={(v) => bufferEnvField("starIntensity", v)} onCommit={(v) => commitEnvField("starIntensity", v)} />
+
+          <EnvelopePreview
+            themeColor={themeColor}
+            overrides={envOverrides}
+            lang={lang}
+            content={{
+              namesAr: [leaf(f.groomDisplayName, "ar"), leaf(f.brideName, "ar")].map((s) => s.trim()).filter(Boolean).join(" و "),
+              namesHe: [leaf(f.groomDisplayName, "he"), leaf(f.brideName, "he")].map((s) => s.trim()).filter(Boolean).join(" ו"),
+              blessing: leaf(f.blessing, editLang),
+              welcome: leaf(f.welcome, editLang),
+              eyebrow: leaf(f.eyebrow, editLang),
+            }}
+          />
+        </Section>
+
         {/* Theme */}
         <Section title={tt(lang, "لون التصميم", "צבע העיצוב")}>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(110px, 1fr))", gap: 10 }}>
@@ -1063,8 +1140,12 @@ function DesignEditorBody({ groomUid, designId }) {
           </div>
         </Section>
 
-        {/* Submit */}
-        {(status === "draft" || status === "rejected") && (
+        {/* Submit (groom) / Publish (admin demo) */}
+        {adminDemoMode ? (
+          <button data-testid="demo-publish-btn" className="gold-btn" onClick={onPublish} disabled={publishing} style={{ width: "100%", padding: "14px 0", fontSize: 14, marginTop: 4 }}>
+            {publishing ? "..." : tt(lang, "🖼 نشر إلى صفحة العرض", "🖼 פרסם לדף ההדגמה")}
+          </button>
+        ) : (status === "draft" || status === "rejected") && (
           <button data-testid="design-submit-btn" className="gold-btn" onClick={onSubmit} disabled={busy} style={{ width: "100%", padding: "14px 0", fontSize: 14, marginTop: 4 }}>
             {busy ? "..." : status === "rejected" ? tt(lang, "📨 إعادة الإرسال للاعتماد", "📨 שלח שוב לאישור") : tt(lang, "📨 إرسال للاعتماد", "📨 שלח לאישור")}
           </button>
@@ -1249,6 +1330,94 @@ function FormField({ label, children }) {
     <div style={{ marginBottom: 12 }}>
       <div style={{ fontSize: 12, color: C.goldDim, marginBottom: 5 }}>{label}</div>
       {children}
+    </div>
+  );
+}
+
+// One envelope colour control: preset chips + a freeform native picker + a reset
+// link (active only when an override is set). The swatch reflects the override or
+// the live theme default when unset.
+function EnvColorRow({ testid, label, value, defaultHex, presets, onPick, onReset, disabled }) {
+  const shown = value || defaultHex || "#000000";
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "8px 2px", borderBottom: "1px solid rgba(255,255,255,.05)" }}>
+      <span style={{ fontSize: 13, color: C.goldLight, fontWeight: 700 }}>{label}</span>
+      <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+        {(presets || []).map((p, i) => (
+          <button
+            key={p} type="button" data-testid={`${testid}-chip-${i}`} disabled={disabled} title={p}
+            onClick={() => onPick(p)}
+            style={{ width: 20, height: 20, borderRadius: "50%", background: p, border: `2px solid ${value === p ? C.gold : "rgba(255,255,255,.18)"}`, cursor: disabled ? "not-allowed" : "pointer", padding: 0 }}
+          />
+        ))}
+        <input
+          type="color" data-testid={testid} value={shown} disabled={disabled}
+          onChange={(e) => onPick(e.target.value)}
+          style={{ width: 30, height: 26, padding: 0, border: "none", background: "none", cursor: disabled ? "not-allowed" : "pointer" }}
+        />
+        <button
+          type="button" data-testid={`${testid}-reset`} disabled={disabled || !value} onClick={onReset} title="reset"
+          style={{ fontSize: 13, lineHeight: 1, color: value ? C.gold : "rgba(255,255,255,.18)", background: "none", border: "none", cursor: disabled || !value ? "default" : "pointer", fontFamily: "inherit", padding: 2 }}
+        >↺</button>
+      </div>
+    </div>
+  );
+}
+
+// A labelled range slider styled like the toggles. `onInput` fires live while
+// dragging (buffer → preview updates); `onCommit` fires once on release (persist).
+function RangeRow({ testid, label, min, max, step, value, onInput, onCommit, disabled }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "10px 2px", opacity: disabled ? 0.5 : 1 }}>
+      <span style={{ fontSize: 13, color: C.goldLight, fontWeight: 700, whiteSpace: "nowrap" }}>{label}</span>
+      <input
+        type="range" data-testid={testid} min={min} max={max} step={step} value={value} disabled={disabled}
+        onChange={(e) => onInput(Number(e.target.value))}
+        onPointerUp={(e) => onCommit(Number(e.currentTarget.value))}
+        onKeyUp={(e) => onCommit(Number(e.currentTarget.value))}
+        style={{ flex: 1, maxWidth: 200, accentColor: C.gold, cursor: disabled ? "not-allowed" : "pointer" }}
+      />
+    </div>
+  );
+}
+
+// Dedicated sealed-envelope 3D preview. Mounts CelestialCanvas directly (bypassing
+// CelestialAmbience), so none of the public-page one-time-reveal / scroll-lock /
+// localStorage logic applies. CelestialCanvas captures the envelope at mount, so
+// we remount (clean dispose + fresh canvas) a beat after edits settle.
+function EnvelopePreview({ themeColor, overrides, content, lang }) {
+  const theme = useMemo(() => getDigitalTheme(themeColor), [themeColor]);
+  const colors = useMemo(() => resolveEnvelopePalette(theme, overrides), [theme, overrides]);
+  const colorsKey = useMemo(() => JSON.stringify(colors), [colors]);
+  const worldRef = useRef(null);
+  const [remount, setRemount] = useState(0);
+
+  // Debounced rebuild: bump the remount key ~250ms after the colours/options stop
+  // changing, so dragging a picker doesn't thrash the WebGL context.
+  useEffect(() => {
+    const id = setTimeout(() => setRemount((n) => n + 1), 250);
+    return () => clearTimeout(id);
+  }, [colorsKey]);
+
+  const play = () => worldRef.current?.openEnvelope({ onComplete: () => setRemount((n) => n + 1) });
+
+  return (
+    <div data-testid="design-env-preview" style={{ position: "relative", height: 300, borderRadius: 14, overflow: "hidden", border: "1px solid rgba(201,168,76,.22)", background: theme.bg, marginTop: 14 }}>
+      <Suspense fallback={null}>
+        <CelestialCanvas
+          key={remount}
+          theme={theme}
+          mode="preview"
+          fixed={false}
+          tier={2}
+          envelope={{ colors, content }}
+          onReady={(w) => { worldRef.current = w; }}
+          elevated={false}
+        />
+      </Suspense>
+      <button type="button" data-testid="design-env-play" onClick={play} style={{ position: "absolute", bottom: 10, left: "50%", transform: "translateX(-50%)", zIndex: 2, ...pillBtn(true) }}>
+        {tt(lang, "▶ تشغيل الفتح", "▶ הפעלת פתיחה")}
+      </button>
     </div>
   );
 }
