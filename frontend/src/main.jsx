@@ -1,4 +1,7 @@
 // Application entry point — mounts the React tree into #root.
+// MUST be first: wires the @dawa/core env + storage adapters before any
+// service/config module is evaluated.
+import "./initAdapters.js";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";

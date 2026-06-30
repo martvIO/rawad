@@ -1,0 +1,12 @@
+{
+  "name": "@dawa/core",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "دعوة — DOM-free shared core (REST client, services, utils, i18n, theme tokens). Imported by the web frontend (Vite alias) and the Expo app (Metro). Platform edges (storage, env) are injected via adapters.",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./*": "./src/*"
+  }
+}

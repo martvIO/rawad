@@ -2,20 +2,20 @@
 // modules are mocked so no fetch fires.
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
-vi.mock("../../utils/apiClient.js", () => {
+vi.mock("@dawa/core/utils/apiClient.js", () => {
   const api = { get: vi.fn(), post: vi.fn(), delete: vi.fn(), upload: vi.fn() };
   return { api, buildApiUrl: (p) => `/api${p}` };
 });
-vi.mock("../../utils/poller.js", () => ({
+vi.mock("@dawa/core/utils/poller.js", () => ({
   createPoller: vi.fn((fetchFn, cb) => {
     Promise.resolve().then(async () => { try { cb(await fetchFn()); } catch { /* noop */ } });
     return () => {};
   }),
 }));
-vi.mock("../../config/index.js", () => ({ POLL_MS: { DIGITAL: 15000 } }));
+vi.mock("@dawa/core/config/index.js", () => ({ POLL_MS: { DIGITAL: 15000 } }));
 
-import { api } from "../../utils/apiClient.js";
-import { createPoller } from "../../utils/poller.js";
+import { api } from "@dawa/core/utils/apiClient.js";
+import { createPoller } from "@dawa/core/utils/poller.js";
 import {
   subscribeFaceMatches,
   createLivenessSession,

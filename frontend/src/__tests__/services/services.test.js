@@ -4,7 +4,7 @@
 // and no token state leaks across tests.
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
-vi.mock("../../utils/apiClient.js", () => {
+vi.mock("@dawa/core/utils/apiClient.js", () => {
   const api = {
     get: vi.fn(),
     post: vi.fn(),
@@ -16,7 +16,7 @@ vi.mock("../../utils/apiClient.js", () => {
   return { api, buildApiUrl: (p) => `/api${p}` };
 });
 
-vi.mock("../../utils/tokenManager.js", () => ({
+vi.mock("@dawa/core/utils/tokenManager.js", () => ({
   loadStoredTokens: vi.fn(),
   storeTokens: vi.fn(),
   clearTokens: vi.fn(),
@@ -26,7 +26,7 @@ vi.mock("../../utils/tokenManager.js", () => ({
   setAuthClearedCallback: vi.fn(),
 }));
 
-vi.mock("../../utils/poller.js", () => ({
+vi.mock("@dawa/core/utils/poller.js", () => ({
   // Stub createPoller so the immediate tick fires once synchronously
   // (just enough to drive the callback). We don't simulate intervals.
   createPoller: vi.fn((fetchFn, cb, opts) => {
@@ -42,9 +42,9 @@ vi.mock("../../utils/poller.js", () => ({
   }),
 }));
 
-import { api } from "../../utils/apiClient.js";
-import * as tokenMgr from "../../utils/tokenManager.js";
-import { createPoller } from "../../utils/poller.js";
+import { api } from "@dawa/core/utils/apiClient.js";
+import * as tokenMgr from "@dawa/core/utils/tokenManager.js";
+import { createPoller } from "@dawa/core/utils/poller.js";
 
 import * as auth from "../../services/auth.js";
 import * as guests from "../../services/guests.js";
