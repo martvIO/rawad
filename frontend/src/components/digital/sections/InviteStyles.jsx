@@ -4,6 +4,19 @@ function ViewStyles({ theme, fixed }) {
     <style>{`
     .dawa-inv ::selection { background: ${theme.accentMuted}; }
 
+    /* Subtle global letter-spacing — opens the Arabic/Hebrew text a touch for a
+     * more elegant, airy feel. Kept tiny (.4px) so the cursive Arabic joins stay
+     * intact; per-element rules below override where more spacing is wanted. */
+    .dawa-inv {
+      letter-spacing: .4px;
+      /* Central vertical-spacing tokens (round-two tightening). The fluid clamps
+       * shrink the section rhythm on phones — where guests open the invite — while
+       * keeping desktop airy. Tune density here in one place. */
+      --inv-sec-pad: clamp(30px, 5vw, 48px);    /* section vertical padding + footer top (was 64px) */
+      --inv-head-gap: clamp(20px, 3.5vw, 28px); /* section-header bottom margin (was 36px) */
+      --inv-foot-bottom: 64px;                  /* footer bottom breathing room (was 96px) */
+    }
+
     /* Faint damask lattice — a barely-there ornamental texture over the whole
      * invitation. Tinted with the live accent so it adapts to every palette; kept
      * at ~4% so it reads as luxury paper grain, never noise. Robust everywhere
@@ -37,7 +50,7 @@ function ViewStyles({ theme, fixed }) {
     }
 
     /* Section shell */
-    .dawa-inv .dawa-inv-section { position: relative; padding: 96px 24px; max-width: 1080px; margin: 0 auto; z-index: 6; }
+    .dawa-inv .dawa-inv-section { position: relative; padding: var(--inv-sec-pad) 24px; max-width: 1080px; margin: 0 auto; z-index: 6; }
     .dawa-inv .dawa-inv-eyebrow { font-size: 11.5px; letter-spacing: 4px; text-transform: uppercase; font-style: italic; display: inline-flex; align-items: center; gap: 14px; margin-bottom: 16px; }
     .dawa-inv .dawa-inv-title { font-weight: 900; font-size: clamp(30px,5vw,48px); line-height: 1.35; margin-bottom: 16px; padding-block: 6px; }
     .dawa-inv .dawa-inv-sub { font-style: italic; font-size: 14px; max-width: 540px; margin: 0 auto; line-height: 1.85; }
@@ -47,7 +60,7 @@ function ViewStyles({ theme, fixed }) {
     .dawa-inv .dawa-inv-secrule .dawa-inv-secrule-dot { flex: 0 0 auto; width: 5px; height: 5px; transform: rotate(45deg); }
 
     /* Hero */
-    .dawa-inv .dawa-inv-hero { position: relative; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 60px 24px; overflow: hidden; z-index: 6; }
+    .dawa-inv .dawa-inv-hero { position: relative; min-height: 100svh; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 48px 24px; overflow: hidden; z-index: 6; }
     .dawa-inv .dawa-inv-hero-glow { position: absolute; inset: 0; pointer-events: none; }
     /* Gold filigree frame inset on the hero — thin border + heavier corner
      * brackets for an engraved-invitation feel. Perimeter only, never over text. */
@@ -80,7 +93,7 @@ function ViewStyles({ theme, fixed }) {
     /* Story timeline */
     .dawa-inv .dawa-inv-timeline { position: relative; padding: 20px 0; }
     .dawa-inv .dawa-inv-timeline::before { content: ""; position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: linear-gradient(180deg, transparent, var(--line) 15%, var(--line) 85%, transparent); }
-    .dawa-inv .dawa-inv-story { position: relative; width: calc(50% - 56px); padding: 8px 4px; margin-bottom: 52px; }
+    .dawa-inv .dawa-inv-story { position: relative; width: calc(50% - 56px); padding: 8px 4px; margin-bottom: 26px; }
     .dawa-inv .dawa-inv-story.is-left { margin-inline-start: auto; padding-inline-start: 32px; }
     .dawa-inv .dawa-inv-story.is-right { margin-inline-end: auto; padding-inline-end: 32px; }
     .dawa-inv .dawa-inv-story-node { position: absolute; top: 14px; width: 9px; height: 9px; border-radius: 50%; }
@@ -111,7 +124,7 @@ function ViewStyles({ theme, fixed }) {
     .dawa-inv .dawa-inv-lightbox-close:hover { transform: rotate(90deg); }
 
     /* Details */
-    .dawa-inv .dawa-inv-details { display: grid; gap: 56px 40px; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
+    .dawa-inv .dawa-inv-details { display: grid; gap: 28px 36px; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
     .dawa-inv .dawa-inv-detail { transition: transform .5s cubic-bezier(.2,.95,.25,1.1); }
     .dawa-inv .dawa-inv-detail:hover { transform: translateY(-3px); }
     .dawa-inv .dawa-inv-detail-icon { font-size: 28px; margin-bottom: 16px; opacity: .9; }
@@ -120,7 +133,7 @@ function ViewStyles({ theme, fixed }) {
     .dawa-inv .dawa-inv-detail-body { font-size: 14px; line-height: 1.95; max-width: 36ch; }
 
     /* Venue */
-    .dawa-inv .dawa-inv-venue { display: grid; grid-template-columns: 1.2fr 1fr; gap: 32px; align-items: stretch; }
+    .dawa-inv .dawa-inv-venue { display: grid; grid-template-columns: 1.2fr 1fr; gap: 24px; align-items: stretch; }
     .dawa-inv .dawa-inv-venue-map { position: relative; border: 1px solid; border-radius: 14px; overflow: hidden; min-height: 360px; background: ${theme.cardBg}; }
     .dawa-inv .dawa-inv-route { stroke-dashoffset: 200; animation: dawa-inv-route 4s linear infinite; }
     .dawa-inv .dawa-inv-venue-info { display: flex; flex-direction: column; }
@@ -138,6 +151,7 @@ function ViewStyles({ theme, fixed }) {
     .dawa-inv .dawa-inv-cd-num { font-weight: 900; font-size: clamp(40px,8vw,72px); line-height: 1.35; font-variant-numeric: tabular-nums; margin-bottom: 10px; display: inline-block; padding-block: 6px; }
     .dawa-inv .dawa-inv-cd-num.is-flip { animation: dawa-inv-flip .65s cubic-bezier(.2,.95,.25,1.1); }
     .dawa-inv .dawa-inv-cd-lbl { font-style: italic; font-size: 11px; letter-spacing: 3px; text-transform: uppercase; opacity: .9; }
+    .dawa-inv .dawa-inv-cd-date { text-align: center; margin-top: 22px; font-size: clamp(15px,2.8vw,20px); font-weight: 700; letter-spacing: .5px; }
 
     /* RSVP + guestbook cards */
     .dawa-inv .dawa-inv-rsvp { max-width: 580px; margin: 0 auto; }
@@ -173,7 +187,7 @@ function ViewStyles({ theme, fixed }) {
     .dawa-inv .dawa-inv-wish-what { font-size: 16px; line-height: 1.8; }
 
     /* Footer */
-    .dawa-inv .dawa-inv-foot { padding: 64px 24px 96px; text-align: center; position: relative; z-index: 6; }
+    .dawa-inv .dawa-inv-foot { padding: var(--inv-sec-pad) 24px var(--inv-foot-bottom); text-align: center; position: relative; z-index: 6; }
     .dawa-inv .dawa-inv-foot-flourish { margin-bottom: 16px; opacity: .92; }
     .dawa-inv .dawa-inv-foot-mark { font-weight: 900; font-size: 38px; margin-bottom: 12px; padding-block: 6px; }
     .dawa-inv .dawa-inv-foot-tag { font-size: 11px; letter-spacing: 3px; text-transform: uppercase; font-style: italic; opacity: .85; }
@@ -189,18 +203,6 @@ function ViewStyles({ theme, fixed }) {
     .dawa-inv .dawa-inv-dock-btn { width: 46px; height: 46px; border-radius: 50%; background: rgba(7,7,10,.5); border: 1px solid; font-size: 18px; cursor: pointer; backdrop-filter: blur(20px); display: flex; align-items: center; justify-content: center; position: relative; transition: all .35s cubic-bezier(.2,.95,.25,1.1); }
     .dawa-inv .dawa-inv-dock-btn:hover { transform: scale(1.06); }
     .dawa-inv .dawa-inv-dock-pulse { position: absolute; inset: -2px; border-radius: 50%; border: 1px solid; animation: dawa-inv-dockpulse 1.8s ease-out infinite; }
-
-    /* Envelope */
-    .dawa-inv .dawa-inv-env-overlay { position: fixed; inset: 0; z-index: 1000; background: radial-gradient(ellipse 80% 60% at 50% 35%, ${theme.accentMuted}, transparent 60%), ${theme.bg}; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 32px; transition: opacity 1.2s, transform 1.4s cubic-bezier(.2,.95,.25,1.1); }
-    .dawa-inv .dawa-inv-env-overlay.is-opening { opacity: 0; transform: scale(1.05); pointer-events: none; }
-    .dawa-inv .dawa-inv-env { position: relative; width: 320px; max-width: 80vw; aspect-ratio: 1.5/1; border-radius: 14px; cursor: pointer; background: ${theme.cardBg}; border: 1.5px solid ${theme.accent}; box-shadow: inset 0 0 0 1px ${theme.accentLine}, inset 0 0 36px ${theme.accentMuted}, 0 30px 80px -20px rgba(0,0,0,.7), 0 0 60px ${theme.accentMuted}; transition: transform .6s cubic-bezier(.2,.95,.25,1.1); }
-    .dawa-inv .dawa-inv-env:hover { transform: translateY(-6px) scale(1.02); }
-    .dawa-inv .dawa-inv-wax { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); width: 92px; height: 92px; border-radius: 50%; background: radial-gradient(circle at 32% 28%, ${theme.accent} 0%, ${theme.accentLine} 55%, ${theme.bg} 100%); border: 2px solid ${theme.accent}; display: flex; align-items: center; justify-content: center; box-shadow: inset 0 1px 1px rgba(255,255,255,.25), inset 0 -2px 6px rgba(0,0,0,.5), 0 8px 26px ${theme.accentMuted}, 0 0 32px ${theme.accentMuted}; animation: dawa-inv-wax 3s ease-in-out infinite; }
-    .dawa-inv .dawa-inv-wax-logo { width: 58%; height: 58%; display: flex; align-items: center; justify-content: center; filter: drop-shadow(0 1px 1px rgba(0,0,0,.55)); }
-    .dawa-inv .dawa-inv-wax-logo svg { width: 100%; height: 100%; display: block; }
-    .dawa-inv .dawa-inv-env-overlay.is-opening .dawa-inv-wax { animation: dawa-inv-crack 1s cubic-bezier(.2,.95,.25,1.1) forwards; }
-    .dawa-inv .dawa-inv-env-hint { margin-top: 34px; color: ${theme.accent}; font-size: 13px; letter-spacing: 3px; text-transform: uppercase; font-style: italic; animation: dawa-inv-cue 2.6s ease-in-out infinite; }
-    .dawa-inv .dawa-inv-env-name { margin-top: 22px; font-weight: 900; font-size: clamp(28px,5vw,44px); color: ${theme.text}; }
 
     /* Petals + sparkles */
     .dawa-inv .dawa-inv-petals { inset: 0; pointer-events: none; z-index: 5; overflow: hidden; }
@@ -255,8 +257,6 @@ function ViewStyles({ theme, fixed }) {
     @keyframes dawa-inv-route { to { stroke-dashoffset: 0; } }
     @keyframes dawa-inv-flip { 0% { transform: translateY(0); } 50% { transform: translateY(-14px); opacity: .4; filter: blur(2px); } 100% { transform: translateY(0); } }
     @keyframes dawa-inv-seal { 0% { transform: scale(0) rotate(-90deg); } 60% { transform: scale(1.15) rotate(8deg); } 100% { transform: scale(1) rotate(0); } }
-    @keyframes dawa-inv-wax { 0%,100% { transform: translate(-50%,-50%) scale(1); } 50% { transform: translate(-50%,-50%) scale(1.05); } }
-    @keyframes dawa-inv-crack { 0% { transform: translate(-50%,-50%) scale(1) rotate(0); } 30% { transform: translate(-50%,-50%) scale(1.25) rotate(-12deg); } 100% { transform: translate(-50%,-50%) scale(0) rotate(180deg); opacity: 0; } }
     @keyframes dawa-inv-dockpulse { 0% { opacity: .9; transform: scale(.95); } 100% { opacity: 0; transform: scale(1.4); } }
     @keyframes dawa-inv-petal { 0% { transform: translateY(0) rotate(0) translateX(0); opacity: 0; } 5% { opacity: .5; } 50% { transform: translateY(45vh) rotate(180deg) translateX(40px); } 95% { opacity: .5; } 100% { transform: translateY(105vh) rotate(420deg) translateX(-30px); opacity: 0; } }
     @keyframes dawa-inv-sparkle { 0%,100% { opacity: 0; transform: scale(.5); } 50% { opacity: 1; transform: scale(1.6); } }

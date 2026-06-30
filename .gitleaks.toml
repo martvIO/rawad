@@ -1,0 +1,35 @@
+# gitleaks config — read automatically by the CI gitleaks job (.github/workflows/ci.yml)
+# and the local pre-commit hook (.husky/pre-commit).
+#
+# WHY: a full-history scan (2026-06-29 audit) surfaced 5 findings, ALL false
+# positives — 2 test fixtures and 3 copies of a PUBLIC reCAPTCHA *site* key.
+# Without this allowlist those false positives make the secret-gate noisy and
+# erode trust in it. See docs/security/audit-2026-06-29.md (finding F-5).
+#
+# Keep this list tight: only obvious, justified false positives. A real secret
+# must never be allowlisted — rotate it instead.
+
+title = "Dawa gitleaks config"
+
+[extend]
+useDefault = true   # keep all of gitleaks' built-in secret rules
+
+[allowlist]
+description = "Audit 2026-06-29 — known false positives (test fixtures + public reCAPTCHA site keys)"
+
+paths = [
+  # Unit-test fixtures: deliberately fake, non-functional placeholder secrets.
+  '''backend/tests/functions/streamToken\.test\.ts''',      # STREAM_TOKEN_SECRET = "test-secret-..."
+  '''frontend/src/__tests__/utils/passwordCrypto\.test\.js''', # key: "bm90LWEta2V5" => "not-a-key"
+  # Public reCAPTCHA *site* keys (client-exposed by design, not secrets):
+  '''(^|/)re\.js$''',          # deleted Google reCAPTCHA Enterprise sample (history only)
+  '''(^|/)\.env\.example$''',  # VITE_RECAPTCHA_ENTERPRISE_SITE_KEY=6Le...
+  '''(^|/)\.claude/claude\.md$''',
+]
+
+regexes = [
+  # reCAPTCHA v2/v3/Enterprise SITE keys are public (embedded in the client).
+  '''6L[0-9A-Za-z_-]{38}''',
+  # The literal test-fixture secret string.
+  '''test-secret-at-least-16-chars-long''',
+]

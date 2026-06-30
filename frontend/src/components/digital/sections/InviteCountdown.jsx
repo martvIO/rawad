@@ -46,10 +46,10 @@ function CountdownCell({ value, label, theme, font }) {
   );
 }
 
-function CountdownSection({ weddingDate, theme, font, lang }) {
+function CountdownSection({ weddingDate, dateText = "", theme, font, lang }) {
   const { d, h, m, s, reached } = useCountdown(weddingDate);
   return (
-    <section className="dawa-inv-section">
+    <section className="dawa-inv-section" id="inv-countdown">
       <SectionHead
         eyebrow={lang === "he" ? "ספירה לאחור" : "العدّ التنازلي"}
         title={lang === "he" ? "נשאר עד החתונה" : "باقي على يوم الفرح"}
@@ -69,6 +69,12 @@ function CountdownSection({ weddingDate, theme, font, lang }) {
           <CountdownCell value={h} label={lang === "he" ? "שעות" : "ساعة"} theme={theme} font={font} />
           <CountdownCell value={m} label={lang === "he" ? "דקות" : "دقيقة"} theme={theme} font={font} />
           <CountdownCell value={s} label={lang === "he" ? "שניות" : "ثانية"} theme={theme} font={font} />
+        </div>
+      )}
+      {/* The wedding date — anchored right under the timer it counts down to. */}
+      {dateText && (
+        <div className="dawa-inv-cd-date dawa-inv-reveal" dir="auto" style={{ color: theme.accent, fontFamily: font.family }}>
+          {dateText}
         </div>
       )}
     </section>

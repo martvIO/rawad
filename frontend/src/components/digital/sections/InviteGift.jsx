@@ -3,7 +3,7 @@ import { SectionHead } from "../inviteShared.jsx";
 // ── Gift ──────────────────────────────────────────────────────────────────────
 function GiftSection({ giftNote, giftIban, theme, font, lang }) {
   return (
-    <section className="dawa-inv-section">
+    <section className="dawa-inv-section" id="inv-gift">
       <SectionHead
         eyebrow={lang === "he" ? "מתנה" : "هدية"}
         title={lang === "he" ? "נוכחותכם היא המתנה" : "حضوركم أجمل هدية"}

@@ -1,0 +1,18 @@
+# Block secrets before they ever leave the machine — defense-in-depth on top of
+# the CI gitleaks gate (.github/workflows/ci.yml). Reads the repo .gitleaks.toml
+# allowlist. See docs/security/audit-2026-06-29.md (guardrails).
+#
+# Best-effort: if gitleaks isn't installed locally, this warns and lets the
+# commit through (CI is still the hard gate). Install gitleaks to enable it:
+#   https://github.com/gitleaks/gitleaks#installing
+if command -v gitleaks >/dev/null 2>&1; then
+  if ! gitleaks protect --staged --redact --config .gitleaks.toml; then
+    echo ""
+    echo "✖ gitleaks found a potential secret in your staged changes — commit aborted."
+    echo "  • Real secret?  Remove it; use .env (gitignored) or Secret Manager."
+    echo "  • False positive?  Add a tight rule to .gitleaks.toml [allowlist]."
+    exit 1
+  fi
+else
+  echo "⚠ gitleaks not installed — skipping local secret scan (CI still enforces it)."
+fi

@@ -1,6 +1,5 @@
 import { lazy, Suspense, useState, useEffect, useRef } from "react";
 import { Ambience } from "./InviteAmbience.jsx";
-import { EnvelopeIntro } from "./EnvelopeIntro.jsx";
 import { CelestialEnvelopeOverlay } from "./CelestialEnvelopeOverlay.jsx";
 import { useDeviceCapability } from "../../../hooks/useDeviceCapability.js";
 import { celDowngraded, markCelDowngraded } from "../celestial/downgradeStore.js";
@@ -24,12 +23,14 @@ function markOpened() {
 
 export function CelestialAmbience({
   theme, font, lang, mode = "public", fixed = true, immersive3d = true,
-  showEnvelope = false, guestName = "", groomName = "", brideName = "", monogram = "",
-  blessing = "", welcome = "", namesAr = "", namesHe = "", eyebrow = "", dateText = "",
+  showEnvelope = false, demo = false, guestName = "", monogram = "",
+  namesAr = "", namesHe = "", eyebrow = "", blessing = "", welcome = "", dateText = "",
 }) {
   const cap = useDeviceCapability();
   const [downgraded, setDowngraded] = useState(celDowngraded);
-  const [opened, setOpened] = useState(readOpened);
+  // The demo is a showcase: always replay the envelope, and never write the
+  // global "opened" flag (so visiting the demo can't suppress a real invite).
+  const [opened, setOpened] = useState(() => (demo ? false : readOpened()));
   // Envelope reveal phases: sealed → opening → revealing → done → gone.
   const [phase, setPhase] = useState("sealed");
   const worldRef = useRef(null);
@@ -46,10 +47,7 @@ export function CelestialAmbience({
   }, []);
 
   const wantWebGL = immersive3d && cap.tier >= 1 && !downgraded && !reduceMotion;
-  // The PREMIUM 3D envelope reveal is heavy (PBR + AA + bursts) — gate it to
-  // capable devices (tier ≥ 2). Tier-1 keeps the particle backdrop but gets the
-  // lighter 2D envelope; no-WebGL / reduced-motion get the 2D floor + 2D envelope.
-  const doEnvelope = !!showEnvelope && !opened && wantWebGL && cap.tier >= 2;
+  const doEnvelope = !!showEnvelope && !opened && wantWebGL;
 
   // Latch "this mount is running the 3D envelope" at first render. `opened` flips
   // true on hand-off (for future visits), so we must NOT key the overlay/elevated
@@ -59,17 +57,13 @@ export function CelestialAmbience({
   const envActive = envActiveRef.current && phase !== "gone";
 
   // Lock page scroll while the 3D envelope is on screen, so the scroll-driven
-  // camera (resumed after hand-off) can't be desynced mid-sequence. Also gate on
-  // `wantWebGL`: if it flips false mid-reveal (mid-session reduced-motion toggle,
-  // or a GPU context-loss → downgrade), the WebGL path unmounts and `phase`
-  // freezes — so we must release the lock here rather than wait for a "gone" that
-  // can never arrive, or the page would stay permanently unscrollable.
+  // camera (resumed after hand-off) can't be desynced mid-sequence.
   useEffect(() => {
-    if (!envActive || !wantWebGL) return undefined;
+    if (!envActive) return undefined;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = prev; };
-  }, [envActive, wantWebGL]);
+  }, [envActive]);
 
   // After the hand-off completes, fade the overlay out then unmount it.
   useEffect(() => {
@@ -89,18 +83,11 @@ export function CelestialAmbience({
     setPhase("opening");
     w.openEnvelope({
       onReveal: () => setPhase("revealing"),
-      onComplete: () => { markOpened(); setOpened(true); setPhase("done"); },
+      onComplete: () => { if (!demo) markOpened(); setOpened(true); setPhase("done"); },
     });
   };
 
   if (wantWebGL) {
-    const envelopePayload = envActiveRef.current
-      ? {
-          colors: themeToEnvelopePalette(theme),
-          monogram,
-          content: { namesAr, namesHe, blessing, welcome, eyebrow, date: dateText },
-        }
-      : null;
     return (
       <>
         <Suspense fallback={<Ambience theme={theme} fixed={fixed} />}>
@@ -110,7 +97,11 @@ export function CelestialAmbience({
             fixed={fixed}
             tier={cap.tier}
             onFpsDowngrade={onFpsDowngrade}
-            envelope={envelopePayload}
+            envelope={envActiveRef.current ? {
+              colors: themeToEnvelopePalette(theme),
+              monogram,
+              content: { namesAr, namesHe, blessing, welcome, eyebrow, date: dateText },
+            } : null}
             onReady={(w) => { worldRef.current = w; }}
             elevated={envActive}
           />
@@ -119,51 +110,18 @@ export function CelestialAmbience({
           <CelestialEnvelopeOverlay
             phase={phase}
             guestName={guestName}
-            groomName={groomName}
-            brideName={brideName}
             theme={theme}
             font={font}
             lang={lang}
             onOpen={onOpen}
           />
         )}
-        {/* Tier-1 capable of the particle world but NOT the premium reveal → the
-            lighter 2D wax-seal envelope rides over the particle backdrop. */}
-        {showEnvelope && !opened && !envActiveRef.current && (
-          <EnvelopeIntro
-            guestName={guestName}
-            groomName={groomName}
-            brideName={brideName}
-            monogram={monogram}
-            blessing={blessing}
-            welcome={welcome}
-            theme={theme}
-            font={font}
-            lang={lang}
-          />
-        )}
       </>
     );
   }
 
-  // No WebGL → the 2D floor, plus the 2D wax-seal envelope (now reveals the
-  // couple names) for reduced-motion / weak / immersive3d-off devices.
-  return (
-    <>
-      {showEnvelope && !opened && (
-        <EnvelopeIntro
-          guestName={guestName}
-          groomName={groomName}
-          brideName={brideName}
-          monogram={monogram}
-          blessing={blessing}
-          welcome={welcome}
-          theme={theme}
-          font={font}
-          lang={lang}
-        />
-      )}
-      <Ambience theme={theme} fixed={fixed} />
-    </>
-  );
+  // No WebGL (reduced-motion / data-saver / no WebGL / immersive3d off) → just
+  // the 2D CSS ambience floor behind the content. The envelope intro is now
+  // WebGL-only: incapable devices land straight on the invitation, no envelope.
+  return <Ambience theme={theme} fixed={fixed} />;
 }

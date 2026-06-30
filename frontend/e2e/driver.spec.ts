@@ -4,6 +4,11 @@
 import { test, expect } from "@playwright/test";
 import { DriverDashboardPage } from "./pages/DriverDashboardPage";
 import { loginAsDriver, clearSession } from "./helpers/auth";
+import { skipIfNoPhysical } from "./helpers/features";
+
+// The whole driver portal is gated behind FEATURES.physical (beta, off by
+// default). Skip these UI specs when it's disabled.
+test.beforeEach(() => skipIfNoPhysical());
 
 test.describe("Driver — pick groom gate", () => {
   test.beforeEach(async ({ page }) => {

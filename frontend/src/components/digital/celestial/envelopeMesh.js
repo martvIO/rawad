@@ -2,8 +2,8 @@
 // celestial particle scene (one renderer — the engine owns the camera + RAF).
 // Ported from the "ultra-premium studio reveal" design (envelope3d.js): a
 // jewel-tone fiber-dyed cardstock envelope with a gold-foil arabesque flap, a
-// glossy jewel-wax seal stamped with the gold دعوة brand emblem, a satin ribbon
-// band, a triangular flap that pivots 180°, and a cream gold-foil
+// glossy jewel-wax seal stamped with the gold دعوة brand emblem, a triangular
+// flap that pivots 180°, and a cream gold-foil
 // invitation card (Arabic + Hebrew calligraphy baked into a CanvasTexture)
 // that rises out of the V-pocket as two gold-spark/shockwave bursts fire and
 // the structure dissolves into light.
@@ -171,14 +171,6 @@ export function buildEnvelope({ colors, content } = {}) {
     envMap: env, envMapIntensity: 1.5, transparent: true, depthWrite: true, map: sealTex,
   });
 
-  // Satin ribbon band wrapping the envelope under the seal — dissolves on open.
-  const ribbonMat = new THREE.MeshPhysicalMaterial({
-    color: col(pal.foil, "#b08d5a").clone().lerp(new THREE.Color("#000"), 0.35),
-    metalness: 0.0, roughness: 0.36, sheen: 1.0, sheenColor: col(pal.foilBright, "#f4d4c4"),
-    sheenRoughness: 0.45, clearcoat: 0.4, clearcoatRoughness: 0.32,
-    envMap: env, envMapIntensity: 0.7, transparent: true, depthWrite: true,
-  });
-
   const cardMaps = makeCardTextures(pal, text);
   cardMaps.list.forEach((t) => disposables.push(t));
   const cardMat = new THREE.MeshPhysicalMaterial({
@@ -251,13 +243,6 @@ export function buildEnvelope({ colors, content } = {}) {
   lining.position.z = -0.02; lining.rotation.y = Math.PI;
   flapPivot.add(lining);
 
-  // satin ribbon band (vertical) wrapping under the seal — in front of the flap,
-  // behind the seal; fades + slides away as the seal fractures.
-  const ribbon = new THREE.Mesh(new THREE.BoxGeometry(0.36, HH * 2 + 0.55, 0.014), ribbonMat);
-  ribbon.position.set(0, 0, Z_SEAL - 0.11);
-  ribbon.renderOrder = 2;
-  group.add(ribbon);
-
   // wax seal — two half-discs split along the flap/body seam
   const sealTop = new THREE.Mesh(new THREE.CircleGeometry(SEAL_R, 64, 0, Math.PI), waxMat);
   sealTop.position.set(0, -HH, Z_SEAL - Z_FLAP); sealTop.renderOrder = 3; flapPivot.add(sealTop);
@@ -299,13 +284,6 @@ export function buildEnvelope({ colors, content } = {}) {
     sealTop.position.y = -HH + 0.045 * frac;
     sealBot.position.y = -0.05 * frac;
     sealBot.rotation.z = 0.18 * frac;
-
-    // ribbon releases mid seal-fracture and is gone (~T=0.37) just as the flap
-    // pivot begins (T=0.35), so a translucent band never overlaps the opening flap.
-    const ribbonFade = 1 - ease(clamp01((T - 0.02) / 0.33));
-    ribbonMat.opacity = ribbonFade;
-    ribbon.position.y = -0.18 * frac;
-    ribbon.visible = ribbonFade > 0.01;
 
     cardPivot.position.y = CARD_BASE_Y + RISE * rise;
     cardPivot.position.z = 0.6 * rise;

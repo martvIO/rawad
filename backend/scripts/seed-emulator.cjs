@@ -25,9 +25,17 @@ process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
 process.env.FIREBASE_STORAGE_EMULATOR_HOST = "127.0.0.1:9199";
 process.env.GCLOUD_PROJECT = PROJECT_ID;
 
+// Write to the SAME RTDB namespace the Cloud Functions read in the emulator.
+// In the emulator the Functions runtime's FIREBASE_CONFIG advertises the LEGACY
+// default instance (https://dawa-aa793.firebaseio.com → namespace "dawa-aa793"),
+// NOT the modern "<project>-default-rtdb". Seeding the modern namespace left the
+// functions reading an empty legacy namespace (guests list empty, confirmations
+// "unknown_groom", etc.). The app only ever touches RTDB through the Admin SDK
+// (which bypasses security rules), so the namespace choice is purely about where
+// data lives — matching the functions is what makes seeded reads work.
 admin.initializeApp({
   projectId: PROJECT_ID,
-  databaseURL: `http://127.0.0.1:9000/?ns=${PROJECT_ID}-default-rtdb`,
+  databaseURL: `http://127.0.0.1:9000/?ns=${PROJECT_ID}`,
 });
 
 const auth = admin.auth();

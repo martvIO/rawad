@@ -6,7 +6,7 @@ import { FloralFlourish } from "../inviteShared.jsx";
 
 function Hero({ guestName, groomName, brideName, monogram, eyebrow, dateText, venueLine, heroMedia = [], theme, font, lang }) {
   return (
-    <section className="dawa-inv-hero">
+    <section className="dawa-inv-hero" id="inv-top">
       <div
         aria-hidden="true"
         className="dawa-inv-hero-glow"

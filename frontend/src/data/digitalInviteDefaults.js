@@ -4,9 +4,9 @@
 
 export const DEFAULT_EYEBROW = { ar: "دعوة شخصية", he: "הזמנה אישית" };
 
-// Shown on the cinematic envelope card (and the 2D fallback envelope): a short
-// blessing line above the couple's names, and a warm welcome line below them.
-// Both are localized {ar, he} and fully editable by the groom.
+// Shown on the cinematic envelope card: a short blessing line above the couple's
+// names, and a warm welcome line below them. Both are localized {ar, he} and
+// fully editable by the groom.
 export const DEFAULT_BLESSING = { ar: "على بركة الله", he: "בשעה טובה ומוצלחת" };
 export const DEFAULT_WELCOME = {
   ar: "بكل الحبّ، ندعوكم لمشاركتنا فرحنا",

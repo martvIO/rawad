@@ -2,21 +2,25 @@
 #
 # WHY: testing was manual and the session-end auto-deploy is disabled, so a
 # second maintainer (being onboarded) could land a regression with nothing
-# catching it. This makes the unit + security-rules + e2e suites a hard gate.
+# catching it. This makes the unit + security-rules + API + e2e suites a hard gate.
 #
 # To ENFORCE blocking: GitHub → Settings → Branches → protect `main` → require
-# the "unit" and "integration" status checks (e2e can stay advisory until it is
-# proven stable in CI).
+# the "unit", "integration", "api", and "full-suite" status checks. ("visual"
+# stays advisory until linux baselines are committed — see that job.)
 name: CI
 
 on:
   pull_request:
   push:
     branches: [main]
+  schedule:
+    # Nightly prod read-only smoke against the live hosted site.
+    - cron: "0 3 * * *"
 
 jobs:
   # Fast, no emulator — the primary merge gate.
   unit:
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -32,8 +36,8 @@ jobs:
         run: npm run test:unit
 
   # Production build gate — catches Vite/tsc breakage before a manual deploy.
-  # (The e2e job builds Functions but never the frontend bundle.)
   build:
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -50,9 +54,9 @@ jobs:
       - name: Build Cloud Functions
         run: node backend/scripts/build-functions.cjs
 
-  # RTDB + (new) Firestore/Storage security-rules tests — needs the Java
-  # emulators. firebase emulators:exec starts and tears the DB emulator down.
+  # RTDB + Firestore/Storage security-rules tests — needs the Java emulators.
   integration:
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -70,10 +74,39 @@ jobs:
       - name: RTDB rules integration tests
         run: npm test
 
-  # End-to-end across Chromium + WebKit (the two that matter most: Chrome +
-  # iOS Safari). Heavier; advisory until proven stable, then promote to required.
-  e2e:
+  # REST API route tests (TASK-006) — hit the Express app via the Functions
+  # emulator. Needs Java + a Functions build + seed (handled by `npm run test:api`).
+  api:
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "21"
+      - name: Install deps
+        run: |
+          npm install --no-audit --no-fund
+          npm install --no-audit --no-fund --prefix backend/functions
+      - name: API route tests
+        run: npm run test:api
+
+  # FULL comprehensive suite — the per-PR gate. Functional layers (feature specs,
+  # cross-role journeys, crawler, a11y, i18n) across Chromium + WebKit (Chrome +
+  # iOS Safari, the two highest-value targets), sharded for wall-clock. @visual is
+  # EXCLUDED here (own job below). The full 5-project matrix runs in the nightly
+  # prod smoke / can be expanded later.
+  full-suite:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ["1/2", "2/2"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -92,30 +125,106 @@ jobs:
         run: npx --prefix frontend playwright install --with-deps chromium webkit
       - name: Build Cloud Functions
         run: node backend/scripts/build-functions.cjs
-      - name: Run e2e under the emulator suite
+      - name: Run full suite under the emulator suite
         env:
           CI: "true"
-        # Start emulators, wait for the Functions + Vite dev server, then run
-        # the suite scoped to chromium + webkit. emulators:exec tears the
-        # emulators down when the inner command exits.
         run: |
           npx firebase emulators:exec \
             --only auth,database,firestore,storage,functions,hosting \
             --project dawa-aa793 \
             "bash -c 'npm --prefix frontend run dev:emulator & \
               npx --yes wait-on -t 120000 http://localhost:5173 && \
-              (cd frontend && npx playwright test --project=chromium --project=webkit)'"
+              (cd frontend && npx playwright test --project=chromium --project=webkit --grep-invert @visual --shard=${{ matrix.shard }})'"
+      - name: Build consolidated report
+        if: ${{ !cancelled() }}
+        run: node scripts/build-report.cjs
+      - name: File GitHub issues for failures (push to main only)
+        if: ${{ !cancelled() && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/file-issues.cjs
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
         with:
-          name: playwright-report
-          path: frontend/playwright-report/
+          name: test-report-${{ strategy.job-index }}
+          path: |
+            test-report/
+            frontend/playwright-report/
           retention-days: 14
 
-  # Secrets scan — prevents a credential from ever being committed. The repo is
-  # currently clean (the admin-SDK key + functions/.env are gitignored and were
-  # never committed); this keeps it that way on every PR/push.
+  # Visual regression (@visual). ADVISORY (continue-on-error) until linux
+  # baselines are committed: snapshots are platform-specific, and the dev machine
+  # is Windows. To promote to a hard gate:
+  #   1. run this job once with `--update-snapshots` (workflow_dispatch / locally
+  #      in a linux container), commit the generated *-linux.png baselines
+  #   2. remove `continue-on-error: true` below.
+  visual:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "21"
+      - name: Install deps
+        run: |
+          npm install --no-audit --no-fund
+          npm install --no-audit --no-fund --prefix frontend
+          npm install --no-audit --no-fund --prefix backend/functions
+      - name: Install Playwright browsers
+        run: npx --prefix frontend playwright install --with-deps chromium
+      - name: Build Cloud Functions
+        run: node backend/scripts/build-functions.cjs
+      - name: Run visual regression
+        env:
+          CI: "true"
+        run: |
+          npx firebase emulators:exec \
+            --only auth,database,firestore,storage,functions,hosting \
+            --project dawa-aa793 \
+            "bash -c 'npm --prefix frontend run dev:emulator & \
+              npx --yes wait-on -t 120000 http://localhost:5173 && \
+              (cd frontend && npx playwright test --project=chromium --grep @visual)'"
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: visual-diffs
+          path: frontend/e2e-results/
+          retention-days: 14
+
+  # Nightly read-only smoke against the LIVE hosted site (@prodsafe tests only —
+  # never logs in, never submits). Catches prod breakage out-of-band.
+  prod-smoke:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install deps
+        run: |
+          npm install --no-audit --no-fund
+          npm install --no-audit --no-fund --prefix frontend
+      - name: Install Playwright browsers
+        run: npx --prefix frontend playwright install --with-deps chromium
+      - name: Prod read-only smoke
+        run: node scripts/test-full.cjs --prod --project=chromium --no-issues
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: prod-smoke-report
+          path: test-report/
+          retention-days: 14
+
+  # Secrets scan — prevents a credential from ever being committed.
   gitleaks:
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

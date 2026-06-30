@@ -14,8 +14,10 @@ test("public landing page has dir='rtl' and renders Arabic headings", async ({ p
 
 test("login page renders Arabic field labels", async ({ page }) => {
   await page.goto("/portal/login");
-  await expect(page.getByText("اسم المستخدم")).toBeVisible();
-  await expect(page.getByText("كلمة المرور")).toBeVisible();
+  // Labels can appear more than once (visible label + sr-only / placeholder
+  // mirror), so assert the first match rather than a strict single element.
+  await expect(page.getByText("اسم المستخدم").first()).toBeVisible();
+  await expect(page.getByText("كلمة المرور").first()).toBeVisible();
 });
 
 test("language switcher swaps copy to Hebrew", async ({ page }) => {

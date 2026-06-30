@@ -1,16 +1,19 @@
 // Pure mapper: a digital-invitation theme (from digitalThemes.js) -> the
-// premium 3D envelope's PHYSICAL palette. The envelope "fully recolors" per
-// theme (the user's choice), so every theme drives the matte cardstock
-// (`paper`), the glossy wax seal (`wax`), the metallic filigree (`foil` +
-// `foilBright`), the cream invitation card (`cardPaper`), and the dark
-// calligraphy ink (`cardInk`).
+// premium 3D envelope's PHYSICAL palette. The envelope reads WHITE by default
+// and recolors per theme: each theme drives the matte cardstock (`paper`), the
+// glossy wax seal (`wax`), the cream invitation card (`cardPaper`), and the
+// dark calligraphy ink (`cardInk`).
 //
-// The single most important job here is CONTRAST SAFETY: the card always stays
-// light and the ink always stays dark (clamped luminance bands) so the baked
-// Arabic/Hebrew calligraphy is legible on light themes (champagne, blush, …)
-// AND dark themes (gold, blue, …) alike. No `three` import — kept trivially
-// unit-testable and tree-shakeable; the engine converts these hex strings to
-// THREE.Color.
+// The metallic filigree (`foil` + `foilBright`) is ALWAYS gold — white+gold is
+// the luxury constant, so the arabesque flap, the gold دعوة seal emblem, the
+// hairline edges and the satin-ribbon sheen stay literal metallic gold on every
+// theme (the user's choice); only the paper/wax/card recolor.
+//
+// The other key job here is CONTRAST SAFETY: the card always stays light and the
+// ink always stays dark (clamped luminance bands) so the baked Arabic/Hebrew
+// calligraphy is legible on light themes (white, champagne, blush, …) AND dark
+// themes (gold, blue, …) alike. No `three` import — kept trivially unit-testable
+// and tree-shakeable; the engine converts these hex strings to THREE.Color.
 
 function hexToRgb(hex) {
   if (typeof hex !== "string") return [0.5, 0.5, 0.5];
@@ -67,26 +70,26 @@ const IVORY = hexToRgb("#f9f6f0");
 const NEAR_BLACK = hexToRgb("#0a0a0d");
 const ESPRESSO = hexToRgb("#241405");
 
+// Metallic gold, fixed for ALL themes — the white+gold luxury constant.
+// `foil` = the filigree/edge gold; `foilBright` = the catch-light highlight that
+// drives the two-tone foil shimmer + the gold sparks in the reveal bursts.
+const FOIL = "#caa14e";
+const FOIL_BRIGHT = "#f5e4ab";
+
 export function themeToEnvelopePalette(theme) {
   const accent = hexToRgb(theme?.accent);
-  const grad = Array.isArray(theme?.gradientStops) ? theme.gradientStops : [];
-  const bright = hexToRgb(grad[0] || theme?.sparkleGlow || theme?.accent);
   const bg = hexToRgb(theme?.bg);
   const isLight = luminance(bg) > 0.5;
 
-  // Metallic filigree: the accent itself, plus a brighter catch-light highlight.
-  // Lighten `bright` toward white BEFORE clamping so the highlight never collapses
-  // to equal `foil` on themes where gradientStops[0] === accent (champagne, blush,
-  // pearl, peach, mint, ivorygold) — otherwise the two-tone foil shimmer + sparks
-  // go flat single-tone.
-  const foil = rgbToHex(clampLum(accent, 0.16, 0.74));
-  const foilBright = rgbToHex(clampLum(mix(bright, WHITE, 0.3), 0.62, 0.96));
+  // Filigree is always gold (see header) — independent of the theme accent.
+  const foil = FOIL;
+  const foilBright = FOIL_BRIGHT;
 
   // Matte cardstock — follows the theme's lightness so the envelope truly
-  // recolors. Dark themes → a DEEP JEWEL TONE (not flat black): pull harder
-  // toward the accent hue and lift the luminance band so the colour reads as
-  // emerald/sapphire/oxblood/espresso rather than near-black. Light themes →
-  // a soft accent-tinted "blush/champagne" cardstock (unchanged).
+  // recolors. White/light themes → a soft accent-tinted ivory "stationery" that
+  // reads white (the default look). Dark themes → a DEEP JEWEL TONE (not flat
+  // black): pull toward the accent hue and lift the band so it reads as
+  // emerald/sapphire/oxblood/espresso rather than near-black.
   const paper = isLight
     ? rgbToHex(clampLum(mix(WHITE, accent, 0.18), 0.74, 0.90))
     : rgbToHex(clampLum(mix(bg, accent, 0.34), 0.05, 0.17));
@@ -94,7 +97,7 @@ export function themeToEnvelopePalette(theme) {
   // Glossy wax seal — a rich JEWEL TONE of the accent on every theme (gold→amber/
   // bronze, rose→oxblood, emerald→forest, blue→sapphire) so the gold-foil emblem
   // pops and the disc reads as COLOURED sealing-wax (never a black puck). Kept a
-  // touch brighter/more saturated than the paper so the seal stands off the body.
+  // touch darker/more saturated than light paper so the seal stands off the body.
   const wax = rgbToHex(clampLum(mix(accent, NEAR_BLACK, 0.34), 0.12, 0.34));
 
   // The cream invitation card — ALWAYS light (faint accent wash over ivory) so

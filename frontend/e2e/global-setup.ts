@@ -7,6 +7,12 @@ import type { FullConfig } from "@playwright/test";
 import { isEmulatorReachable, seedEmulator } from "./helpers/seed";
 
 export default async function globalSetup(_config: FullConfig): Promise<void> {
+  // Prod read-only smoke (npm run test:full:prod) runs against the live hosted
+  // site — there is no emulator to seed, and we must never mutate prod data.
+  if (process.env.PROD_SMOKE) {
+    console.log("[global-setup] PROD_SMOKE — skipping emulator seed (read-only run).");
+    return;
+  }
   const reachable = await isEmulatorReachable();
   if (!reachable) {
     console.warn("[global-setup] Firebase auth emulator (127.0.0.1:9099) not reachable.");

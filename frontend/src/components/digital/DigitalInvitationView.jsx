@@ -9,7 +9,7 @@
 // component owns no token / auth state — that lives in the route wrapper.
 import { useEffect,useMemo,useRef } from "react";
 import { getDigitalTheme, getDigitalFont } from "../../styles/digitalThemes.js";
-import { DEFAULT_EYEBROW, DEFAULT_BLESSING, DEFAULT_WELCOME, DEFAULT_MEAL_OPTIONS } from "../../data/digitalInviteDefaults.js";
+import { DEFAULT_EYEBROW, DEFAULT_MEAL_OPTIONS, DEFAULT_BLESSING, DEFAULT_WELCOME } from "../../data/digitalInviteDefaults.js";
 import { localize, localizeItems, localizeList } from "../../utils/localize.js";
 import { ensureDigitalFonts } from "../../utils/digitalFonts.js";
 import { LangToggle, SorekButton } from "./inviteShared.jsx";
@@ -23,6 +23,7 @@ import { RSVPSection } from "./sections/InviteRsvp.jsx";
 import { GiftSection } from "./sections/InviteGift.jsx";
 import { GuestbookSection } from "./sections/InviteGuestbook.jsx";
 import { InviteFooter, FloatingDock } from "./sections/InviteFooterDock.jsx";
+import { InviteNavMenu } from "./sections/InviteNavMenu.jsx";
 import { CelestialAmbience } from "./sections/CelestialAmbience.jsx";
 import { ViewStyles } from "./sections/InviteStyles.jsx";
 import { WalletButton } from "./WalletButton.jsx";
@@ -39,6 +40,7 @@ export function DigitalInvitationView({
   onSubmitWish,
   onOpenSorek,
   showEnvelope = false,
+  demo = false,
   alreadyAnswered = false,
   rsvpDone = false,
   boardingPassEnabled = false,
@@ -130,16 +132,33 @@ export function DigitalInvitationView({
   const venueLine = [venue, venueCity].filter(Boolean).join(" · ");
 
   // ── Envelope-card content ────────────────────────────────────────────────
-  // The cinematic card shows the couple's names in BOTH scripts (it's the
+  // The cinematic 3D card shows the couple's names in BOTH scripts (the
   // universal element), with the blessing + welcome + date in the guest's
   // current language. Names join groom-first with the "و" / "ו" connective,
-  // matching the hero + 2D fallback.
+  // matching the hero.
   const namesAr = [localize(design?.groomDisplayName, "ar"), localize(design?.brideName, "ar")]
     .map((s) => s.trim()).filter(Boolean).join(" و ");
   const namesHe = [localize(design?.groomDisplayName, "he"), localize(design?.brideName, "he")]
     .map((s) => s.trim()).filter(Boolean).join(" ו");
   const blessing = localize(design?.blessing, lang).trim() || (lang === "he" ? DEFAULT_BLESSING.he : DEFAULT_BLESSING.ar);
   const welcome = localize(design?.welcome, lang).trim() || (lang === "he" ? DEFAULT_WELCOME.he : DEFAULT_WELCOME.ar);
+
+  // Section list for the floating nav menu — built in render order from the same
+  // show* flags, so it always matches exactly the sections that are on screen.
+  const navItems = useMemo(() => {
+    const L = (ar, he) => (lang === "he" ? he : ar);
+    return [
+      { id: "inv-top", label: L("الأعلى", "למעלה"), show: true },
+      { id: "inv-story", label: L("القصة", "הסיפור"), show: showStory },
+      { id: "inv-gallery", label: L("الصور", "התמונות"), show: showGallery },
+      { id: "inv-details", label: L("التفاصيل", "הפרטים"), show: showDetails },
+      { id: "inv-venue", label: L("المكان", "המקום"), show: showVenue },
+      { id: "inv-countdown", label: L("العدّ التنازلي", "ספירה לאחור"), show: showCountdown },
+      { id: "rsvp", label: L("تأكيد الحضور", "אישור הגעה"), show: true },
+      { id: "inv-gift", label: L("هدية", "מתנה"), show: showGift },
+      { id: "inv-guestbook", label: L("التهاني", "ברכות"), show: showGuestbook },
+    ].filter((it) => it.show);
+  }, [lang, showStory, showGallery, showDetails, showVenue, showCountdown, showGift, showGuestbook]);
 
   // Scroll-reveal: animate `.dawa-inv-reveal` blocks in as they enter view on
   // the public page. In preview (or without IntersectionObserver) reveal them
@@ -198,9 +217,8 @@ export function DigitalInvitationView({
         fixed={isPublic}
         immersive3d={on(design?.immersive3d)}
         showEnvelope={showEnvelopeNow}
+        demo={demo}
         guestName={guestName}
-        groomName={groomName}
-        brideName={brideName}
         monogram={monogram}
         namesAr={namesAr}
         namesHe={namesHe}
@@ -216,7 +234,7 @@ export function DigitalInvitationView({
         brideName={brideName}
         monogram={monogram}
         eyebrow={eyebrow}
-        dateText={dateText}
+        dateText={/* under countdown by default; hero shows it only as a fallback when the countdown is hidden */ showCountdown ? "" : dateText}
         venueLine={venueLine}
         heroMedia={showHeroMedia ? heroMedia : []}
         theme={theme}
@@ -239,7 +257,7 @@ export function DigitalInvitationView({
           lang={lang}
         />
       )}
-      {showCountdown && <CountdownSection weddingDate={weddingDate} theme={theme} font={font} lang={lang} />}
+      {showCountdown && <CountdownSection weddingDate={weddingDate} dateText={dateText} theme={theme} font={font} lang={lang} />}
 
       <RSVPSection
         theme={theme}
@@ -269,7 +287,7 @@ export function DigitalInvitationView({
           only (every wedding reaches 100-600 in-market guests). Links back to
           the marketing site with a referral param. Hidden in the editor preview. */}
       {isPublic && (
-        <div style={{ textAlign: "center", padding: "16px 16px 96px" }}>
+        <div style={{ textAlign: "center", padding: "16px 16px 72px" }}>
           <a href="/?ref=invite" target="_blank" rel="noopener noreferrer"
              style={{ color: theme.accent, textDecoration: "none", opacity: 0.7, fontSize: 12, fontWeight: 700 }}>
             {lang === "he" ? "נוצר עם דעוה — צרו את ההזמנה שלכם ←" : "صُنعت بواسطة دعوة — اصنع دعوتك ←"}
@@ -291,6 +309,8 @@ export function DigitalInvitationView({
           musicUrl={musicUrl}
         />
       )}
+
+      <InviteNavMenu items={navItems} theme={theme} font={font} lang={lang} fixed={isPublic} />
 
       {mode === "preview" && (
         <div

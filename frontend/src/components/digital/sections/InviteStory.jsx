@@ -3,7 +3,7 @@ import { SectionHead } from "../inviteShared.jsx";
 // ── Story timeline ─────────────────────────────────────────────────────────────
 function StorySection({ items, theme, font, lang }) {
   return (
-    <section className="dawa-inv-section">
+    <section className="dawa-inv-section" id="inv-story">
       <SectionHead
         eyebrow={lang === "he" ? "הסיפור שלנו" : "قصتنا"}
         title={lang === "he" ? "המסע שלנו עד היום" : "رحلتنا حتى اليوم"}

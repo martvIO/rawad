@@ -4,6 +4,13 @@
 import { test, expect } from "@playwright/test";
 import { GroomDashboardPage } from "./pages/GroomDashboardPage";
 import { loginAsGroom, clearSession } from "./helpers/auth";
+import { skipIfNoPhysical } from "./helpers/features";
+
+// The entire groom HANDWRITTEN track is gated behind FEATURES.physical (beta,
+// off by default). Skip these UI specs when it's disabled — the digital track
+// is covered separately and the physical backend pipeline via the API tests +
+// the physical-delivery journey.
+test.beforeEach(() => skipIfNoPhysical());
 
 test.describe("Groom — type select gate", () => {
   test.beforeEach(async ({ page }) => {
