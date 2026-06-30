@@ -77,6 +77,13 @@ service cloud.firestore {
       allow read: if request.auth != null && request.auth.token.role == 'admin';
     }
 
+    // App-wide config (e.g. appConfig/demoDesign = the published demo snapshot).
+    // Server-mediated only: the Admin SDK writes it on publish and the public
+    // demo reads it through the no-auth REST endpoint, never via direct Firestore.
+    match /appConfig/{doc} {
+      allow read, write: if false;
+    }
+
     // Default deny — all other paths
     match /{document=**} {
       allow read, write: if false;

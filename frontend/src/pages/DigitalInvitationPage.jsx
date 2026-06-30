@@ -5,7 +5,7 @@
 import { useEffect, useState, useRef, lazy, Suspense } from "react";
 import { useParams, Routes, Route, useSearchParams, useNavigate } from "react-router-dom";
 import { subscribeInviteToken, submitDigitalWish, getApprovedWishes } from "../services/invites.js";
-import { getDigitalInvitationPublic, submitDigitalGuestInvite, pingDigitalInviteOpened } from "../services/digitalInvitation.js";
+import { getDigitalInvitationPublic, submitDigitalGuestInvite, pingDigitalInviteOpened, getDemoDesignPublic } from "../services/digitalInvitation.js";
 import { logErr } from "../utils/logger.js";
 import { DigitalInvitationView } from "../components/digital/DigitalInvitationView.jsx";
 import { EventUnavailableNotice } from "../components/EventUnavailableNotice.jsx";
@@ -41,6 +41,47 @@ function mergeLang(arAr, heAr, keys) {
   });
 }
 
+// The built-in demo design — shown until/unless an admin publishes a demo
+// design (see AdminDemoTab). Kept as the empty-state fallback so the demo is
+// never blank. No query-param reads here; overrides are layered separately.
+function buildDemoFallbackDoc() {
+  return {
+    media: DEMO_MEDIA,
+    mediaCaptions: DEMO_CAPTIONS,
+    weddingDate: Date.now() + 47 * 86400000,
+    brideName: { ar: "ليلى", he: "לילה" },
+    groomDisplayName: { ar: "كريم", he: "כרים" },
+    monogram: "ك&ل",
+    venue: { ar: "قاعة الأفراح الملكية", he: "אולמי המלכות" },
+    venueCity: { ar: "حيفا", he: "חיפה" },
+    venueAddress: { ar: "شارع النبي 86، حيفا", he: "רחוב הנביאים 86, חיפה" },
+    accessNote: { ar: "15–20 دقيقة من وسط المدينة · خدمة فاليه", he: "15–20 דקות ממרכז העיר · שירות ולט" },
+    dressCode: { ar: "كاجوال أنيق · ألوان فاتحة", he: "אלגנט קז'ואל · צבעים בהירים" },
+    themeColor: "ivorygold",
+    fontFamily: "amiri",
+    storyTimeline: mergeLang(SAMPLE_STORY.ar, SAMPLE_STORY.he, ["when", "title", "body"]),
+    details: mergeLang(SAMPLE_DETAILS.ar, SAMPLE_DETAILS.he, ["meta", "title", "body"]),
+    hotels: mergeLang(SAMPLE_HOTELS.ar, SAMPLE_HOTELS.he, ["name", "walk"]),
+    wishes: mergeLang(SAMPLE_WISHES.ar, SAMPLE_WISHES.he, ["who", "what"]),
+    mealOptions: DEFAULT_MEAL_OPTIONS.ar.map((a, i) => ({ ar: a, he: DEFAULT_MEAL_OPTIONS.he[i] || a })),
+  };
+}
+
+// Layer the personalized demo-link query overrides (?theme/?font/?date) on top
+// of a base design (the published snapshot OR the built-in fallback). ?name is
+// applied separately to the guest name (tokenRec).
+function applyDemoOverrides(base, search) {
+  const theme = search.get("theme");
+  const font = search.get("font");
+  const date = search.get("date");
+  return {
+    ...base,
+    themeColor: theme || base.themeColor,
+    fontFamily: font || base.fontFamily,
+    weddingDate: date ? new Date(date).getTime() : base.weddingDate,
+  };
+}
+
 const DigitalYourPhotos = lazy(() =>
   import("./DigitalYourPhotos.jsx").then((m) => ({ default: m.DigitalYourPhotos })),
 );
@@ -67,7 +108,6 @@ function DigitalLandingMain({ t, lang, setLang }) {
   const [search] = useSearchParams();
   const isDemo = search.get("demo") === "1";
   const demoName = search.get("name");
-  const demoDate = search.get("date");
 
   // The public demo (?demo=1) must replay the envelope intro on EVERY open, so
   // clear the "already opened" flag once on mount — before the envelope's own
@@ -89,33 +129,26 @@ function DigitalLandingMain({ t, lang, setLang }) {
         }
       : undefined,
   );
+  // Demo first paint = the built-in fallback (instant, never blank); an effect
+  // below swaps in the admin-published demo design if one exists.
   const [doc, setDoc] = useState(
-    isDemo
-      ? {
-          media: DEMO_MEDIA,
-          mediaCaptions: DEMO_CAPTIONS,
-          weddingDate: demoDate ? new Date(demoDate).getTime() : Date.now() + 47 * 86400000,
-          brideName: { ar: "ليلى", he: "לילה" },
-          groomDisplayName: { ar: "كريم", he: "כרים" },
-          monogram: "ك&ل",
-          venue: { ar: "قاعة الأفراح الملكية", he: "אולמי המלכות" },
-          venueCity: { ar: "حيفا", he: "חיפה" },
-          venueAddress: { ar: "شارع النبي 86، حيفا", he: "רחוב הנביאים 86, חיפה" },
-          accessNote: { ar: "15–20 دقيقة من وسط المدينة · خدمة فاليه", he: "15–20 דקות ממרכז העיר · שירות ולט" },
-          dressCode: { ar: "كاجوال أنيق · ألوان فاتحة", he: "אלגנט קז'ואל · צבעים בהירים" },
-          themeColor: search.get("theme") || "ivorygold",
-          fontFamily: search.get("font") || "amiri",
-          storyTimeline: mergeLang(SAMPLE_STORY.ar, SAMPLE_STORY.he, ["when", "title", "body"]),
-          details: mergeLang(SAMPLE_DETAILS.ar, SAMPLE_DETAILS.he, ["meta", "title", "body"]),
-          hotels: mergeLang(SAMPLE_HOTELS.ar, SAMPLE_HOTELS.he, ["name", "walk"]),
-          wishes: mergeLang(SAMPLE_WISHES.ar, SAMPLE_WISHES.he, ["who", "what"]),
-          mealOptions: DEFAULT_MEAL_OPTIONS.ar.map((a, i) => ({ ar: a, he: DEFAULT_MEAL_OPTIONS.he[i] || a })),
-        }
-      : null,
+    isDemo ? applyDemoOverrides(buildDemoFallbackDoc(), search) : null,
   );
   const [done, setDone] = useState(false);
   const [approvedWishes, setApprovedWishes] = useState([]);
   const pingedRef = useRef(false);
+
+  // Demo: swap in the admin-published demo design if one exists; otherwise keep
+  // the built-in fallback already set above. Query overrides layer on top.
+  useEffect(() => {
+    if (!isDemo) return undefined;
+    let active = true;
+    getDemoDesignPublic().then((snap) => {
+      if (active && snap) setDoc(applyDemoOverrides(snap, search));
+    });
+    return () => { active = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isDemo]);
 
   useEffect(() => {
     if (isDemo) return;

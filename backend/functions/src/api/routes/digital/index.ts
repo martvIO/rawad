@@ -31,6 +31,7 @@ import { registerMediaRoutes } from "./media.routes";
 import { registerDesignsRoutes } from "./designs.routes";
 import { registerPhotographerRoutes } from "./photographer.routes";
 import { registerWorkflowRoutes } from "./workflow.routes";
+import { registerDemoRoutes } from "./demo.routes";
 import { registerPublicRoutes } from "./public.routes";
 import { registerPhotoShareRoutes } from "./photoShare.routes";
 import { registerGalleryRoutes } from "./gallery.routes";
@@ -45,6 +46,8 @@ registerMediaRoutes(digitalRouter);
 registerDesignsRoutes(digitalRouter);
 registerPhotographerRoutes(digitalRouter);
 registerWorkflowRoutes(digitalRouter);
+// Literal `/demo/*` routes — registered before /:uid/* so `demo` is not a uid.
+registerDemoRoutes(digitalRouter);
 registerPublicRoutes(digitalRouter);
 registerPhotoShareRoutes(digitalRouter);
 registerGalleryRoutes(digitalRouter);

@@ -18,6 +18,7 @@ import { AdminWhatsAppSetupTab } from "./AdminWhatsAppSetupTab.jsx";
 import { AdminMessageTemplatesTab } from "./AdminMessageTemplatesTab.jsx";
 import { AdminConfirmationsTab } from "./AdminConfirmationsTab.jsx";
 import { AdminDesigns } from "./AdminDesigns.jsx";
+import { AdminDemoTab } from "./AdminDemoTab.jsx";
 import { AdminGallery } from "./AdminGallery.jsx";
 import { AdminAuditTab } from "./AdminAuditTab.jsx";
 import { AdminLifecycleTab } from "./AdminLifecycleTab.jsx";
@@ -86,6 +87,7 @@ export function AdminPortal() {
           <NavLink data-testid="nav-admin-send"          to="/portal/admin/send"          style={tabStyle}>📨 {t("admin_tab_send")}</NavLink>
           <NavLink data-testid="nav-admin-confirmations" to="/portal/admin/confirmations" style={tabStyle}>✓ {t("admin_tab_confirmations")}{confirmations.length ? <> (<Num>{confirmations.length}</Num>)</> : ""}</NavLink>
           <NavLink data-testid="nav-admin-designs"       to="/portal/admin/designs"       style={tabStyle}>🎨 {lang === "he" ? "עיצובים" : "التصاميم"}</NavLink>
+          <NavLink data-testid="nav-admin-demo"          to="/portal/admin/demo"          style={tabStyle}>🖼 {lang === "he" ? "דף הדגמה" : "صفحة العرض"}</NavLink>
           <NavLink data-testid="nav-admin-gallery"       to="/portal/admin/gallery"       style={tabStyle}>📸 {lang === "he" ? "גלריה" : "المعرض"}</NavLink>
           <NavLink data-testid="nav-admin-settings"      to="/portal/admin/settings"      style={tabStyle}>⚙ {t("admin_tab_settings")}</NavLink>
           <NavLink data-testid="nav-admin-whatsapp"      to="/portal/admin/whatsapp"      style={tabStyle}>📱 {t("admin_tab_whatsapp")}</NavLink>
@@ -103,6 +105,7 @@ export function AdminPortal() {
             <Route path="send"            element={<AdminSendTab />} />
             <Route path="confirmations"   element={<AdminConfirmationsTab />} />
             <Route path="designs"         element={<AdminDesigns />} />
+            <Route path="demo"            element={<AdminDemoTab />} />
             <Route path="gallery"         element={<AdminGallery lang={lang} />} />
             <Route path="settings"        element={<AdminSettingsTab />} />
             <Route path="whatsapp"        element={<AdminWhatsAppSetupTab />} />
