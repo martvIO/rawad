@@ -84,6 +84,15 @@ export function DigitalPortal() {
                 fontSize: 10, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
               }}
             >⇄</button>
+            <button
+              onClick={() => navigate("/help")}
+              title={lang === "he" ? "עזרה" : "مساعدة"}
+              style={{
+                background: "rgba(75,159,212,.08)", border: "1px solid rgba(75,159,212,.25)",
+                color: C.blue, padding: "4px 9px", borderRadius: 7,
+                fontSize: 12, fontWeight: 800, cursor: "pointer", fontFamily: "inherit",
+              }}
+            >؟</button>
             <LangSwitcher lang={lang} setLang={setLang} />
             <button onClick={() => setLogoutAsking(true)} title={t("logout")} style={{
               background: "rgba(212,80,58,.08)", border: "1px solid rgba(212,80,58,.3)",

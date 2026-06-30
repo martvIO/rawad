@@ -26,6 +26,8 @@ import { DIGITAL_THEMES, DIGITAL_FONTS, DIGITAL_THEME_KEYS, DIGITAL_FONT_KEYS } 
 import { DigitalInvitationView } from "../../../../components/digital/DigitalInvitationView.jsx";
 import {
   DEFAULT_EYEBROW,
+  DEFAULT_BLESSING,
+  DEFAULT_WELCOME,
   DEFAULT_MEAL_OPTIONS,
   SAMPLE_STORY,
   SAMPLE_DETAILS,
@@ -70,7 +72,7 @@ function mergeLang(arAr, heAr, keys) {
 // preview is a simple merge and autosave can target a single key at a time.
 const SCALAR_KEYS = [
   "title",
-  "brideName", "groomDisplayName", "eyebrow", "monogram",
+  "brideName", "groomDisplayName", "eyebrow", "blessing", "welcome", "monogram",
   "venue", "venueCity", "venueAddress", "accessNote", "dressCode",
   "giftNote", "giftIban", "musicUrl",
 ];
@@ -726,6 +728,12 @@ function DesignEditorBody({ groomUid, designId }) {
           </FormField>
           <FormField label={tt(lang, "نص علوي صغير في البداية", "כיתוב עליון קצר")}>
             <input data-testid="design-eyebrow" type="text" placeholder={DEFAULT_EYEBROW[editLang]} {...textProps("eyebrow", 60)} />
+          </FormField>
+          <FormField label={tt(lang, "بركة فوق الأسماء (على الظرف)", "ברכה מעל השמות (על המעטפה)")}>
+            <input data-testid="design-blessing" type="text" placeholder={DEFAULT_BLESSING[editLang]} {...textProps("blessing", 80)} />
+          </FormField>
+          <FormField label={tt(lang, "جملة ترحيب تحت الأسماء (على الظرف)", "משפט ברכה מתחת לשמות (על המעטפה)")}>
+            <input data-testid="design-welcome" type="text" placeholder={DEFAULT_WELCOME[editLang]} {...textProps("welcome", 120)} />
           </FormField>
         </Section>
 

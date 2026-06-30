@@ -10,6 +10,7 @@ import { makeT } from "./i18n/index.js";
 import { GlobalStyle } from "./styles/GlobalStyle.jsx";
 import { LandingPage } from "./pages/LandingPage.jsx";
 import { TermsPage } from "./pages/TermsPage.jsx";
+import { HelpPage } from "./pages/HelpPage.jsx";
 import { ConfirmationForm } from "./pages/ConfirmationForm.jsx";
 import { InviteForm } from "./pages/InviteForm.jsx";
 import { DigitalInviteForm } from "./pages/DigitalInviteForm.jsx";
@@ -61,6 +62,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<LandingPage onEnterPortal={() => navigate("/portal")} {...langProps} />} />
           <Route path="/terms" element={<TermsPage {...langProps} />} />
+          <Route path="/help" element={<HelpPage {...langProps} />} />
           <Route path="/confirm/:groomUsername" element={<ConfirmationForm {...langProps} />} />
           <Route path="/invite/digital/:token" element={<DigitalInviteForm {...langProps} />} />
           <Route path="/invite/:token" element={<InviteForm {...langProps} />} />

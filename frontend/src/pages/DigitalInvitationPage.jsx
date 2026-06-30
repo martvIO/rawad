@@ -69,6 +69,17 @@ function DigitalLandingMain({ t, lang, setLang }) {
   const demoName = search.get("name");
   const demoDate = search.get("date");
 
+  // The public demo (?demo=1) must replay the envelope intro on EVERY open, so
+  // clear the "already opened" flag once on mount — before the envelope's own
+  // useState initializers (in CelestialAmbience, rendered below as a
+  // descendant) read it. Render-phase + ref-guarded so it runs exactly once,
+  // ahead of the children. Real guest invites never hit this path.
+  const didDemoResetRef = useRef(false);
+  if (isDemo && !didDemoResetRef.current) {
+    didDemoResetRef.current = true;
+    try { localStorage.setItem("dawa-invite-opened", "0"); } catch { /* ignore */ }
+  }
+
   const [tokenRec, setTokenRec] = useState(
     isDemo
       ? {

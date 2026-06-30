@@ -40,6 +40,7 @@ _(ideas, frameworks, patterns, principles — pages that describe a concept)_
 - [[Communication Settings]] — admin contact channels + public /settings/public + landing WhatsApp CTAs
 - [[Admin Analytics]] — admin operator command center: server-aggregated GET /admin/analytics + recharts page (composition/revenue/operations/rsvp/designs/triage/trends)
 - [[Conversion KPIs]] — North Star (paid weddings/month) + funnel KPIs + weekly cadence; flags the untracked top-of-funnel (WhatsApp-click) gap
+- [[Mobile App]] — groom-only Android+iOS Capacitor app (separate `app/` package reusing frontend/); phased roadmap (foundation → push → self-serve signup w/ iOS IAP + Android Lemon Squeezy); Phase 1 built 2026-06-25
 
 ## Sources
 
