@@ -22,9 +22,12 @@ import {
 import { logErr } from "../../../../utils/logger.js";
 import { ensureDigitalFonts } from "../../../../utils/digitalFonts.js";
 import { C } from "../../../../styles/theme.js";
-import { DIGITAL_THEMES, DIGITAL_FONTS, DIGITAL_THEME_KEYS, DIGITAL_FONT_KEYS, getDigitalTheme } from "../../../../styles/digitalThemes.js";
+import { DIGITAL_THEMES, DIGITAL_FONTS, DIGITAL_THEME_KEYS, DIGITAL_FONT_KEYS, getDigitalTheme, getDigitalFont } from "../../../../styles/digitalThemes.js";
 import { resolveEnvelopePalette } from "../../../../utils/themeToEnvelopePalette.js";
+import { resolveBackground } from "../../../../utils/themeToBackground.js";
 import { DigitalInvitationView } from "../../../../components/digital/DigitalInvitationView.jsx";
+import { Ambience } from "../../../../components/digital/sections/InviteAmbience.jsx";
+import { ViewStyles } from "../../../../components/digital/sections/InviteStyles.jsx";
 
 // Lazy WebGL host for the dedicated sealed-envelope preview (pulls `three` only
 // when the design editor's envelope section mounts).
@@ -258,11 +261,14 @@ export function DesignEditorBody({ groomUid, designId, adminDemoMode = false, on
   const [progress, setProgress] = useState(0);
   const [heroBusy, setHeroBusy] = useState(false);
   const [heroProgress, setHeroProgress] = useState(0);
+  const [bgBusy, setBgBusy] = useState(false);
+  const [bgProgress, setBgProgress] = useState(0);
   // An APPROVED design is read-only until the groom presses "تعديل التصميم".
   // Reset per design so a fresh/approved design always starts locked.
   const [editUnlocked, setEditUnlocked] = useState(false);
   const fileInputRef = useRef(null);
   const heroFileInputRef = useRef(null);
+  const bgFileInputRef = useRef(null);
 
   // Buffered field values (scalars + arrays + toggles + mediaCaptions + the
   // wedding-date input string). Autosave fires on blur/change, not per keystroke.
@@ -313,6 +319,7 @@ export function DesignEditorBody({ groomUid, designId, adminDemoMode = false, on
         TOGGLE_KEYS.forEach((k) => apply(k, next[k] !== false));
         apply("mediaCaptions", next.mediaCaptions && typeof next.mediaCaptions === "object" ? next.mediaCaptions : {});
         apply("envelope", next.envelope && typeof next.envelope === "object" ? next.envelope : {});
+        apply("background", next.background && typeof next.background === "object" ? next.background : {});
         apply("themeColor", next.themeColor || "gold");
         apply("fontFamily", next.fontFamily || "amiri");
         return merged;
@@ -329,6 +336,9 @@ export function DesignEditorBody({ groomUid, designId, adminDemoMode = false, on
   // theme-derived defaults shown in the swatches when an override is unset.
   const envOverrides = f.envelope && typeof f.envelope === "object" ? f.envelope : {};
   const envDefaults = useMemo(() => resolveEnvelopePalette(getDigitalTheme(themeColor)), [themeColor]);
+  // Custom-background overrides + the theme-derived defaults shown when unset.
+  const bgOverrides = f.background && typeof f.background === "object" ? f.background : {};
+  const bgDefaults = useMemo(() => resolveBackground(getDigitalTheme(themeColor), {}), [themeColor]);
   const media = Array.isArray(doc?.media) ? doc.media : [];
   const heroMedia = Array.isArray(doc?.heroMedia) ? doc.heroMedia : [];
 
@@ -389,6 +399,7 @@ export function DesignEditorBody({ groomUid, designId, adminDemoMode = false, on
       if (TOGGLE_KEYS.includes(key)) return { ...prev, [key]: cur[key] !== false };
       if (key === "mediaCaptions") return { ...prev, mediaCaptions: cur.mediaCaptions || {} };
       if (key === "envelope") return { ...prev, envelope: cur.envelope || {} };
+      if (key === "background") return { ...prev, background: cur.background || {} };
       if (key === "themeColor") return { ...prev, themeColor: cur.themeColor || "gold" };
       if (key === "fontFamily") return { ...prev, fontFamily: cur.fontFamily || "amiri" };
       return { ...prev, [key]: cur[key] || "" };
@@ -465,6 +476,76 @@ export function DesignEditorBody({ groomUid, designId, adminDemoMode = false, on
     const n = nextEnv(subKey, value);
     setField("envelope", n);
     flush("envelope", n);
+  };
+
+  // ── Custom background overrides ───────────────────────────────────────────
+  // One buffered nested object (like `envelope`). All keys carry explicit values
+  // (no key-deletion resets) so the server's set({merge:true}) deep-merge can't
+  // resurrect a stale value, and the server-owned `image` (set by the upload
+  // route) is preserved across patches (sanitizeBackground strips it from input).
+  const nextBg = (subKey, value) => {
+    const n = { ...bgOverrides };
+    if (value == null || value === "") delete n[subKey];
+    else n[subKey] = value;
+    return n;
+  };
+  const setBgField = (subKey, value) => {
+    if (!editable) return;
+    const n = nextBg(subKey, value);
+    setField("background", n);
+    flush("background", n);
+  };
+  const bufferBgField = (subKey, value) => {
+    if (!editable) return;
+    setField("background", nextBg(subKey, value));
+  };
+  const commitBgField = (subKey, value) => {
+    if (!editable) return;
+    const n = nextBg(subKey, value);
+    setField("background", n);
+    flush("background", n);
+  };
+
+  // Background image lives at background.image and is owned by the upload/remove
+  // routes (target=background). Mirror onUploadHero, but write the single image
+  // object (not an array) into both the doc snapshot and the buffer so the
+  // preview reflects it immediately.
+  const onUploadBg = async (file) => {
+    if (!file || !editable) return;
+    setBgBusy(true);
+    setBgProgress(0);
+    try {
+      const item = await addDesignMedia(currentUid, designId, file, { target: "background", onProgress: setBgProgress });
+      if (item && item.storagePath) {
+        const mergeImg = (obj) => ({ ...(obj || {}), background: { ...((obj || {}).background || {}), image: item } });
+        setDoc((prev) => mergeImg(prev));
+        setF((prev) => mergeImg(prev));
+      }
+      showToast(tt(lang, "✓ تم رفع الخلفية", "✓ הרקע הועלה"));
+    } catch (err) {
+      logErr("addDesignMedia.background", err);
+      showToast(localizeApiError(err, lang, tt(lang, "فشل الرفع", "ההעלאה נכשלה")));
+    } finally {
+      setBgBusy(false);
+      setBgProgress(0);
+      if (bgFileInputRef.current) bgFileInputRef.current.value = "";
+    }
+  };
+  const onRemoveBg = async () => {
+    if (!editable) return;
+    const img = bgOverrides.image;
+    if (!img?.storagePath) return;
+    if (!window.confirm(tt(lang, "حذف صورة الخلفية؟", "למחוק את תמונת הרקע?"))) return;
+    try {
+      await removeDesignMedia(currentUid, designId, img, { target: "background" });
+      const clearImg = (obj) => ({ ...(obj || {}), background: { ...((obj || {}).background || {}), image: null } });
+      setDoc((prev) => clearImg(prev));
+      setF((prev) => clearImg(prev));
+      showToast(tt(lang, "✓ تم الحذف", "✓ נמחק"));
+    } catch (err) {
+      logErr("removeDesignMedia.background", err);
+      showToast(localizeApiError(err, lang, tt(lang, "فشل الحذف", "המחיקה נכשלה")));
+    }
   };
 
   // One-click: start from the full sample design for any sections still empty.
@@ -1106,6 +1187,62 @@ export function DesignEditorBody({ groomUid, designId, adminDemoMode = false, on
           />
         </Section>
 
+        {/* Custom background */}
+        <Section title={tt(lang, "الخلفية المخصّصة", "רקע מותאם אישית")}>
+          <div style={{ fontSize: 11, color: C.dim, marginBottom: 12, lineHeight: 1.6 }}>
+            {tt(lang,
+              "صمّم خلفية الدعوة: لون أو تدرّج أو صورة، مع دوائر زخرفية على الأطراف. فعّل \"استخدم خلفيتي\" ليراها كل المدعوين (يحلّ محل العالم ثلاثي الأبعاد؛ يبقى غلاف الفتح ثم يختفي تدريجياً).",
+              "עצב את רקע ההזמנה: צבע, מעבר צבע או תמונה, עם עיגולים דקורטיביים בקצוות. הפעל \"השתמש ברקע שלי\" כדי שכל המוזמנים יראו אותו (מחליף את העולם התלת-ממדי; מעטפת הפתיחה עדיין מתנגנת ואז נמוגה).")}
+          </div>
+
+          <ToggleRow label={tt(lang, "استخدم خلفيتي (لكل المدعوين)", "השתמש ברקע שלי (לכל המוזמנים)")} checked={bgOverrides.enabled === true} disabled={!editable} testid="design-bg-enabled" onChange={(c) => setBgField("enabled", c)} />
+
+          {/* Fill */}
+          <div style={{ fontSize: 12, color: C.goldDim, margin: "14px 0 4px" }}>{tt(lang, "اللون", "צבע")}</div>
+          <EnvColorRow testid="design-bg-color" label={tt(lang, "لون الخلفية", "צבע הרקע")} value={bgOverrides.color} defaultHex={bgDefaults.color} presets={["#07070a", "#0b1020", "#1a0f1f", "#f7f3ec"]} disabled={!editable} onPick={(hex) => setBgField("color", hex)} onReset={() => setBgField("color", bgDefaults.color)} />
+          <ToggleRow label={tt(lang, "تدرّج لوني", "מעבר צבע")} checked={bgOverrides.gradient === true} disabled={!editable} testid="design-bg-gradient" onChange={(c) => setBgField("gradient", c)} />
+          {bgOverrides.gradient === true && (
+            <>
+              <EnvColorRow testid="design-bg-grad-from" label={tt(lang, "من (أعلى)", "מ (למעלה)")} value={bgOverrides.gradientFrom} defaultHex={bgDefaults.gradientFrom} presets={["#07070a", "#0b1020", "#1a0f1f", "#2a1a3a"]} disabled={!editable} onPick={(hex) => setBgField("gradientFrom", hex)} onReset={() => setBgField("gradientFrom", bgDefaults.gradientFrom)} />
+              <EnvColorRow testid="design-bg-grad-to" label={tt(lang, "إلى (أسفل)", "אל (למטה)")} value={bgOverrides.gradientTo} defaultHex={bgDefaults.gradientTo} presets={["#000000", "#07070a", "#1a1030", "#2a1a3a"]} disabled={!editable} onPick={(hex) => setBgField("gradientTo", hex)} onReset={() => setBgField("gradientTo", bgDefaults.gradientTo)} />
+            </>
+          )}
+
+          {/* Image */}
+          <div style={{ fontSize: 12, color: C.goldDim, margin: "14px 0 6px" }}>{tt(lang, "صورة الخلفية (اختياري)", "תמונת רקע (אופציונלי)")}</div>
+          {bgOverrides.image?.url ? (
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+              <div style={{ width: 64, height: 44, borderRadius: 8, backgroundImage: `url("${bgOverrides.image.url}")`, backgroundSize: "cover", backgroundPosition: "center", border: "1px solid rgba(255,255,255,.14)" }} />
+              <button type="button" data-testid="design-bg-remove" onClick={onRemoveBg} disabled={!editable} style={{ ...pillBtn(false), fontSize: 12 }}>{tt(lang, "حذف الصورة", "מחק תמונה")}</button>
+            </div>
+          ) : (
+            <label style={{ display: "block", padding: "12px 16px", borderRadius: 10, textAlign: "center", border: `2px dashed ${bgBusy ? "rgba(201,168,76,.65)" : "rgba(201,168,76,.32)"}`, background: bgBusy ? "rgba(201,168,76,.06)" : "rgba(201,168,76,.02)", cursor: bgBusy || !editable ? "not-allowed" : "pointer" }}>
+              <input ref={bgFileInputRef} type="file" accept="image/*" style={{ display: "none" }} disabled={bgBusy || !editable} data-testid="design-bg-upload-input" onChange={(e) => onUploadBg(e.target.files?.[0])} />
+              <span style={{ fontSize: 13, color: C.goldLight, fontWeight: 700 }}>{bgBusy ? `⏳ ${Math.round(bgProgress * 100)}%` : tt(lang, "📁 رفع صورة", "📁 העלאת תמונה")}</span>
+            </label>
+          )}
+          {bgOverrides.image?.url && (
+            <RangeRow testid="design-bg-overlay" label={tt(lang, "تعتيم فوق الصورة", "כהות מעל התמונה")} min={0} max={1} step={0.05} value={bgOverrides.imageOverlay ?? bgDefaults.imageOverlay} disabled={!editable} onInput={(v) => bufferBgField("imageOverlay", v)} onCommit={(v) => commitBgField("imageOverlay", v)} />
+          )}
+
+          {/* Circles */}
+          <div style={{ fontSize: 12, color: C.goldDim, margin: "14px 0 4px" }}>{tt(lang, "الدوائر الزخرفية (على الأطراف)", "עיגולים דקורטיביים (בקצוות)")}</div>
+          <RangeRow testid="design-bg-circle-count" label={tt(lang, "العدد", "כמות")} min={0} max={6} step={1} value={bgOverrides.circleCount ?? bgDefaults.circles.count} disabled={!editable} onInput={(v) => bufferBgField("circleCount", v)} onCommit={(v) => commitBgField("circleCount", v)} />
+          <EnvColorRow testid="design-bg-circle-color" label={tt(lang, "لون الدوائر", "צבע העיגולים")} value={bgOverrides.circleColor} defaultHex={bgDefaults.circles.color} presets={["#d4a07a", "#caa14e", "#9ecbff", "#e8b4b8"]} disabled={!editable} onPick={(hex) => setBgField("circleColor", hex)} onReset={() => setBgField("circleColor", bgDefaults.circles.color)} />
+          <RangeRow testid="design-bg-circle-size" label={tt(lang, "الحجم", "גודל")} min={0} max={1} step={0.05} value={bgOverrides.circleSize ?? bgDefaults.circles.size} disabled={!editable} onInput={(v) => bufferBgField("circleSize", v)} onCommit={(v) => commitBgField("circleSize", v)} />
+          <RangeRow testid="design-bg-circle-opacity" label={tt(lang, "الشفافية", "שקיפות")} min={0} max={1} step={0.05} value={bgOverrides.circleOpacity ?? bgDefaults.circles.opacity} disabled={!editable} onInput={(v) => bufferBgField("circleOpacity", v)} onCommit={(v) => commitBgField("circleOpacity", v)} />
+          <RangeRow testid="design-bg-circle-softness" label={tt(lang, "النعومة (التمويه)", "ריכוך (טשטוש)")} min={0} max={1} step={0.05} value={bgOverrides.circleSoftness ?? bgDefaults.circles.softness} disabled={!editable} onInput={(v) => bufferBgField("circleSoftness", v)} onCommit={(v) => commitBgField("circleSoftness", v)} />
+          <ToggleRow label={tt(lang, "حركة انسياب", "תנועת ריחוף")} checked={bgOverrides.circleMotion !== false} disabled={!editable} testid="design-bg-circle-motion" onChange={(c) => setBgField("circleMotion", c)} />
+
+          {/* Petals + sparkles */}
+          <div style={{ marginTop: 12 }}>
+            <ToggleRow label={tt(lang, "بتلات متساقطة", "עלי כותרת נושרים")} checked={bgOverrides.petals !== false} disabled={!editable} testid="design-bg-petals" onChange={(c) => setBgField("petals", c)} />
+            <ToggleRow label={tt(lang, "ومضات لامعة", "ניצוצות נוצצים")} checked={bgOverrides.sparkles !== false} disabled={!editable} testid="design-bg-sparkles" onChange={(c) => setBgField("sparkles", c)} />
+          </div>
+
+          <BackgroundPreview themeColor={themeColor} fontFamily={fontFamily} overrides={bgOverrides} lang={lang} />
+        </Section>
+
         {/* Theme */}
         <Section title={tt(lang, "لون التصميم", "צבע העיצוב")}>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(110px, 1fr))", gap: 10 }}>
@@ -1418,6 +1555,30 @@ function EnvelopePreview({ themeColor, overrides, content, lang }) {
       <button type="button" data-testid="design-env-play" onClick={play} style={{ position: "absolute", bottom: 10, left: "50%", transform: "translateX(-50%)", zIndex: 2, ...pillBtn(true) }}>
         {tt(lang, "▶ تشغيل الفتح", "▶ הפעלת פתיחה")}
       </button>
+    </div>
+  );
+}
+
+// Live 2D preview of the custom background — renders the same <Ambience> the
+// public page uses (no WebGL), so the groom sees fill / circles / image instantly.
+// Wrapped in a `.dawa-inv` box with its own ViewStyles so the scoped aurora /
+// petal / sparkle CSS + drift keyframes apply even outside the full preview.
+function BackgroundPreview({ themeColor, fontFamily, overrides, lang }) {
+  const theme = useMemo(() => getDigitalTheme(themeColor), [themeColor]);
+  const font = useMemo(() => getDigitalFont(fontFamily), [fontFamily]);
+  const bg = useMemo(() => resolveBackground(theme, overrides), [theme, overrides]);
+  return (
+    <div
+      className="dawa-inv"
+      data-testid="design-bg-preview"
+      style={{ position: "relative", height: 280, borderRadius: 14, overflow: "hidden", border: "1px solid rgba(201,168,76,.22)", marginTop: 14, background: theme.bg, color: theme.text }}
+    >
+      <ViewStyles theme={theme} font={font} fixed={false} />
+      <Ambience theme={theme} fixed={false} background={bg} />
+      <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", zIndex: 6, pointerEvents: "none", padding: 16 }}>
+        <div style={{ fontSize: 11, letterSpacing: 3, textTransform: "uppercase", opacity: 0.75 }}>{tt(lang, "معاينة الخلفية", "תצוגת רקע")}</div>
+        <div style={{ fontSize: 26, fontWeight: 900, marginTop: 6, fontFamily: font.family }}>{tt(lang, "دعوة", "הזמנה")}</div>
+      </div>
     </div>
   );
 }

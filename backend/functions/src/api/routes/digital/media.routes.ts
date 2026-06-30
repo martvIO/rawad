@@ -265,15 +265,21 @@ router.post(
       return;
     }
 
-    // `target` selects which array the upload appends to: the hero/featured
-    // media shown under the greeting ("hero") or the gallery (default).
-    const target = parsed.fields.target === "hero" ? "hero" : "gallery";
+    // `target` selects the destination: the hero/featured media shown under the
+    // greeting ("hero"), the single custom-background image ("background", set on
+    // background.image — not an array), or the gallery (default).
+    const target =
+      parsed.fields.target === "hero"
+        ? "hero"
+        : parsed.fields.target === "background"
+          ? "background"
+          : "gallery";
 
     try {
       const uid = req.params.uid;
       const designId = await resolveDesignId(req);
       const ext = pickExtensionFromFilename(parsed.file.filename, "bin");
-      const prefix = target === "hero" ? "hero" : "m";
+      const prefix = target === "hero" ? "hero" : target === "background" ? "bg" : "m";
       const path = `${STORAGE_MEDIA_PREFIX}/${uid}/${designId}/${prefix}_${Date.now()}.${ext}`;
       const url = await uploadAndGetUrl(
         path,
@@ -290,6 +296,9 @@ router.post(
 
       // BUG-O003 fix — atomic append via transaction (now per design doc).
       const docRef = designDoc(uid, designId);
+      // The background image replaces any previous one; capture its path inside the
+      // transaction and best-effort delete it AFTER the commit (no I/O in a tx).
+      let prevBgPath: string | null = null;
       await fs().runTransaction(async (tx) => {
         const docSnap = await tx.get(docRef);
         const data = docSnap.exists ? docSnap.data() : null;
@@ -297,6 +306,12 @@ router.post(
         if (target === "hero") {
           const existing = (data?.heroMedia ?? []) as unknown[];
           update.heroMedia = [...existing, item].slice(-MAX_HERO_MEDIA_ITEMS);
+        } else if (target === "background") {
+          const prev = (data?.background as { image?: { storagePath?: string } } | undefined)?.image;
+          prevBgPath = prev?.storagePath ?? null;
+          // Deep-merge (set+merge) updates background.image only, preserving the
+          // groom's fill/circle settings on the same `background` map.
+          update.background = { image: item };
         } else {
           const existing = (data?.media ?? []) as unknown[];
           const migrated = migrateLegacyBackground(data, existing);
@@ -308,6 +323,9 @@ router.post(
         }
         tx.set(docRef, update, { merge: true });
       });
+      if (prevBgPath && prevBgPath !== path) {
+        await deleteStorageObjectSilently(prevBgPath);
+      }
       res.json(item);
     } catch (err) {
       res.status(500).json({ error: "upload_failed", detail: safeDetail(err) });
@@ -332,8 +350,14 @@ router.post(
       res.status(400).json({ error: "invalid_storage_path" });
       return;
     }
-    // `target` selects which array to prune — hero/featured media or gallery.
-    const target = req.body?.target === "hero" ? "hero" : "gallery";
+    // `target` selects what to prune — hero/featured media, the single
+    // custom-background image, or the gallery (default).
+    const target =
+      req.body?.target === "hero"
+        ? "hero"
+        : req.body?.target === "background"
+          ? "background"
+          : "gallery";
     try {
       const uid = req.params.uid;
       const designId = await resolveDesignId(req);
@@ -343,10 +367,15 @@ router.post(
         const snap = await tx.get(docRef);
         if (!snap.exists) return;
         const data = snap.data();
-        const field = target === "hero" ? "heroMedia" : "media";
-        const existing = (data?.[field] ?? []) as { storagePath?: string }[];
-        const filtered = existing.filter((m) => m.storagePath !== storagePath);
-        const update: Record<string, unknown> = { [field]: filtered };
+        const update: Record<string, unknown> = {};
+        if (target === "background") {
+          // Clear background.image only (deep-merge keeps fill/circle settings).
+          update.background = { image: null };
+        } else {
+          const field = target === "hero" ? "heroMedia" : "media";
+          const existing = (data?.[field] ?? []) as { storagePath?: string }[];
+          update[field] = existing.filter((m) => m.storagePath !== storagePath);
+        }
         if (data?.designStatus === "approved") {
           update.designStatus = "draft";
           update.designApprovedAt = null;

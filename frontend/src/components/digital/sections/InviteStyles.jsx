@@ -223,6 +223,17 @@ function ViewStyles({ theme, fixed }) {
     .dawa-inv .dawa-inv-aurora-blob.a1 { top: -14%; inset-inline-start: -14%; animation: dawa-inv-drift1 24s ease-in-out infinite; }
     .dawa-inv .dawa-inv-aurora-blob.a2 { bottom: -18%; inset-inline-end: -14%; animation: dawa-inv-drift2 30s ease-in-out infinite; }
     .dawa-inv .dawa-inv-aurora-blob.a3 { top: 36%; inset-inline-start: 26%; opacity: .12; animation: dawa-inv-drift3 34s ease-in-out infinite; }
+    /* Custom-background circles. Sized in cqmin so they scale to their CONTAINER
+       (correct in the small editor preview AND the full-viewport public page);
+       a vmin first-declaration is the fallback for browsers without container
+       query units. The aurora becomes a size query container in custom mode. */
+    .dawa-inv .dawa-inv-aurora.is-custom { container-type: size; }
+    .dawa-inv .dawa-inv-bgcircle-anchor {
+      position: absolute;
+      width: calc(var(--bgdia) * 1vmin); height: calc(var(--bgdia) * 1vmin);
+      width: calc(var(--bgdia) * 1cqmin); height: calc(var(--bgdia) * 1cqmin);
+    }
+    .dawa-inv .dawa-inv-bgcircle { display: block; width: 100%; height: 100%; border-radius: 50%; will-change: transform; }
 
     /* Couple names + greeting: a richer, layered gold halo. */
     .dawa-inv .dawa-inv-couple { text-shadow: 0 0 1px ${theme.accentLine}, 0 0 26px ${theme.accentMuted}, 0 0 72px ${theme.accentMuted}, 0 2px 3px rgba(0,0,0,.22); letter-spacing: .5px; }

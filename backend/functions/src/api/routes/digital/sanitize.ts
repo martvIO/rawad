@@ -1,4 +1,4 @@
-import { MAX_DESIGN_TITLE_LEN,MAX_GUEST_NAME_LEN,MAX_GUEST_PHONE_LEN,MAX_GUEST_RANK_LEN,MAX_GUEST_NOTE_LEN,MAX_BRIDE_NAME_LEN,MAX_VENUE_LEN,MAX_VENUE_ADDR_LEN,MAX_CUSTOM_MSG_LEN,MAX_STORY_LEN,MAX_EVENT_TITLE_LEN,MAX_EVENT_TIME_LEN,MAX_EVENT_VENUE_LEN,MAX_EVENT_ADDR_LEN,MAX_MAP_URL_LEN,MAX_GIFT_IBAN_LEN,MAX_GIFT_NOTE_LEN,MAX_MUSIC_URL_LEN,MAX_EVENT_ICON_LEN,MAX_EVENTS,MAX_RANK_ITEMS,MAX_EYEBROW_LEN,MAX_MONOGRAM_LEN,MAX_VENUE_CITY_LEN,MAX_ACCESS_NOTE_LEN,MAX_DRESS_CODE_LEN,MAX_BLESSING_LEN,MAX_WELCOME_LEN,MAX_STORY_WHEN_LEN,MAX_STORY_TITLE_LEN,MAX_STORY_BODY_LEN,MAX_STORY_ITEMS,MAX_DETAIL_META_LEN,MAX_DETAIL_TITLE_LEN,MAX_DETAIL_BODY_LEN,MAX_DETAIL_ITEMS,MAX_HOTEL_NAME_LEN,MAX_HOTEL_WALK_LEN,MAX_HOTEL_ITEMS,MAX_WISH_WHO_LEN,MAX_WISH_WHAT_LEN,MAX_WISH_ITEMS,MAX_MEAL_OPTION_LEN,MAX_MEAL_OPTIONS,MAX_CAPTION_LEN,MAX_CAPTION_ENTRIES,MAX_GUEST_STATUSES,HEX_COLOR_RE,ENVELOPE_COLOR_KEYS,STAR_DENSITY_MIN,STAR_DENSITY_MAX,STAR_INTENSITY_MIN,STAR_INTENSITY_MAX,THEME_COLORS,FONT_FAMILIES } from "./constants";
+import { MAX_DESIGN_TITLE_LEN,MAX_GUEST_NAME_LEN,MAX_GUEST_PHONE_LEN,MAX_GUEST_RANK_LEN,MAX_GUEST_NOTE_LEN,MAX_BRIDE_NAME_LEN,MAX_VENUE_LEN,MAX_VENUE_ADDR_LEN,MAX_CUSTOM_MSG_LEN,MAX_STORY_LEN,MAX_EVENT_TITLE_LEN,MAX_EVENT_TIME_LEN,MAX_EVENT_VENUE_LEN,MAX_EVENT_ADDR_LEN,MAX_MAP_URL_LEN,MAX_GIFT_IBAN_LEN,MAX_GIFT_NOTE_LEN,MAX_MUSIC_URL_LEN,MAX_EVENT_ICON_LEN,MAX_EVENTS,MAX_RANK_ITEMS,MAX_EYEBROW_LEN,MAX_MONOGRAM_LEN,MAX_VENUE_CITY_LEN,MAX_ACCESS_NOTE_LEN,MAX_DRESS_CODE_LEN,MAX_BLESSING_LEN,MAX_WELCOME_LEN,MAX_STORY_WHEN_LEN,MAX_STORY_TITLE_LEN,MAX_STORY_BODY_LEN,MAX_STORY_ITEMS,MAX_DETAIL_META_LEN,MAX_DETAIL_TITLE_LEN,MAX_DETAIL_BODY_LEN,MAX_DETAIL_ITEMS,MAX_HOTEL_NAME_LEN,MAX_HOTEL_WALK_LEN,MAX_HOTEL_ITEMS,MAX_WISH_WHO_LEN,MAX_WISH_WHAT_LEN,MAX_WISH_ITEMS,MAX_MEAL_OPTION_LEN,MAX_MEAL_OPTIONS,MAX_CAPTION_LEN,MAX_CAPTION_ENTRIES,MAX_GUEST_STATUSES,HEX_COLOR_RE,ENVELOPE_COLOR_KEYS,STAR_DENSITY_MIN,STAR_DENSITY_MAX,STAR_INTENSITY_MIN,STAR_INTENSITY_MAX,BACKGROUND_COLOR_KEYS,BACKGROUND_BOOL_KEYS,BG_CIRCLE_COUNT_MIN,BG_CIRCLE_COUNT_MAX,BG_UNIT_MIN,BG_UNIT_MAX,THEME_COLORS,FONT_FAMILIES } from "./constants";
 
 // ─── Sanitizers ───────────────────────────────────────────────────────────────
 
@@ -231,6 +231,7 @@ interface MediaSettings {
   heroMediaEnabled?: boolean;
   title?: Localized;
   envelope?: EnvelopeSettings;
+  background?: BackgroundSettings;
 }
 
 interface EnvelopeSettings {
@@ -242,6 +243,33 @@ interface EnvelopeSettings {
   stars?: boolean;
   starDensity?: number;
   starIntensity?: number;
+}
+
+// Per-design custom background. All colour keys are "#rrggbb"; the unit sliders
+// (circleSize/circleOpacity/circleSoftness/imageOverlay) are 0..1; circleCount is
+// an int 0..6. `image` is set ONLY by the upload route (target=background) — it is
+// never accepted from client PATCH input (stripped in sanitizeBackground).
+interface BackgroundImage {
+  url: string;
+  storagePath: string;
+  kind?: string;
+}
+interface BackgroundSettings {
+  enabled?: boolean;
+  color?: string;
+  gradient?: boolean;
+  gradientFrom?: string;
+  gradientTo?: string;
+  imageOverlay?: number;
+  circleCount?: number;
+  circleColor?: string;
+  circleSize?: number;
+  circleOpacity?: number;
+  circleSoftness?: number;
+  circleMotion?: boolean;
+  petals?: boolean;
+  sparkles?: boolean;
+  image?: BackgroundImage | null;
 }
 
 function sanitizeMediaSettings(body: unknown): Sanitized<MediaSettings> {
@@ -507,6 +535,13 @@ function sanitizeMediaSettings(body: unknown): Sanitized<MediaSettings> {
     out.envelope = env.value;
   }
 
+  // ── Custom background (fill / circles / image overlay) ────────────────────
+  if (data.background !== undefined) {
+    const bg = sanitizeBackground(data.background);
+    if (!bg.ok) return bg;
+    out.background = bg.value;
+  }
+
   const boolKeys: (keyof MediaSettings)[] = [
     "storyEnabled",
     "eventsEnabled",
@@ -573,6 +608,50 @@ function sanitizeEnvelope(v: unknown): Sanitized<EnvelopeSettings> {
   if (typeof o.starIntensity === "number" && Number.isFinite(o.starIntensity)) {
     out.starIntensity = clampRange(o.starIntensity, STAR_INTENSITY_MIN, STAR_INTENSITY_MAX);
   }
+  return { ok: true, value: out };
+}
+
+/**
+ * Sanitize the per-design custom-background object: validate hex colours, clamp
+ * the numeric sliders (clamp, never reject), coerce booleans, and DROP empty/absent
+ * keys so partial overrides persist cleanly with set({merge:true}). `image` is
+ * SERVER-managed (written only by the upload route) and is always stripped from
+ * client input. `null` / `{}` ⇒ reset all background customization to defaults.
+ */
+function sanitizeBackground(v: unknown): Sanitized<BackgroundSettings> {
+  if (v === null) return { ok: true, value: {} };
+  if (typeof v !== "object" || Array.isArray(v)) {
+    return { ok: false, error: "invalid_background", field: "background" };
+  }
+  const o = v as Record<string, unknown>;
+  const out: BackgroundSettings = {};
+  for (const key of BACKGROUND_COLOR_KEYS) {
+    const raw = o[key];
+    if (raw === undefined || raw === "") continue; // unset → fall back to default
+    if (typeof raw !== "string" || !HEX_COLOR_RE.test(raw)) {
+      return { ok: false, error: "invalid_background_color", field: `background.${key}` };
+    }
+    out[key] = raw.toLowerCase();
+  }
+  for (const key of BACKGROUND_BOOL_KEYS) {
+    const raw = o[key];
+    if (raw === undefined) continue;
+    if (typeof raw !== "boolean") {
+      return { ok: false, error: "invalid_toggle", field: `background.${key}` };
+    }
+    out[key] = raw;
+  }
+  if (typeof o.circleCount === "number" && Number.isFinite(o.circleCount)) {
+    out.circleCount = Math.round(clampRange(o.circleCount, BG_CIRCLE_COUNT_MIN, BG_CIRCLE_COUNT_MAX));
+  }
+  for (const key of ["circleSize", "circleOpacity", "circleSoftness", "imageOverlay"] as const) {
+    const raw = o[key];
+    if (typeof raw === "number" && Number.isFinite(raw)) {
+      out[key] = clampRange(raw, BG_UNIT_MIN, BG_UNIT_MAX);
+    }
+  }
+  // `image` is intentionally NOT read from client input — the upload/remove routes
+  // own it server-side. Anything the client sends here is ignored.
   return { ok: true, value: out };
 }
 

@@ -18,6 +18,7 @@ describe("projectPublicDoc — demo publish / public read projection", () => {
       media: [{ url: "u", kind: "image", storagePath: "p", order: 0 }],
       envelope: { wax: "#f4ece0", stars: true },
       envelopeEnabled: true,
+      background: { enabled: true, color: "#0b1020", circleCount: 4, image: { url: "u", storagePath: "p" } },
     })!;
     expect(out.themeColor).toBe("rose");
     expect(out.fontFamily).toBe("amiri");
@@ -26,6 +27,8 @@ describe("projectPublicDoc — demo publish / public read projection", () => {
     expect(out.media).toHaveLength(1);
     // The envelope customization (other feature) must reach the public demo.
     expect(out.envelope).toEqual({ wax: "#f4ece0", stars: true });
+    // The custom background (incl. its server-set image) must reach guests too.
+    expect(out.background).toEqual({ enabled: true, color: "#0b1020", circleCount: 4, image: { url: "u", storagePath: "p" } });
   });
 
   it("strips design-workflow metadata (never leaks to a tokenless caller)", () => {

@@ -4,13 +4,19 @@ import { CelestialEnvelopeOverlay } from "./CelestialEnvelopeOverlay.jsx";
 import { useDeviceCapability } from "../../../hooks/useDeviceCapability.js";
 import { celDowngraded, markCelDowngraded } from "../celestial/downgradeStore.js";
 import { resolveEnvelopePalette } from "../../../utils/themeToEnvelopePalette.js";
+import { resolveBackground } from "../../../utils/themeToBackground.js";
 
 // Single owner of the invitation's backdrop AND intro envelope. It decides,
 // per device capability and the groom's flags:
 //   • WebGL celestial world vs the 2D CSS ambience floor (the guaranteed fallback)
-//   • 3D WebGL envelope vs the 2D wax-seal envelope
+//   • 3D WebGL envelope vs (since the 2D wax-seal was removed) no envelope
 // The 2D floor is BOTH the fallback and the Suspense placeholder, so the page is
 // never blank while the (lazy) three.js chunk loads.
+//
+// When the groom enables a CUSTOM BACKGROUND (`background.enabled`), the 3D world
+// is replaced for ALL guests by the 2D custom backdrop (fill/circles/image). The
+// envelope intro still plays on capable devices, then its WebGL canvas fades out
+// to reveal the custom background underneath.
 const CelestialCanvas = lazy(() => import("../celestial/CelestialCanvas.jsx"));
 
 const OPENED_KEY = "dawa-invite-opened";
@@ -25,7 +31,7 @@ export function CelestialAmbience({
   theme, font, lang, mode = "public", fixed = true, immersive3d = true,
   showEnvelope = false, demo = false, guestName = "", monogram = "",
   namesAr = "", namesHe = "", eyebrow = "", blessing = "", welcome = "", dateText = "",
-  envelopeOverrides = null,
+  envelopeOverrides = null, background = null,
 }) {
   const cap = useDeviceCapability();
   const [downgraded, setDowngraded] = useState(celDowngraded);
@@ -47,8 +53,16 @@ export function CelestialAmbience({
     return () => mq.removeEventListener("change", onChange);
   }, []);
 
-  const wantWebGL = immersive3d && cap.tier >= 1 && !downgraded && !reduceMotion;
-  const doEnvelope = !!showEnvelope && !opened && wantWebGL;
+  // Custom background: replaces the persistent 3D world (not the envelope intro).
+  const resolvedBg = background ? resolveBackground(theme, background) : null;
+  const customBg = !!resolvedBg?.enabled;
+
+  const canWebGL = cap.tier >= 1 && !downgraded && !reduceMotion;
+  // The persistent 3D world only when NOT in custom-background mode.
+  const wantWorld = !customBg && immersive3d && canWebGL;
+  // Envelope intro: tied to the world in normal mode; in custom mode it just
+  // needs a WebGL-capable device (the world is gone, but the reveal still plays).
+  const doEnvelope = !!showEnvelope && !opened && (customBg ? canWebGL : wantWorld);
 
   // Latch "this mount is running the 3D envelope" at first render. `opened` flips
   // true on hand-off (for future visits), so we must NOT key the overlay/elevated
@@ -66,7 +80,7 @@ export function CelestialAmbience({
     return () => { document.body.style.overflow = prev; };
   }, [envActive]);
 
-  // After the hand-off completes, fade the overlay out then unmount it.
+  // After the hand-off completes, fade the overlay/canvas out then unmount.
   useEffect(() => {
     if (phase !== "done") return undefined;
     const id = setTimeout(() => setPhase("gone"), 650);
@@ -88,7 +102,61 @@ export function CelestialAmbience({
     });
   };
 
-  if (wantWebGL) {
+  const envelopeProp = {
+    colors: resolveEnvelopePalette(theme, envelopeOverrides),
+    monogram,
+    content: { namesAr, namesHe, blessing, welcome, eyebrow, date: dateText },
+  };
+
+  // ── Custom background mode ───────────────────────────────────────────────────
+  // The 2D custom backdrop is the base layer (behind content). If the envelope
+  // intro runs, its WebGL canvas sits on top (z 999) and fades out on hand-off,
+  // revealing the custom backdrop. No persistent 3D world.
+  if (customBg) {
+    return (
+      <>
+        <Ambience theme={theme} fixed={fixed} background={resolvedBg} />
+        {envActive && (
+          <>
+            <div
+              style={{
+                position: fixed ? "fixed" : "absolute",
+                inset: 0,
+                zIndex: 999,
+                pointerEvents: "none",
+                opacity: phase === "done" ? 0 : 1,
+                transition: "opacity .6s ease",
+              }}
+            >
+              <Suspense fallback={null}>
+                <CelestialCanvas
+                  theme={theme}
+                  mode={mode}
+                  fixed={false}
+                  tier={cap.tier}
+                  onFpsDowngrade={onFpsDowngrade}
+                  envelope={envActiveRef.current ? envelopeProp : null}
+                  onReady={(w) => { worldRef.current = w; }}
+                  elevated={false}
+                />
+              </Suspense>
+            </div>
+            <CelestialEnvelopeOverlay
+              phase={phase}
+              guestName={guestName}
+              theme={theme}
+              font={font}
+              lang={lang}
+              onOpen={onOpen}
+            />
+          </>
+        )}
+      </>
+    );
+  }
+
+  // ── Normal mode: persistent 3D world (capable) or the 2D theme floor ─────────
+  if (wantWorld) {
     return (
       <>
         <Suspense fallback={<Ambience theme={theme} fixed={fixed} />}>
@@ -98,11 +166,7 @@ export function CelestialAmbience({
             fixed={fixed}
             tier={cap.tier}
             onFpsDowngrade={onFpsDowngrade}
-            envelope={envActiveRef.current ? {
-              colors: resolveEnvelopePalette(theme, envelopeOverrides),
-              monogram,
-              content: { namesAr, namesHe, blessing, welcome, eyebrow, date: dateText },
-            } : null}
+            envelope={envActiveRef.current ? envelopeProp : null}
             onReady={(w) => { worldRef.current = w; }}
             elevated={envActive}
           />
