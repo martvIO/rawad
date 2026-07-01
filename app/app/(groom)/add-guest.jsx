@@ -1,8 +1,8 @@
 // Digital invitation — Add guest (native port of the web DigitalAddGuest).
-// Single add + bulk paste/import. Validation: name 2+ words, +972 & exactly 9
+// Single add + bulk paste/contacts. Validation: name 2+ words, +972 & exactly 9
 // national digits, duplicate-phone blocked (canonical intl compare). Bulk: paste
-// "Name, Phone" lines (parseGuestLines) or import a .vcf/.csv via the built-in
-// expo-file-system picker → contactsTextToLines. Reached as a push screen from
+// "Name, Phone" lines (parseGuestLines) OR pick from the phone's contacts
+// (expo-contacts, permission-gated multi-select). Reached as a push screen from
 // the Guests header "➕" button; navigates back on success.
 import { useState, useMemo } from "react";
 import {
@@ -11,17 +11,18 @@ import {
   TextInput,
   Pressable,
   ScrollView,
+  FlatList,
+  Modal,
   StyleSheet,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { File } from "expo-file-system";
+import * as Contacts from "expo-contacts";
 import { ScreenHeader } from "../../src/ui/ScreenHeader.jsx";
 import { usePortal } from "../../src/portal/PortalContext.jsx";
 import { useGroomDigital } from "../../src/portal/useGroomDigital.jsx";
 import { useToast } from "../../src/ui/Toast.jsx";
 import { Chip } from "../../src/ui/primitives.jsx";
 import { parseGuestLines, toLocalIL } from "@dawa/core/utils/bulkGuests.js";
-import { contactsTextToLines } from "@dawa/core/utils/contactsImport.js";
 import { toIntlPhone } from "@dawa/core/utils/phone.js";
 import { localizeApiError } from "@dawa/core/utils/apiError.js";
 import { C, space, radius, type } from "../../src/ui/theme.js";
@@ -42,7 +43,13 @@ export default function AddGuest() {
   const [bulkText, setBulkText] = useState("");
   const [bulkBusy, setBulkBusy] = useState(false);
   const [bulkProgress, setBulkProgress] = useState({ done: 0, total: 0 });
-  const [importBusy, setImportBusy] = useState(false);
+
+  // Contacts multi-select (replaces the file import).
+  const [contactsBusy, setContactsBusy] = useState(false);
+  const [contactsOpen, setContactsOpen] = useState(false);
+  const [contactList, setContactList] = useState([]); // [{ id, name, phone }]
+  const [contactSel, setContactSel] = useState(() => new Set());
+  const [contactQuery, setContactQuery] = useState("");
 
   const nameWords = name.trim().split(/\s+/).filter(Boolean);
   const phoneDigits = phone.replace(/\D/g, "").slice(0, 9); // 9 national digits after +972
@@ -82,29 +89,73 @@ export default function AddGuest() {
     }
   };
 
-  const importFile = async () => {
-    if (importBusy) return;
-    setImportBusy(true);
+  // Ask for Contacts permission, load the device contacts that have a phone,
+  // and open the multi-select modal.
+  const openContacts = async () => {
+    if (contactsBusy) return;
+    setContactsBusy(true);
     try {
-      const picked = await File.pickFileAsync({
-        mimeTypes: ["text/vcard", "text/x-vcard", "text/csv", "text/comma-separated-values", "text/plain", "*/*"],
-      });
-      if (picked?.canceled || !picked?.result) return;
-      const f = picked.result;
-      const text = await f.text();
-      const lines = contactsTextToLines(text, f.name || f.uri || "");
-      if (!lines.trim()) {
-        toast.show(he ? "לא נמצאו אנשי קשר בקובץ" : "لم يتم العثور على جهات اتصال في الملف");
-      } else {
-        setBulkText((prev) => (prev.trim() ? prev.trim() + "\n" + lines : lines));
-        setBulkOpen(true);
+      const perm = await Contacts.requestPermissionsAsync();
+      if (!perm.granted) {
+        toast.show(he ? "אין הרשאה לאנשי קשר" : "لا يوجد إذن للوصول إلى جهات الاتصال");
+        return;
       }
+      const { data } = await Contacts.getContactsAsync({
+        fields: [Contacts.Fields.Name, Contacts.Fields.PhoneNumbers],
+      });
+      const rows = [];
+      for (const c of data || []) {
+        const num = c.phoneNumbers?.find((p) => p?.number)?.number;
+        const name = (c.name || "").trim();
+        if (!num || !name) continue;
+        rows.push({ id: c.id || `${name}-${num}`, name, phone: num });
+      }
+      if (!rows.length) {
+        toast.show(he ? "לא נמצאו אנשי קשר עם טלפון" : "لا توجد جهات اتصال بأرقام هاتف");
+        return;
+      }
+      // Sort by name for a scannable list.
+      rows.sort((a, b) => a.name.localeCompare(b.name));
+      setContactList(rows);
+      setContactSel(new Set());
+      setContactQuery("");
+      setContactsOpen(true);
     } catch {
-      toast.show(he ? "קריאת הקובץ נכשלה" : "تعذّر قراءة الملف");
+      toast.show(he ? "טעינת אנשי קשר נכשלה" : "تعذّر تحميل جهات الاتصال");
     } finally {
-      setImportBusy(false);
+      setContactsBusy(false);
     }
   };
+
+  const toggleContact = (id) =>
+    setContactSel((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  // Append the checked contacts as "Name, Phone" lines into the bulk textarea,
+  // then reuse the existing parse-preview + runBulkAdd pipeline.
+  const addSelectedContacts = () => {
+    const lines = contactList
+      .filter((c) => contactSel.has(c.id))
+      .map((c) => `${c.name.replace(/[,\t]/g, " ").trim()}, ${c.phone.trim()}`)
+      .join("\n");
+    if (!lines) {
+      setContactsOpen(false);
+      return;
+    }
+    setBulkText((prev) => (prev.trim() ? prev.trim() + "\n" + lines : lines));
+    setBulkOpen(true);
+    setContactsOpen(false);
+  };
+
+  const filteredContacts = useMemo(() => {
+    const q = contactQuery.trim().toLowerCase();
+    if (!q) return contactList;
+    return contactList.filter((c) => c.name.toLowerCase().includes(q) || c.phone.includes(q));
+  }, [contactList, contactQuery]);
 
   const bulkParsed = useMemo(() => {
     const existingLocals = new Set(guests.map((g) => toLocalIL(g.phone)).filter(Boolean));
@@ -153,14 +204,14 @@ export default function AddGuest() {
           {bulkOpen ? (
             <View style={styles.bulkBody}>
               <Pressable
-                style={[styles.ghostBtn, importBusy && styles.dim]}
-                onPress={importFile}
-                disabled={importBusy}
+                style={[styles.ghostBtn, contactsBusy && styles.dim]}
+                onPress={openContacts}
+                disabled={contactsBusy}
               >
                 <Text style={styles.ghostBtnText}>
-                  {importBusy
-                    ? (he ? "קורא קובץ…" : "جاري قراءة الملف…")
-                    : (he ? "📇 ייבוא מאנשי קשר (‎.vcf / ‎.csv)" : "📇 استيراد من جهات الاتصال (‎.vcf / ‎.csv)")}
+                  {contactsBusy
+                    ? (he ? "טוען אנשי קשר…" : "جاري تحميل جهات الاتصال…")
+                    : (he ? "📇 בחירה מאנשי קשר" : "📇 اختيار من جهات الاتصال")}
                 </Text>
               </Pressable>
               <Text style={styles.helpText}>
@@ -259,12 +310,92 @@ export default function AddGuest() {
           </Pressable>
         </View>
       </ScrollView>
+
+      {/* ── Contacts multi-select modal ─────────────────────────── */}
+      <Modal visible={contactsOpen} animationType="slide" onRequestClose={() => setContactsOpen(false)}>
+        <View style={styles.modalScreen}>
+          <View style={styles.modalBar}>
+            <Pressable onPress={() => setContactsOpen(false)} hitSlop={10}>
+              <Text style={styles.modalCancel}>{he ? "ביטול" : "إلغاء"}</Text>
+            </Pressable>
+            <Text style={styles.modalTitle}>{he ? "בחר אנשי קשר" : "اختر جهات الاتصال"}</Text>
+            <Pressable onPress={addSelectedContacts} hitSlop={10} disabled={contactSel.size === 0}>
+              <Text style={[styles.modalAdd, contactSel.size === 0 && styles.dim]}>
+                {he ? `הוסף (${contactSel.size})` : `إضافة (${contactSel.size})`}
+              </Text>
+            </Pressable>
+          </View>
+          <TextInput
+            style={styles.modalSearch}
+            value={contactQuery}
+            onChangeText={setContactQuery}
+            placeholder={he ? "חיפוש" : "بحث"}
+            placeholderTextColor={C.dim}
+          />
+          <FlatList
+            data={filteredContacts}
+            keyExtractor={(c) => c.id}
+            keyboardShouldPersistTaps="handled"
+            renderItem={({ item }) => {
+              const on = contactSel.has(item.id);
+              return (
+                <Pressable style={styles.contactRow} onPress={() => toggleContact(item.id)}>
+                  <View style={[styles.checkbox, on && styles.checkboxOn]}>
+                    {on ? <Text style={styles.checkmark}>✓</Text> : null}
+                  </View>
+                  <View style={styles.contactMain}>
+                    <Text style={styles.contactName} numberOfLines={1}>{item.name}</Text>
+                    <Text style={styles.contactPhone} numberOfLines={1}>{item.phone}</Text>
+                  </View>
+                </Pressable>
+              );
+            }}
+            ListEmptyComponent={<Text style={styles.contactEmpty}>{he ? "אין תוצאות" : "لا نتائج"}</Text>}
+            contentContainerStyle={styles.contactList}
+          />
+        </View>
+      </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: C.bg },
+  modalScreen: { flex: 1, backgroundColor: C.bg },
+  modalBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: space[4],
+    paddingVertical: space[3],
+    borderBottomColor: "rgba(201,168,76,0.2)",
+    borderBottomWidth: 1,
+    backgroundColor: "#0d0c08",
+  },
+  modalCancel: { color: C.dim, fontSize: type.md, fontWeight: "700" },
+  modalTitle: { color: C.goldLight, fontSize: type.md, fontWeight: "800" },
+  modalAdd: { color: C.gold, fontSize: type.md, fontWeight: "800" },
+  modalSearch: {
+    margin: space[4],
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderColor: "rgba(201,168,76,0.3)",
+    borderWidth: 1,
+    borderRadius: radius.md,
+    paddingHorizontal: space[3],
+    paddingVertical: space[3],
+    color: C.goldLight,
+    fontSize: type.md,
+    textAlign: "right",
+  },
+  contactList: { paddingHorizontal: space[4], paddingBottom: space[12] },
+  contactRow: { flexDirection: "row", alignItems: "center", gap: space[3], paddingVertical: space[3], borderBottomColor: "rgba(255,255,255,0.05)", borderBottomWidth: 1 },
+  checkbox: { width: 24, height: 24, borderRadius: 6, borderColor: "rgba(201,168,76,0.5)", borderWidth: 1.5, alignItems: "center", justifyContent: "center" },
+  checkboxOn: { backgroundColor: C.gold, borderColor: C.gold },
+  checkmark: { color: C.bg, fontSize: type.sm, fontWeight: "900" },
+  contactMain: { flex: 1, minWidth: 0 },
+  contactName: { color: C.goldLight, fontSize: type.md, fontWeight: "700", textAlign: "right" },
+  contactPhone: { color: C.dim, fontSize: type.sm, writingDirection: "ltr", textAlign: "right" },
+  contactEmpty: { color: C.dim, textAlign: "center", padding: space[8] },
   body: { padding: space[4], paddingBottom: space[12], gap: space[3] },
   card: {
     backgroundColor: "#0f0f15",

@@ -23,6 +23,7 @@ import {
   removeInvitationMedia,
   addDigitalGuest,
   updateDigitalGuest,
+  updateManyDigitalGuests,
   removeDigitalGuest,
 } from "@dawa/core/services/digitalInvitation.js";
 import { localizeApiError } from "@dawa/core/utils/apiError.js";
@@ -214,6 +215,19 @@ export function DigitalProvider({ children }) {
     [uid],
   );
 
+  // Bulk role edit — ONE API call for many guests. `updates` is
+  // [{ id, ranks }] with each guest's FINAL ranks (caller computed Add/Replace).
+  // Optimistic: apply locally, then persist; throws to the caller on failure so
+  // the sheet can surface it (server-side it's a single Firestore batch).
+  const bulkUpdateGuests = useCallback(
+    async (updates) => {
+      const byId = new Map(updates.map((u) => [u.id, u.ranks]));
+      setGuests((gs) => gs.map((g) => (byId.has(g.id) ? { ...g, ranks: byId.get(g.id) } : g)));
+      await updateManyDigitalGuests(uid, updates);
+    },
+    [uid],
+  );
+
   const deleteGuest = useCallback(
     async (id) => {
       try {
@@ -357,6 +371,7 @@ export function DigitalProvider({ children }) {
     removeRank,
     addGuest,
     editGuest,
+    bulkUpdateGuests,
     deleteGuest,
     cycleGuestStatus,
     addMedia,

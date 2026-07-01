@@ -47,7 +47,7 @@ function designTitle(d, lang) {
 
 export default function Guests() {
   const { t, lang } = usePortal();
-  const { guests, ranks: availableRanks, designs, editGuest, deleteGuest, cycleGuestStatus, canSeeAttendance } =
+  const { guests, ranks: availableRanks, designs, editGuest, bulkUpdateGuests, deleteGuest, cycleGuestStatus, canSeeAttendance } =
     useGroomDigital();
   const toast = useToast();
   const router = useRouter();
@@ -58,6 +58,14 @@ export default function Guests() {
   const [eRanks, setERanks] = useState([]);
   const [eDesign, setEDesign] = useState("");
   const [saving, setSaving] = useState(false);
+
+  // Multi-select + bulk role assignment.
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [assignOpen, setAssignOpen] = useState(false);
+  const [assignRanks, setAssignRanks] = useState([]);
+  const [assignMode, setAssignMode] = useState("add"); // "add" | "replace"
+  const [bulkSaving, setBulkSaving] = useState(false);
 
   const statuses = [
     { key: "pending", label: t("chip_pending") },
@@ -102,6 +110,53 @@ export default function Guests() {
       toast.show("✗ " + (t("err_save") || "خطأ"));
     } finally {
       setSaving(false);
+    }
+  };
+
+  const he = lang === "he";
+  const toggleSelect = (id) =>
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  const exitSelect = () => {
+    setSelectMode(false);
+    setSelectedIds(new Set());
+  };
+  const selectAllFiltered = () => setSelectedIds(new Set(filtered.map((g) => g.id)));
+  const toggleAssignRank = (r) => setAssignRanks((p) => (p.includes(r) ? p.filter((x) => x !== r) : [...p, r]));
+
+  // Apply the bulk role change to every selected guest in ONE API call. Each
+  // guest's FINAL ranks are computed here (Replace = the picked set; Add = union
+  // of existing + picked), then sent as one batch via bulkUpdateGuests.
+  const applyBulk = async () => {
+    const ids = [...selectedIds];
+    const picked = assignRanks.filter((r) => availableRanks.includes(r));
+    if (!ids.length) return;
+    if (assignMode === "add" && picked.length === 0) {
+      toast.show(he ? "בחר לפחות רמה אחת" : "اختر رتبة واحدة على الأقل");
+      return;
+    }
+    const updates = ids.map((id) => {
+      const g = guests.find((x) => x.id === id);
+      const existing = getGuestRanks(g);
+      const ranks =
+        assignMode === "replace" ? picked : [...new Set([...existing, ...picked])];
+      return { id, ranks };
+    });
+    setBulkSaving(true);
+    try {
+      await bulkUpdateGuests(updates);
+      toast.show(he ? `✓ עודכנו ${ids.length}` : `✓ تم تحديث ${ids.length}`);
+      setAssignOpen(false);
+      setAssignRanks([]);
+      exitSelect();
+    } catch {
+      toast.show("✗ " + (t("err_save") || "خطأ"));
+    } finally {
+      setBulkSaving(false);
     }
   };
 
@@ -155,10 +210,20 @@ export default function Guests() {
   const renderRow = ({ item: g }) => {
     const st = guestStatus(g);
     const gr = getGuestRanks(g);
+    const selected = selectedIds.has(g.id);
     const assigned =
       designs.length > 1 ? designs.find((d) => d.id === g.designId) || designs.find((d) => d.isDefault) : null;
+    const RowWrap = selectMode ? Pressable : View;
     return (
-      <View style={styles.row}>
+      <RowWrap
+        style={[styles.row, selectMode && selected && styles.rowSelected]}
+        {...(selectMode ? { onPress: () => toggleSelect(g.id) } : {})}
+      >
+        {selectMode ? (
+          <View style={[styles.checkbox, selected && styles.checkboxOn]}>
+            {selected ? <Text style={styles.checkmark}>✓</Text> : null}
+          </View>
+        ) : null}
         <View style={styles.rowMain}>
           <Text style={styles.name}>{g.name}</Text>
           <Text style={styles.phone}>{g.phone}</Text>
@@ -181,14 +246,16 @@ export default function Guests() {
             <Text style={styles.sent}>✓ {lang === "he" ? "נשלח" : "تم الإرسال"}</Text>
           ) : null}
         </View>
-        <View style={styles.rowSide}>
-          <StatusBadge status={st} locked={!canSeeAttendance} onPress={() => cycleGuestStatus(g)} />
-          <View style={styles.actions}>
-            <IconButton glyph="✎" onPress={() => openEdit(g)} size={32} />
-            <IconButton glyph="🗑" color={C.red} onPress={() => confirmDelete(g)} size={32} />
+        {!selectMode ? (
+          <View style={styles.rowSide}>
+            <StatusBadge status={st} locked={!canSeeAttendance} onPress={() => cycleGuestStatus(g)} />
+            <View style={styles.actions}>
+              <IconButton glyph="✎" onPress={() => openEdit(g)} size={32} />
+              <IconButton glyph="🗑" color={C.red} onPress={() => confirmDelete(g)} size={32} />
+            </View>
           </View>
-        </View>
-      </View>
+        ) : null}
+      </RowWrap>
     );
   };
 
@@ -199,14 +266,32 @@ export default function Guests() {
           {(lang === "he" ? "רשימת מוזמנים" : "قائمة المدعوين")} ({guests.length})
         </Text>
         <View style={styles.headBtns}>
-          {guests.length > 0 ? (
-            <Pressable style={styles.ghostBtn} onPress={exportCsv}>
-              <Text style={styles.ghostBtnText}>⬇ CSV</Text>
-            </Pressable>
-          ) : null}
-          <Pressable style={styles.goldBtn} onPress={() => router.push("/add-guest")}>
-            <Text style={styles.goldBtnText}>➕ {lang === "he" ? "הוסף" : "إضافة"}</Text>
-          </Pressable>
+          {selectMode ? (
+            <>
+              <Pressable style={styles.ghostBtn} onPress={selectAllFiltered}>
+                <Text style={styles.ghostBtnText}>{he ? "הכל" : "الكل"}</Text>
+              </Pressable>
+              <Pressable style={styles.ghostBtn} onPress={exitSelect}>
+                <Text style={styles.ghostBtnText}>{he ? "בטל" : "إلغاء"}</Text>
+              </Pressable>
+            </>
+          ) : (
+            <>
+              {guests.length > 0 ? (
+                <Pressable style={styles.ghostBtn} onPress={() => setSelectMode(true)}>
+                  <Text style={styles.ghostBtnText}>☑ {he ? "בחר" : "تحديد"}</Text>
+                </Pressable>
+              ) : null}
+              {guests.length > 0 ? (
+                <Pressable style={styles.ghostBtn} onPress={exportCsv}>
+                  <Text style={styles.ghostBtnText}>⬇ CSV</Text>
+                </Pressable>
+              ) : null}
+              <Pressable style={styles.goldBtn} onPress={() => router.push("/add-guest")}>
+                <Text style={styles.goldBtnText}>➕ {lang === "he" ? "הוסף" : "إضافة"}</Text>
+              </Pressable>
+            </>
+          )}
         </View>
       </View>
       <Text style={styles.hint}>
@@ -311,13 +396,89 @@ export default function Guests() {
           </Pressable>
         </View>
       </BottomSheet>
+
+      {/* Bulk action bar — visible while selecting. */}
+      {selectMode && selectedIds.size > 0 ? (
+        <View style={styles.bulkBar}>
+          <Text style={styles.bulkCount}>{selectedIds.size} {he ? "נבחרו" : "محدد"}</Text>
+          <Pressable style={styles.bulkBtn} onPress={() => { setAssignRanks([]); setAssignMode("add"); setAssignOpen(true); }}>
+            <Text style={styles.bulkBtnText}>🏷 {he ? "שיוך רמות" : "تعيين الرتب"}</Text>
+          </Pressable>
+        </View>
+      ) : null}
+
+      {/* Bulk role-assignment sheet. */}
+      <BottomSheet
+        visible={assignOpen}
+        onClose={() => setAssignOpen(false)}
+        title={he ? `שיוך רמות ל-${selectedIds.size}` : `تعيين الرتب لـ ${selectedIds.size}`}
+      >
+        <View style={styles.modeRow}>
+          <Pressable style={[styles.modeBtn, assignMode === "add" && styles.modeBtnOn]} onPress={() => setAssignMode("add")}>
+            <Text style={[styles.modeBtnText, assignMode === "add" && styles.modeBtnTextOn]}>➕ {he ? "הוסף" : "إضافة"}</Text>
+          </Pressable>
+          <Pressable style={[styles.modeBtn, assignMode === "replace" && styles.modeBtnOn]} onPress={() => setAssignMode("replace")}>
+            <Text style={[styles.modeBtnText, assignMode === "replace" && styles.modeBtnTextOn]}>♻ {he ? "החלף" : "استبدال"}</Text>
+          </Pressable>
+        </View>
+        <Text style={styles.modeHint}>
+          {assignMode === "add"
+            ? (he ? "הרמות שנבחרו יתווספו לכל מוזמן שנבחר." : "ستُضاف الرتب المحددة إلى كل مدعو محدد.")
+            : (he ? "הרמות שנבחרו יחליפו את הרמות הקיימות (ריק = ניקוי)." : "ستحل الرتب المحددة محل الرتب الحالية (فارغ = مسح).")}
+        </Text>
+        {availableRanks.length > 0 ? (
+          <View style={styles.chipWrap}>
+            {availableRanks.map((r) => (
+              <Chip key={r} label={r} selected={assignRanks.includes(r)} onPress={() => toggleAssignRank(r)} />
+            ))}
+          </View>
+        ) : (
+          <Text style={styles.fieldLabel}>{he ? "אין רמות — הוסף בדשבורד" : "لا توجد رتب — أضفها في الرئيسية"}</Text>
+        )}
+        <View style={styles.sheetBtns}>
+          <Pressable style={[styles.goldBtn, styles.sheetBtn, bulkSaving && { opacity: 0.5 }]} onPress={bulkSaving ? undefined : applyBulk}>
+            <Text style={styles.goldBtnText}>{bulkSaving ? "…" : `✓ ${he ? "החל" : "تطبيق"}`}</Text>
+          </Pressable>
+          <Pressable style={[styles.ghostBtn, styles.sheetBtn]} onPress={() => setAssignOpen(false)}>
+            <Text style={styles.ghostBtnText}>{he ? "ביטול" : "إلغاء"}</Text>
+          </Pressable>
+        </View>
+      </BottomSheet>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: C.bg },
-  list: { padding: space[4], paddingBottom: space[12] },
+  list: { padding: space[4], paddingBottom: space[24] },
+  rowSelected: { borderColor: C.gold, backgroundColor: "rgba(201,168,76,0.08)" },
+  checkbox: { width: 24, height: 24, borderRadius: 6, borderColor: "rgba(201,168,76,0.5)", borderWidth: 1.5, alignItems: "center", justifyContent: "center", alignSelf: "center" },
+  checkboxOn: { backgroundColor: C.gold, borderColor: C.gold },
+  checkmark: { color: C.bg, fontSize: type.sm, fontWeight: "900" },
+  bulkBar: {
+    position: "absolute",
+    left: space[4],
+    right: space[4],
+    bottom: space[4],
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#141019",
+    borderColor: C.gold,
+    borderWidth: 1,
+    borderRadius: radius.xl,
+    paddingHorizontal: space[4],
+    paddingVertical: space[3],
+  },
+  bulkCount: { color: C.goldLight, fontSize: type.md, fontWeight: "800" },
+  bulkBtn: { backgroundColor: C.gold, borderRadius: radius.md, paddingHorizontal: space[4], paddingVertical: space[2] },
+  bulkBtnText: { color: C.bg, fontSize: type.sm, fontWeight: "800" },
+  modeRow: { flexDirection: "row", gap: space[2] },
+  modeBtn: { flex: 1, paddingVertical: space[2], borderRadius: radius.md, borderColor: "rgba(201,168,76,0.3)", borderWidth: 1, alignItems: "center" },
+  modeBtnOn: { backgroundColor: "rgba(201,168,76,0.18)", borderColor: C.gold },
+  modeBtnText: { color: C.dim, fontWeight: "800", fontSize: type.sm },
+  modeBtnTextOn: { color: C.gold },
+  modeHint: { color: C.dim, fontSize: type.xs, textAlign: "right", marginVertical: space[2], lineHeight: 18 },
   headRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: space[2] },
   count: { color: C.goldLight, fontSize: type.lg, fontWeight: "800" },
   headBtns: { flexDirection: "row", gap: space[2] },

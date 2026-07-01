@@ -37,6 +37,13 @@ export default {
             "تتيح لك دعوة التقاط صور بالكاميرا لإضافتها إلى دعوتك أو معرض المصوّر.",
         },
       ],
+      [
+        "expo-contacts",
+        {
+          contactsPermission:
+            "تتيح لك دعوة اختيار مدعوين من جهات الاتصال في هاتفك لإضافتهم إلى قائمتك.",
+        },
+      ],
     ],
     experiments: { typedRoutes: false },
     extra: {

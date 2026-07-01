@@ -129,6 +129,26 @@ Windows, no Mac), and runs the existing Three.js 3D via `expo-gl`.
   `/preview/digital/:id` serves the SPA ✅. (Full on-device render still needs the
   user's EAS/Apple accounts; Playwright render check needs Chrome installed.)
 
+## Phase 3b — contacts import + bulk role change (2026-07-01)
+
+- **Add-Guest now imports from device contacts** (`expo-contacts`), **replacing**
+  the app's `.vcf/.csv` file picker. "📇 اختيار من جهات الاتصال" →
+  `requestPermissionsAsync()` (permission-gated) → `getContactsAsync({ Name,
+  PhoneNumbers })` → a searchable **multi-select modal**; checked contacts become
+  "Name, Phone" lines feeding the existing `parseGuestLines` preview + `runBulkAdd`.
+  Contacts permission string added to `app.config.js`. (The web keeps its
+  `contactsFileToText` file import.)
+- **Bulk role assignment** in Guests: a "☑ تحديد" header button enters **selection
+  mode** (row checkboxes, "select all filtered"); a floating bar → **"تعيين الرتب
+  (N)"** opens a sheet with rank chips + an **Add / Replace** toggle. The client
+  computes each guest's final `ranks` (Add = union, Replace = the set) and sends
+  them as **ONE** `PATCH /digital/:uid/guests` — the server commits a single
+  **Firestore WriteBatch chunked at 500** (new `guestStore.patchMany` + route,
+  ranks-only via `coerceRanks`), so a bulk edit is one API call, not one per guest.
+  New shared `updateManyDigitalGuests` + context `bulkUpdateGuests` (optimistic).
+- **Verified:** backend `tsc` + **471/471** unit tests (incl. new `patchMany` +
+  500-chunk tests), app Metro bundle ✅, `expo-doctor` 21/21 ✅, i18n guard ✅.
+
 ## Roadmap (later)
 
 1. **Push:** FCM + APNs (`expo-notifications`), device-token registry, Cloud

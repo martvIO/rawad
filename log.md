@@ -235,3 +235,6 @@ Touched: Digital-Invitations, Architecture-Decisions
 
 ## [2026-07-01 09:15] session | Grilled + built app groom pages + hardware-rendered design
 Touched: Mobile-App, Architecture-Decisions
+
+## [2026-07-01 09:55] session | Grilled + built contacts import + one-call bulk role change
+Touched: Mobile-App, Architecture-Decisions

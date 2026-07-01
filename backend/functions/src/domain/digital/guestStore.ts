@@ -16,7 +16,7 @@
 // Unit-testable with the in-memory FirestorePort fake, no emulator (see
 // tests/functions/digitalGuestStore.test.ts).
 
-import { FirestorePort } from "../ports";
+import { FirestorePort, FsBatchOp } from "../ports";
 
 /** Collection layout — Firestore `digitalInvitations/{uid}/guests`. */
 const ROOT = "digitalInvitations";
@@ -50,8 +50,20 @@ export interface DigitalGuestStore {
     dedupe: DedupeBy,
   ): Promise<CreateGuestResult>;
   patch(uid: string, guestId: string, patch: Record<string, unknown>): Promise<void>;
+  /**
+   * Apply many per-guest patches in ONE bulk write (Firestore WriteBatch),
+   * chunked at the 500-op batch cap. Lets a bulk role edit reach the server as a
+   * single API call + a handful of atomic commits instead of N requests.
+   */
+  patchMany(
+    uid: string,
+    updates: { id: string; patch: Record<string, unknown> }[],
+  ): Promise<void>;
   remove(uid: string, guestId: string): Promise<void>;
 }
+
+/** Firestore WriteBatch hard cap — ops beyond this must split into more commits. */
+const BATCH_MAX = 500;
 
 export function makeDigitalGuestStore(deps: {
   fs: FirestorePort;
@@ -77,6 +89,17 @@ export function makeDigitalGuestStore(deps: {
 
     async patch(uid, guestId, patch) {
       await fs.update(guestDocPath(uid, guestId), patch);
+    },
+
+    async patchMany(uid, updates) {
+      const ops: FsBatchOp[] = updates.map((u) => ({
+        type: "update",
+        docPath: guestDocPath(uid, u.id),
+        patch: u.patch,
+      }));
+      for (let i = 0; i < ops.length; i += BATCH_MAX) {
+        await fs.batchWrite(ops.slice(i, i + BATCH_MAX));
+      }
     },
 
     async remove(uid, guestId) {
