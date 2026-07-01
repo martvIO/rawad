@@ -51,6 +51,7 @@ describe("resolveEnvelopePalette — overrides + star options", () => {
     expect(r.starsEnabled).toBe(true);
     expect(r.starDensity).toBe(2);
     expect(r.starIntensity).toBe(null);
+    expect(r.sealStarEnabled).toBe(false); // wax-seal compass star defaults OFF
   });
 
   it("applies a valid colour override and leaves others at the default", () => {
@@ -78,6 +79,13 @@ describe("resolveEnvelopePalette — overrides + star options", () => {
     expect(resolveEnvelopePalette(theme, { starDensity: -5 }).starDensity).toBe(1);
     expect(resolveEnvelopePalette(theme, { starIntensity: 5 }).starIntensity).toBe(1);
     expect(resolveEnvelopePalette(theme, { starIntensity: -1 }).starIntensity).toBe(0);
+  });
+
+  it("enables the wax-seal compass star only when sealStar === true", () => {
+    expect(resolveEnvelopePalette(theme, { sealStar: true }).sealStarEnabled).toBe(true);
+    expect(resolveEnvelopePalette(theme, { sealStar: false }).sealStarEnabled).toBe(false);
+    expect(resolveEnvelopePalette(theme, {}).sealStarEnabled).toBe(false);
+    expect(resolveEnvelopePalette(theme, { sealStar: "yes" }).sealStarEnabled).toBe(false);
   });
 });
 

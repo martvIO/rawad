@@ -278,6 +278,32 @@ function ViewStyles({ theme, fixed }) {
       .dawa-inv *, .dawa-inv *::before, .dawa-inv *::after { animation: none !important; transition-duration: .01ms !important; }
       .dawa-inv .dawa-inv-reveal { opacity: 1; transform: none; }
     }
+
+    /* ════════════ ARABIC CURSIVE JOINS ════════════
+     * Arabic is a joined script: letter-spacing pries the connected forms apart so
+     * words render as disconnected glyphs. The wide tracking above is a Latin/Hebrew
+     * typographic flourish (uppercase eyebrows, spaced labels) with no benefit for
+     * Arabic, so we reset it to normal only when the invitation renders in Arabic
+     * (lang=ar on the .dawa-inv root). Hebrew/Latin keep every value above.
+     * Selectors carry an extra [lang] attribute (specificity 0,3,0) so they win over
+     * the per-element rules (0,2,0) without an important flag. */
+    .dawa-inv[lang="ar"],
+    .dawa-inv[lang="ar"] .dawa-inv-eyebrow,
+    .dawa-inv[lang="ar"] .dawa-inv-hero-eyebrow,
+    .dawa-inv[lang="ar"] .dawa-inv-greet,
+    .dawa-inv[lang="ar"] .dawa-inv-greet strong,
+    .dawa-inv[lang="ar"] .dawa-inv-couple,
+    .dawa-inv[lang="ar"] .dawa-inv-dateline,
+    .dawa-inv[lang="ar"] .dawa-inv-cue,
+    .dawa-inv[lang="ar"] .dawa-inv-story-when,
+    .dawa-inv[lang="ar"] .dawa-inv-detail-meta,
+    .dawa-inv[lang="ar"] .dawa-inv-venue-label,
+    .dawa-inv[lang="ar"] .dawa-inv-field label,
+    .dawa-inv[lang="ar"] .dawa-inv-cd-lbl,
+    .dawa-inv[lang="ar"] .dawa-inv-cd-date,
+    .dawa-inv[lang="ar"] .dawa-inv-wish-who,
+    .dawa-inv[lang="ar"] .dawa-inv-foot-tag,
+    .dawa-inv[lang="ar"] .dawa-inv-submit { letter-spacing: normal; }
     `}</style>
   );
 }

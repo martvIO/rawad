@@ -22,13 +22,13 @@ describe("sanitizeMediaSettings — envelope overrides", () => {
       envelope: {
         paper: "#2A211A", wax: "#F4ECE0", foil: "#caa14e",
         cardPaper: "#f9f6f0", cardInk: "#3a2412",
-        stars: true, starDensity: 3, starIntensity: 0.5,
+        stars: true, starDensity: 3, starIntensity: 0.5, sealStar: true,
       },
     });
     expect(v.envelope).toEqual({
       paper: "#2a211a", wax: "#f4ece0", foil: "#caa14e",
       cardPaper: "#f9f6f0", cardInk: "#3a2412",
-      stars: true, starDensity: 3, starIntensity: 0.5,
+      stars: true, starDensity: 3, starIntensity: 0.5, sealStar: true,
     });
   });
 
@@ -58,6 +58,15 @@ describe("sanitizeMediaSettings — envelope overrides", () => {
 
   it("rejects a non-boolean stars toggle", () => {
     const r = sanitizeMediaSettings({ envelope: { stars: "yes" } });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toBe("invalid_toggle");
+  });
+
+  it("persists the sealStar toggle and rejects a non-boolean value", () => {
+    expect(ok({ envelope: { sealStar: true } }).envelope).toEqual({ sealStar: true });
+    expect(ok({ envelope: { sealStar: false } }).envelope).toEqual({ sealStar: false });
+    expect(ok({ envelope: {} }).envelope).toEqual({}); // absent → unset (default OFF)
+    const r = sanitizeMediaSettings({ envelope: { sealStar: "yes" } });
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error).toBe("invalid_toggle");
   });

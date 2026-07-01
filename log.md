@@ -241,3 +241,6 @@ Touched: Mobile-App, Architecture-Decisions
 
 ## [2026-07-01 11:40] session | Grilled + built backend security hardening + admin Security page
 Touched: Security-Model, Backend-Security-Hardening-2026-07-01, Security-Audit-2026-06-29
+
+## [2026-07-01 19:20] session | Grilled + built seal-star toggle + Arabic cursive-join fix
+Touched: Digital-Invitations

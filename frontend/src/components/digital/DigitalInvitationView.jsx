@@ -195,6 +195,7 @@ export function DigitalInvitationView({
     <div
       ref={rootRef}
       className="dawa-inv"
+      lang={lang}
       style={{
         minHeight: "100vh",
         background: theme.bg,

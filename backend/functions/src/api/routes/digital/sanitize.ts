@@ -243,6 +243,7 @@ interface EnvelopeSettings {
   stars?: boolean;
   starDensity?: number;
   starIntensity?: number;
+  sealStar?: boolean;
 }
 
 // Per-design custom background. All colour keys are "#rrggbb"; the unit sliders
@@ -601,6 +602,12 @@ function sanitizeEnvelope(v: unknown): Sanitized<EnvelopeSettings> {
       return { ok: false, error: "invalid_toggle", field: "envelope.stars" };
     }
     out.stars = o.stars;
+  }
+  if (o.sealStar !== undefined) {
+    if (typeof o.sealStar !== "boolean") {
+      return { ok: false, error: "invalid_toggle", field: "envelope.sealStar" };
+    }
+    out.sealStar = o.sealStar;
   }
   if (typeof o.starDensity === "number" && Number.isFinite(o.starDensity)) {
     out.starDensity = Math.round(clampRange(o.starDensity, STAR_DENSITY_MIN, STAR_DENSITY_MAX));
