@@ -16,7 +16,11 @@
 
 import { Router, Response } from "express";
 import { AuthRequest, requireAuth } from "../middleware/auth";
+import { uidRateLimit } from "../middleware/rateLimit";
 import { MAX_LEN } from "../../constants/limits";
+import { HOUR_MS } from "../../constants/time";
+import { RATE } from "../../constants/rateLimits";
+import { isUsername } from "../../helpers";
 import { firebaseGuestStore } from "../../domain/guests/firebaseGuestStore";
 import { sendDomainError } from "../../domain/httpError";
 
@@ -29,6 +33,8 @@ const MAX_GROOM_USERNAME_LEN = MAX_LEN.GROOM_USERNAME;
 const MAX_PROOF_PATH_LEN = MAX_LEN.PATH;
 const MAX_INVITE_TOKEN_LEN = 64;
 const MAX_DELIVERED_BY_LEN = MAX_LEN.NAME;
+/** ISO-8601 timestamps are ~30 chars; 64 is a safe upper bound. */
+const MAX_DELIVERED_AT_LEN = 64;
 
 const ALLOWED_STATUS = new Set([
   "pending", "enroute", "delivered",
@@ -76,7 +82,7 @@ const GUEST_STATUS: Record<string, number> = {};
  * Admin-only flat list of every guest across every groom.
  * Each item shape: `{ id, groomUid, ...guestFields }`.
  */
-guestsRouter.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
+guestsRouter.get("/", requireAuth, uidRateLimit("guestsListAll", RATE.GUESTS_READ_PER_USER.limit, HOUR_MS), async (req: AuthRequest, res: Response) => {
   if (req.caller!.claims.role !== "admin") {
     res.status(403).json({ error: "admins_only" });
     return;
@@ -99,6 +105,7 @@ guestsRouter.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
 guestsRouter.get(
   "/:groomUid",
   requireAuth,
+  uidRateLimit("guestsRead", RATE.GUESTS_READ_PER_USER.limit, HOUR_MS),
   async (req: AuthRequest, res: Response) => {
     const { groomUid } = req.params;
     if (!canReadGroom(req, groomUid)) {
@@ -140,6 +147,7 @@ guestsRouter.get(
 guestsRouter.post(
   "/:groomUid",
   requireAuth,
+  uidRateLimit("guestsWrite", RATE.GUESTS_WRITE_PER_USER.limit, HOUR_MS),
   async (req: AuthRequest, res: Response) => {
     const { groomUid } = req.params;
     if (!canWriteGroomAsOwnerOrAdmin(req, groomUid)) {
@@ -177,6 +185,7 @@ guestsRouter.post(
 guestsRouter.patch(
   "/:groomUid/:guestId",
   requireAuth,
+  uidRateLimit("guestsWrite", RATE.GUESTS_WRITE_PER_USER.limit, HOUR_MS),
   async (req: AuthRequest, res: Response) => {
     const { groomUid, guestId } = req.params;
     if (!canPatchGuest(req, groomUid)) {
@@ -211,6 +220,7 @@ guestsRouter.patch(
 guestsRouter.delete(
   "/:groomUid/:guestId",
   requireAuth,
+  uidRateLimit("guestsWrite", RATE.GUESTS_WRITE_PER_USER.limit, HOUR_MS),
   async (req: AuthRequest, res: Response) => {
     const { groomUid, guestId } = req.params;
     if (!canWriteGroomAsOwnerOrAdmin(req, groomUid)) {
@@ -343,7 +353,9 @@ function validateField(key: string, value: unknown): FieldResult {
       }
       return { ok: true, value };
     case "groomUsername":
-      if (typeof value !== "string" || value.length > MAX_GROOM_USERNAME_LEN) {
+      // Enforce the username FORMAT (not just length) for parity with
+      // isUsername() used everywhere else (audit: format was unvalidated).
+      if (typeof value !== "string" || value.length > MAX_GROOM_USERNAME_LEN || !isUsername(value)) {
         return { ok: false, error: "invalid_groom_username", field: key };
       }
       return { ok: true, value };
@@ -363,7 +375,8 @@ function validateField(key: string, value: unknown): FieldResult {
       }
       return { ok: true, value };
     case "deliveredAt":
-      if (typeof value !== "string") {
+      // Cap length like every other string field (audit: was type-only).
+      if (typeof value !== "string" || value.length > MAX_DELIVERED_AT_LEN) {
         return { ok: false, error: "invalid_delivered_at", field: key };
       }
       return { ok: true, value };

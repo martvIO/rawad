@@ -238,3 +238,6 @@ Touched: Mobile-App, Architecture-Decisions
 
 ## [2026-07-01 09:55] session | Grilled + built contacts import + one-call bulk role change
 Touched: Mobile-App, Architecture-Decisions
+
+## [2026-07-01 11:40] session | Grilled + built backend security hardening + admin Security page
+Touched: Security-Model, Backend-Security-Hardening-2026-07-01, Security-Audit-2026-06-29

@@ -15,6 +15,7 @@
 import { Request, Response, NextFunction } from "express";
 import { getAuth } from "firebase-admin/auth";
 import { DawaClaims } from "../../helpers";
+import { recordSecurityEvent } from "../../securityEvents";
 
 /** Bearer scheme prefix in the Authorization header. */
 const BEARER_PREFIX = "Bearer ";
@@ -65,8 +66,20 @@ export async function requireAuth(
     };
     next();
   } catch (err) {
+    const code =
+      err && typeof err === "object" && "code" in err
+        ? String((err as { code: unknown }).code)
+        : "";
     const message =
       err instanceof Error && err.message ? err.message : "invalid_token";
+    // Expired tokens are normal traffic (the client refreshes + retries), so
+    // don't flag them. A REVOKED or malformed/forged token IS worth surfacing.
+    if (code !== "auth/id-token-expired") {
+      recordSecurityEvent("invalid_token", req, {
+        severity: code === "auth/id-token-revoked" ? "high" : "medium",
+        detail: { code: code || undefined },
+      });
+    }
     res.status(401).json({ error: "invalid_token", detail: message });
   }
 }
@@ -81,6 +94,9 @@ export function requireAdmin(
   next: NextFunction
 ): void {
   if (req.caller?.claims?.role !== "admin") {
+    recordSecurityEvent("authz_denied", req, {
+      detail: { required: "admin", had: req.caller?.claims?.role ?? null },
+    });
     res.status(403).json({ error: "admins_only" });
     return;
   }
@@ -98,6 +114,9 @@ export function requireRole(role: Role) {
     next: NextFunction
   ): void {
     if (req.caller?.claims?.role !== role) {
+      recordSecurityEvent("authz_denied", req, {
+        detail: { required: role, had: req.caller?.claims?.role ?? null },
+      });
       res.status(403).json({ error: "forbidden", required: role });
       return;
     }
@@ -118,6 +137,9 @@ export function requireAnyRole(...roles: Role[]) {
   ): void {
     const role = req.caller?.claims?.role;
     if (!role || !roles.includes(role as Role)) {
+      recordSecurityEvent("authz_denied", req, {
+        detail: { required: roles.join("|"), had: role ?? null },
+      });
       res.status(403).json({ error: "forbidden", allowed: roles });
       return;
     }

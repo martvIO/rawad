@@ -41,7 +41,12 @@ export function decryptPasswordFields(
     return;
   }
 
-  const requireEncrypted = process.env.REQUIRE_ENCRYPTED_PASSWORDS === "true";
+  // Enforce encrypted-only in production, but NEVER under the emulator suite:
+  // the api/e2e tests (and local dev) legitimately send plaintext over the local
+  // HTTP boundary, matching how the rate limiters skip in the emulator.
+  const requireEncrypted =
+    process.env.REQUIRE_ENCRYPTED_PASSWORDS === "true" &&
+    process.env.FUNCTIONS_EMULATOR !== "true";
 
   for (const field of PASSWORD_FIELDS) {
     const val = body[field];

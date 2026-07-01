@@ -3,6 +3,15 @@
     ".read": false,
     ".write": false,
 
+    "securityBlocks": {
+      // Server-only (Admin SDK). Account / IP / fingerprint deny-lists written
+      // by the security API + auto-blocker and read via the /admin/security REST
+      // endpoint — never client-readable or -writable. Explicit deny mirrors the
+      // default-deny root so nobody opens the subtree by accident.
+      ".read": false,
+      ".write": false
+    },
+
     "users": {
       // مدير يقرأ القائمة كاملة؛ كل مستخدم يقرأ سجله الخاص فقط
       ".read": "auth != null && auth.token.role === 'admin'",

@@ -663,6 +663,7 @@ paymentsRouter.get(
   "/links",
   requireAuth,
   requireAdmin,
+  uidRateLimit("getPaymentLinks", RATE.PAYMENT_LINKS_READ_PER_ADMIN.limit, HOUR_MS),
   async (_req: AuthRequest, res: Response) => {
     try {
       const db = getDatabase();

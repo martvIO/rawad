@@ -37,6 +37,8 @@ import { rtdbPort } from "../../domain/firebaseAdapters";
 import { HOUR_MS } from "../../constants/time";
 import { RATE } from "../../constants/rateLimits";
 import { getPublicKeyMeta, isEphemeralKey } from "../passwordCrypto";
+import { recordSecurityEvent } from "../../securityEvents";
+import { recordAutoBlockSignal } from "../../autoBlock";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -162,6 +164,7 @@ authRouter.post(
     // Per-account lockout (see LOGIN_MAX_FAILURES_PER_ACCOUNT). Skipped under the
     // emulator so e2e suites can hammer login without tripping it.
     if (!IN_EMULATOR && (await failureCountPersistent(rtdbPort(), acctKey)) >= LOGIN_MAX_FAILURES_PER_ACCOUNT) {
+      recordSecurityEvent("account_lockout", req, { detail: { account: acct } });
       res.status(429).json({ error: "too_many_requests", scope: "account" });
       return;
     }
@@ -187,6 +190,8 @@ authRouter.post(
       const code = extractFirebaseErrorCode(fbData);
       if (LOGIN_INVALID_CREDENTIAL_CODES.has(code)) {
         if (!IN_EMULATOR) await recordFailurePersistent(rtdbPort(), acctKey, ONE_HOUR_MS);
+        recordSecurityEvent("auth_failure", req, { detail: { account: acct } });
+        recordAutoBlockSignal("auth_failure", req);
         res.status(401).json({ error: "invalid_credentials" });
         return;
       }
@@ -366,6 +371,7 @@ authRouter.post(
         ONE_HOUR_MS
       ))
     ) {
+      recordSecurityEvent("otp_abuse", req, { detail: { account: acct, scope: "account" } });
       res.status(429).json({ error: "too_many_requests", scope: "account" });
       return;
     }

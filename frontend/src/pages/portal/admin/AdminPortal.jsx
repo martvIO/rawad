@@ -21,6 +21,7 @@ import { AdminDesigns } from "./AdminDesigns.jsx";
 import { AdminDemoTab } from "./AdminDemoTab.jsx";
 import { AdminGallery } from "./AdminGallery.jsx";
 import { AdminAuditTab } from "./AdminAuditTab.jsx";
+import { AdminSecurityTab } from "./AdminSecurityTab.jsx";
 import { AdminLifecycleTab } from "./AdminLifecycleTab.jsx";
 import { Num } from "../../../components/Num.jsx";
 import { C } from "../../../styles/theme.js";
@@ -94,6 +95,7 @@ export function AdminPortal() {
           <NavLink data-testid="nav-admin-templates"     to="/portal/admin/templates"     style={tabStyle}>📝 {t("admin_tab_templates")}</NavLink>
           <NavLink data-testid="nav-admin-lifecycle"     to="/portal/admin/lifecycle"     style={tabStyle}>🚫 {t("adm_lc_tab")}</NavLink>
           <NavLink data-testid="nav-admin-audit"         to="/portal/admin/audit"         style={tabStyle}>📜 {lang === "he" ? "יומן" : "السجل"}</NavLink>
+          <NavLink data-testid="nav-admin-security"      to="/portal/admin/security"      style={tabStyle}>🛡 {lang === "he" ? "אבטחה" : "الأمان"}</NavLink>
         </div>
 
         <Suspense fallback={<div className="card" style={{ textAlign: "center", padding: 24, color: C.dim }}>…</div>}>
@@ -112,6 +114,7 @@ export function AdminPortal() {
             <Route path="templates"       element={<AdminMessageTemplatesTab />} />
             <Route path="lifecycle"       element={<AdminLifecycleTab />} />
             <Route path="audit"           element={<AdminAuditTab />} />
+            <Route path="security"        element={<AdminSecurityTab />} />
             <Route path="*"               element={<Navigate to="users" replace />} />
           </Routes>
         </Suspense>

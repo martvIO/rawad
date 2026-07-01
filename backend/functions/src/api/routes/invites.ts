@@ -27,7 +27,7 @@ import {
   requireAuth,
   requireAdmin,
 } from "../middleware/auth";
-import { ipRateLimit, uidRateLimit, tokenRateLimit } from "../middleware/rateLimit";
+import { ipRateLimit, uidRateLimit, tokenRateLimit, keyedRateLimit } from "../middleware/rateLimit";
 import { isFiniteInRange, normalisePhone } from "../../helpers";
 import { writeAudit } from "../../audit";
 import { MAX_LEN } from "../../constants/limits";
@@ -98,7 +98,18 @@ export const invitesRouter = Router();
  * the form. Returns 404 on missing tokens so the page can render an
  * "invalid invitation" message.
  */
-invitesRouter.get("/token/:token", async (req: Request, res: Response) => {
+invitesRouter.get(
+  "/token/:token",
+  // Per-token bucket + per-IP backstop so token existence can't be enumerated
+  // by status-code probing (audit: public token-lookup had no limiter).
+  keyedRateLimit(
+    "inviteLookup",
+    (req) => (req.params.token ?? "").toString(),
+    RATE.INVITE_LOOKUP_PER_TOKEN.limit,
+    HOUR_MS,
+    RATE.INVITE_LOOKUP_IP_BACKSTOP.limit,
+  ),
+  async (req: Request, res: Response) => {
   const { token } = req.params;
   if (!TOKEN_HEX_RE.test(token)) {
     res.status(400).json({ error: "invalid_token_format" });
@@ -829,6 +840,13 @@ invitesRouter.post(
 // approved wish appears on every guest's invitation regardless of their design.
 invitesRouter.get(
   "/digital/wishes/:token",
+  keyedRateLimit(
+    "wishesRead",
+    (req) => (req.params.token ?? "").toString(),
+    RATE.WISHES_READ_PER_TOKEN.limit,
+    HOUR_MS,
+    RATE.WISHES_READ_IP_BACKSTOP.limit,
+  ),
   async (req: Request, res: Response) => {
     const token = (req.params.token ?? "").toString();
     if (!TOKEN_HEX_RE.test(token)) { res.status(400).json({ error: "invalid_token_format" }); return; }

@@ -19,6 +19,9 @@ import {
   requireAuth,
   requireRole,
 } from "../middleware/auth";
+import { uidRateLimit } from "../middleware/rateLimit";
+import { HOUR_MS } from "../../constants/time";
+import { RATE } from "../../constants/rateLimits";
 import { isUsername } from "../../helpers";
 import { writeAudit } from "../../audit";
 import { firebaseAssignmentStore } from "../../domain/assignments/firebaseAssignmentStore";
@@ -35,6 +38,7 @@ export const assignmentsRouter = Router();
 assignmentsRouter.get(
   "/:driverUid",
   requireAuth,
+  uidRateLimit("assignRead", RATE.ASSIGN_READ_PER_USER.limit, HOUR_MS),
   async (req: AuthRequest, res: Response) => {
     const { driverUid } = req.params;
     const claims = req.caller!.claims;
@@ -72,6 +76,7 @@ assignmentsRouter.post(
   "/",
   requireAuth,
   requireRole("driver"),
+  uidRateLimit("assignWrite", RATE.ASSIGN_WRITE_PER_USER.limit, HOUR_MS),
   async (req: AuthRequest, res: Response) => {
     const driverUid = req.caller!.uid;
     const groomUsername = (req.body?.groomUsername ?? "")

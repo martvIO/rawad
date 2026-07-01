@@ -51,3 +51,16 @@ NAT IP — keying by IP alone would throttle the whole party as one client.
 
 ## Hard rules for contributors
 Per [[AI Engineering Rules]], never weaken `database.rules.json`, `storage.rules`, `assertAdmin()`, `requireAuth`, rate limits, or input validation; always test security changes with rule tests. Note: a service-account JSON key sits in the repo root and must not be committed — see [[Tasks Backlog]] TASK-008.
+
+## 2026-07-01 — Monitoring, blocking & comprehensive input validation
+
+Added a fourth-generation hardening pass (see [[Backend-Security-Hardening-2026-07-01]]):
+
+- **Input validation** — `zod` + a `validate()` middleware (`api/middleware/validate.ts`, `api/schemas/common.ts`) reject bad body/params/query with a 400 *before* the handler and emit a `malformed_input` event. Reuses the existing `isUsername`/`isE164`/`isStrongPassword` helpers.
+- **Per-request monitoring** — every request → Cloud Logging (redacted, no PII) via `api/middleware/requestLog.ts`; the threat subset → Firestore `securityEvents` (`securityEvents.ts`), high-severity mirrored to Sentry. Threat types: auth/brute-force, authorization abuse, rate-limit/flood, malformed input, path-scan, blocks.
+- **Blocking** — RTDB `securityBlocks` (account/IP/fingerprint) via `blockList.ts` + pre-auth `blockCheck` middleware (fail-open, cached); account blocks also `disable + revokeRefreshTokens` in Firebase Auth. Best-effort device fingerprint (`X-Device-FP`, evadable — not hardware) + conservative time-boxed IP auto-block (`autoBlock.ts`).
+- **Admin Security page** — `/admin/security` routes + `AdminSecurityTab.jsx` to filter events and block/unblock.
+- **Encryption enforcement** — `REQUIRE_ENCRYPTED_PASSWORDS=true` in prod (skipped under the emulator so plaintext api-tests still pass).
+- **Explicit deny rules** added for `securityBlocks` (RTDB) + `securityEvents` (Firestore), mirroring the biometric-data lockdown (they were already covered by default-deny).
+
+Note: "block hardware to defeat VPN" is not achievable from a server — the layered account+IP+fingerprint approach is the realistic equivalent, and the fingerprint is an evadable weak signal.

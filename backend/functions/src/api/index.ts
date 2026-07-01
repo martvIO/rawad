@@ -39,6 +39,9 @@ import { paymentsRouter } from "./routes/payments";
 import { decryptPasswordFields } from "./middleware/decryptPasswordFields";
 import { isEncryptionAvailable } from "./passwordCrypto";
 import { captureError, sentryEnabled } from "../sentry";
+import { requestLog } from "./middleware/requestLog";
+import { blockCheck } from "./middleware/blockCheck";
+import { securityRouter } from "./routes/security";
 // NOTE: additional routers (users, guests, ...) are mounted as their files
 // are created in subsequent migration steps. The import + app.use lines
 // below are added incrementally.
@@ -79,6 +82,17 @@ app.use(express.json({ limit: JSON_BODY_LIMIT }));
 // leading "/api" so routers can be mounted at "/auth" once.
 app.use(stripApiPrefix);
 
+// Per-request access logging (Cloud Logging) + path-scan detection. Mounted
+// before the routers so its res.on("finish") hook sees the final status of
+// every request, including 404s.
+app.use(requestLog);
+
+// Block enforcement: refuse a blocked IP / device fingerprint on EVERY route
+// (including public forms) before any handler runs. Account blocks are enforced
+// separately by Firebase Auth (disable + token revoke) via requireAuth.
+// Fail-open — a block-store error never locks everyone out.
+app.use(blockCheck);
+
 // ─── Routers ──────────────────────────────────────────────────────────────────
 
 // decryptPasswordFields runs ahead of the two routers that receive passwords,
@@ -99,6 +113,8 @@ app.use("/proofs", proofsRouter);
 // capture the literal "photos" path segment.
 app.use("/digital/photos", photoFacesRouter);
 app.use("/digital", digitalRouter);
+// Mount /admin/security BEFORE /admin so the more specific prefix matches first.
+app.use("/admin/security", securityRouter);
 app.use("/admin", adminRouter);
 app.use("/whatsapp", whatsappRouter);
 app.use("/payments", paymentsRouter);

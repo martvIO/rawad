@@ -24,7 +24,7 @@ _(ideas, frameworks, patterns, principles — pages that describe a concept)_
 - [[REST API Architecture]] — Express-on-Cloud-Functions REST layer; no Firebase SDK on the client
 - [[Authentication]] — synthetic email, JWT custom claims, token manager, phone-OTP reset
 - [[Polling and Realtime]] — REST polling (15–30s) for most data; SSE for live driver GPS
-- [[Security Model]] — three enforced server-side layers + non-authoritative UI guard
+- [[Security Model]] — three enforced server-side layers + non-authoritative UI guard; + 2026-07-01 monitoring/blocking/validation layer
 - [[Password Encryption]] — client RSA-OAEP-encrypts password fields as `enc:v1:` envelopes (defense-in-depth on top of HTTPS); backend middleware decrypts ahead of /auth + /users
 - [[Digital Invitations]] — the Firestore-backed WhatsApp-link invite flow; guest phone fields reuse the shared PhoneInput (Arabic-digit safe), groom add-guest imports contacts from .vcf/.csv files
 - [[Face Matching]] — AWS Rekognition engine: guest "your photos" (camera-only Face Liveness → matches → ZIP) + OTP-gated "People" gallery; auto-send photos on publish; Cognito pool wired (us-east-1); consent + 30-day auto-purge
@@ -62,6 +62,7 @@ _(synthesized answers to questions you've asked, filed back as pages)_
 - [[CRO and IA Audit 2026-06-20]] — conversion/IA audit + shipped fixes (CTA flip to WhatsApp-primary, sample-invite link, social-proof band, AS-FEATURED removed); flags prod WhatsApp number unset
 - [[QA Analytics and Ops Hardening 2026-06-20]] — analytics/QA/web-ops audit remediation: shipped DR backups (backupRtdb + setup-backups.sh + RUNBOOK), CI pipeline, cross-browser/device Playwright, Firestore/Storage rules tests (123 pass), axe a11y, handoff docs; GA4/Clarity/monitoring/backup-enablement remain owner-gated
 - [[Five-Domain Audit Implementation 2026-06-20]] — full five-domain web audit (`docs/WEB-AUDIT-2026-06-20.md`) executed + deployed on Node 22: a11y/iOS-zoom, venue-NAT confirm rate-limit, invite-open KPI, localized reminders, audit-log+biometric retention, Sentry (DSN-gated), CI build+gitleaks, onboarding/OG/icons, softened deletion copy + corrected false "secrets-in-history" docs; build/admin-SDK-key alarms verified false
+- [[Backend Security Hardening 2026-07-01]] — added input-validation (zod), per-request monitoring (Cloud Logging + Firestore securityEvents), account/IP/fingerprint blocking + admin Security page, encrypted-password enforcement; full endpoint audit fixed ~20 missing rate limiters + 2 input-validation gaps
 - [[Security Audit 2026-06-29]] — targeted audit of AI-introduced vuln classes (hardcoded secrets / injection / auth-crypto): app verified clean (Semgrep 0 findings, no SQL/XSS, strong auth-crypto, no real secret in 662 commits); added `.gitleaks.toml` allowlist + `security.yml` (Semgrep/dependency-review/CodeQL) + Husky pre-commit; open: F-1 transitive npm vulns, rotate chat-shared LS key
 - [[Comprehensive-Test-Harness]] — multi-layer automated test + feedback harness (`npm run test:full`): API route tests (closes TASK-006), 7 cross-role journeys, auto-crawler, visual regression, i18n/a11y sweeps → one consolidated report + deduped auto-filed issues; emulator-full + read-only prod smoke; flag-aware (physical track gated off); fixed the emulator seed namespace mismatch
 ---

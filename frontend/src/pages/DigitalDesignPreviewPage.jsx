@@ -61,6 +61,9 @@ export function DigitalDesignPreviewPage({ lang: appLang, setLang }) {
       lang={lang}
       setLang={setLang}
       mode="preview"
+      showEnvelope
+      demo
+      fullscreen
       guestName={lang === "he" ? "שם האורח" : "اسم الضيف"}
     />
   );

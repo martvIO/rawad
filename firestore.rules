@@ -84,6 +84,13 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Security events — server-only (Admin SDK). The admin Security page reads
+    // them via the /admin/security REST API, never directly. Explicit deny
+    // mirrors appConfig / the biometric subtrees.
+    match /securityEvents/{id} {
+      allow read, write: if false;
+    }
+
     // Default deny — all other paths
     match /{document=**} {
       allow read, write: if false;

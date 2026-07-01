@@ -27,7 +27,10 @@ import {
   requireAuth,
   requireAnyRole,
 } from "../middleware/auth";
+import { uidRateLimit } from "../middleware/rateLimit";
 import { MAX_BYTES, MAX_LEN } from "../../constants/limits";
+import { HOUR_MS } from "../../constants/time";
+import { RATE } from "../../constants/rateLimits";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -65,6 +68,7 @@ proofsRouter.post(
   "/upload",
   requireAuth,
   requireAnyRole("driver"),
+  uidRateLimit("proofUpload", RATE.PROOF_UPLOAD_PER_USER.limit, HOUR_MS),
   async (req: AuthRequest, res: Response) => {
     let parsed: ParsedUpload;
     try {
@@ -157,6 +161,7 @@ proofsRouter.post(
 proofsRouter.get(
   "/url",
   requireAuth,
+  uidRateLimit("proofUrl", RATE.PROOF_URL_PER_USER.limit, HOUR_MS),
   async (req: AuthRequest, res: Response) => {
     const path = (req.query.path ?? "").toString();
     if (!path || path.length > MAX_PATH_LEN) {

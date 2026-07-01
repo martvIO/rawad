@@ -41,6 +41,7 @@ export function DigitalInvitationView({
   onOpenSorek,
   showEnvelope = false,
   demo = false,
+  fullscreen = false,
   alreadyAnswered = false,
   rsvpDone = false,
   boardingPassEnabled = false,
@@ -113,7 +114,11 @@ export function DigitalInvitationView({
   const showDock = on(design?.footerDockEnabled);
   const showMusic = on(design?.musicEnabled) && !!musicUrl;
   const showHeroMedia = on(design?.heroMediaEnabled) && heroMedia.length > 0;
-  const showEnvelopeNow = isPublic && showEnvelope && on(design?.envelopeEnabled);
+  // Envelope shows wherever a caller explicitly opts in via showEnvelope (public
+  // guest page + groom previews). The old `isPublic` guard suppressed it in every
+  // preview; visibility is now driven purely by the explicit prop, so the admin
+  // preview modal (passes neither) stays off.
+  const showEnvelopeNow = showEnvelope && on(design?.envelopeEnabled);
 
   const rsvpOpts = {
     companions: on(design?.rsvpCompanionsEnabled),
@@ -214,7 +219,7 @@ export function DigitalInvitationView({
         font={font}
         lang={lang}
         mode={mode}
-        fixed={isPublic}
+        fixed={isPublic || fullscreen}
         immersive3d={on(design?.immersive3d)}
         showEnvelope={showEnvelopeNow}
         demo={demo}

@@ -25,14 +25,27 @@ import {
 import { logErr, log } from "./logger.js";
 import { westernizeDeep } from "./digits.js";
 import { encryptPasswordFields, resetPublicKeyCache } from "./passwordCrypto.js";
+import { getDeviceFingerprint } from "./deviceFingerprint.js";
 import { API_BASE_URL, API_TIMEOUT_MS } from "../config/index.js";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const HEADER_AUTH = "Authorization";
 const HEADER_CONTENT_TYPE = "Content-Type";
+const HEADER_DEVICE_FP = "X-Device-FP";
 const JSON_MIME = "application/json";
 const BEARER_PREFIX = "Bearer ";
+
+/** Best-effort device fingerprint header (never throws). Sent on every call —
+ *  authenticated or public — so the security layer can correlate abuse across
+ *  changing IPs. It is a weak, evadable signal, not an auth credential. */
+function deviceFpHeader() {
+  try {
+    return getDeviceFingerprint();
+  } catch {
+    return null;
+  }
+}
 
 const HTTP_UNAUTHORIZED = 401;
 
@@ -125,6 +138,8 @@ async function request(method, path, body, opts) {
   const timeoutMs = opts?.timeoutMs ?? API_TIMEOUT_MS.DEFAULT;
   const headers = { Accept: JSON_MIME };
   if (body !== undefined) headers[HEADER_CONTENT_TYPE] = JSON_MIME;
+  const fp = deviceFpHeader();
+  if (fp) headers[HEADER_DEVICE_FP] = fp;
 
   // Normalize Arabic-Indic digits to Western before they ever reach the API,
   // so the database only stores ASCII digits. Password fields are preserved.
@@ -239,6 +254,8 @@ async function upload(path, formData, opts) {
   const onProgress = typeof opts?.onProgress === "function" ? opts.onProgress : null;
   const useXhr = !!onProgress && typeof XMLHttpRequest !== "undefined";
   const headers = { Accept: JSON_MIME };
+  const fpUp = deviceFpHeader();
+  if (fpUp) headers[HEADER_DEVICE_FP] = fpUp;
   if (!skipAuth) {
     const tok = await getIdToken().catch(() => null);
     if (tok) headers[HEADER_AUTH] = `${BEARER_PREFIX}${tok}`;

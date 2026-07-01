@@ -23,9 +23,23 @@ import { allow } from "../../rateLimit";
 import { allowPersistent } from "../../rateLimitPersistent";
 import { rtdbPort } from "../../domain/firebaseAdapters";
 import { AuthRequest } from "./auth";
+import { recordSecurityEvent } from "../../securityEvents";
+import { recordAutoBlockSignal } from "../../autoBlock";
 
 /** Fallback IP key when Express cannot resolve the client address. */
 const UNKNOWN_IP_KEY = "unknown";
+
+/**
+ * Emit a 429, record a `rate_limited` security event, and — for anonymous
+ * abuse scopes (ip/token/key) — feed the conservative auto-blocker. UID-scope
+ * rejections are throttling of an authenticated caller (e.g. an admin hitting
+ * their own cap); we surface those as events but never auto-block their IP.
+ */
+function reject429(req: Request, res: Response, scope: string): void {
+  recordSecurityEvent("rate_limited", req, { detail: { scope } });
+  if (scope !== "uid") recordAutoBlockSignal("rate_limited", req);
+  res.status(429).json({ error: "too_many_requests", scope });
+}
 
 /** Fallback UID key for anonymous calls that somehow reach a uidRateLimit. */
 const ANON_UID_KEY = "anon";
@@ -48,10 +62,7 @@ export function ipRateLimit(prefix: string, maxPerHour: number, windowMs: number
     const ip = resolveClientIp(req);
     const key = `${prefix}:${ip}`;
     if (!allow(key, maxPerHour, windowMs)) {
-      res.status(429).json({
-        error: "too_many_requests",
-        scope: "ip",
-      });
+      reject429(req, res, "ip");
       return;
     }
     next();
@@ -72,7 +83,7 @@ export function ipRateLimitPersistent(prefix: string, maxPerHour: number, window
     const ip = resolveClientIp(req);
     const allowed = await allowPersistent(rtdbPort(), `${prefix}:${ip}`, maxPerHour, windowMs);
     if (!allowed) {
-      res.status(429).json({ error: "too_many_requests", scope: "ip" });
+      reject429(req, res, "ip");
       return;
     }
     next();
@@ -89,10 +100,7 @@ export function uidRateLimit(prefix: string, maxPerHour: number, windowMs: numbe
     const uid = req.caller?.uid ?? ANON_UID_KEY;
     const key = `${prefix}:${uid}`;
     if (!allow(key, maxPerHour, windowMs)) {
-      res.status(429).json({
-        error: "too_many_requests",
-        scope: "uid",
-      });
+      reject429(req, res, "uid");
       return;
     }
     next();
@@ -120,11 +128,11 @@ export function tokenRateLimit(
     const ip = resolveClientIp(req);
     const tokenKey = token ? `${prefix}:t:${token}` : `${prefix}:noToken:${ip}`;
     if (!allow(tokenKey, maxPerToken, windowMs)) {
-      res.status(429).json({ error: "too_many_requests", scope: "token" });
+      reject429(req, res, "token");
       return;
     }
     if (!allow(`${prefix}:ip:${ip}`, ipBackstopMax, windowMs)) {
-      res.status(429).json({ error: "too_many_requests", scope: "ip" });
+      reject429(req, res, "ip");
       return;
     }
     next();
@@ -153,11 +161,11 @@ export function keyedRateLimit(
     const raw = (keyOf(req) || "").toString();
     const primaryKey = raw ? `${prefix}:k:${raw}` : `${prefix}:noKey:${ip}`;
     if (!allow(primaryKey, maxPerKey, windowMs)) {
-      res.status(429).json({ error: "too_many_requests", scope: "key" });
+      reject429(req, res, "key");
       return;
     }
     if (!allow(`${prefix}:ip:${ip}`, ipBackstopMax, windowMs)) {
-      res.status(429).json({ error: "too_many_requests", scope: "ip" });
+      reject429(req, res, "ip");
       return;
     }
     next();

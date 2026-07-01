@@ -72,13 +72,15 @@ export function CelestialAmbience({
   const envActive = envActiveRef.current && phase !== "gone";
 
   // Lock page scroll while the 3D envelope is on screen, so the scroll-driven
-  // camera (resumed after hand-off) can't be desynced mid-sequence.
+  // camera (resumed after hand-off) can't be desynced mid-sequence. Only for
+  // full-viewport previews (`fixed`): the contained desktop-editor preview pane
+  // (fixed=false) must NOT freeze the whole editor page until its envelope is tapped.
   useEffect(() => {
-    if (!envActive) return undefined;
+    if (!envActive || !fixed) return undefined;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = prev; };
-  }, [envActive]);
+  }, [envActive, fixed]);
 
   // After the hand-off completes, fade the overlay/canvas out then unmount.
   useEffect(() => {
