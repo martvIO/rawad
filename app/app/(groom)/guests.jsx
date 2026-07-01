@@ -11,6 +11,7 @@ import {
   Alert,
   StyleSheet,
 } from "react-native";
+import { useRouter } from "expo-router";
 import { File, Paths } from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import { ScreenHeader } from "../../src/ui/ScreenHeader.jsx";
@@ -49,6 +50,7 @@ export default function Guests() {
   const { guests, ranks: availableRanks, designs, editGuest, deleteGuest, cycleGuestStatus, canSeeAttendance } =
     useGroomDigital();
   const toast = useToast();
+  const router = useRouter();
 
   const [editing, setEditing] = useState(null); // the guest being edited
   const [eName, setEName] = useState("");
@@ -202,7 +204,7 @@ export default function Guests() {
               <Text style={styles.ghostBtnText}>⬇ CSV</Text>
             </Pressable>
           ) : null}
-          <Pressable style={styles.goldBtn} onPress={() => toast.show(t("coming_soon") || "قريبًا")}>
+          <Pressable style={styles.goldBtn} onPress={() => router.push("/add-guest")}>
             <Text style={styles.goldBtnText}>➕ {lang === "he" ? "הוסף" : "إضافة"}</Text>
           </Pressable>
         </View>

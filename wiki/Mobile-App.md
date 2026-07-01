@@ -57,9 +57,12 @@ Windows, no Mac), and runs the existing Three.js 3D via `expo-gl`.
 - **In the app:** auth (login / change-password / forgot-password-stub / logout),
   Help, Terms, and the groom **digital** track: Dashboard (media gallery, wedding
   date, ranks, attendance stats, guest messages), Guests (list, search/filter,
-  status cycle, inline edit, delete, CSV export), Manage (wedding lifecycle).
-- **Later phases:** Add-Guest (+ contact import), Photographer, Design editor (+
-  the 3D preview via react-three-fiber/expo-gl), push, self-serve signup + payments.
+  status cycle, inline edit, delete, CSV export), Manage (wedding lifecycle),
+  **Add-Guest** (single + bulk paste/.vcf/.csv import, dup-phone block),
+  **Photographer** (upload library/camera, rename, delete, search, publish w/
+  biometric-consent ack), and the **Design editor** (full-parity native form +
+  live WebView preview) — see Phase 3 below.
+- **Later phases:** push, self-serve signup + payments.
 - **Excluded:** landing, admin, driver, all guest-facing public pages, and the
   handwritten track. **No GPS, no camera-for-face.**
 
@@ -83,10 +86,52 @@ Windows, no Mac), and runs the existing Three.js 3D via `expo-gl`.
   android Hermes bundles export OK.** Pending: on-device EAS dev-client run (needs the
   user's `eas login`; iOS needs an Apple Developer account). See [[Architecture-Decisions]].
 
+## Phase 3 — remaining groom pages + i18n fix + hardware-rendered design (2026-07-01)
+
+- **i18n English-leak fix.** `makeT` returns the raw key on a miss, so 23 keys the
+  app used but the registry lacked rendered as English (`login_username`,
+  `pwd_*`, `tab_manage`, …) and defeated the `t(k) || "fallback"` pattern (the key
+  is truthy). Fixed by adding the keys to `shared/src/i18n/{ar,he}.js` (+ repointing
+  `login_username→login_user`, `login_password→login_pass`) and a **regression
+  guard**: `frontend/src/__tests__/i18n/appKeyCoverage.test.js` scans every `t("…")`
+  in `app/` and fails if a key is absent from ar+he. Registry now 734 keys, 0 missing.
+- **Add-Guest** (`app/(groom)/add-guest.jsx`, push from Guests header). Single add
+  (+972 · 9 digits, 2-word name, dup-phone block) + bulk paste (`parseGuestLines`)
+  + **.vcf/.csv import** via the built-in `expo-file-system` `File.pickFileAsync`
+  → new shared `contactsTextToLines()` (DOM-free sibling of `contactsFileToText`).
+  New `addGuest` in `useGroomDigital` w/ optimistic pending-guest poll-race bridge.
+- **Photographer** (tab, gated on `canUsePhotographer`). Upload from library +
+  **camera** (`ImagePicker.launchCameraAsync` — no `expo-camera` needed), rename,
+  delete, search/type-filter, **publish toggle** behind a biometric-indexing consent
+  modal (`setPhotographerPublished(uid,true,true)`; server 409s ack_required).
+- **Design editor** (tab) — **full-parity native form** driven by a new shared
+  schema `@dawa/core/data/digitalDesignSchema.js` (SCALAR/ARRAY/TOGGLE keys +
+  status meta, now imported by the **web** editor too, so they can't drift).
+  `useDesignEditor` hook mirrors the web buffer+dirty autosave (`patchDesignById`):
+  switcher (create/duplicate/delete), edit-language toggle, theme + font pickers,
+  all 15 scalars (localized per-lang), date, all 15 toggles, the 5 array editors,
+  gallery+hero media, and 3D-envelope + custom-background overrides (hex fields +
+  steppers + switches). Submit/cancel for approval.
+- **Hardware-rendered preview** (the "use device hardware to render" ask). The
+  design page's **👁 Preview** opens `app/(groom)/design-preview.jsx` — a
+  `react-native-webview` loading the **new authenticated web route
+  `/preview/digital/:designId`** (`frontend/src/pages/DigitalDesignPreviewPage.jsx`)
+  which renders the real `<DigitalInvitationView mode="preview">`. Its WebGL 3D
+  envelope runs on the **device GPU** inside the WebView = one renderer, zero fork,
+  always what the guest sees. Auth: the app seeds the WebView's `localStorage` with
+  the groom's tokens via new `tokenManager.peekTokens()` (before content loads), so
+  the web apiClient reads the still-**draft** design (which `/d` would refuse).
+  Guests stay on the website — the app preview is groom-only.
+- **Export & share:** `react-native-view-shot` `captureRef` → `expo-sharing` on the
+  preview screen (⤴). New native deps: `react-native-webview`, `react-native-view-shot`.
+- **Verified:** app Metro bundle (Android Hermes) ✅, `expo-doctor` 21/21 ✅, web
+  `vite build` ✅, i18n coverage+parity + contactsImport/bulkGuests unit tests ✅,
+  `/preview/digital/:id` serves the SPA ✅. (Full on-device render still needs the
+  user's EAS/Apple accounts; Playwright render check needs Chrome installed.)
+
 ## Roadmap (later)
 
-1. **Add-Guest + Photographer + Design editor** (+ image-picker/contacts/3D).
-2. **Push:** FCM + APNs (`expo-notifications`), device-token registry, Cloud
+1. **Push:** FCM + APNs (`expo-notifications`), device-token registry, Cloud
    Function triggers.
 3. **Self-serve signup + payments:** **Android → Lemon Squeezy** (see [[Payments]]);
    **iOS → Apple StoreKit IAP** with a new receipt-validation endpoint. Packages

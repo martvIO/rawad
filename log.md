@@ -232,3 +232,6 @@ Grilled "what to do before public launch" → **controlled soft launch** (invite
 
 ## [2026-06-30 22:20] session | Grilled + built per-design custom invite background
 Touched: Digital-Invitations, Architecture-Decisions
+
+## [2026-07-01 09:15] session | Grilled + built app groom pages + hardware-rendered design
+Touched: Mobile-App, Architecture-Decisions

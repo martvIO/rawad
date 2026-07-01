@@ -102,23 +102,36 @@ export function parseDelimited(text) {
 }
 
 /**
+ * Convert raw vCard/CSV file TEXT to "Name, Phone" lines that parseGuestLines()
+ * can consume. Auto-detects vCard by content or the source filename. Pure /
+ * DOM-free so it works on React Native (no FileReader): the caller reads the
+ * file to a string (expo-file-system) and passes it here.
+ * @param {string} text     file contents
+ * @param {string} [name]   original filename (for the .vcf extension hint)
+ * @returns {string} newline-joined "Name, Phone" lines.
+ */
+export function contactsTextToLines(text, name = "") {
+  const str = String(text || "");
+  const isVcf = /BEGIN:VCARD/i.test(str) || /\.vcf$/i.test(name || "");
+  const rows = isVcf ? parseVcards(str) : parseDelimited(str);
+  return rows
+    .map((r) => `${(r.name || "").replace(/[,\t]/g, " ").trim()}, ${(r.phone || "").trim()}`)
+    .filter((l) => l.replace(/[\s,]/g, "").length > 0)
+    .join("\n");
+}
+
+/**
  * Read a File and convert vCard/CSV contacts to "Name, Phone" text lines that
  * parseGuestLines() can consume. Auto-detects vCard by content/extension.
+ * Browser-only (uses FileReader); native callers use contactsTextToLines().
  * @returns {Promise<string>} newline-joined "Name, Phone" lines.
  */
 export function contactsFileToText(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onerror = () => reject(new Error("read_failed"));
-    reader.onload = () => {
-      const text = String(reader.result || "");
-      const isVcf = /BEGIN:VCARD/i.test(text) || /\.vcf$/i.test(file?.name || "");
-      const rows = isVcf ? parseVcards(text) : parseDelimited(text);
-      const lines = rows
-        .map((r) => `${(r.name || "").replace(/[,\t]/g, " ").trim()}, ${(r.phone || "").trim()}`)
-        .filter((l) => l.replace(/[\s,]/g, "").length > 0);
-      resolve(lines.join("\n"));
-    };
+    reader.onload = () =>
+      resolve(contactsTextToLines(String(reader.result || ""), file?.name || ""));
     reader.readAsText(file);
   });
 }
