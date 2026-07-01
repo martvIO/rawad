@@ -127,3 +127,61 @@ Two grilled tweaks (pure render/CSS + one new persisted design field). Verified 
   - **Build gotcha (caught by browser verify):** backtick characters inside a CSS comment **inside the `` `…` `` template literal** in `InviteStyles.jsx` prematurely close the template string → Vite `Unexpected token` parse error. Keep template-literal CSS comments backtick-free.
 
 See [[Visual-Design-System]], [[Architecture-Decisions]].
+
+## Always-open section-nav column + merged صورك (2026-07-01)
+Grilled + built (pure presentational; no schema/rules/data change). The public invitation's
+navigation was reworked from a tap-to-open hamburger into a single always-visible vertical column.
+- **Decisions (grilled):** ONE always-open column pinned **top-right** (`insetInlineStart:14`, RTL →
+  right edge); **صورك on top** as the first row; then the enabled section links. **Colorful emoji**
+  next to every button (⬆️القصة📖 الصور🖼️ التفاصيل📋 المكان📍 العدّ⏳ تأكيد✅ التهاني💌 هدية🎁, صورك📸) —
+  chosen over monochrome glyphs for recognizability + consistency with the app's existing emoji. صورك
+  is the **only framed** button, framed in **`theme.accent`** (matches the palette, not hard-coded
+  gold). **No background fill** on any button (removed the frosted `theme.overlay` menu card, صورك's
+  `theme.chipBg`, and the active `theme.accentMuted` fill). Column is **visible the whole time**
+  (removed the scroll-past-hero reveal gate); it still sits at z-index 120 < envelope overlay 1000, so
+  it stays hidden behind the 3D-envelope intro and never fights it.
+- **Implementation:** `sections/InviteNavMenu.jsx` rewritten — dropped `open`/`visible` state, the
+  hamburger button, the outside-tap/Escape dismiss effect and `useRef`; kept the `IntersectionObserver`
+  scroll-spy driving `active`. New nullable prop `sorek={label,icon,onClick}` renders the framed first
+  row. Active row = accent color + weight 800; inactive = `theme.textSoft` + 600; a subtle
+  `textShadow` preserves legibility with no fill. `DigitalInvitationView.jsx` added an `icon` per
+  `navItems` entry, removed the standalone `<SorekButton/>` render, and passes `sorek` into the nav
+  menu (same visibility gate the old button had). The now-unused **`SorekButton`** was deleted from
+  `inviteShared.jsx` (and its stale mention in `WalletButton.jsx`'s header comment cleaned up).
+- **Verified** via Playwright MCP on the demo (`/d/demo/demo?demo=1`): column is `position:fixed`,
+  14px from the right, transparent background, always visible; صورك has `1px solid` accent border +
+  transparent bg (the only framed button); section rows have no border/bg (active bold+accent);
+  clicking a row smooth-scrolls (0→3591px to المكان); AR↔HE toggle localizes all labels and keeps the
+  frame on accent. Adversarial multi-lens code review found no surviving correctness/theme bugs.
+
+### Follow-up: icon-only circles with reveal-on-demand names (2026-07-01)
+Same session, second grilled pass. The labelled column was tightened into **icon-only circular
+buttons** — every emoji now sits in a **44px transparent circle** (`border-radius:50%`) and the names
+are **hidden by default**, revealed as a floating pill only when relevant.
+- **Decisions (grilled):** reveal = a **tooltip pill** to the inner (left, RTL) side of the circle,
+  not an inline expansion; **rings** = faint `theme.accentLine` on section circles, bolder
+  `theme.accent` on صورك **and** on the active section (a "you are here" ring); revealed label sits on
+  a **frosted chip**. A name shows when `id === active` (scroll-spy) **OR** `id === hovered`
+  (pointer/focus). صورك has no section so its name reveals on hover/press/focus only.
+- **Implementation (single file, `InviteNavMenu.jsx`):** added a `hovered` state OR'd with the existing
+  `active`; `renderCircle()` (a plain function, not a component, to avoid remount-on-hover) draws the
+  circle + an absolutely-positioned pill (`insetInlineEnd: calc(100%+8px)`, `opacity` toggled). Hover
+  wired via `onPointerEnter/Leave` + `onFocus/Blur` (pointer events cover mouse *and* touch-press; a
+  section tap also scrolls → becomes `active` → its pill persists). `aria-label` on each circle keeps
+  the name for screen readers. Scroll-spy + `go()` kept verbatim. صورك uses a synthetic id `"__sorek"`.
+- **Post-review hardening (adversarial workflow):** (1) pill text switched from `theme.accent` to
+  **`theme.overlay` bg + `theme.text`** — the palette's designed-for-legibility pair — because
+  accent-on-`chipBg` failed WCAG AA on light themes (champagne measured **2.3:1 → 12.55:1** after the
+  fix); (2) a guard effect clamps `active`/`hovered` to valid ids when `items` shrinks (the groom
+  toggling a section off in the **editor preview** really does change `items`); (3) pill got a
+  `max-width` + ellipsis cap. Dismissed as non-issues: `__sorek` id collision (ids are controlled
+  `inv-*`/`rsvp`), RTL scrollbar occlusion (≤10 circles never overflow a phone height), touch
+  "180ms vanish" (section names re-appear via the active state after the tap scrolls there).
+- **Verified** via Playwright MCP on the demo (gold + champagne themes): 44px transparent circles,
+  faint vs bolder rings, only the active pill shown by default, hover reveals just that one while the
+  active stays, click scrolls + updates the "you are here" pill, صورك reveals on hover, AR↔HE
+  localizes pills, and the champagne-theme pill contrast measures 12.55:1. Build passes; the 42 failing
+  unit tests are **pre-existing** (tokenManager/storage/forgotPassword/groomPortal — confirmed failing
+  at HEAD with all changes stashed), unrelated to this presentational change.
+
+See [[Visual-Design-System]], [[Architecture-Decisions]].

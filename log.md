@@ -244,3 +244,9 @@ Touched: Security-Model, Backend-Security-Hardening-2026-07-01, Security-Audit-2
 
 ## [2026-07-01 19:20] session | Grilled + built seal-star toggle + Arabic cursive-join fix
 Touched: Digital-Invitations
+
+## [2026-07-01 20:25] session | Grilled + built always-open nav column + merged صورك
+Touched: Digital-Invitations
+
+## [2026-07-01 20:58] session | Nav circles + reveal-on-demand names
+Touched: Digital-Invitations
