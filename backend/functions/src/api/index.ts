@@ -35,7 +35,7 @@ import { digitalRouter } from "./routes/digital";
 import { photoFacesRouter } from "./routes/photoFaces";
 import { adminRouter } from "./routes/admin";
 import { whatsappRouter } from "./routes/whatsapp.routes";
-import { paymentsRouter } from "./routes/payments";
+import { paymentsRouter, isLemonSqueezyConfigured } from "./routes/payments";
 import { decryptPasswordFields } from "./middleware/decryptPasswordFields";
 import { isEncryptionAvailable } from "./passwordCrypto";
 import { captureError, sentryEnabled } from "../sentry";
@@ -67,6 +67,20 @@ export const app = express();
 // Override via TRUSTED_PROXY_HOPS only if the deployment topology changes.
 const TRUSTED_PROXY_HOPS = Number(process.env.TRUSTED_PROXY_HOPS) || 1;
 app.set("trust proxy", TRUSTED_PROXY_HOPS);
+
+// Don't advertise Express as the server (removes a trivial fingerprint).
+app.disable("x-powered-by");
+
+// Baseline security response headers on every API response (defense-in-depth;
+// no dependency needed for a JSON API). nosniff stops content-type sniffing of
+// any error body; DENY framing since nothing here is meant to be embedded;
+// no-referrer avoids leaking token-bearing URLs (e.g. SSE ?token=) via Referer.
+app.use((_req: Request, res: Response, next: NextFunction) => {
+  res.set("X-Content-Type-Options", "nosniff");
+  res.set("X-Frame-Options", "DENY");
+  res.set("Referrer-Policy", "no-referrer");
+  next();
+});
 
 app.use(cors({
   origin: buildCorsOriginCheck(),
@@ -136,6 +150,10 @@ app.get("/health", (_req, res) => {
     uptimeSeconds: Math.floor(process.uptime()),
     encryption: isEncryptionAvailable(),
     monitoring: sentryEnabled, // false until SENTRY_DSN is provisioned
+    // `payments` surfaces whether Lemon Squeezy is fully wired (API key + store +
+    // webhook secret + Premium variant) so monitoring can catch a deploy that
+    // dropped the LS secrets, without exposing any secret value.
+    payments: isLemonSqueezyConfigured(),
   });
 });
 

@@ -75,6 +75,17 @@ function lsWebhookSecret(): string | null {
   return process.env.LEMONSQUEEZY_WEBHOOK_SECRET || null;
 }
 
+/**
+ * Whether Lemon Squeezy is fully configured for the checkout + webhook flow:
+ * API key + store id + webhook secret + at least the Premium variant. This mirrors
+ * what `POST /links/:token/intent` actually enforces, so `/api/health` can surface
+ * a deploy that forgot the LS secrets. VIP is optional — Premium is the minimum
+ * sellable package. Never throws (safe to call on the health path).
+ */
+export function isLemonSqueezyConfigured(): boolean {
+  return !!(lsApiKey() && lsStoreId() && lsWebhookSecret() && variantIdFor("premium"));
+}
+
 /** POST a JSON:API body to the Lemon Squeezy REST API; returns parsed JSON. */
 async function lsPost(path: string, body: unknown, key: string) {
   const res = await fetch(`${LS_API}${path}`, {

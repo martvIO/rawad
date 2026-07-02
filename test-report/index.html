@@ -20,54 +20,15 @@ code{background:#11131a;border-radius:4px;padding:1px 5px;font-size:12px}.err{co
 a{color:#7aa2ff}
 </style></head><body><div class="wrap">
 <h1>Dawa Test Report</h1>
-<div class="sub">2026-06-29T10:40:00.243Z · mode <b>emulator</b> · http://localhost:5173 · 426.4s
+<div class="sub">2026-07-02T05:11:54.405Z · mode <b>emulator</b> · http://localhost:5173 · 0.0s
  · <a href="../frontend/playwright-report/index.html">Playwright HTML (traces)</a></div>
 <div class="hero">
-  <div class="stat"><b class="">59</b>passed</div>
-  <div class="stat"><b class="bad">17</b>failed</div>
-  <div class="stat"><b class="muted">26</b>skipped</div>
-  <div class="stat"><b class="warn">14</b>findings</div>
+  <div class="stat"><b class="good">0</b>passed</div>
+  <div class="stat"><b class="muted">0</b>failed</div>
+  <div class="stat"><b class="muted">0</b>skipped</div>
+  <div class="stat"><b class="muted">0</b>findings</div>
 </div>
-<div class="card"><h3>By area</h3><table><thead><tr><th>Area</th><th>Pass rate</th><th class="num">Passed</th><th class="num">Failed</th><th class="num">Skip</th></tr></thead><tbody><tr><td>a11y</td><td><div class="track"><div class="fill" style="width:100%"></div></div></td>
-      <td class="num">4/4</td><td class="num ">0</td><td class="num muted">0</td></tr><tr><td>a11y-authed</td><td><div class="track"><div class="fill" style="width:50%"></div></div></td>
-      <td class="num">2/4</td><td class="num bad">1</td><td class="num muted">1</td></tr><tr><td>a11y-axe</td><td><div class="track"><div class="fill" style="width:100%"></div></div></td>
-      <td class="num">3/3</td><td class="num ">0</td><td class="num muted">0</td></tr><tr><td>admin</td><td><div class="track"><div class="fill" style="width:91%"></div></div></td>
-      <td class="num">10/11</td><td class="num bad">1</td><td class="num muted">0</td></tr><tr><td>auth</td><td><div class="track"><div class="fill" style="width:83%"></div></div></td>
-      <td class="num">10/12</td><td class="num bad">1</td><td class="num muted">1</td></tr><tr><td>crawler</td><td><div class="track"><div class="fill" style="width:0%"></div></div></td>
-      <td class="num">0/4</td><td class="num bad">3</td><td class="num muted">1</td></tr><tr><td>driver</td><td><div class="track"><div class="fill" style="width:0%"></div></div></td>
-      <td class="num">0/9</td><td class="num ">0</td><td class="num muted">9</td></tr><tr><td>groom</td><td><div class="track"><div class="fill" style="width:0%"></div></div></td>
-      <td class="num">0/11</td><td class="num ">0</td><td class="num muted">11</td></tr><tr><td>groom-digital</td><td><div class="track"><div class="fill" style="width:0%"></div></div></td>
-      <td class="num">0/2</td><td class="num bad">2</td><td class="num muted">0</td></tr><tr><td>i18n-render</td><td><div class="track"><div class="fill" style="width:90%"></div></div></td>
-      <td class="num">9/10</td><td class="num bad">1</td><td class="num muted">0</td></tr><tr><td>invitation</td><td><div class="track"><div class="fill" style="width:83%"></div></div></td>
-      <td class="num">5/6</td><td class="num bad">1</td><td class="num muted">0</td></tr><tr><td>journeys</td><td><div class="track"><div class="fill" style="width:57%"></div></div></td>
-      <td class="num">4/7</td><td class="num bad">3</td><td class="num muted">0</td></tr><tr><td>paid-signup-ls</td><td><div class="track"><div class="fill" style="width:0%"></div></div></td>
-      <td class="num">0/1</td><td class="num bad">1</td><td class="num muted">0</td></tr><tr><td>prod-smoke</td><td><div class="track"><div class="fill" style="width:100%"></div></div></td>
-      <td class="num">4/4</td><td class="num ">0</td><td class="num muted">0</td></tr><tr><td>rtl</td><td><div class="track"><div class="fill" style="width:75%"></div></div></td>
-      <td class="num">3/4</td><td class="num bad">1</td><td class="num muted">0</td></tr><tr><td>visual</td><td><div class="track"><div class="fill" style="width:50%"></div></div></td>
-      <td class="num">5/10</td><td class="num bad">2</td><td class="num muted">3</td></tr></tbody></table></div>
-<div class="card"><h3>Failed tests <span class="pill warn">17</span></h3><table><thead><tr><th>Area</th><th>Project</th><th>Test</th><th>Error</th></tr></thead><tbody><tr><td>crawler</td><td>chromium</td><td>Crawler — full render sweep › anonymous / public pages</td>
-    <td class="err">Error: Crawler found 2 error-severity issues:</td></tr><tr><td>groom-digital</td><td>chromium</td><td>Groom — digital track › pick digital lands on the digital dashboard</td>
-    <td class="err">Error: expect(page).toHaveURL(expected) failed</td></tr><tr><td>journeys</td><td>chromium</td><td>Journey — admin bulk send › select groom → send to all issues the request without crashing</td>
-    <td class="err">Error: expect(locator).toBeVisible() failed</td></tr><tr><td>journeys</td><td>chromium</td><td>Journey — digital lifecycle › digital guest → invite minted → invitation renders → RSVP + wish accepted</td>
-    <td class="err">Error: expect(received).toBe(expected) // Object.is equality</td></tr><tr><td>a11y-authed</td><td>chromium</td><td>a11y — authenticated portals › groom dashboard</td>
-    <td class="err">TimeoutError: page.goto: Timeout 20000ms exceeded.</td></tr><tr><td>admin</td><td>chromium</td><td>Admin — dashboard + nav › user list shows seeded users</td>
-    <td class="err">TimeoutError: page.goto: Timeout 20000ms exceeded.</td></tr><tr><td>i18n-render</td><td>chromium</td><td>i18n — he › login renders fully translated (he)</td>
-    <td class="err">TimeoutError: page.goto: Timeout 20000ms exceeded.</td></tr><tr><td>paid-signup-ls</td><td>chromium</td><td>paid signup: admin link → /pay → LS checkout → webhook → groom account → forced change</td>
-    <td class="err">TimeoutError: page.goto: Timeout 20000ms exceeded.</td></tr><tr><td>rtl</td><td>chromium</td><td>public landing page has dir='rtl' and renders Arabic headings</td>
-    <td class="err">TimeoutError: page.goto: Timeout 20000ms exceeded.</td></tr><tr><td>invitation</td><td>chromium</td><td>Per-guest invite token › expired token shows expired-link page</td>
-    <td class="err">TimeoutError: page.goto: Timeout 20000ms exceeded.</td></tr><tr><td>auth</td><td>chromium</td><td>Auth — role redirects › driver login → /portal/driver/*</td>
-    <td class="err">TimeoutError: page.goto: Timeout 20000ms exceeded.</td></tr><tr><td>journeys</td><td>chromium</td><td>Journey — paid signup handoff › admin mints pay link → /pay renders → username availability enables Pay</td>
-    <td class="err">TimeoutError: page.goto: Timeout 20000ms exceeded.</td></tr><tr><td>groom-digital</td><td>chromium</td><td>Groom — digital track › every digital screen renders with no console errors</td>
-    <td class="err">TimeoutError: page.goto: Timeout 20000ms exceeded.</td></tr><tr><td>crawler</td><td>chromium</td><td>Crawler — full render sweep › admin portal</td>
-    <td class="err">Test timeout of 120000ms exceeded.</td></tr><tr><td>visual</td><td>chromium</td><td>Visual — public @visual › landing <span class="pill warn">visual</span></td>
-    <td class="err">Error: expect(page).toHaveScreenshot(expected) failed</td></tr><tr><td>crawler</td><td>chromium</td><td>Crawler — full render sweep › groom portal (both tracks)</td>
-    <td class="err">Error: Crawler found 3 error-severity issues:</td></tr><tr><td>visual</td><td>chromium</td><td>Visual — authed @visual › admin-users <span class="pill warn">visual</span></td>
-    <td class="err">Error: expect(page).toHaveScreenshot(expected) failed</td></tr></tbody></table></div>
-<div class="card"><h3>Findings</h3><h3>console-error <span class="pill">9</span></h3>
-    <ul class="findings"><li class="error"><code>/portal/login</code> Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES<span class="muted"> — Crawler — full render sweep › anonymous / public pages</span></li><li class="error"><code>/portal/login</code> Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES<span class="muted"> — Crawler — full render sweep › anonymous / public pages</span></li><li class="error"><code>/portal/groom/digital/dashboard</code> Failed to load resource: the server responded with a status of 401 ()<span class="muted"> — Crawler — full render sweep › groom portal (both tracks)</span></li><li class="error"><code>/portal/groom/digital/dashboard</code> [dawa] subscribeDriversForGroom:error  [object Event] Event<span class="muted"> — Crawler — full render sweep › groom portal (both tracks)</span></li><li class="error"><code>/portal/groom/digital/dashboard</code> Failed to load resource: the server responded with a status of 401 ()<span class="muted"> — Crawler — full render sweep › groom portal (both tracks)</span></li><li class="error"><code>/portal/groom/digital/dashboard</code> [dawa] subscribeDriversForGroom:error  [object Event] Event<span class="muted"> — Crawler — full render sweep › groom portal (both tracks)</span></li><li class="error"><code>/portal/groom/digital/dashboard</code> [dawa] subscribeDriversForGroom:error  [object Event] Event<span class="muted"> — Crawler — full render sweep › groom portal (both tracks)</span></li><li class="error"><code>/portal/groom/digital/dashboard</code> Failed to load resource: the server responded with a status of 401 ()<span class="muted"> — Crawler — full render sweep › groom portal (both tracks)</span></li><li class="error"><code>/portal/groom/digital/dashboard</code> [dawa] subscribeDriversForGroom:error  [object Event] Event<span class="muted"> — Crawler — full render sweep › groom portal (both tracks)</span></li></ul><h3>broken-image <span class="pill">4</span></h3>
-    <ul class="findings"><li class="warning"><code>/d/groom/demo?demo=1 [ar]</code> broken &lt;img&gt; https://images.unsplash.com/photo-1465495976277-4387d4b0e4a6?w=1200&amp;q=80<span class="muted"> — i18n — ar › invitation-demo renders fully translated (ar)</span></li><li class="warning"><code>/d/groom/demo?demo=1</code> broken &lt;img&gt; https://images.unsplash.com/photo-1465495976277-4387d4b0e4a6?w=1200&amp;q=80<span class="muted"> — Crawler — full render sweep › anonymous / public pages</span></li><li class="warning"><code>/d/groom/demo?demo=1 [he]</code> broken &lt;img&gt; https://images.unsplash.com/photo-1465495976277-4387d4b0e4a6?w=1200&amp;q=80<span class="muted"> — i18n — he › invitation-demo renders fully translated (he)</span></li><li class="warning"><code>/d/groom/demo?demo=1 [he]</code> broken &lt;img&gt; https://images.unsplash.com/photo-1465495976277-4387d4b0e4a6?w=1200&amp;q=80<span class="muted"> — i18n — he › invitation-demo renders fully translated (he)</span></li></ul><h3>other <span class="pill">1</span></h3>
-    <ul class="findings"><li class="error"><code>/portal/admin/send</code> navigation failed: TimeoutError: page.goto: Timeout 20000ms exceeded.
-Call log:
-[2m  - navigating to &quot;http://localhost:5173/portal/admin/send&quot;, waiting until &quot;commit&quot;[22m
-<span class="muted"> — Crawler — full render sweep › admin portal</span></li></ul></div>
+<div class="card"><h3>By area</h3><table><thead><tr><th>Area</th><th>Pass rate</th><th class="num">Passed</th><th class="num">Failed</th><th class="num">Skip</th></tr></thead><tbody><tr><td colspan="5" class="muted">no tests</td></tr></tbody></table></div>
+
+<div class="card"><h3>Findings</h3><p class="muted">No findings — clean run.</p></div>
 </div></body></html>
