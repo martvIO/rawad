@@ -154,6 +154,16 @@ navigation was reworked from a tap-to-open hamburger into a single always-visibl
   clicking a row smooth-scrolls (0→3591px to المكان); AR↔HE toggle localizes all labels and keeps the
   frame on accent. Adversarial multi-lens code review found no surviving correctness/theme bugs.
 
+## DECIDED, not built: editable RSVP + change log (2026-07-02)
+
+Owner decision from the live interview in [[UX Research Discovery 2026-07-02]]: the current
+**one-shot RSVP** (a guest cannot view or change an answer after submitting) will become
+**editable until a deadline the couple controls, with a change log the couple sees** — so
+headcounts never silently shift. Chosen over "admin reset only" and "keep one-shot".
+Needs its own design + explicit go-ahead before building (token semantics, `digitalGuests`
+schema, RTDB/Firestore rules, notification surface). Until then, usability task G4 in
+[[Usability Test Plan 2026-07]] measures how guests behave when they hit the current wall.
+
 ### Follow-up: icon-only circles with reveal-on-demand names (2026-07-01)
 Same session, second grilled pass. The labelled column was tightened into **icon-only circular
 buttons** — every emoji now sits in a **44px transparent circle** (`border-radius:50%`) and the names

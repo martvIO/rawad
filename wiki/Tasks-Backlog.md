@@ -28,6 +28,18 @@ Prioritized work for [[Dawa]] (full list in `TASKS.md`).
 - **TASK-007** — document `seed-emulator.cjs`
 - **TASK-008** — rotate/remove service-account JSON key from repo root (security — see [[Security Model]])
 
+## UX opportunity backlog (2026-07-02 — from [[UX Research Discovery 2026-07-02]], each item needs its own go-ahead)
+Owner funded **all four clusters** in the interview; sequence by impact. Baseline usability test
+([[Usability Test Plan 2026-07]]) runs BEFORE these land, re-test after.
+- **TASK-UX-1 (S, highest impact)** — guest first-load: skeleton/hero placeholder + skip-intro path + fix `.dawa-inv-cue` hardcoded `left:50%` → logical properties (`InviteStyles.jsx`)
+- **TASK-UX-2 (M)** — confidence layer: per-guest sent/delivered/read via [[WhatsApp Messaging]] states, last-synced chip, design-review notification, "why admin sends" explainer, filtered-count fixes
+- **TASK-UX-3 (M)** — safe actions: undo-toast guest delete (replace instant swipe-delete), themed bulk-send confirm modal, driver upload progress + retry queue
+- **TASK-UX-4 (M, compounding)** — design-system adoption sweep: hand-rolled modals → `ui/Modal`, 133+ hardcoded colors → tokens, `left/right` → logical properties, ≥44px touch targets
+- **TASK-UX-5 (M, decided feature)** — editable RSVP + change log (see [[Digital Invitations]] "DECIDED, not built")
+- **TASK-UX-6** — guest funnel metrics (link-open → envelope-open → RSVP) — needs a DB-writing endpoint (ask-first rule)
+- **TASK-UX-7 (owner polish targets)** — landing page + portal look & feel passes; landing scroll-reveal no-JS/reduced-motion fallback; GPS-accuracy ≥500m warning
+- ~~**TASK-UX-8** — phone input dial-code-only (remove flag emoji)~~ **DONE 2026-07-02** (`PhoneInput.jsx`)
+
 ## Low
 - **TASK-009** — code-split portal by route (`React.lazy`); bundle ~775 KB
 - **TASK-010** — GitHub Actions CI (lint + tests, block merge on failure)
