@@ -312,9 +312,9 @@ async function writeOgCache(token: string, buf: Buffer): Promise<void> {
 // groom's (assigned/default) design so the couple names still appear.
 async function loadDesignForToken(
   token: string,
-): Promise<{ design: DesignLike | null; guestName: string }> {
+): Promise<{ exists: boolean; design: DesignLike | null; guestName: string }> {
   const snap = await getDatabase().ref(`inviteTokens/${token}`).get();
-  if (!snap.exists()) return { design: null, guestName: "" };
+  if (!snap.exists()) return { exists: false, design: null, guestName: "" };
   const tk = snap.val() as {
     designSnapshot?: DesignLike;
     guestName?: string;
@@ -323,6 +323,7 @@ async function loadDesignForToken(
   };
   const guestName = (tk?.guestName ?? "").toString();
   let design = (tk?.designSnapshot ?? null) as DesignLike | null;
+  const exists = true;
   if (!design && tk?.groomUid) {
     try {
       const fsdb = getFirestore();
@@ -337,7 +338,7 @@ async function loadDesignForToken(
       }
     } catch { /* no design — render the branded card without couple names */ }
   }
-  return { design, guestName };
+  return { exists, design, guestName };
 }
 
 /**
@@ -345,9 +346,14 @@ async function loadDesignForToken(
  * onCreate trigger (pre-generate at mint) and as the cache-miss path below.
  */
 export async function renderAndCacheOgForToken(token: string): Promise<Buffer> {
-  const { design, guestName } = await loadDesignForToken(token);
+  const { design, guestName, exists } = await loadDesignForToken(token);
   const buf = await renderOgImage(design, guestName);
-  await writeOgCache(token, buf);
+  // Only PERSIST the render for a real token. The public /og/** rewrite lets
+  // anyone request /og/<any-32-hex>.jpg; without this guard a flood of random
+  // (non-existent) tokens would render + write unbounded junk JPEGs to
+  // og-cache/* (Storage + write-op cost amplification). We still return the
+  // branded fallback buffer so the caller can stream it — we just don't cache it.
+  if (exists) await writeOgCache(token, buf);
   return buf;
 }
 

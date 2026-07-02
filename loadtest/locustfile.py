@@ -82,21 +82,26 @@ if _cfg_path:
 # ════════════════════════════════════════════════════════════════════════════
 
 # --- Target -----------------------------------------------------------------
-# Production custom domain. The REST API is SAME-ORIGIN under /api (Firebase
-# Hosting rewrites /api/** to the `api` Cloud Function). Page routes (/, /d/...)
-# are served by Hosting/the preview function.
-BASE_URL = os.environ.get("LOADTEST_BASE_URL") or _CFG.get("base_url", "https://dawa.to")
+# The REST API is SAME-ORIGIN under /api (Firebase Hosting rewrites /api/** to
+# the `api` Cloud Function). Page routes (/, /d/...) are served by Hosting/the
+# preview function. Default to LOCALHOST so a run that forgets to set
+# LOADTEST_BASE_URL can never accidentally hammer production — point it at prod
+# explicitly via LOADTEST_BASE_URL=https://dawa.to (or set base_url in config).
+BASE_URL = os.environ.get("LOADTEST_BASE_URL") or _CFG.get("base_url", "http://localhost:5000")
 API_BASE = "/api"
 
 # --- Credentials (used ONLY by the one-time bootstrap to mint a real token) --
 # Minting an invite token is an ADMIN operation server-side, so the admin login
 # is required. The groom login is used to discover groomUid and manage the test
-# guest. Override via env if you don't want creds in the file.
+# guest. Set these in the gitignored loadtest/.env (see .env.example) — NEVER
+# hardcode a real password here. Passwords have NO default: a missing one yields
+# an empty string, so the bootstrap login fails loudly instead of silently
+# authenticating with a real production credential baked into source control.
 CREDENTIALS = {
     "admin": {"username": os.environ.get("LOADTEST_ADMIN_USER", "admin"),
-              "password": os.environ.get("LOADTEST_ADMIN_PASS", "DawaAdmin2026")},
+              "password": os.environ.get("LOADTEST_ADMIN_PASS", "")},
     "groom": {"username": os.environ.get("LOADTEST_GROOM_USER", "groom"),
-              "password": os.environ.get("LOADTEST_GROOM_PASS", "DawaGroom2026")},
+              "password": os.environ.get("LOADTEST_GROOM_PASS", "")},
 }
 
 # --- Write policy ------------------------------------------------------------

@@ -101,4 +101,18 @@ export const RATE = Object.freeze({
   WA_READ_PER_ADMIN: perHour(60),
   /** Admin read of the payment-links list (returns sensitive data). */
   PAYMENT_LINKS_READ_PER_ADMIN: perHour(120),
+
+  // ── Rate-limit gaps closed after the 2026-07-02 re-audit ─────────────────
+  /** Digital media / photographer file uploads (per caller uid). Large
+   *  multipart bodies (50 MB media, 200 MB photographer) so cap per-caller
+   *  frequency to bound self-inflicted Storage/egress cost. */
+  MEDIA_UPLOAD_PER_USER: perHour(120),
+  PHOTOG_UPLOAD_PER_USER: perHour(120),
+  /** People-gallery read-heavy routes (index/cluster status, clusters, config)
+   *  — polled by the gallery UI; generous per-caller cap on own-tenant reads. */
+  GALLERY_READ_PER_USER: perHour(600),
+  /** People-gallery curation / config writes (per caller uid). */
+  GALLERY_WRITE_PER_USER: perHour(120),
+  /** Admin settings merge-patch (per admin). */
+  SETTINGS_PATCH_PER_ADMIN: perHour(60),
 });

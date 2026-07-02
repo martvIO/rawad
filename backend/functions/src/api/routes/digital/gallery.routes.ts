@@ -20,6 +20,8 @@ import { getFirestore } from "firebase-admin/firestore";
 import { AuthRequest, requireAuth, requireAdmin } from "../../middleware/auth";
 import { uidRateLimit } from "../../middleware/rateLimit";
 import { HOUR_MS } from "../../../constants/time";
+import { RATE } from "../../../constants/rateLimits";
+import { MAX_DESIGN_TITLE_LEN } from "./constants";
 import { canActOnUid } from "./access";
 import { safeDetail } from "./project";
 import { recomputeClusters } from "../../../faceIndex/clusterJob";
@@ -57,6 +59,29 @@ async function readConfig(uid: string): Promise<Record<string, unknown>> {
   return snap.exists ? { ...DEFAULT_CONFIG, ...snap.data() } : { ...DEFAULT_CONFIG };
 }
 
+// Upper bounds on the free-form gallery-config design fields (title, coverPhoto).
+// These were written to Firestore verbatim; bound type + size so an owner can't
+// stash oddly-shaped / large blobs in a doc that (once admin-approved) is echoed
+// to OTP-verified guests. Lenient on shape (string or plain object) to avoid
+// breaking the client's localized-title / {url,box} coverPhoto payloads.
+const MAX_GALLERY_TITLE_JSON = Math.max(2048, MAX_DESIGN_TITLE_LEN * 4);
+const MAX_COVER_PHOTO_JSON = 4096;
+
+/**
+ * Accept null | string(≤max) | plain object(serialized ≤max); reject arrays,
+ * numbers, booleans, and oversized values. Returns `{ ok, value }`.
+ */
+function boundedConfigField(v: unknown, maxLen: number): { ok: boolean; value: unknown } {
+  if (v === null) return { ok: true, value: null };
+  if (typeof v === "string") return v.length <= maxLen ? { ok: true, value: v } : { ok: false, value: null };
+  if (typeof v === "object" && !Array.isArray(v)) {
+    let size = Infinity;
+    try { size = JSON.stringify(v).length; } catch { return { ok: false, value: null }; }
+    return size <= maxLen ? { ok: true, value: v } : { ok: false, value: null };
+  }
+  return { ok: false, value: null };
+}
+
 export function registerGalleryRoutes(router: Router): void {
   const ownerOr403 = (req: AuthRequest, res: Response): boolean => {
     if (!canActOnUid(req, req.params.uid)) {
@@ -67,7 +92,7 @@ export function registerGalleryRoutes(router: Router): void {
   };
 
   // ── Progress ────────────────────────────────────────────────────────────
-  router.get("/:uid/index-status", requireAuth, async (req: AuthRequest, res: Response) => {
+  router.get("/:uid/index-status", requireAuth, uidRateLimit("galleryRead", RATE.GALLERY_READ_PER_USER.limit, HOUR_MS), async (req: AuthRequest, res: Response) => {
     if (!ownerOr403(req, res)) return;
     const uid = req.params.uid;
     try {
@@ -96,7 +121,7 @@ export function registerGalleryRoutes(router: Router): void {
     }
   });
 
-  router.get("/:uid/cluster-status", requireAuth, async (req: AuthRequest, res: Response) => {
+  router.get("/:uid/cluster-status", requireAuth, uidRateLimit("galleryRead", RATE.GALLERY_READ_PER_USER.limit, HOUR_MS), async (req: AuthRequest, res: Response) => {
     if (!ownerOr403(req, res)) return;
     try {
       const snap = await fs().doc(`digitalInvitations/${req.params.uid}/jobStatus/clustering`).get();
@@ -122,7 +147,7 @@ export function registerGalleryRoutes(router: Router): void {
     },
   );
 
-  router.get("/:uid/gallery/clusters", requireAuth, async (req: AuthRequest, res: Response) => {
+  router.get("/:uid/gallery/clusters", requireAuth, uidRateLimit("galleryRead", RATE.GALLERY_READ_PER_USER.limit, HOUR_MS), async (req: AuthRequest, res: Response) => {
     if (!ownerOr403(req, res)) return;
     try {
       const snap = await clustersCol(req.params.uid).orderBy("photoCount", "desc").get();
@@ -147,7 +172,7 @@ export function registerGalleryRoutes(router: Router): void {
   });
 
   // ── Gallery config ────────────────────────────────────────────────────────
-  router.get("/:uid/gallery", requireAuth, async (req: AuthRequest, res: Response) => {
+  router.get("/:uid/gallery", requireAuth, uidRateLimit("galleryRead", RATE.GALLERY_READ_PER_USER.limit, HOUR_MS), async (req: AuthRequest, res: Response) => {
     if (!ownerOr403(req, res)) return;
     try {
       res.json(await readConfig(req.params.uid));
@@ -156,14 +181,22 @@ export function registerGalleryRoutes(router: Router): void {
     }
   });
 
-  router.patch("/:uid/gallery", requireAuth, async (req: AuthRequest, res: Response) => {
+  router.patch("/:uid/gallery", requireAuth, uidRateLimit("galleryWrite", RATE.GALLERY_WRITE_PER_USER.limit, HOUR_MS), async (req: AuthRequest, res: Response) => {
     if (!ownerOr403(req, res)) return;
     const uid = req.params.uid;
     const body = req.body ?? {};
     const patch: Record<string, unknown> = {};
-    if ("title" in body) patch.title = body.title;
+    if ("title" in body) {
+      const t = boundedConfigField(body.title, MAX_GALLERY_TITLE_JSON);
+      if (!t.ok) { res.status(400).json({ error: "invalid_title" }); return; }
+      patch.title = t.value;
+    }
     if ("layout" in body && (body.layout === "grid" || body.layout === "masonry")) patch.layout = body.layout;
-    if ("coverPhoto" in body) patch.coverPhoto = body.coverPhoto;
+    if ("coverPhoto" in body) {
+      const c = boundedConfigField(body.coverPhoto, MAX_COVER_PHOTO_JSON);
+      if (!c.ok) { res.status(400).json({ error: "invalid_cover_photo" }); return; }
+      patch.coverPhoto = c.value;
+    }
     if ("autoSendOnPublish" in body) patch.autoSendOnPublish = body.autoSendOnPublish === true;
     if (!Object.keys(patch).length) {
       res.status(400).json({ error: "no_fields" });
@@ -188,7 +221,7 @@ export function registerGalleryRoutes(router: Router): void {
   });
 
   // ── Approval state machine ─────────────────────────────────────────────────
-  router.post("/:uid/gallery/submit", requireAuth, async (req: AuthRequest, res: Response) => {
+  router.post("/:uid/gallery/submit", requireAuth, uidRateLimit("galleryWrite", RATE.GALLERY_WRITE_PER_USER.limit, HOUR_MS), async (req: AuthRequest, res: Response) => {
     if (!ownerOr403(req, res)) return;
     const uid = req.params.uid;
     try {
@@ -282,7 +315,7 @@ export function registerGalleryRoutes(router: Router): void {
     path: string,
     apply: (data: Record<string, unknown>, body: Record<string, unknown>) => Record<string, unknown> | null,
   ) =>
-    router.post(`/:uid/gallery/clusters/:clusterId/${path}`, requireAuth, async (req: AuthRequest, res: Response) => {
+    router.post(`/:uid/gallery/clusters/:clusterId/${path}`, requireAuth, uidRateLimit("galleryWrite", RATE.GALLERY_WRITE_PER_USER.limit, HOUR_MS), async (req: AuthRequest, res: Response) => {
       if (!ownerOr403(req, res)) return;
       try {
         const ref = clustersCol(req.params.uid).doc(req.params.clusterId);
@@ -308,7 +341,7 @@ export function registerGalleryRoutes(router: Router): void {
     return { members, photoCount, memberCount: members.length };
   });
 
-  router.post("/:uid/gallery/clusters/merge", requireAuth, async (req: AuthRequest, res: Response) => {
+  router.post("/:uid/gallery/clusters/merge", requireAuth, uidRateLimit("galleryWrite", RATE.GALLERY_WRITE_PER_USER.limit, HOUR_MS), async (req: AuthRequest, res: Response) => {
     if (!ownerOr403(req, res)) return;
     const sourceId = String(req.body?.sourceId ?? "");
     const targetId = String(req.body?.targetId ?? "");

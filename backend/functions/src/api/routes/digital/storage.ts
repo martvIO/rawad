@@ -146,6 +146,24 @@ function hasAllowedPrefix(contentType: string, prefixes: string[]): boolean {
   return prefixes.some((p) => contentType.startsWith(p));
 }
 
+/**
+ * True only for content-types safe to store in a PUBLIC-read bucket and serve
+ * back to guests: raster images and video. Crucially this REJECTS
+ * `image/svg+xml` (and any SVG variant), which passes a naive `image/` prefix
+ * check but is active markup — a script-bearing SVG (or an `.html` mislabeled
+ * `text/html`) opened directly from the firebasestorage.googleapis.com URL
+ * renders/executes, turning our public media buckets into a phishing / JS host.
+ * Raster/video declared types are inert on direct navigation even if the bytes
+ * are spoofed, so a positive image/video allowlist minus SVG closes the vector.
+ * The MIME may carry parameters (e.g. `image/svg+xml; charset=utf-8`), so we
+ * compare on the base type only.
+ */
+function isSafeMediaContentType(contentType: string): boolean {
+  const base = (contentType || "").split(";")[0].trim().toLowerCase();
+  if (base === "image/svg+xml" || base === "image/svg") return false;
+  return base.startsWith("image/") || base.startsWith("video/");
+}
+
 function pickExtensionFromFilename(filename: string, fallback: string): string {
   const dot = filename.lastIndexOf(".");
   if (dot < 0) return fallback;
@@ -155,5 +173,5 @@ function pickExtensionFromFilename(filename: string, fallback: string): string {
 }
 
 
-export { uploadAndGetUrl, deleteStorageObjectSilently, deleteStorageFolder, kindOf, parseMultipart, hasAllowedPrefix, pickExtensionFromFilename };
+export { uploadAndGetUrl, deleteStorageObjectSilently, deleteStorageFolder, kindOf, parseMultipart, hasAllowedPrefix, isSafeMediaContentType, pickExtensionFromFilename };
 export type { ParsedMultipart };

@@ -9,10 +9,18 @@ service cloud.firestore {
     //   digitalInvitations/{groomUid}/photographerFiles/{id}  — photographer uploads
     //   digitalInvitations/{groomUid}/designRequests/{reqId}  — design workflow
     //
-    // Public read of the parent doc itself is allowed: guests opening their
-    // invite link need to fetch wedding date + media without authentication.
+    // Parent doc: OWNER/ADMIN read only. Guests never read this doc directly —
+    // they fetch the wedding date + media through the server-mediated, approved-
+    // only, freeze-gated GET /digital/:uid/public endpoint, which returns a
+    // PUBLIC_DESIGN_FIELDS-allowlisted projection. A blanket public read here
+    // leaked legacy (pre-v2) grooms' full design payload (brideName, venue,
+    // giftIban, story, …) plus design-workflow metadata straight off the parent,
+    // bypassing the endpoint's allowlist/approval/freeze gates. The
+    // photographerFiles child rule below uses a rule-internal get() of this doc,
+    // which is NOT subject to this read rule, so gating it changes nothing there.
     match /digitalInvitations/{groomUid} {
-      allow read: if true;
+      allow read: if request.auth != null
+        && (request.auth.uid == groomUid || request.auth.token.role == 'admin');
       allow write: if request.auth != null
         && (request.auth.uid == groomUid || request.auth.token.role == 'admin');
 

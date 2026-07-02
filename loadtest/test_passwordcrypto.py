@@ -46,23 +46,23 @@ def _decrypt(priv, envelope: str) -> str:
 
 def test_encrypt_password_round_trip():
     priv = _install_key()
-    env = passwordcrypto.encrypt_password(_BASE, "DawaAdmin2026")
-    assert _decrypt(priv, env) == "DawaAdmin2026"
+    env = passwordcrypto.encrypt_password(_BASE, "TestPw0rd-Sample")
+    assert _decrypt(priv, env) == "TestPw0rd-Sample"
 
 
 def test_encrypt_credentials_encrypts_only_password():
     priv = _install_key()
     out = passwordcrypto.encrypt_credentials(
-        _BASE, {"username": "admin", "password": "DawaAdmin2026"}
+        _BASE, {"username": "admin", "password": "TestPw0rd-Sample"}
     )
     assert out["username"] == "admin"
-    assert _decrypt(priv, out["password"]) == "DawaAdmin2026"
+    assert _decrypt(priv, out["password"]) == "TestPw0rd-Sample"
 
 
 def test_plaintext_fallback_when_no_key():
     passwordcrypto.reset_cache()
     passwordcrypto._key_cache[_BASE] = None  # simulate keyless / older server
-    assert passwordcrypto.encrypt_password(_BASE, "DawaAdmin2026") == "DawaAdmin2026"
+    assert passwordcrypto.encrypt_password(_BASE, "TestPw0rd-Sample") == "TestPw0rd-Sample"
 
 
 def test_non_ascii_password_round_trip():
@@ -90,10 +90,10 @@ def test_cleanup_core_login_encrypts_password_keeps_username_plaintext():
         return resp
 
     with patch.object(cleanup_core.requests, "post", side_effect=fake_post):
-        cleanup_core.login(_BASE, "admin", "DawaAdmin2026")
+        cleanup_core.login(_BASE, "admin", "TestPw0rd-Sample")
 
     assert captured["json"]["username"] == "admin"  # username untouched
-    assert _decrypt(priv, captured["json"]["password"]) == "DawaAdmin2026"
+    assert _decrypt(priv, captured["json"]["password"]) == "TestPw0rd-Sample"
 
 
 if __name__ == "__main__":

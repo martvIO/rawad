@@ -1,10 +1,13 @@
 import type { ParsedMultipart } from "./storage";
 import { Response } from "express";
 import { AuthRequest,requireAuth } from "../../middleware/auth";
+import { uidRateLimit } from "../../middleware/rateLimit";
+import { HOUR_MS } from "../../../constants/time";
+import { RATE } from "../../../constants/rateLimits";
 import { touchUnindexedPhotographerFiles } from "../../../faceIndex/backfill";
-import { STORAGE_MEDIA_PREFIX,DESIGN_FIELDS,MAX_INVITE_MEDIA_BYTES,MAX_HERO_MEDIA_ITEMS,ALLOWED_MEDIA_PREFIX } from "./constants";
+import { STORAGE_MEDIA_PREFIX,DESIGN_FIELDS,MAX_INVITE_MEDIA_BYTES,MAX_HERO_MEDIA_ITEMS } from "./constants";
 import { fs,parentDoc,designDoc,ensureMigrated,resolveDefaultDesignId,resolveDesignId } from "./firestore";
-import { uploadAndGetUrl,deleteStorageObjectSilently,deleteStorageFolder,kindOf,parseMultipart,hasAllowedPrefix,pickExtensionFromFilename } from "./storage";
+import { uploadAndGetUrl,deleteStorageObjectSilently,deleteStorageFolder,kindOf,parseMultipart,isSafeMediaContentType,pickExtensionFromFilename } from "./storage";
 import { canActOnUid } from "./access";
 import { sanitizeMediaSettings } from "./sanitize";
 import { projectMediaDoc,migrateLegacyBackground,safeDetail } from "./project";
@@ -240,6 +243,7 @@ router.patch(
 router.post(
   ["/:uid/media/upload", "/:uid/designs/:designId/media/upload"],
   requireAuth,
+  uidRateLimit("mediaUpload", RATE.MEDIA_UPLOAD_PER_USER.limit, HOUR_MS),
   async (req: AuthRequest, res: Response) => {
     if (!canActOnUid(req, req.params.uid)) {
       res.status(403).json({ error: "forbidden" });
@@ -260,7 +264,10 @@ router.post(
       res.status(413).json({ error: "file_too_large", maxBytes: MAX_INVITE_MEDIA_BYTES });
       return;
     }
-    if (!hasAllowedPrefix(parsed.file.contentType, ALLOWED_MEDIA_PREFIX)) {
+    // image/* or video/* only, and NOT image/svg+xml (active markup — see
+    // isSafeMediaContentType). digitalMedia is a public-read bucket, so a
+    // script-bearing SVG here would be a JS/phishing host on a Google domain.
+    if (!isSafeMediaContentType(parsed.file.contentType)) {
       res.status(415).json({ error: "unsupported_content_type" });
       return;
     }

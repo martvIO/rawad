@@ -16,6 +16,9 @@
 
 import { Router, Response } from "express";
 import { requireAuth, requireAdmin, AuthRequest } from "../middleware/auth";
+import { uidRateLimit } from "../middleware/rateLimit";
+import { HOUR_MS } from "../../constants/time";
+import { RATE } from "../../constants/rateLimits";
 import { firebaseSettingsStore } from "../../domain/settings/firebaseSettingsStore";
 
 // ─── Schema constants ─────────────────────────────────────────────────────────
@@ -98,6 +101,7 @@ settingsRouter.patch(
   "/",
   requireAuth,
   requireAdmin,
+  uidRateLimit("settingsPatch", RATE.SETTINGS_PATCH_PER_ADMIN.limit, HOUR_MS),
   async (req: AuthRequest, res: Response) => {
     const patch = req.body;
     if (!patch || typeof patch !== "object" || Array.isArray(patch)) {

@@ -125,9 +125,9 @@ flags. Template: `loadtest/.env.example`. Credentials are never read from the ru
 | Variable | Default | Purpose |
 |---|---|---|
 | `LOADTEST_CONFIG_FILE` | none | Path to `run_config.json` (set by `run.py --config`) |
-| `LOADTEST_BASE_URL` | `https://dawa.to` | Target host |
-| `LOADTEST_ADMIN_USER` / `LOADTEST_ADMIN_PASS` | `admin` / `DawaAdmin2026` | Admin creds for bootstrap token mint |
-| `LOADTEST_GROOM_USER` / `LOADTEST_GROOM_PASS` | `groom` / `DawaGroom2026` | Groom creds for token discovery |
+| `LOADTEST_BASE_URL` | `http://localhost:5000` | Target host — set to `https://dawa.to` explicitly to test prod |
+| `LOADTEST_ADMIN_USER` / `LOADTEST_ADMIN_PASS` | `admin` / _(set in `loadtest/.env`)_ | Admin creds for bootstrap token mint — never hardcode a real password |
+| `LOADTEST_GROOM_USER` / `LOADTEST_GROOM_PASS` | `groom` / _(set in `loadtest/.env`)_ | Groom creds for token discovery — never hardcode a real password |
 | `LOADTEST_NO_WRITES` | writes on | `1` = read-only run |
 | `LOADTEST_NO_APPROVE` | approve on | `1` = skip design auto-approve |
 | `LOADTEST_FALLBACK_TOKEN` | 32 hex zeros | Token used to exercise the 404 path |

@@ -96,8 +96,29 @@ describe("digitalMedia/* (public read)", () => {
   test("groom can write their own media", async () => {
     await assertSucceeds(uploadBytes(ref(asGroom(), media), bytes(), JPEG));
   });
+  test("groom can write a video to their own media", async () => {
+    await assertSucceeds(uploadBytes(ref(asGroom(), `digitalMedia/${GROOM}/clip.mp4`), bytes(), { contentType: "video/mp4" }));
+  });
   test("a different groom cannot write the media", async () => {
     await assertFails(uploadBytes(ref(asGroom(GROOM2), media), bytes(), JPEG));
+  });
+  // 2026-07-02: reject script-bearing SVG in a public-read bucket.
+  test("groom CANNOT write an SVG to public media", async () => {
+    await assertFails(uploadBytes(ref(asGroom(), `digitalMedia/${GROOM}/x.svg`), bytes(), { contentType: "image/svg+xml" }));
+  });
+  test("groom CANNOT write text/html to public media", async () => {
+    await assertFails(uploadBytes(ref(asGroom(), `digitalMedia/${GROOM}/x.html`), bytes(), { contentType: "text/html" }));
+  });
+});
+
+// ── photographerFiles: content-type gate on write ─────────────────────────────
+describe("photographerFiles/* write content-type gate", () => {
+  const pf = `photographerFiles/${GROOM}/a.jpg`;
+  test("groom can write an image", async () => {
+    await assertSucceeds(uploadBytes(ref(asGroom(), pf), bytes(), JPEG));
+  });
+  test("groom CANNOT write an SVG (public-read bucket)", async () => {
+    await assertFails(uploadBytes(ref(asGroom(), `photographerFiles/${GROOM}/x.svg`), bytes(), { contentType: "image/svg+xml" }));
   });
 });
 
