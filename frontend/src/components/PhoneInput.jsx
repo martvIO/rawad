@@ -8,14 +8,16 @@
 import { useEffect, useRef, useState } from "react";
 import { toWesternDigits } from "../utils/digits.js";
 
+// Dial code only — no flag emoji (owner decision 2026-07-02): the country is
+// identified by its localized name in the picker and the dial code on the chip.
 const COUNTRIES = [
-  { code: "IL", dial: "+972", flag: "🇮🇱", name_ar: "إسرائيل",       name_he: "ישראל",       len: 9,  startsWith: ["5", "7"] },
-  { code: "PS", dial: "+970", flag: "🇵🇸", name_ar: "فلسطين",        name_he: "פלסטין",       len: 9,  startsWith: ["5"] },
-  { code: "JO", dial: "+962", flag: "🇯🇴", name_ar: "الأردن",         name_he: "ירדן",         len: 9,  startsWith: ["7"] },
-  { code: "EG", dial: "+20",  flag: "🇪🇬", name_ar: "مصر",           name_he: "מצרים",        len: 10, startsWith: ["1"] },
-  { code: "AE", dial: "+971", flag: "🇦🇪", name_ar: "الإمارات",      name_he: "איחוד האמירויות", len: 9, startsWith: ["5"] },
-  { code: "SA", dial: "+966", flag: "🇸🇦", name_ar: "السعودية",      name_he: "ערב הסעודית",  len: 9,  startsWith: ["5"] },
-  { code: "US", dial: "+1",   flag: "🇺🇸", name_ar: "الولايات المتحدة", name_he: "ארה״ב",       len: 10, startsWith: [] },
+  { code: "IL", dial: "+972", name_ar: "إسرائيل",       name_he: "ישראל",       len: 9,  startsWith: ["5", "7"] },
+  { code: "PS", dial: "+970", name_ar: "فلسطين",        name_he: "פלסטין",       len: 9,  startsWith: ["5"] },
+  { code: "JO", dial: "+962", name_ar: "الأردن",         name_he: "ירדן",         len: 9,  startsWith: ["7"] },
+  { code: "EG", dial: "+20",  name_ar: "مصر",           name_he: "מצרים",        len: 10, startsWith: ["1"] },
+  { code: "AE", dial: "+971", name_ar: "الإمارات",      name_he: "איחוד האמירויות", len: 9, startsWith: ["5"] },
+  { code: "SA", dial: "+966", name_ar: "السعودية",      name_he: "ערב הסעודית",  len: 9,  startsWith: ["5"] },
+  { code: "US", dial: "+1",   name_ar: "الولايات المتحدة", name_he: "ארה״ב",       len: 10, startsWith: [] },
 ];
 
 function findByDial(e164) {
@@ -180,7 +182,6 @@ export function PhoneInput({
           aria-label={t ? t("phone_country_select") : current[countryName]}
           className="phone-input-chip"
         >
-          <span style={{ fontSize: 18, lineHeight: 1 }} aria-hidden>{current.flag}</span>
           <span style={{ direction: "ltr", fontWeight: 800 }}>{current.dial}</span>
           <span style={{ fontSize: 9, opacity: .55 }} aria-hidden>▾</span>
         </button>
@@ -218,7 +219,6 @@ export function PhoneInput({
                 onClick={() => switchCountry(c.code)}
                 className={"phone-input-picker-row" + (active ? " active" : "")}
               >
-                <span style={{ fontSize: 20, lineHeight: 1 }} aria-hidden>{c.flag}</span>
                 <span style={{ flex: 1, textAlign: "start" }}>{c[countryName] || c.name_ar}</span>
                 <span style={{ direction: "ltr", opacity: .75, fontVariantNumeric: "tabular-nums" }}>{c.dial}</span>
               </button>
