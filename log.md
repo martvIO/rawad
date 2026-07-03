@@ -271,3 +271,6 @@ Touched: Digital-Invitations, Tasks-Backlog
 
 ## [2026-07-03 17:15] session | Fixed digital-invite envelope not showing
 Touched: Digital-Invitations
+
+## [2026-07-03 17:45] session | WhatsApp preview: shorter title + groom share-message
+Touched: Digital-Invitations

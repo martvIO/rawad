@@ -242,3 +242,26 @@ the envelope still only renders on WebGL-capable devices and only when the desig
 **Verified live** on `/d/demo/demo` with `dawa-invite-opened=1` pre-set (the exact bug trigger): the
 sealed envelope still appears (bundle `index-BK7dNB6-.js`), opening completes to the invitation, and
 no flag is written afterwards. See [[Architecture-Decisions]].
+
+## WhatsApp share preview — shorter title + groom-authored description (2026-07-03)
+Two owner-requested changes to the `/d/**` link preview (OG tags served by `digitalInvitePreview`):
+- **Title:** `دعوة زفاف — <guest>` → **`دعوة — <guest>`** (dropped the word "زفاف"). Empty-guest
+  fallback `دعوة زفاف` → `دعوة`. `digitalInvitePreview.ts`.
+- **Groom-authored description:** new **bilingual design field `shareMessage`** — whatever the groom
+  types in the editor becomes the `og:description`, with the wedding date **auto-appended**
+  (`<shareMessage> — <date>`, owner's chosen behaviour). Empty → the previous auto line
+  (`<couple> يتشرّفون بدعوتكم لحضور حفل زفافهم — <date>`). The field is **NOT rendered on the
+  invitation page** — only in the WhatsApp link preview.
+- **Pipeline:** `shareMessage` added to `DESIGN_FIELDS` (`constants.ts`) → auto-included in
+  `PUBLIC_DESIGN_FIELDS` and the mint-time `designSnapshot` (which spreads the full design doc, see
+  [[#API]]), so it reaches the token `digitalInvitePreview` reads; sanitized as a localized scalar
+  (`sanitize.ts`, max 300, bilingual `{ar,he}` clamp); editor input in `DigitalDesignEditor.jsx` —
+  new "وصف الرابط على واتساب" `<Section>` (`data-testid design-share-message`, uses the shared
+  `textProps` leaf-binding). Deploy targets: `hosting,functions:api,functions:digitalInvitePreview`.
+- **Verified live** via a throwaway prod invite token (written with the admin SDK, curled, then
+  deleted): `og:title = "دعوة — أحمد محمد"`, `og:description =
+  "أفراحنا لا تكتمل إلا بوجودكم — 19 أغسطس 2026"` (custom message + auto date). Save path unit-verified
+  (`sanitizeMediaSettings` accepts/clamps the bilingual field). The editor field itself was **not**
+  browser-verified — the emulator needs Java 11+ and only Java 8 is installed here, and there are no
+  prod groom creds; it follows the identical, working blessing/welcome field pattern. See
+  [[Architecture-Decisions]].
