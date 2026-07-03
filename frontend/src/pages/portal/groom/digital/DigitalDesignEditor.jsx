@@ -917,13 +917,13 @@ export function DesignEditorBody({ groomUid, designId, adminDemoMode = false, on
           )}
         </Section>
 
-        {/* Wedding date */}
-        <Section title={tt(lang, "تاريخ الزفاف", "תאריך החתונה")}>
-          <FormField label={tt(lang, "اختر التاريخ", "בחר תאריך")}>
+        {/* Wedding date + time */}
+        <Section title={tt(lang, "تاريخ الزفاف ووقته", "תאריך ושעת החתונה")}>
+          <FormField label={tt(lang, "اختر اليوم والساعة", "בחר יום ושעה")}>
             <input
               data-testid="design-wedding-date"
               className="input-field"
-              type="date"
+              type="datetime-local"
               value={v("weddingDate")}
               disabled={!editable}
               onChange={(e) => setField("weddingDate", e.target.value)}
@@ -931,6 +931,13 @@ export function DesignEditorBody({ groomUid, designId, adminDemoMode = false, on
               style={{ direction: "ltr" }}
             />
           </FormField>
+          <div style={{ fontSize: 11, color: C.dim, marginTop: 8, lineHeight: 1.6 }}>
+            {tt(
+              lang,
+              "الساعة تظهر جنب التاريخ في الدعوة، والعدّ التنازلي يحسب حتى الساعة المحدّدة.",
+              "השעה מוצגת ליד התאריך בהזמנה, והספירה לאחור מחשבת עד השעה שנבחרה.",
+            )}
+          </div>
         </Section>
 
         {/* Story timeline */}
@@ -1598,7 +1605,9 @@ function epochToInput(epoch) {
   const d = new Date(epoch);
   if (Number.isNaN(d.getTime())) return "";
   const pad = (n) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  // datetime-local shape "YYYY-MM-DDTHH:MM" in the browser's local time (the groom
+  // is in the venue's timezone). inputToEpoch round-trips it back via new Date().
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 function inputToEpoch(value) {

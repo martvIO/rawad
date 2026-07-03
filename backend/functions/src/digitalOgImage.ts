@@ -20,6 +20,11 @@ import { TOKEN_HEX_RE } from "./constants/tokens";
 const W = 1200;
 const H = 630;
 
+// Venue timezone (the Arab/Israeli market). Cloud Functions run in UTC, so the
+// wedding time must be formatted with this explicit zone to show the couple's real
+// local time. Legacy date-only designs sit at UTC midnight → rendered date-only.
+const WEDDING_TZ = "Asia/Jerusalem";
+
 // Accent (gold/rose/…) per the design's themeColor — mirrors digitalThemes.
 // Light-palette accents use a slightly brightened tone so they stay legible on
 // the dark photo scrim of the OG card.
@@ -115,9 +120,14 @@ export async function renderOgImage(design: DesignLike | null, guestName = ""): 
   const couple = [groom, bride].filter(Boolean).join("   &   ") || "بطاقة دعوة زفاف";
   const venue = [localize(design?.venue, lang), localize(design?.venueCity, lang)].filter(Boolean).join("  ·  ");
   const accent = ACCENTS[design?.themeColor || "gold"] || ACCENTS.gold;
-  const dateText = design?.weddingDate
-    ? new Date(design.weddingDate).toLocaleDateString("ar-EG", { day: "numeric", month: "long", year: "numeric", numberingSystem: "latn" })
-    : "";
+  const dateText = ((): string => {
+    if (!design?.weddingDate) return "";
+    const d = new Date(design.weddingDate);
+    const datePart = d.toLocaleDateString("ar-EG", { day: "numeric", month: "long", year: "numeric", numberingSystem: "latn", timeZone: WEDDING_TZ } as Intl.DateTimeFormatOptions);
+    if (d.getUTCHours() === 0 && d.getUTCMinutes() === 0) return datePart;
+    const timePart = d.toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit", hour12: false, numberingSystem: "latn", timeZone: WEDDING_TZ } as Intl.DateTimeFormatOptions);
+    return `${datePart} · ${timePart}`;
+  })();
   const media = Array.isArray(design?.media) ? design!.media! : [];
   const bgUrl = (media.find((m) => m && m.kind !== "video" && m.url) || {}).url || design?.backgroundUrl || "";
 

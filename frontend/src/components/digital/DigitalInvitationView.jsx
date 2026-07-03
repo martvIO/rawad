@@ -28,6 +28,28 @@ import { CelestialAmbience } from "./sections/CelestialAmbience.jsx";
 import { ViewStyles } from "./sections/InviteStyles.jsx";
 import { WalletButton } from "./WalletButton.jsx";
 
+// Wedding date/time line. Always formatted in the venue timezone (Asia/Jerusalem,
+// the market) with WESTERN digits, so every guest sees the couple's real local
+// wedding time regardless of where they open the link. A wedding time set via the
+// editor's datetime picker is appended (24h "HH:MM"); legacy date-only designs are
+// stored at UTC midnight → shown as date-only (no time).
+const WEDDING_TZ = "Asia/Jerusalem";
+function formatWeddingDateTime(epoch, lang) {
+  const d = new Date(epoch);
+  if (Number.isNaN(d.getTime())) return "";
+  const locale = lang === "he" ? "he-IL" : "ar-EG";
+  const datePart = d.toLocaleDateString(locale, {
+    day: "numeric", month: "long", year: "numeric",
+    numberingSystem: "latn", timeZone: WEDDING_TZ,
+  });
+  if (d.getUTCHours() === 0 && d.getUTCMinutes() === 0) return datePart;
+  const timePart = d.toLocaleTimeString(locale, {
+    hour: "2-digit", minute: "2-digit", hour12: false,
+    numberingSystem: "latn", timeZone: WEDDING_TZ,
+  });
+  return `${datePart} · ${timePart}`;
+}
+
 export function DigitalInvitationView({
   design,
   guestName,
@@ -125,14 +147,7 @@ export function DigitalInvitationView({
     song: on(design?.rsvpSongEnabled),
   };
 
-  const dateText = weddingDate
-    ? new Date(weddingDate).toLocaleDateString(lang === "he" ? "he-IL" : "ar-EG", {
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-        numberingSystem: "latn",
-      })
-    : "";
+  const dateText = weddingDate ? formatWeddingDateTime(weddingDate, lang) : "";
   const venueLine = [venue, venueCity].filter(Boolean).join(" · ");
 
   // ── Envelope-card content ────────────────────────────────────────────────

@@ -134,12 +134,24 @@ function loc(v: Localized): string {
   if (typeof v === "string") return v;
   return (v.ar || v.he || "").toString();
 }
+// Wedding date (+ time when set) in the venue timezone (Asia/Jerusalem, the
+// market) with Western digits. Cloud Functions run in UTC, so the explicit
+// timeZone is required to show the couple's real local wedding time. A time set
+// via the editor is appended (24h); legacy date-only designs sit at UTC midnight
+// → date only.
+const WEDDING_TZ = "Asia/Jerusalem";
 function formatDate(ms?: number | null): string {
   if (!ms) return "";
   try {
-    return new Date(ms).toLocaleDateString("ar-EG", {
-      day: "numeric", month: "long", year: "numeric", numberingSystem: "latn",
+    const d = new Date(ms);
+    const datePart = d.toLocaleDateString("ar-EG", {
+      day: "numeric", month: "long", year: "numeric", numberingSystem: "latn", timeZone: WEDDING_TZ,
     } as Intl.DateTimeFormatOptions);
+    if (d.getUTCHours() === 0 && d.getUTCMinutes() === 0) return datePart;
+    const timePart = d.toLocaleTimeString("ar-EG", {
+      hour: "2-digit", minute: "2-digit", hour12: false, numberingSystem: "latn", timeZone: WEDDING_TZ,
+    } as Intl.DateTimeFormatOptions);
+    return `${datePart} · ${timePart}`;
   } catch { return ""; }
 }
 
