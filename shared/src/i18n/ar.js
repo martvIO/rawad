@@ -532,6 +532,21 @@ export const ar = {
   wa_status_delivered: "وصلت",
   wa_status_read: "تمت القراءة",
   wa_status_failed: "فشلت",
+  wa_status_manual: "أُرسلت يدوياً",
+  // Manual-send fallback modal — shown when a WhatsApp send fails (or the
+  // wa.me tab is popup-blocked) so the admin can send the message themselves.
+  wa_fallback_title: "إرسال يدوي عبر واتساب",
+  wa_fallback_hint: "لم تُرسل الرسالة تلقائياً — انسخ النص أو افتح واتساب وأرسلها بنفسك",
+  wa_fallback_copy: "نسخ النص",
+  wa_fallback_copied: "تم نسخ النص ✓",
+  wa_fallback_copy_failed: "تعذّر النسخ — حدِّد النص وانسخه يدويًا",
+  wa_error_popup_blocked: "منع المتصفح فتح نافذة واتساب",
+  wa_fallback_open: "فتح واتساب",
+  wa_fallback_close: "إغلاق",
+  wa_fallback_no_phone: "رقم الهاتف غير صالح — انسخ النص وأرسله بطريقة أخرى",
+  wa_fallback_done: "تم ✓",
+  wa_bulk_failed_title: "رسائل لم تُرسل",
+  wa_bulk_failed_hint: "لم تصل الرسالة لهؤلاء المعزومين — انسخ النص أو افتح واتساب لكل واحد وأرسلها يدوياً",
   // Admin WhatsApp Setup + Message Templates pages.
   admin_tab_whatsapp: "واتساب",
   admin_tab_templates: "القوالب",

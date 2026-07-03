@@ -522,6 +522,21 @@ export const he = {
   wa_status_delivered: "נמסר",
   wa_status_read: "נקרא",
   wa_status_failed: "נכשל",
+  wa_status_manual: "נשלח ידנית",
+  // Manual-send fallback modal — shown when a WhatsApp send fails (or the
+  // wa.me tab is popup-blocked) so the admin can send the message themselves.
+  wa_fallback_title: "שליחה ידנית בוואטסאפ",
+  wa_fallback_hint: "ההודעה לא נשלחה אוטומטית — העתק את הטקסט או פתח וואטסאפ ושלח אותה בעצמך",
+  wa_fallback_copy: "העתק טקסט",
+  wa_fallback_copied: "הטקסט הועתק ✓",
+  wa_fallback_copy_failed: "ההעתקה נכשלה — סמן את הטקסט והעתק ידנית",
+  wa_error_popup_blocked: "הדפדפן חסם את פתיחת חלון הוואטסאפ",
+  wa_fallback_open: "פתח וואטסאפ",
+  wa_fallback_close: "סגור",
+  wa_fallback_no_phone: "מספר הטלפון אינו תקין — העתק את הטקסט ושלח בדרך אחרת",
+  wa_fallback_done: "בוצע ✓",
+  wa_bulk_failed_title: "הודעות שלא נשלחו",
+  wa_bulk_failed_hint: "ההודעה לא הגיעה למוזמנים האלה — העתק את הטקסט או פתח וואטסאפ לכל אחד ושלח ידנית",
   // Admin WhatsApp Setup + Message Templates pages.
   admin_tab_whatsapp: "וואטסאפ",
   admin_tab_templates: "תבניות",
