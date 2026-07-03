@@ -214,6 +214,14 @@ describe("/guestsByGroom", () => {
     await assertFails(set(ref(asGroom(), `guestsByGroom/${GROOM}/abc1`),
       { ...validGuest(), nope: "haha" }));
   });
+  test("validator accepts inviteWaStatus 'manual' (admin wa.me fallback stamp)", async () => {
+    await assertSucceeds(set(ref(asGroom(), `guestsByGroom/${GROOM}/abc1`),
+      { ...validGuest(), inviteWaStatus: "manual", inviteWaStatusAt: Date.now() }));
+  });
+  test("validator rejects an unknown inviteWaStatus", async () => {
+    await assertFails(set(ref(asGroom(), `guestsByGroom/${GROOM}/abc1`),
+      { ...validGuest(), inviteWaStatus: "carrier_pigeon" }));
+  });
 });
 
 // ── /liveLocationsByGroom ────────────────────────────────────────────────────
