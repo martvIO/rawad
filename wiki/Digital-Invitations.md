@@ -195,3 +195,30 @@ are **hidden by default**, revealed as a floating pill only when relevant.
   at HEAD with all changes stashed), unrelated to this presentational change.
 
 See [[Visual-Design-System]], [[Architecture-Decisions]].
+
+## Couple-name connective → "&" across all surfaces (2026-07-03)
+Owner request (scope confirmed: "everywhere incl. the WhatsApp share"). The connective between the
+groom + bride names changed from the localized **"و"** (Arabic) / **"ו"** (Hebrew) to a
+**script-neutral "&"** on every surface that renders the couple:
+- **Envelope reveal card** (WebGL, both the AR *and* HE baked lines) + **hero couple title** —
+  `DigitalInvitationView.jsx` (`namesAr`/`namesHe` now `join(" & ")`) and
+  `sections/InviteHero.jsx` (the `.dawa-inv-amp` span, previously `lang === "he" ? "ו" : "و"`). The
+  monogram already joined initials with "&", so it's now consistent.
+- **WhatsApp share** — `backend/functions/src/digitalOgImage.ts` (OG image couple line,
+  `join("   &   ")` — verified the "&" glyph renders cleanly in the Amiri font) and
+  `digitalInvitePreview.ts` (og:description couple, `join(" & ")`).
+Verified live on `/d/demo/demo` (hero **"كريم & ليلى"**, bundle `index-ZA0WrUxc.js`) and via a direct
+`renderOgImage` render of the deployed function (OG card **"كريم & ليلى"**).
+
+**Deploy gotcha discovered (important, latent):** `firebase deploy` runs the **functions** predeploy
+(`backend/scripts/build-functions.cjs`) *before* the **hosting** predeploy (`build-vite.cjs`), and
+build-functions copies `frontend/dist/index.html` into the function (`digitalInvitePreview` /
+`digitalOgImage` serve it to inject OG tags). So when `dist` is stale, those functions serve a
+**one-build-old SPA shell** pointing at the *previous* JS bundle — the first deploy this session left
+the live `/d/**` page loading the old "و" bundle even though hosting had the new one. **Workaround
+used:** run `npm run build` (frontend) *before* `firebase deploy` so `dist` is already the final
+bundle (Vite content-hashing is deterministic → the hosting rebuild reproduces the exact hash the
+function bundled, keeping function + hosting consistent). Also: the deploy service-account key lacks
+`cloudscheduler.jobs.update`, so a **full** `firebase deploy` 403s on the 6 scheduled functions —
+deploy `--only hosting,functions:digitalInvitePreview,functions:digitalOgImage` for invite changes.
+Both filed in [[Tasks-Backlog]]. See [[Architecture-Decisions]].

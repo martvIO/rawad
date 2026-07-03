@@ -27,6 +27,8 @@ Prioritized work for [[Dawa]] (full list in `TASKS.md`).
 - ~~**TASK-006** — write REST API route tests (`auth`, `users`, `guests`, `confirmations`)~~ **DONE** (2026-06-29): `backend/tests/api/*` (38 tests, role-guards + validation + token states), `npm run test:api`. See [[Comprehensive-Test-Harness]].
 - **TASK-007** — document `seed-emulator.cjs`
 - **TASK-008** — rotate/remove service-account JSON key from repo root (security — see [[Security Model]])
+- **TASK-DEPLOY-1** — fix the predeploy ordering (build [[Digital Invitations|deploy gotcha]], found 2026-07-03): `firebase deploy` runs the **functions** predeploy before **hosting**, so `build-functions.cjs` bundles a possibly-stale `frontend/dist/index.html` into `digitalInvitePreview`/`digitalOgImage`, and they serve a one-build-old SPA shell (wrong JS bundle) on `/d/**`+`/invite/**`. Fix: make `build-functions.cjs` build the frontend first (or have hosting predeploy run first / share one build step). Current workaround: `npm run build` before `firebase deploy`.
+- **TASK-DEPLOY-2** — grant the deploy service account `cloudscheduler.jobs.update` (or Cloud Scheduler Admin) so a **full** `firebase deploy` stops 403-ing on the 6 scheduled functions (`backupRtdb`, `sendRsvpReminders`, `purgeExpiredFaces`, `finalizeWeddingCancellations`, `purgeOldAuditLogs`, `reclusterDirtyGalleries`). Until then, deploy invite changes with `--only hosting,functions:digitalInvitePreview,functions:digitalOgImage`.
 
 ## UX opportunity backlog (2026-07-02 — from [[UX Research Discovery 2026-07-02]], each item needs its own go-ahead)
 Owner funded **all four clusters** in the interview; sequence by impact. Baseline usability test
