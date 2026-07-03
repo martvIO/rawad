@@ -19,6 +19,24 @@ import { resolveBackground } from "../../../utils/themeToBackground.js";
 // to reveal the custom background underneath.
 const CelestialCanvas = lazy(() => import("../celestial/CelestialCanvas.jsx"));
 
+// Opaque full-viewport backdrop shown WHILE the lazy WebGL chunk downloads, so
+// the invitation content underneath never flashes before the sealed مكتوب paints.
+// Sits above the DOM content (hero ≈ z 6) and below the sealed overlay (z 1000).
+function EnvelopeBootCover({ theme, fixed }) {
+  return (
+    <div
+      aria-hidden="true"
+      style={{
+        position: fixed ? "fixed" : "absolute",
+        inset: 0,
+        zIndex: 998,
+        background: theme.bg,
+        pointerEvents: "none",
+      }}
+    />
+  );
+}
+
 export function CelestialAmbience({
   theme, font, lang, mode = "public", fixed = true, immersive3d = true,
   showEnvelope = false, guestName = "", monogram = "",
@@ -124,7 +142,7 @@ export function CelestialAmbience({
                 transition: "opacity .6s ease",
               }}
             >
-              <Suspense fallback={null}>
+              <Suspense fallback={<EnvelopeBootCover theme={theme} fixed={false} />}>
                 <CelestialCanvas
                   theme={theme}
                   mode={mode}
@@ -155,7 +173,7 @@ export function CelestialAmbience({
   if (wantWorld) {
     return (
       <>
-        <Suspense fallback={<Ambience theme={theme} fixed={fixed} />}>
+        <Suspense fallback={envActive ? <EnvelopeBootCover theme={theme} fixed={fixed} /> : <Ambience theme={theme} fixed={fixed} />}>
           <CelestialCanvas
             theme={theme}
             mode={mode}

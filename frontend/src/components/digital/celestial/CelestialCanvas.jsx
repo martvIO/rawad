@@ -125,6 +125,10 @@ export default function CelestialCanvas({ theme, mode = "public", fixed = true, 
         // Elevated above the DOM hero (z 6) while the envelope intro covers the
         // page; drops behind everything for the normal scene.
         zIndex: elevated ? 999 : 0,
+        // While elevated, paint an opaque backdrop so the invitation content
+        // behind can't flash through in the instant between the canvas mounting
+        // and the WebGL scene drawing its first frame.
+        background: elevated ? theme.bg : undefined,
         pointerEvents: "none",
       }}
     />

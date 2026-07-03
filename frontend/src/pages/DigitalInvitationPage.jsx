@@ -82,6 +82,16 @@ function applyDemoOverrides(base, search) {
   };
 }
 
+// The digitalInvitePreview function inlines the guest+design record as
+// window.__DAWA_INVITE__ (same shape as GET /invites/token) so the invitation
+// renders on first paint, skipping the token round-trip + loading spinner. Guard
+// on the token so a stale value from a prior SPA page is never reused.
+function readEmbeddedInvite(token) {
+  if (typeof window === "undefined") return null;
+  const pre = window.__DAWA_INVITE__;
+  return pre && pre.token === token && pre.rec ? pre.rec : null;
+}
+
 const DigitalYourPhotos = lazy(() =>
   import("./DigitalYourPhotos.jsx").then((m) => ({ default: m.DigitalYourPhotos })),
 );
@@ -109,20 +119,26 @@ function DigitalLandingMain({ t, lang, setLang }) {
   const isDemo = search.get("demo") === "1";
   const demoName = search.get("name");
 
-  const [tokenRec, setTokenRec] = useState(
-    isDemo
-      ? {
-          guestName: demoName ? decodeURIComponent(demoName) : "أحمد محمد",
-          groomUid: "demo",
-          expiresAt: Date.now() + 30 * 86400000,
-        }
-      : undefined,
-  );
+  const [tokenRec, setTokenRec] = useState(() => {
+    if (isDemo) {
+      return {
+        guestName: demoName ? decodeURIComponent(demoName) : "أحمد محمد",
+        groomUid: "demo",
+        expiresAt: Date.now() + 30 * 86400000,
+      };
+    }
+    // Server-embedded record → render immediately, no loading spinner. The poller
+    // below still refreshes it (and adds boardingPassEnabled/eventStatus).
+    return readEmbeddedInvite(token) ?? undefined;
+  });
   // Demo first paint = the built-in fallback (instant, never blank); an effect
-  // below swaps in the admin-published demo design if one exists.
-  const [doc, setDoc] = useState(
-    isDemo ? applyDemoOverrides(buildDemoFallbackDoc(), search) : null,
-  );
+  // below swaps in the admin-published demo design if one exists. For a real
+  // invite, seed from the embedded designSnapshot so the invitation + envelope
+  // render fully themed on first paint (no default-theme flash).
+  const [doc, setDoc] = useState(() => {
+    if (isDemo) return applyDemoOverrides(buildDemoFallbackDoc(), search);
+    return readEmbeddedInvite(token)?.designSnapshot ?? null;
+  });
   const [done, setDone] = useState(false);
   const [approvedWishes, setApprovedWishes] = useState([]);
   const pingedRef = useRef(false);

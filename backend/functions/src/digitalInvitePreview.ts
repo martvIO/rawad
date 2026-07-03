@@ -111,6 +111,17 @@ function escapeHtml(s: string): string {
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c] as string));
 }
 
+// Embed the guest+design record (the SAME public shape as GET /invites/token)
+// so the SPA can render the personalized invitation on first paint instead of
+// showing a spinner while it round-trips the token. Only the cheap fields already
+// on the token record are inlined; the derived boardingPassEnabled/eventStatus are
+// left to the client poller. URI-encoding makes the payload safe to inline inside a
+// <script> (no </script> breakout, no raw quotes / newlines / U+2028-9).
+function buildInviteDataScript(token: string, rec: Record<string, unknown>): string {
+  const payload = encodeURIComponent(JSON.stringify({ token, rec }));
+  return `<script>window.__DAWA_INVITE__=JSON.parse(decodeURIComponent("${payload}"))</script>`;
+}
+
 // Design text fields are stored bilingually as { ar, he }; resolve to a string
 // (Arabic preferred) so the OG description isn't "[object Object]".
 type Localized = string | { ar?: string; he?: string } | undefined | null;
@@ -187,6 +198,9 @@ export const digitalInvitePreview = onRequest(
     const origin = resolveIndexUrl(req).replace(/\/index\.html$/, "");
 
     let inputs: OgInputs = { guestName: "", url: fullUrl };
+    // Server-embedded invite record (see buildInviteDataScript) — filled for
+    // digital tokens so the SPA skips the token round-trip on first paint.
+    let inviteDataScript = "";
 
     try {
       if (token && TOKEN_HEX_RE.test(token)) {
@@ -204,11 +218,29 @@ export const digitalInvitePreview = onRequest(
           const tk = snap.val() as {
             groomUid?: string;
             guestName?: string;
+            guestPhone?: string;
             guestType?: string;
+            groomUsername?: string;
+            expiresAt?: number | null;
+            usedAt?: number | null;
             designId?: string;
             designSnapshot?: DesignLike;
           };
           inputs.guestName = tk.guestName || "";
+          // Inline the guest+design data for digital links so the page renders
+          // instantly (mirrors the GET /invites/token public projection exactly).
+          if (tk.guestType === "digital") {
+            inviteDataScript = "\n" + buildInviteDataScript(token, {
+              guestName: tk.guestName,
+              guestPhone: tk.guestPhone,
+              guestType: tk.guestType,
+              groomUsername: tk.groomUsername,
+              expiresAt: tk.expiresAt,
+              usedAt: tk.usedAt,
+              designId: tk.designId,
+              designSnapshot: tk.designSnapshot,
+            });
+          }
           // Physical/handwritten tokens carry no `guestType: "digital"`. Flag
           // them so the OG description becomes the platform line (title + image
           // are unchanged). Digital links keep the couple + date description.
@@ -256,7 +288,7 @@ export const digitalInvitePreview = onRequest(
     }
 
     const ogBlock = buildOgTags(inputs);
-    const rendered = html.replace(OG_BLOCK_RE, ogBlock);
+    const rendered = html.replace(OG_BLOCK_RE, ogBlock + inviteDataScript);
 
     res.set("Cache-Control", "public, max-age=300, s-maxage=600");
     res.set("Content-Type", "text/html; charset=utf-8");
