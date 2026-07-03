@@ -19,25 +19,19 @@ import { resolveBackground } from "../../../utils/themeToBackground.js";
 // to reveal the custom background underneath.
 const CelestialCanvas = lazy(() => import("../celestial/CelestialCanvas.jsx"));
 
-const OPENED_KEY = "dawa-invite-opened";
-function readOpened() {
-  try { return localStorage.getItem(OPENED_KEY) === "1"; } catch { return false; }
-}
-function markOpened() {
-  try { localStorage.setItem(OPENED_KEY, "1"); } catch { /* ignore */ }
-}
-
 export function CelestialAmbience({
   theme, font, lang, mode = "public", fixed = true, immersive3d = true,
-  showEnvelope = false, demo = false, guestName = "", monogram = "",
+  showEnvelope = false, guestName = "", monogram = "",
   namesAr = "", namesHe = "", eyebrow = "", blessing = "", welcome = "", dateText = "",
   envelopeOverrides = null, background = null,
 }) {
   const cap = useDeviceCapability();
   const [downgraded, setDowngraded] = useState(celDowngraded);
-  // The demo is a showcase: always replay the envelope, and never write the
-  // global "opened" flag (so visiting the demo can't suppress a real invite).
-  const [opened, setOpened] = useState(() => (demo ? false : readOpened()));
+  // The envelope intro replays on EVERY open (owner decision 2026-07-03) — there
+  // is NO persisted "already opened" flag, so each guest always sees the sealed
+  // مكتوب before it opens, and re-opening the same link shows it again. (The old
+  // global flag suppressed the envelope on all invites once any one was opened.)
+  const [opened, setOpened] = useState(false);
   // Envelope reveal phases: sealed → opening → revealing → done → gone.
   const [phase, setPhase] = useState("sealed");
   const worldRef = useRef(null);
@@ -100,7 +94,7 @@ export function CelestialAmbience({
     setPhase("opening");
     w.openEnvelope({
       onReveal: () => setPhase("revealing"),
-      onComplete: () => { if (!demo) markOpened(); setOpened(true); setPhase("done"); },
+      onComplete: () => { setOpened(true); setPhase("done"); },
     });
   };
 
