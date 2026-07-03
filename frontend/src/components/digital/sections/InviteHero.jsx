@@ -107,7 +107,7 @@ function Hero({ guestName, groomName, brideName, monogram, eyebrow, dateText, ve
       )}
       {groomName && brideName && (
         <span className="dawa-inv-amp" style={{ color: theme.accent, fontFamily: font.family }}>
-          {lang === "he" ? "ו" : "و"}
+          {"&"}
         </span>
       )}
       {brideName && (

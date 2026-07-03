@@ -148,7 +148,7 @@ function buildOgTags(inputs: OgInputs): string {
     // description, not the couple names + date (title + image stay the same).
     description = "منصة دعوة لتوصيل مكاتيب للمناسبات";
   } else {
-    const couple = [inputs.groomDisplayName, inputs.brideName].filter(Boolean).join(" و ");
+    const couple = [inputs.groomDisplayName, inputs.brideName].filter(Boolean).join(" & ");
     description = couple
       ? `${couple} يتشرّفون بدعوتكم لحضور حفل زفافهم`
       : "تفضّل بفتح بطاقة الدعوة الرقمية";

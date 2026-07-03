@@ -134,12 +134,12 @@ export function DigitalInvitationView({
   // ── Envelope-card content ────────────────────────────────────────────────
   // The cinematic 3D card shows the couple's names in BOTH scripts (the
   // universal element), with the blessing + welcome + date in the guest's
-  // current language. Names join groom-first with the "و" / "ו" connective,
-  // matching the hero.
+  // current language. Names join groom-first with the "&" connective (script-
+  // neutral in both Arabic and Hebrew), matching the hero.
   const namesAr = [localize(design?.groomDisplayName, "ar"), localize(design?.brideName, "ar")]
-    .map((s) => s.trim()).filter(Boolean).join(" و ");
+    .map((s) => s.trim()).filter(Boolean).join(" & ");
   const namesHe = [localize(design?.groomDisplayName, "he"), localize(design?.brideName, "he")]
-    .map((s) => s.trim()).filter(Boolean).join(" ו");
+    .map((s) => s.trim()).filter(Boolean).join(" & ");
   const blessing = localize(design?.blessing, lang).trim() || (lang === "he" ? DEFAULT_BLESSING.he : DEFAULT_BLESSING.ar);
   const welcome = localize(design?.welcome, lang).trim() || (lang === "he" ? DEFAULT_WELCOME.he : DEFAULT_WELCOME.ar);
 
