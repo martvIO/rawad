@@ -265,3 +265,37 @@ Two owner-requested changes to the `/d/**` link preview (OG tags served by `digi
   browser-verified — the emulator needs Java 11+ and only Java 8 is installed here, and there are no
   prod groom creds; it follows the identical, working blessing/welcome field pattern. See
   [[Architecture-Decisions]].
+
+## Faster first paint + no content flash before the مكتوب (2026-07-03)
+Two owner-reported load-experience bugs on the public `/d/:groomUsername/:token` page.
+
+**Problem — long "جاري التحميل" spinner.** The page blocked on a client round-trip to
+`GET /invites/token/:token` (the `api` function, cold-start-prone) before rendering anything.
+**Fix (owner picked the free option): server-embed the invite record.** `digitalInvitePreview`
+already reads the token (for OG tags), so it now also inlines the guest+design record — the SAME
+public projection as `GET /invites/token` (guestName, guestPhone, guestType, groomUsername,
+expiresAt, usedAt, designId, designSnapshot; the derived boardingPassEnabled/eventStatus are left
+to the poller). `DigitalInvitationPage` seeds `tokenRec` **and** `doc` from it in the `useState`
+initializers (`readEmbeddedInvite`), so the personalized invitation + envelope render on **first
+paint** with no spinner; the existing poller still refreshes it.
+- **CSP gotcha (caught in browser verify):** the first cut inlined an executable
+  `<script>window.__DAWA_INVITE__=…</script>`, which the strict CSP (`script-src` has **no**
+  `'unsafe-inline'`) blocked — the script never ran. Fix: inline an **inert
+  `<script type="application/json" id="__DAWA_INVITE__">` data block** (not executed → not subject
+  to `script-src`), read via `getElementById(...).textContent`. Payload is `encodeURIComponent`-d so
+  it can't break out of the tag. There is **no** new exposure — the same fields are already public to
+  any token holder via `/invites/token`, and the HTML is cached per-token-URL.
+- **Verified live** (throwaway prod token): the data block parses (guest "سامي خليل", theme
+  "emerald"), the sealed envelope renders themed with the guest name, and — decisively — while the
+  token poller was returning **429** (rate-limited by repeated test loads) the page **still rendered**
+  from the embedded data. So first paint no longer depends on the `api` round-trip.
+
+**Problem — the invitation flashes for ~1s before the مكتوب.** The 3D envelope is a lazy 535 KB
+WebGL chunk; the ambience floor sits at `z:0` behind the content, so until the chunk loaded the
+invitation content showed through the (mostly transparent) sealed overlay, then the canvas (`z:999`)
+covered it. **Fix:** while the envelope is active, the `Suspense` fallback is now an opaque
+`EnvelopeBootCover` (`z:998`, `theme.bg`) instead of the transparent `Ambience`, and the
+`CelestialCanvas` container paints an opaque `theme.bg` while `elevated` — so the sealed-envelope
+backdrop shows from the first frame and the content never flashes. Both the normal-world and
+custom-background branches covered (`CelestialAmbience.jsx` + `CelestialCanvas.jsx`).
+Deploy: `hosting,functions:digitalInvitePreview`. See [[Architecture-Decisions]].

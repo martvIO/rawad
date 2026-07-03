@@ -274,3 +274,6 @@ Touched: Digital-Invitations
 
 ## [2026-07-03 17:45] session | WhatsApp preview: shorter title + groom share-message
 Touched: Digital-Invitations
+
+## [2026-07-03 18:45] session | Faster invite load + no content flash before envelope
+Touched: Digital-Invitations
