@@ -259,3 +259,6 @@ Touched: UX-Research-Discovery-2026-07-02, Usability-Test-Plan-2026-07, Research
 
 ## [2026-07-02 11:56] session | Fixed Meta Business Suite redirect loop via /select/
 Touched: none
+
+## [2026-07-03 09:52] session | Grilled + built WhatsApp manual-send fallback
+Touched: WhatsApp-Messaging, index
