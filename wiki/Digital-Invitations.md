@@ -299,3 +299,29 @@ covered it. **Fix:** while the envelope is active, the `Suspense` fallback is no
 backdrop shows from the first frame and the content never flashes. Both the normal-world and
 custom-background branches covered (`CelestialAmbience.jsx` + `CelestialCanvas.jsx`).
 Deploy: `hosting,functions:digitalInvitePreview`. See [[Architecture-Decisions]].
+
+## Wedding time — datetime picker, countdown to the hour (2026-07-04)
+Owner request: let the groom set an hour (not just a day) so the countdown targets the exact time and
+the time shows next to the date. **No schema change** — `weddingDate` is still a single number (epoch);
+it just now carries the hour.
+- **Editor** (`DigitalDesignEditor.jsx`): the wedding-date input is now `type="datetime-local"` (day +
+  hour). `epochToInput`/`inputToEpoch` round-trip `"YYYY-MM-DDTHH:MM"` via the browser's local time
+  (the groom is in the venue's timezone).
+- **Countdown** (`InviteCountdown.jsx`): unchanged — it already targets the epoch to the second, so it
+  counts to the exact hour automatically once the epoch carries the time.
+- **Display**: date + **24h** time (e.g. `19 أغسطس 2026 · 19:30`) with **Western digits** on the
+  invitation (`DigitalInvitationView` `formatWeddingDateTime`), the WhatsApp OG image
+  (`digitalOgImage.ts`), and the OG description (`digitalInvitePreview.ts` `formatDate`). All three
+  format in a **fixed venue timezone `Asia/Jerusalem`** (DST-aware) so every guest sees the couple's
+  real local time regardless of where they open the link; Cloud Functions run in UTC, so the explicit
+  zone is required. Legacy date-only designs sit at UTC midnight → detected
+  (`getUTCHours()===0 && getUTCMinutes()===0`) → shown date-only.
+- **Deploy gotcha (important):** OG images are pre-rendered at token mint by the **`cacheInviteOgImage`**
+  onCreate trigger (Storage `og-cache/{token}.jpg`) — a SEPARATE function from `digitalOgImage`. The
+  first deploy shipped only `digitalOgImage`, so freshly-minted links still cached the OLD (timeless)
+  image (served on cache hit). Fix: also deploy `cacheInviteOgImage`. **Full targets for any OG-image
+  change:** `hosting,functions:digitalInvitePreview,functions:digitalOgImage,functions:cacheInviteOgImage`.
+- **Verified live** (throwaway token, 19:30 IDT): invitation countdown line `"19 أغسطس 2026 · 19:30"`,
+  `og:description` `"… — 19 أغسطس 2026 · 19:30"`, and the OG image renders the time; DST checked (Aug
+  19:30 IDT vs Jan 20:00 IST). Editor input itself not browser-verified (auth-gated; emulator needs
+  Java 11+, only Java 8 here). See [[Architecture-Decisions]].
