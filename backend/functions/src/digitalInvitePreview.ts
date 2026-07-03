@@ -115,11 +115,15 @@ function escapeHtml(s: string): string {
 // so the SPA can render the personalized invitation on first paint instead of
 // showing a spinner while it round-trips the token. Only the cheap fields already
 // on the token record are inlined; the derived boardingPassEnabled/eventStatus are
-// left to the client poller. URI-encoding makes the payload safe to inline inside a
-// <script> (no </script> breakout, no raw quotes / newlines / U+2028-9).
+// left to the client poller.
+//
+// It's an INERT `type="application/json"` data block, NOT executable JS — so it is
+// not subject to the strict CSP `script-src` (which has no 'unsafe-inline'); the
+// client reads its textContent and parses it. URI-encoding the payload keeps it
+// safe (no </script> breakout, no raw quotes / newlines / U+2028-9).
 function buildInviteDataScript(token: string, rec: Record<string, unknown>): string {
   const payload = encodeURIComponent(JSON.stringify({ token, rec }));
-  return `<script>window.__DAWA_INVITE__=JSON.parse(decodeURIComponent("${payload}"))</script>`;
+  return `<script type="application/json" id="__DAWA_INVITE__">${payload}</script>`;
 }
 
 // Design text fields are stored bilingually as { ar, he }; resolve to a string

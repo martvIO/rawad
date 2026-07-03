@@ -82,14 +82,21 @@ function applyDemoOverrides(base, search) {
   };
 }
 
-// The digitalInvitePreview function inlines the guest+design record as
-// window.__DAWA_INVITE__ (same shape as GET /invites/token) so the invitation
-// renders on first paint, skipping the token round-trip + loading spinner. Guard
-// on the token so a stale value from a prior SPA page is never reused.
+// The digitalInvitePreview function inlines the guest+design record as an inert
+// <script type="application/json" id="__DAWA_INVITE__"> block (same shape as GET
+// /invites/token) so the invitation renders on first paint, skipping the token
+// round-trip + loading spinner. A data block (not executable JS) passes the strict
+// CSP. Guard on the token so a stale value from a prior SPA page is never reused.
 function readEmbeddedInvite(token) {
-  if (typeof window === "undefined") return null;
-  const pre = window.__DAWA_INVITE__;
-  return pre && pre.token === token && pre.rec ? pre.rec : null;
+  if (typeof document === "undefined") return null;
+  try {
+    const el = document.getElementById("__DAWA_INVITE__");
+    if (!el) return null;
+    const pre = JSON.parse(decodeURIComponent(el.textContent || ""));
+    return pre && pre.token === token && pre.rec ? pre.rec : null;
+  } catch {
+    return null;
+  }
 }
 
 const DigitalYourPhotos = lazy(() =>
