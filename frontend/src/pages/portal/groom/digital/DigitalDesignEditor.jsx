@@ -852,6 +852,27 @@ export function DesignEditorBody({ groomUid, designId, adminDemoMode = false, on
           </FormField>
         </Section>
 
+        {/* WhatsApp share-link description (og:description) — NOT shown on the
+            invitation page itself, only in the WhatsApp link preview. */}
+        <Section title={tt(lang, "وصف الرابط على واتساب", "תיאור הקישור בוואטסאפ")}>
+          <div style={{ fontSize: 11, color: C.dim, marginBottom: 12, lineHeight: 1.6 }}>
+            {tt(
+              lang,
+              "الجملة التي تظهر تحت العنوان عند إرسال رابط الدعوة على واتساب. اتركها فارغة لاستخدام النص التلقائي (أسماء العروسين). تاريخ الزفاف يُضاف تلقائياً في النهاية.",
+              "המשפט שמופיע מתחת לכותרת כששולחים את קישור ההזמנה בוואטסאפ. השאירו ריק לטקסט אוטומטי (שמות הזוג). תאריך החתונה יתווסף אוטומטית בסוף.",
+            )}
+          </div>
+          <FormField label={tt(lang, "نص الوصف", "טקסט התיאור")}>
+            <textarea
+              data-testid="design-share-message"
+              rows={2}
+              {...textProps("shareMessage", 300)}
+              placeholder={tt(lang, "يتشرّفون بدعوتكم لحضور حفل زفافهم", "מתכבדים להזמינכם לחתונתם")}
+              style={{ resize: "vertical", minHeight: 50 }}
+            />
+          </FormField>
+        </Section>
+
         {/* Featured media under the greeting */}
         <Section
           title={tt(lang, "صور تحت الترحيب (وسائط مميزة)", "מדיה מתחת לברכה")}

@@ -133,6 +133,7 @@ interface OgInputs {
   brideName?: string;
   groomDisplayName?: string;
   dateText?: string;
+  shareMessage?: string;
   imageUrl?: string;
   url: string;
   isPhysical?: boolean;
@@ -140,18 +141,20 @@ interface OgInputs {
 
 function buildOgTags(inputs: OgInputs): string {
   const title = inputs.guestName
-    ? `دعوة زفاف — ${inputs.guestName}`
-    : "دعوة زفاف";
+    ? `دعوة — ${inputs.guestName}`
+    : "دعوة";
   let description: string;
   if (inputs.isPhysical) {
     // Physical / handwritten invite link — describe the platform in the OG
     // description, not the couple names + date (title + image stay the same).
     description = "منصة دعوة لتوصيل مكاتيب للمناسبات";
   } else {
+    // The groom-authored `shareMessage` (design field) wins; otherwise fall back
+    // to the couple-names line. The wedding date is auto-appended in both cases.
     const couple = [inputs.groomDisplayName, inputs.brideName].filter(Boolean).join(" & ");
-    description = couple
-      ? `${couple} يتشرّفون بدعوتكم لحضور حفل زفافهم`
-      : "تفضّل بفتح بطاقة الدعوة الرقمية";
+    const custom = (inputs.shareMessage || "").trim();
+    description = custom
+      || (couple ? `${couple} يتشرّفون بدعوتكم لحضور حفل زفافهم` : "تفضّل بفتح بطاقة الدعوة الرقمية");
     if (inputs.dateText) description += ` — ${inputs.dateText}`;
   }
   const tags: string[] = [
@@ -196,6 +199,7 @@ export const digitalInvitePreview = onRequest(
             brideName?: Localized;
             groomDisplayName?: Localized;
             weddingDate?: number | null;
+            shareMessage?: Localized;
           };
           const tk = snap.val() as {
             groomUid?: string;
@@ -233,6 +237,7 @@ export const digitalInvitePreview = onRequest(
               inputs.brideName        = loc(d.brideName);
               inputs.groomDisplayName = loc(d.groomDisplayName);
               inputs.dateText         = formatDate(d.weddingDate);
+              inputs.shareMessage     = loc(d.shareMessage);
               // (Background photo is fetched inside the OG-image generator.)
             }
           }
