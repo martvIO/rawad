@@ -280,3 +280,6 @@ Touched: Digital-Invitations
 
 ## [2026-07-04 00:50] session | Wedding time — datetime picker + countdown to the hour
 Touched: Digital-Invitations
+
+## [2026-07-04 01:20] session | Reliable photographer album upload (queue + retry + cap)
+Touched: Digital-Invitations

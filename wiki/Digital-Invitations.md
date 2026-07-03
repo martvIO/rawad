@@ -325,3 +325,27 @@ it just now carries the hour.
   `og:description` `"… — 19 أغسطس 2026 · 19:30"`, and the OG image renders the time; DST checked (Aug
   19:30 IDT vs Jan 20:00 IST). Editor input itself not browser-verified (auth-gated; emulator needs
   Java 11+, only Java 8 here). See [[Architecture-Decisions]].
+
+## Reliable photographer album upload — bounded queue + retry + higher cap (2026-07-04)
+Owner-reported: uploading a photographer's event album (before publish, the [[Face Matching]] "صورك"
+source) took forever and **failed on many photos**. Three causes, all fixed — **full resolution kept**
+(owner declined downscaling: "keep it until you find a solution").
+- **Frontend fired every file at once** (`DigitalPhotographer.jsx` `handleFiles` used one
+  `Promise.allSettled(arr.map(...))`). The browser runs only ~6 sockets/host, so the rest queued — and
+  each queued XHR still counted down its **2-min upload timeout while WAITING** → mass `request_timeout`
+  failures on big albums. **Fix:** `runUploads()` — a **bounded-concurrency queue** (`UPLOAD_CONCURRENCY
+  = 4`) so only a few XHRs are ever live, with **per-file retry** on transient (timeout/network)
+  failures (`UPLOAD_MAX_ATTEMPTS = 3`, 500ms×attempt backoff; permanent errors like 413/429 are NOT
+  retried). Returns Promise.allSettled shape, so the optimistic-merge/toast code is unchanged. Progress
+  UI now shows an **"X / N" counter** instead of a chip per file (hundreds of chips was unusable).
+- **Per-user cap was 120 uploads/hour** (`PHOTOG_UPLOAD_PER_USER = perHour(120)`, `rateLimits.ts`) →
+  429 after 120 photos; a wedding album is routinely many hundreds. **Fix:** raised to `perHour(2000)`
+  (sized for a full-event dump, still bounds abuse). `MEDIA_UPLOAD_PER_USER` (background/hero, few
+  files) left at 120.
+- **Each file is still a multipart POST through the `api` Cloud Function** (browser→function→GCS), not a
+  direct-to-Storage resumable upload — the remaining speed ceiling. Noted for a future pass; the
+  queue+retry+cap already make big albums RELIABLE at full quality.
+Deploy: `hosting,functions:api`. The concurrency+retry algorithm was verified by a standalone sim (peak
+concurrency ≤ 4, transient files recover via retry, permanent errors reject, order preserved); the live
+upload UI is auth-gated (groom login; emulator needs Java 11+, only Java 8 here) so not browser-verified.
+See [[Face Matching]], [[Architecture-Decisions]].
