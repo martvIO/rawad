@@ -349,3 +349,35 @@ Deploy: `hosting,functions:api`. The concurrency+retry algorithm was verified by
 concurrency ≤ 4, transient files recover via retry, permanent errors reject, order preserved); the live
 upload UI is auth-gated (groom login; emulator needs Java 11+, only Java 8 here) so not browser-verified.
 See [[Face Matching]], [[Architecture-Decisions]].
+
+## Background-star controls + stale-demo-envelope fix (2026-07-04)
+Two owner requests on the 3D scene.
+
+**Bug — the مكتوب stayed on the OLD design after the admin edited + re-published the demo.** The WebGL
+envelope is built ONCE at `CelestialCanvas` mount (config captured in a ref; the create-effect has an
+empty dep array). The demo page first paints the built-in fallback design, then an effect swaps in the
+admin-published design — but the envelope never re-baked, so it stayed frozen on the fallback while the
+DOM invitation updated. **Fix:** the engine gains `rebuildEnvelope(next)` (`celestialEngine.js`) that
+disposes + rebuilds the sealed envelope, guarded to `mode === "envelope"` (never mid-open); `liveEnvelope`
+is now mutable. `CelestialCanvas` adds an effect keyed on the serialized envelope config that calls it on
+a real change (first run skipped — the engine already built it at mount). Verified: toggling AR↔HE on the
+sealed demo (a real content change) re-bakes cleanly (sealed survives, `glError 0`).
+
+**Feature — per-design control of the 3D BACKGROUND starfield** (the celestial particle motes, NOT the
+envelope arabesque stars — owner explicitly picked the background field): **colour, size,
+clarity/opacity**.
+- **Data:** new `starfield` design object `{ color?, size?, opacity? }`. `sanitizeStarfield`
+  (`sanitize.ts`: hex colour + `STARFIELD_SIZE 0.4–2.5` + `STARFIELD_OPACITY 0–2`, clamp-never-reject),
+  added to `DESIGN_FIELDS` → flows via `designSnapshot` / `PUBLIC_DESIGN_FIELDS`.
+- **Render:** `themeToUniforms(theme, starfield)` merges the override (a colour paints core+halo; size +
+  opacity are shader multipliers, default 1 = theme baseline). Particle shader (`particles.glsl.js`)
+  gains `uStarSize` (VERT, multiplies `gl_PointSize`) + `uStarOpacity` (FRAG, multiplies alpha); the
+  engine adds the two uniforms + applies them in `setTheme`. Threaded `DigitalInvitationView →
+  CelestialAmbience → CelestialCanvas`. The celestial motes were previously theme-derived ONLY.
+- **Editor:** new "نجوم الخلفية" `<Section>` (`design-star-color` / `design-star-size` /
+  `design-star-opacity`) mirroring the envelope colour/slider pattern via new `setStarField` /
+  `bufferStarField` / `commitStarField`; the admin demo editor reuses the same `DesignEditorBody`.
+- **Verified live** (throwaway prod token): a `{color:"#3bd6ff", size:2.2, opacity:2}` override rendered
+  big, bright CYAN background stars (`glError 0`); the shader compiles + the envelope still opens.
+Deploy: `hosting,functions:api,functions:digitalInvitePreview`. Editor UI itself not browser-verified
+(auth-gated; emulator needs Java 11+). See [[Visual-Design-System]], [[Architecture-Decisions]].

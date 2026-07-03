@@ -283,3 +283,6 @@ Touched: Digital-Invitations
 
 ## [2026-07-04 01:20] session | Reliable photographer album upload (queue + retry + cap)
 Touched: Digital-Invitations
+
+## [2026-07-04 02:40] session | Background-star controls + stale-demo-envelope fix
+Touched: Digital-Invitations
