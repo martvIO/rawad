@@ -48,6 +48,9 @@ export const SSE_BASE_URL =
 export const INVITE_BASE_URL =
   ENV.VITE_INVITE_BASE_URL ?? "https://invite.dawa.to";
 
+// Mirrors backend TOKEN_TTL_MS (constants/time.ts) — the frontend cannot import backend constants.
+export const INVITE_TOKEN_TTL_MS = 90 * 24 * 60 * 60 * 1000;
+
 /**
  * Contact-channel BUILD-TIME fallbacks for the marketing site's "talk to us"
  * CTAs. The admin overrides/disables these in the Communication settings page
