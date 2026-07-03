@@ -33,6 +33,15 @@ export default {
         {
           photosPermission:
             "تتيح لك دعوة اختيار صور وفيديوهات من معرض هاتفك لرفعها إلى دعوتك.",
+          cameraPermission:
+            "تتيح لك دعوة التقاط صور بالكاميرا لإضافتها إلى دعوتك أو معرض المصوّر.",
+        },
+      ],
+      [
+        "expo-contacts",
+        {
+          contactsPermission:
+            "تتيح لك دعوة اختيار مدعوين من جهات الاتصال في هاتفك لإضافتهم إلى قائمتك.",
         },
       ],
     ],
@@ -43,6 +52,9 @@ export default {
       sseBaseUrl: "https://api-je74slt7ra-uc.a.run.app",
       inviteBaseUrl: "https://invite.dawa.to",
       contactWhatsapp: "972529348797",
+      // Firebase Hosting SPA — serves the web renderer the design-preview WebView
+      // loads at /preview/digital/:designId (auth via injected tokens).
+      webBaseUrl: "https://dawa-aa793.web.app",
     },
   },
 };

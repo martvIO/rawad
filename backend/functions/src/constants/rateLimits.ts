@@ -61,4 +61,58 @@ export const RATE = Object.freeze({
   INVITE_OPEN_PER_TOKEN: perHour(60),
   /** IP backstop for the open ping — generous for a venue sharing one NAT IP. */
   INVITE_OPEN_IP_BACKSTOP: perHour(600),
+
+  // ── Admin Security page ──────────────────────────────────────────────────
+  /** Reads on the admin Security page (events / summary / blocks; polled). */
+  SECURITY_READ_PER_ADMIN: perHour(600),
+  /** Block / unblock / resolve actions on the Security page. */
+  SECURITY_ACTION_PER_ADMIN: perHour(120),
+
+  // ── Rate-limit gaps closed after the security audit ──────────────────────
+  /** Public invite-token lookup (GET /invites/token/:token) — per token + IP. */
+  INVITE_LOOKUP_PER_TOKEN: perHour(60),
+  INVITE_LOOKUP_IP_BACKSTOP: perHour(600),
+  /** Public digital-wishes read (GET /invites/digital/wishes/:token). */
+  WISHES_READ_PER_TOKEN: perHour(120),
+  WISHES_READ_IP_BACKSTOP: perHour(1200),
+  /** Public wedding-status lookup (GET /lifecycle/public/:username) — per name + IP. */
+  PUBLIC_STATUS_PER_NAME: perHour(120),
+  PUBLIC_STATUS_IP_BACKSTOP: perHour(600),
+  /** Authenticated guest CRUD (per caller uid). */
+  GUESTS_READ_PER_USER: perHour(600),
+  GUESTS_WRITE_PER_USER: perHour(600),
+  /** Groom lifecycle state changes (cancel/undo/pause/resume) per caller. */
+  LIFECYCLE_ACTION_PER_USER: perHour(30),
+  /** Admin lifecycle actions (confirm-cancel / restore) per admin. */
+  LIFECYCLE_ADMIN_PER_ADMIN: perHour(60),
+  /** SSE stream-token minting (per caller uid). */
+  STREAM_TOKEN_PER_USER: perHour(120),
+  /** Proof upload / signed-URL fetch (per caller uid). */
+  PROOF_UPLOAD_PER_USER: perHour(60),
+  PROOF_URL_PER_USER: perHour(300),
+  /** Driver self-assignment write / read (per caller uid). */
+  ASSIGN_WRITE_PER_USER: perHour(20),
+  ASSIGN_READ_PER_USER: perHour(120),
+  /** Admin read endpoints that were missing a limiter. */
+  USERS_LIST_PER_ADMIN: perHour(120),
+  GROOM_PROFILES_READ_PER_USER: perHour(240),
+  GROOM_PROFILE_WRITE_PER_ADMIN: perHour(60),
+  ADMIN_CLAIM_PER_ADMIN: perHour(30),
+  WA_READ_PER_ADMIN: perHour(60),
+  /** Admin read of the payment-links list (returns sensitive data). */
+  PAYMENT_LINKS_READ_PER_ADMIN: perHour(120),
+
+  // ── Rate-limit gaps closed after the 2026-07-02 re-audit ─────────────────
+  /** Digital media / photographer file uploads (per caller uid). Large
+   *  multipart bodies (50 MB media, 200 MB photographer) so cap per-caller
+   *  frequency to bound self-inflicted Storage/egress cost. */
+  MEDIA_UPLOAD_PER_USER: perHour(120),
+  PHOTOG_UPLOAD_PER_USER: perHour(120),
+  /** People-gallery read-heavy routes (index/cluster status, clusters, config)
+   *  — polled by the gallery UI; generous per-caller cap on own-tenant reads. */
+  GALLERY_READ_PER_USER: perHour(600),
+  /** People-gallery curation / config writes (per caller uid). */
+  GALLERY_WRITE_PER_USER: perHour(120),
+  /** Admin settings merge-patch (per admin). */
+  SETTINGS_PATCH_PER_ADMIN: perHour(60),
 });

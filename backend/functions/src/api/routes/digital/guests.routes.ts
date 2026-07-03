@@ -2,9 +2,12 @@ import { Response } from "express";
 import { AuthRequest,requireAuth } from "../../middleware/auth";
 import { firebaseDigitalGuestStore } from "../../../domain/digital/firebaseDigitalGuestStore";
 import { canActOnUid } from "./access";
-import { ilNational,sanitizeDigitalGuestCreate,sanitizeDigitalGuestPatch } from "./sanitize";
+import { coerceRanks,ilNational,sanitizeDigitalGuestCreate,sanitizeDigitalGuestPatch } from "./sanitize";
 import { safeDetail } from "./project";
 import { Router } from "express";
+
+/** Upper bound on a single bulk guest-patch request (keeps the body bounded). */
+const MAX_BULK_GUEST_UPDATES = 1000;
 
 export function registerGuestsRoutes(router: Router): void {
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -114,6 +117,65 @@ router.patch(
         sanitized.value as Record<string, unknown>
       );
       res.json({ ok: true });
+    } catch (err) {
+      res.status(500).json({ error: "write_failed", detail: safeDetail(err) });
+    }
+  }
+);
+
+/**
+ * Bulk-patch guests in ONE request → ONE Firestore batch (chunked at 500 inside
+ * the store), so a bulk role edit doesn't hit the server with N calls. Body:
+ * `{ updates: [{ id, ranks }] }` — roles-only; `ranks` REPLACES per guest (the
+ * client computes Add vs Replace against each guest's existing ranks). Duplicate
+ * ids collapse to the last one. Rejects an empty or oversized batch.
+ */
+router.patch(
+  "/:uid/guests",
+  requireAuth,
+  async (req: AuthRequest, res: Response) => {
+    if (!canActOnUid(req, req.params.uid)) {
+      res.status(403).json({ error: "forbidden" });
+      return;
+    }
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const updates = Array.isArray(body.updates) ? body.updates : null;
+    if (!updates || updates.length === 0) {
+      res.status(400).json({ error: "empty_updates" });
+      return;
+    }
+    if (updates.length > MAX_BULK_GUEST_UPDATES) {
+      res.status(400).json({ error: "too_many_updates" });
+      return;
+    }
+    // Dedupe by id (last write wins) and sanitize ranks per row.
+    const byId = new Map<string, Record<string, unknown>>();
+    for (const raw of updates as unknown[]) {
+      if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+        res.status(400).json({ error: "invalid_update" });
+        return;
+      }
+      const row = raw as Record<string, unknown>;
+      const id = (row.id ?? "").toString().trim();
+      if (!id) {
+        res.status(400).json({ error: "invalid_id", field: "id" });
+        return;
+      }
+      const ranksResult = coerceRanks(row);
+      if (!ranksResult.ok) {
+        res.status(400).json({ error: ranksResult.error, field: ranksResult.field });
+        return;
+      }
+      if (ranksResult.value === undefined) {
+        res.status(400).json({ error: "empty_patch", field: "ranks" });
+        return;
+      }
+      byId.set(id, { ranks: ranksResult.value });
+    }
+    const clean = [...byId.entries()].map(([id, patch]) => ({ id, patch }));
+    try {
+      await firebaseDigitalGuestStore().patchMany(req.params.uid, clean);
+      res.json({ ok: true, count: clean.length });
     } catch (err) {
       res.status(500).json({ error: "write_failed", detail: safeDetail(err) });
     }

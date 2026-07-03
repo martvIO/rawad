@@ -45,13 +45,13 @@ export default function Login() {
         <Heading>{t("login_title") || "تسجيل الدخول"}</Heading>
         <Caption>{t("app_name") || "دعوة"}</Caption>
         <Field
-          label={t("login_username") || "اسم المستخدم"}
+          label={t("login_user") || "اسم المستخدم"}
           value={username}
           onChangeText={setUsername}
           testID="field-username"
         />
         <Field
-          label={t("login_password") || "كلمة المرور"}
+          label={t("login_pass") || "كلمة المرور"}
           value={password}
           onChangeText={setPassword}
           secureTextEntry

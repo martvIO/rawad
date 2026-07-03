@@ -22,6 +22,7 @@ import { canActOnUid } from "./access";
 import { safeDetail } from "./project";
 import { sendWhatsAppTemplate } from "../../../whatsapp";
 import { getWhatsAppConfig, isConfigured } from "../../../whatsappConfig";
+import { reserveDailySend } from "../../../waRateLimit";
 
 const PUBLIC_BASE_URL = (process.env.PUBLIC_BASE_URL || "https://dawa-aa793.web.app").replace(/\/+$/, "");
 const TEMPLATE_LANG = process.env.WHATSAPP_YOURPHOTOS_TEMPLATE_LANG || "ar";
@@ -48,7 +49,9 @@ export async function sendPhotoLinksForGroom(
   // No-op until WhatsApp + the template are configured. Phone id / token come
   // from the resolved config (admin DB over env); the template name stays env.
   const cfg = await getWhatsAppConfig();
-  const yourPhotosTemplate = (process.env.WHATSAPP_YOURPHOTOS_TEMPLATE || "").trim();
+  // Template name now resolves from the admin DB (over env) like every other
+  // template, via whatsappConfig — was env-only before.
+  const yourPhotosTemplate = cfg.yourPhotosTemplate;
   if (!isConfigured(cfg) || !yourPhotosTemplate) {
     return { ok: true, sent: 0, considered: 0, skipped: { not_configured: true } };
   }
@@ -64,7 +67,7 @@ export async function sendPhotoLinksForGroom(
 
   const db = getDatabase();
   const snap = await guestsCol(uid).get();
-  const skipped: Record<string, number> = { no_phone: 0, no_token: 0, expired_token: 0, already_sent: 0, send_failed: 0 };
+  const skipped: Record<string, number> = { no_phone: 0, no_token: 0, expired_token: 0, already_sent: 0, send_failed: 0, daily_cap: 0 };
   let sent = 0;
   let considered = 0;
 
@@ -84,6 +87,11 @@ export async function sendPhotoLinksForGroom(
     const tk = tkSnap.exists() ? (tkSnap.val() as { groomUsername?: string; expiresAt?: number }) : null;
     if (!tk || !tk.groomUsername) { skipped.no_token++; continue; }
     if (tk.expiresAt && Date.now() > tk.expiresAt) { skipped.expired_token++; continue; }
+
+    // Respect the shared daily cap (no manual fallback here — stop the run and
+    // defer the rest; unsent guests are picked up on the next run, still unsent).
+    const reservation = await reserveDailySend(cfg.dailyCap);
+    if (!reservation.allowed) { skipped.daily_cap++; break; }
 
     const link = `${PUBLIC_BASE_URL}/d/${tk.groomUsername}/${g.inviteLinkToken}/photos`;
     const components = [{ type: "body", parameters: [{ type: "text", text: link }] }];

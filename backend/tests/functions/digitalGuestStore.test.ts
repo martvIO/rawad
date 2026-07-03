@@ -83,6 +83,41 @@ describe("makeDigitalGuestStore", () => {
     });
   });
 
+  it("patchMany() applies many per-guest patches in one bulk write", async () => {
+    const { fs, cols } = inMemoryFirestore({
+      [GUESTS]: {
+        g1: { name: "A", ranks: ["family"] },
+        g2: { name: "B", ranks: [] },
+        g3: { name: "C", ranks: ["vip"] },
+      },
+    });
+    const store = makeDigitalGuestStore({ fs });
+    await store.patchMany("groom-1", [
+      { id: "g1", patch: { ranks: ["family", "vip"] } }, // add
+      { id: "g2", patch: { ranks: ["vip"] } }, // replace-from-empty
+      { id: "g3", patch: { ranks: [] } }, // clear
+    ]);
+    const col = cols.get(GUESTS)!;
+    expect(col.get("g1")).toMatchObject({ name: "A", ranks: ["family", "vip"] });
+    expect(col.get("g2")).toMatchObject({ name: "B", ranks: ["vip"] });
+    expect(col.get("g3")).toMatchObject({ name: "C", ranks: [] });
+  });
+
+  it("patchMany() chunks past the 500-op Firestore batch cap", async () => {
+    const seed: Record<string, Record<string, unknown>> = {};
+    const updates: { id: string; patch: Record<string, unknown> }[] = [];
+    for (let i = 0; i < 550; i++) {
+      seed[`g${i}`] = { name: `G${i}`, ranks: [] };
+      updates.push({ id: `g${i}`, patch: { ranks: ["tagged"] } });
+    }
+    const { fs, cols } = inMemoryFirestore({ [GUESTS]: seed });
+    const store = makeDigitalGuestStore({ fs });
+    await store.patchMany("groom-1", updates); // 550 > 500 → two commits
+    const col = cols.get(GUESTS)!;
+    expect(col.get("g0")).toMatchObject({ ranks: ["tagged"] });
+    expect(col.get("g549")).toMatchObject({ ranks: ["tagged"] });
+  });
+
   it("remove() deletes the guest", async () => {
     const { fs, cols } = inMemoryFirestore({
       [GUESTS]: { g1: { name: "A" } },

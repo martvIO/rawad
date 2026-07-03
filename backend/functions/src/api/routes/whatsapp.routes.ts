@@ -17,6 +17,7 @@ import { getDatabase } from "firebase-admin/database";
 import { AuthRequest, requireAuth, requireAdmin } from "../middleware/auth";
 import { uidRateLimit } from "../middleware/rateLimit";
 import { HOUR_MS } from "../../constants/time";
+import { RATE } from "../../constants/rateLimits";
 import { normalisePhone } from "../../helpers";
 import { sendWhatsAppText, sendWhatsAppTemplate } from "../../whatsapp";
 import {
@@ -138,6 +139,7 @@ whatsappRouter.get(
   "/status",
   requireAuth,
   requireAdmin,
+  uidRateLimit("waStatus", RATE.WA_READ_PER_ADMIN.limit, HOUR_MS),
   async (_req: AuthRequest, res: Response) => {
     try {
       const cfg = await getWhatsAppConfig();
@@ -203,6 +205,7 @@ whatsappRouter.get(
   "/templates",
   requireAuth,
   requireAdmin,
+  uidRateLimit("waTemplates", RATE.WA_READ_PER_ADMIN.limit, HOUR_MS),
   async (_req: AuthRequest, res: Response) => {
     try {
       const { slots, metaError } = await slotStatuses(await getWhatsAppConfig());

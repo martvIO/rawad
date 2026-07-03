@@ -232,3 +232,36 @@ Grilled "what to do before public launch" → **controlled soft launch** (invite
 
 ## [2026-06-30 22:20] session | Grilled + built per-design custom invite background
 Touched: Digital-Invitations, Architecture-Decisions
+
+## [2026-07-01 09:15] session | Grilled + built app groom pages + hardware-rendered design
+Touched: Mobile-App, Architecture-Decisions
+
+## [2026-07-01 09:55] session | Grilled + built contacts import + one-call bulk role change
+Touched: Mobile-App, Architecture-Decisions
+
+## [2026-07-01 11:40] session | Grilled + built backend security hardening + admin Security page
+Touched: Security-Model, Backend-Security-Hardening-2026-07-01, Security-Audit-2026-06-29
+
+## [2026-07-01 19:20] session | Grilled + built seal-star toggle + Arabic cursive-join fix
+Touched: Digital-Invitations
+
+## [2026-07-01 20:25] session | Grilled + built always-open nav column + merged صورك
+Touched: Digital-Invitations
+
+## [2026-07-01 20:58] session | Nav circles + reveal-on-demand names
+Touched: Digital-Invitations
+
+## [2026-07-02 10:15] session | Full-codebase security re-audit + fixes
+Touched: [[Security Audit 2026-07-02]], [[Security Model]], [[Authentication]], [[Payments]]
+
+## [2026-07-02 12:35] session | UX discovery cycle + owner interview + test plan + synthesis
+Touched: UX-Research-Discovery-2026-07-02, Usability-Test-Plan-2026-07, Research-Synthesis-2026-07, Buyer-Persona, Digital-Invitations, Tasks-Backlog, index
+
+## [2026-07-02 11:56] session | Fixed Meta Business Suite redirect loop via /select/
+Touched: none
+
+## [2026-07-03 09:52] session | Grilled + built WhatsApp manual-send fallback
+Touched: WhatsApp-Messaging, index
+
+## [2026-07-03 13:50] session | Deployed to Firebase + verified encryption E2E
+Touched: Password-Encryption, index

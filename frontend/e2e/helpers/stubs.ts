@@ -7,8 +7,9 @@
 // webhook (LS cloud can't reach localhost). GPS + camera + file uploads are
 // injected through Playwright's own device APIs.
 
-import type { APIRequestContext, BrowserContext, Locator, Page } from "@playwright/test";
+import { expect, type APIRequestContext, type BrowserContext, type Locator, type Page } from "@playwright/test";
 import { createHmac } from "node:crypto";
+import { TEST_USERS } from "./seed";
 
 /** Functions-emulator base for the Express API (matches paid-signup-ls.spec). */
 export const API = process.env.E2E_API_BASE ?? "http://127.0.0.1:5001/dawa-aa793/us-central1/api";
@@ -85,6 +86,107 @@ export async function lemonSqueezyOrderCreated(
     headers: { "Content-Type": "application/json", "x-signature": sig },
     data: payload,
   });
+}
+
+// ─── Admin API helpers (paid-signup lifecycle assertions) ───────────────────
+
+/** Log in as the seeded admin and return a Bearer idToken for direct API calls. */
+export async function adminIdToken(request: APIRequestContext): Promise<string> {
+  const resp = await request.post(`${API}/auth/login`, {
+    data: { username: TEST_USERS.admin.username, password: TEST_USERS.admin.password },
+  });
+  return (await resp.json()).idToken as string;
+}
+
+/** Admin `GET /payments/links` row for a token (status, createdUid, generatedPassword, amountIls…). */
+export async function adminPaymentLinksRow(
+  request: APIRequestContext,
+  token: string,
+  tok?: string,
+): Promise<Record<string, unknown> | undefined> {
+  const bearer = tok ?? (await adminIdToken(request));
+  const resp = await request.get(`${API}/payments/links`, { headers: { Authorization: `Bearer ${bearer}` } });
+  const links: Array<Record<string, unknown>> = (await resp.json()).links ?? [];
+  return links.find((l) => l.token === token);
+}
+
+/** Admin `GET /users` row for a username (full profile incl. feature flags + paymentPackageId). */
+export async function adminUserByUsername(
+  request: APIRequestContext,
+  username: string,
+  tok?: string,
+): Promise<Record<string, unknown> | undefined> {
+  const bearer = tok ?? (await adminIdToken(request));
+  const resp = await request.get(`${API}/users`, { headers: { Authorization: `Bearer ${bearer}` } });
+  const body = await resp.json();
+  // GET /users returns a bare array (userStore.listUsers()); tolerate {users:[…]} too.
+  const users: Array<Record<string, unknown>> = Array.isArray(body) ? body : (body.users ?? []);
+  return users.find((u) => u.username === username);
+}
+
+export interface ProvisionedGroom {
+  token: string;
+  username: string;
+  phone: string;
+  generatedPassword: string;
+  createdUid: string;
+}
+
+/** Drive a full simulated paid signup for one package and return the provisioned
+ * identity. Mints the link via the admin API (package-agnostic), does the public
+ * `/pay` UI (price + form + tolerant intent 200|503), fires the signed
+ * `order_created` webhook with the package's variant, then polls the admin list
+ * until the account is provisioned. Assumes `blockThirdParty(page)` is applied. */
+export async function provisionPaidGroom(
+  page: Page,
+  request: APIRequestContext,
+  opts: { packageId: "premium" | "vip"; variantId: number; priceText: RegExp; runId?: string },
+): Promise<ProvisionedGroom> {
+  const runId = opts.runId ?? String(Date.now()).slice(-7);
+  const username = `lc${opts.packageId}${runId}`; // lowercased, valid username
+  const phone = `+97250${runId.slice(-7).padStart(7, "0")}`; // +972 50 + 7 digits
+
+  // Mint via admin API (deterministic, package-agnostic — UI mint is covered elsewhere).
+  const bearer = await adminIdToken(request);
+  const mint = await request.post(`${API}/payments/links`, {
+    headers: { Authorization: `Bearer ${bearer}` },
+    data: { packageId: opts.packageId },
+  });
+  expect(mint.status(), "admin mints a payment link").toBe(200);
+  const token = (await mint.json()).token as string;
+  expect(token).toMatch(/^[a-f0-9]{32}$/);
+
+  // Public /pay UI: price renders, form fills, Pay enables, intent fires (200 or 503).
+  await page.goto(`/pay/${token}`);
+  await expect(page.getByText(opts.priceText)).toBeVisible();
+  await page.getByTestId("field-pay-username").fill(username);
+  await page.locator("#field-pay-phone").fill(phone);
+  await expect(page.getByTestId("btn-pay-submit")).toBeEnabled({ timeout: 10_000 });
+  const [intentResp] = await Promise.all([
+    page.waitForResponse((r) => r.url().includes("/intent") && r.request().method() === "POST"),
+    page.getByTestId("btn-pay-submit").click(),
+  ]);
+  expect([200, 503]).toContain(intentResp.status());
+
+  // Signed order_created webhook (LS cloud can't reach localhost).
+  const webhook = await lemonSqueezyOrderCreated(request, {
+    token, username, phone, packageId: opts.packageId, variantId: opts.variantId, runId,
+  });
+  expect(webhook.status()).toBe(200);
+  expect((await webhook.json()).received).toBe(true);
+
+  // The webhook provisions asynchronously relative to its 200 — poll the admin row.
+  await expect
+    .poll(async () => (await adminPaymentLinksRow(request, token, bearer))?.createdUid, { timeout: 15_000 })
+    .toBeTruthy();
+  const row = (await adminPaymentLinksRow(request, token, bearer))!;
+  return {
+    token,
+    username,
+    phone,
+    createdUid: row.createdUid as string,
+    generatedPassword: row.generatedPassword as string,
+  };
 }
 
 /** Block real third-party network calls so a run stays offline + deterministic,

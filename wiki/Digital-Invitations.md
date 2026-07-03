@@ -113,3 +113,85 @@ Grilled + built. The public invite now supports a fully groom-customizable 2D ba
 - **Frontend:** `utils/themeToBackground.js` `resolveBackground(theme, overrides)` (theme defaults: fill←`theme.bg`, circle colour←`theme.accent`); `InviteAmbience.jsx` `Ambience` gained a `background` branch (fill/image/overlay + edge-centred circles); `CelestialAmbience.jsx` custom-bg branch (2D backdrop base + WebGL envelope on a z-999 wrapper that fades opacity→0 on `phase==="done"` then unmounts at `"gone"`); threaded `background` through `DigitalInvitationView`; new "الخلفية المخصّصة" editor `<Section>` + `BackgroundPreview` (live 2D, reuses `ViewStyles`) in `DigitalDesignEditor.jsx` (so the admin demo editor gets it too via `DesignEditorBody`).
 - **Two gotchas fixed during browser verify:** (1) circles sized in `vmin` looked right only at full viewport — switched to **`cqmin` with a `vmin` fallback** + `container-type:size` on the aurora so they scale to their container (correct in the small editor preview AND the public page); (2) the inner circle `<span>` was `display:inline` so `width/height:100%` were ignored and it painted nothing — fixed with `display:block`. Centre-clarity guaranteed by **centring each circle exactly on an edge point** (translate on the sized anchor) so the visible glow never reaches the centre at any size.
 - **Verified** (bundled-Chromium, MCP needs system chrome): demo default path unchanged (0 console errors); editor Background section + live preview drive cyan edge-circles with a provably clear centre (`centreCovered:0`, `visible:6` at box AND full-viewport scale); persistence round-trips. New unit tests: `digitalBackgroundSanitize.test.ts` (backend), `themeToBackground.test.js` (frontend), + a `background` assertion in `digitalPublicProjection.test.ts`. See [[Architecture Decisions]].
+
+## Seal compass-star toggle + Arabic cursive-join fix (2026-07-01)
+Two grilled tweaks (pure render/CSS + one new persisted design field). Verified end-to-end via Playwright MCP on the emulator (groom `Groom1234`).
+
+- **Seal compass star is now OFF by default + toggleable.** The wax seal had *two* independent stars: the **arabesque lattice** across flap/shell (long-standing `stars`/`starDensity`/`starIntensity` controls) and a faint **8-point "compass" star debossed behind the gold دعوة emblem on the seal disc** (`makeSealTex` in `celestial/envelopeMesh.js`), which was always drawn with no control. Grilled decision: **remove the seal star by default** for everyone, add a **separate** toggle to opt back in (the دعوة emblem always stays; only the star deboss is gated).
+  - New per-design override field **`envelope.sealStar` (boolean, default OFF)** — rides the existing `envelope` override object (same pipeline as `stars`). `resolveEnvelopePalette` (`utils/themeToEnvelopePalette.js`) resolves it as `sealStarEnabled: o.sealStar === true`; `makeSealTex` guards its two `star(...)` fills behind `if (pal.sealStarEnabled)`. Existing invitations (no `sealStar`) therefore render the seal **without** the star immediately.
+  - **Backend:** `sanitizeEnvelope` (`api/routes/digital/sanitize.ts`) whitelists `sealStar` as a boolean (mirrors the `stars` block; non-boolean → `invalid_toggle`). This is the ONLY persistence gate — `database.rules.json` does not `.validate` the `envelope` object. Without this the toggle value is silently stripped on save.
+  - **UI:** new `ToggleRow` "نجمة على الختم" / "כוכב על החותם" (`testid design-env-seal-star`) in the "المظروف ثلاثي الأبعاد" section of `DigitalDesignEditor.jsx`, beside the arabesque-stars toggle. `EnvelopePreview` re-resolves the palette, so the live 3D preview reacts. The star is a monochrome deboss (no colour control) — purely on/off.
+  - **Tests:** `themeToEnvelopePalette.test.js` (default false / true only when `=== true`) + `digitalEnvelopeSanitize.test.ts` (round-trips boolean, rejects non-boolean).
+
+- **Arabic letters now join in the scrolling invitation.** Root cause: heavy CSS `letter-spacing` (eyebrows 4px, labels/cues 2.8–3px, plus the `.4px` global base — see the 2026-06-29 note above) pries apart Arabic's cursive joins so words render as disconnected glyphs. That wide tracking is a **Latin/Hebrew** flourish (uppercase eyebrows) with no benefit for Arabic. **Language-scoped fix:** `DigitalInvitationView` now sets **`lang={lang}` on the `.dawa-inv` root** (both AR & HE are RTL, so `dir` can't distinguish them — `lang` can); `sections/InviteStyles.jsx` appends `.dawa-inv[lang="ar"] …{ letter-spacing: normal }` rules (specificity 0,3,0 beats the per-element 0,2,0 without `!important`) covering the eyebrow/label/name/foot classes + the base. **Hebrew keeps every tracking value** (flip `lang` to `he` → 4px/3px/.4px return). Verified: computed `letter-spacing` is `normal` under `lang=ar`, original under `lang=he`; Arabic preview renders joined ("يتشرفون بدعوتكم،", "دعوة شخصية").
+  - **Build gotcha (caught by browser verify):** backtick characters inside a CSS comment **inside the `` `…` `` template literal** in `InviteStyles.jsx` prematurely close the template string → Vite `Unexpected token` parse error. Keep template-literal CSS comments backtick-free.
+
+See [[Visual-Design-System]], [[Architecture-Decisions]].
+
+## Always-open section-nav column + merged صورك (2026-07-01)
+Grilled + built (pure presentational; no schema/rules/data change). The public invitation's
+navigation was reworked from a tap-to-open hamburger into a single always-visible vertical column.
+- **Decisions (grilled):** ONE always-open column pinned **top-right** (`insetInlineStart:14`, RTL →
+  right edge); **صورك on top** as the first row; then the enabled section links. **Colorful emoji**
+  next to every button (⬆️القصة📖 الصور🖼️ التفاصيل📋 المكان📍 العدّ⏳ تأكيد✅ التهاني💌 هدية🎁, صورك📸) —
+  chosen over monochrome glyphs for recognizability + consistency with the app's existing emoji. صورك
+  is the **only framed** button, framed in **`theme.accent`** (matches the palette, not hard-coded
+  gold). **No background fill** on any button (removed the frosted `theme.overlay` menu card, صورك's
+  `theme.chipBg`, and the active `theme.accentMuted` fill). Column is **visible the whole time**
+  (removed the scroll-past-hero reveal gate); it still sits at z-index 120 < envelope overlay 1000, so
+  it stays hidden behind the 3D-envelope intro and never fights it.
+- **Implementation:** `sections/InviteNavMenu.jsx` rewritten — dropped `open`/`visible` state, the
+  hamburger button, the outside-tap/Escape dismiss effect and `useRef`; kept the `IntersectionObserver`
+  scroll-spy driving `active`. New nullable prop `sorek={label,icon,onClick}` renders the framed first
+  row. Active row = accent color + weight 800; inactive = `theme.textSoft` + 600; a subtle
+  `textShadow` preserves legibility with no fill. `DigitalInvitationView.jsx` added an `icon` per
+  `navItems` entry, removed the standalone `<SorekButton/>` render, and passes `sorek` into the nav
+  menu (same visibility gate the old button had). The now-unused **`SorekButton`** was deleted from
+  `inviteShared.jsx` (and its stale mention in `WalletButton.jsx`'s header comment cleaned up).
+- **Verified** via Playwright MCP on the demo (`/d/demo/demo?demo=1`): column is `position:fixed`,
+  14px from the right, transparent background, always visible; صورك has `1px solid` accent border +
+  transparent bg (the only framed button); section rows have no border/bg (active bold+accent);
+  clicking a row smooth-scrolls (0→3591px to المكان); AR↔HE toggle localizes all labels and keeps the
+  frame on accent. Adversarial multi-lens code review found no surviving correctness/theme bugs.
+
+## DECIDED, not built: editable RSVP + change log (2026-07-02)
+
+Owner decision from the live interview in [[UX Research Discovery 2026-07-02]]: the current
+**one-shot RSVP** (a guest cannot view or change an answer after submitting) will become
+**editable until a deadline the couple controls, with a change log the couple sees** — so
+headcounts never silently shift. Chosen over "admin reset only" and "keep one-shot".
+Needs its own design + explicit go-ahead before building (token semantics, `digitalGuests`
+schema, RTDB/Firestore rules, notification surface). Until then, usability task G4 in
+[[Usability Test Plan 2026-07]] measures how guests behave when they hit the current wall.
+
+### Follow-up: icon-only circles with reveal-on-demand names (2026-07-01)
+Same session, second grilled pass. The labelled column was tightened into **icon-only circular
+buttons** — every emoji now sits in a **44px transparent circle** (`border-radius:50%`) and the names
+are **hidden by default**, revealed as a floating pill only when relevant.
+- **Decisions (grilled):** reveal = a **tooltip pill** to the inner (left, RTL) side of the circle,
+  not an inline expansion; **rings** = faint `theme.accentLine` on section circles, bolder
+  `theme.accent` on صورك **and** on the active section (a "you are here" ring); revealed label sits on
+  a **frosted chip**. A name shows when `id === active` (scroll-spy) **OR** `id === hovered`
+  (pointer/focus). صورك has no section so its name reveals on hover/press/focus only.
+- **Implementation (single file, `InviteNavMenu.jsx`):** added a `hovered` state OR'd with the existing
+  `active`; `renderCircle()` (a plain function, not a component, to avoid remount-on-hover) draws the
+  circle + an absolutely-positioned pill (`insetInlineEnd: calc(100%+8px)`, `opacity` toggled). Hover
+  wired via `onPointerEnter/Leave` + `onFocus/Blur` (pointer events cover mouse *and* touch-press; a
+  section tap also scrolls → becomes `active` → its pill persists). `aria-label` on each circle keeps
+  the name for screen readers. Scroll-spy + `go()` kept verbatim. صورك uses a synthetic id `"__sorek"`.
+- **Post-review hardening (adversarial workflow):** (1) pill text switched from `theme.accent` to
+  **`theme.overlay` bg + `theme.text`** — the palette's designed-for-legibility pair — because
+  accent-on-`chipBg` failed WCAG AA on light themes (champagne measured **2.3:1 → 12.55:1** after the
+  fix); (2) a guard effect clamps `active`/`hovered` to valid ids when `items` shrinks (the groom
+  toggling a section off in the **editor preview** really does change `items`); (3) pill got a
+  `max-width` + ellipsis cap. Dismissed as non-issues: `__sorek` id collision (ids are controlled
+  `inv-*`/`rsvp`), RTL scrollbar occlusion (≤10 circles never overflow a phone height), touch
+  "180ms vanish" (section names re-appear via the active state after the tap scrolls there).
+- **Verified** via Playwright MCP on the demo (gold + champagne themes): 44px transparent circles,
+  faint vs bolder rings, only the active pill shown by default, hover reveals just that one while the
+  active stays, click scrolls + updates the "you are here" pill, صورك reveals on hover, AR↔HE
+  localizes pills, and the champagne-theme pill contrast measures 12.55:1. Build passes; the 42 failing
+  unit tests are **pre-existing** (tokenManager/storage/forgotPassword/groomPortal — confirmed failing
+  at HEAD with all changes stashed), unrelated to this presentational change.
+
+See [[Visual-Design-System]], [[Architecture-Decisions]].

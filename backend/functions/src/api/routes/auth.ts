@@ -37,6 +37,8 @@ import { rtdbPort } from "../../domain/firebaseAdapters";
 import { HOUR_MS } from "../../constants/time";
 import { RATE } from "../../constants/rateLimits";
 import { getPublicKeyMeta, isEphemeralKey } from "../passwordCrypto";
+import { recordSecurityEvent } from "../../securityEvents";
+import { recordAutoBlockSignal } from "../../autoBlock";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -84,6 +86,14 @@ const LOGIN_RATE_PER_HOUR = 50;
 // failed attempts accumulate for an account within ONE_HOUR_MS; only failures
 // count (cleared on success) so legitimate repeated logins are never locked out.
 const LOGIN_MAX_FAILURES_PER_ACCOUNT = 10;
+// Defensive upper bounds on raw auth input — reject absurd payloads before any
+// work (large-body / ReDoS hygiene). Real usernames are ≤60 chars (isUsername)
+// and a portal password never needs to be huge; these are generous ceilings, not
+// the real policy (which Firebase Auth + isStrongPassword still enforce).
+const MAX_USERNAME_INPUT_LEN = 256;
+const MAX_PASSWORD_INPUT_LEN = 1024;
+const MAX_PHONE_INPUT_LEN = 64;
+const MAX_RECAPTCHA_TOKEN_LEN = 4096;
 const REFRESH_RATE_PER_HOUR = 60;
 const OTP_RATE_PER_HOUR = 5;
 const VERIFY_OTP_RATE_PER_HOUR = 5;
@@ -152,19 +162,31 @@ authRouter.post(
   ipRateLimitPersistent("login", LOGIN_RATE_PER_HOUR, ONE_HOUR_MS),
   async (req, res) => {
     const { username, password } = req.body ?? {};
-    if (typeof username !== "string" || typeof password !== "string") {
+    if (
+      typeof username !== "string" ||
+      typeof password !== "string" ||
+      username.length > MAX_USERNAME_INPUT_LEN ||
+      password.length > MAX_PASSWORD_INPUT_LEN
+    ) {
       res.status(400).json({ error: "missing_fields" });
       return;
     }
 
     const acct = username.trim().toLowerCase();
     const acctKey = `login_acct:${acct}`;
-    // Per-account lockout (see LOGIN_MAX_FAILURES_PER_ACCOUNT). Skipped under the
-    // emulator so e2e suites can hammer login without tripping it.
-    if (!IN_EMULATOR && (await failureCountPersistent(rtdbPort(), acctKey)) >= LOGIN_MAX_FAILURES_PER_ACCOUNT) {
-      res.status(429).json({ error: "too_many_requests", scope: "account" });
-      return;
-    }
+    // The per-account failure count is a SIGNAL — NOT a pre-credential hard block.
+    // A hard block let an unauthenticated attacker lock out a real user (incl.
+    // admin) with ~10 wrong-password POSTs from one IP: a cheap targeted
+    // account-lockout DoS, and precisely the account-block that autoBlock.ts
+    // deliberately refuses to do. Instead we ALWAYS verify the password: a correct
+    // one logs in and clears the counter (so a legitimate user can never be locked
+    // out by someone else's failures), and only a FAILED attempt against an
+    // already-maxed account is answered with 429. Brute force stays bounded by the
+    // per-IP limiter (50/hr) + the auth_failure IP auto-block. Skipped in the
+    // emulator so e2e suites can hammer login.
+    const lockedOut =
+      !IN_EMULATOR &&
+      (await failureCountPersistent(rtdbPort(), acctKey)) >= LOGIN_MAX_FAILURES_PER_ACCOUNT;
 
     const apiKey = effectiveApiKey();
     if (!apiKey) {
@@ -187,7 +209,18 @@ authRouter.post(
       const code = extractFirebaseErrorCode(fbData);
       if (LOGIN_INVALID_CREDENTIAL_CODES.has(code)) {
         if (!IN_EMULATOR) await recordFailurePersistent(rtdbPort(), acctKey, ONE_HOUR_MS);
-        res.status(401).json({ error: "invalid_credentials" });
+        recordSecurityEvent(lockedOut ? "account_lockout" : "auth_failure", req, {
+          detail: { account: acct },
+        });
+        recordAutoBlockSignal("auth_failure", req);
+        // A failed attempt against an already-maxed account → 429 (throttle the
+        // attacker). A correct password never reaches this branch, so the real
+        // user is never locked out by another party's failures.
+        if (lockedOut) {
+          res.status(429).json({ error: "too_many_requests", scope: "account" });
+        } else {
+          res.status(401).json({ error: "invalid_credentials" });
+        }
         return;
       }
       // Don't echo the raw Firebase code to the client — codes such as
@@ -344,7 +377,10 @@ authRouter.post(
     if (
       typeof username !== "string" ||
       typeof phoneE164 !== "string" ||
-      typeof recaptchaToken !== "string"
+      typeof recaptchaToken !== "string" ||
+      username.length > MAX_USERNAME_INPUT_LEN ||
+      phoneE164.length > MAX_PHONE_INPUT_LEN ||
+      recaptchaToken.length > MAX_RECAPTCHA_TOKEN_LEN
     ) {
       res.status(400).json({ error: "missing_fields" });
       return;
@@ -366,6 +402,7 @@ authRouter.post(
         ONE_HOUR_MS
       ))
     ) {
+      recordSecurityEvent("otp_abuse", req, { detail: { account: acct, scope: "account" } });
       res.status(429).json({ error: "too_many_requests", scope: "account" });
       return;
     }

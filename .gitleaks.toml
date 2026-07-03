@@ -32,4 +32,7 @@ regexes = [
   '''6L[0-9A-Za-z_-]{38}''',
   # The literal test-fixture secret string.
   '''test-secret-at-least-16-chars-long''',
+  # Fake fixture key bm90LWEta2V5 == base64("not-a-key"), quoted verbatim in the
+  # passwordCrypto test and echoed by the security audit docs (2026-06-29 F-P).
+  '''bm90LWEta2V5''',
 ]

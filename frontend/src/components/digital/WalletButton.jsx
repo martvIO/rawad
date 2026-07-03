@@ -6,7 +6,8 @@
 // follows the 302 to pay.google.com. No fetch / no auth header: the guest token
 // in the URL is the only credential (same trust model as the invitation itself).
 //
-// Styled with the groom's chosen palette + font, mirroring SorekButton. Mounted
+// Styled with the groom's chosen palette + font, matching the invitation's other
+// guest-facing chips. Mounted
 // only when the admin enabled the per-groom `canUseBoardingPass` flag (gated by
 // the parent). If the backend platform isn't configured yet, tapping returns a
 // 503 and nothing is added — the button simply no-ops gracefully.

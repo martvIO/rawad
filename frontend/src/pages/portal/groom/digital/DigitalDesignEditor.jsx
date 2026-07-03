@@ -43,6 +43,12 @@ import {
   SAMPLE_WISHES,
 } from "../../../../data/digitalInviteDefaults.js";
 import { hasContent } from "../../../../utils/localize.js";
+import {
+  SCALAR_KEYS,
+  ARRAY_KEYS,
+  TOGGLE_KEYS,
+  DESIGN_STATUS_META,
+} from "@dawa/core/data/digitalDesignSchema.js";
 
 const tt = (lang, ar, he) => (lang === "he" ? he : ar);
 
@@ -76,29 +82,11 @@ function mergeLang(arAr, heAr, keys) {
   });
 }
 
-// Every scalar/array field the groom edits lives in one buffered object so the
-// preview is a simple merge and autosave can target a single key at a time.
-const SCALAR_KEYS = [
-  "title",
-  "brideName", "groomDisplayName", "eyebrow", "blessing", "welcome", "monogram",
-  "venue", "venueCity", "venueAddress", "accessNote", "dressCode",
-  "giftNote", "giftIban", "musicUrl",
-];
-const ARRAY_KEYS = ["storyTimeline", "details", "hotels", "wishes", "mealOptions"];
-const TOGGLE_KEYS = [
-  "storyEnabled", "galleryEnabled", "detailsEnabled", "venueEnabled",
-  "countdownEnabled", "guestbookEnabled", "giftEnabled", "musicEnabled",
-  "footerDockEnabled", "envelopeEnabled", "heroMediaEnabled",
-  "rsvpCompanionsEnabled", "rsvpMealEnabled", "rsvpSongEnabled",
-  "immersive3d",
-];
-
-const DESIGN_STATUS_META = {
-  draft:            { ar: "مسوّدة", he: "טיוטה", color: "#c9a84c" },
-  pending_approval: { ar: "بانتظار الموافقة", he: "ממתין לאישור", color: "#4b9fd4" },
-  approved:         { ar: "معتمد", he: "מאושר", color: "#4cc97a" },
-  rejected:         { ar: "مرفوض", he: "נדחה", color: "#d4533a" },
-};
+// SCALAR_KEYS / ARRAY_KEYS / TOGGLE_KEYS / DESIGN_STATUS_META are imported from
+// the shared schema (@dawa/core/data/digitalDesignSchema.js) so the web + native
+// editors can't drift. Every scalar/array field the groom edits lives in one
+// buffered object so the preview is a simple merge and autosave targets a single
+// key at a time.
 
 function pillBtn(enabled) {
   return {
@@ -1169,6 +1157,7 @@ export function DesignEditorBody({ groomUid, designId, adminDemoMode = false, on
 
           <div style={{ marginTop: 12 }}>
             <ToggleRow label={tt(lang, "نجوم على كامل المظروف", "כוכבים על כל המעטפה")} checked={envOverrides.stars !== false} disabled={!editable} testid="design-env-stars" onChange={(c) => setEnvField("stars", c)} />
+            <ToggleRow label={tt(lang, "نجمة على الختم", "כוכב על החותם")} checked={envOverrides.sealStar === true} disabled={!editable} testid="design-env-seal-star" onChange={(c) => setEnvField("sealStar", c)} />
           </div>
           <RangeRow testid="design-env-density" label={tt(lang, "كثافة النجوم", "צפיפות הכוכבים")} min={1} max={4} step={1} value={envOverrides.starDensity ?? 2} disabled={!editable || envOverrides.stars === false} onInput={(v) => bufferEnvField("starDensity", v)} onCommit={(v) => commitEnvField("starDensity", v)} />
           <RangeRow testid="design-env-intensity" label={tt(lang, "وضوح النجوم", "עוצמת הכוכבים")} min={0} max={1} step={0.05} value={envOverrides.starIntensity ?? 0.22} disabled={!editable || envOverrides.stars === false} onInput={(v) => bufferEnvField("starIntensity", v)} onCommit={(v) => commitEnvField("starIntensity", v)} />

@@ -49,9 +49,25 @@ const asGroom  = (uid = GROOM) => env.authenticatedContext(uid).firestore();
 
 // ── parent invitation doc ─────────────────────────────────────────────────────
 describe("digitalInvitations/{groomUid} (parent doc)", () => {
-  test("anyone (even anon) can READ the parent doc — guests open links", async () => {
+  // Parent doc is OWNER/ADMIN read only. Guests read the wedding data through the
+  // server-mediated GET /digital/:uid/public endpoint (allowlisted + approved-only
+  // + freeze-gated), NOT by reading this doc directly. A blanket public read here
+  // leaked legacy grooms' full design payload off the parent (2026-07-02 audit).
+  test("anon CANNOT read the parent doc directly", async () => {
     await seed(async (db) => setDoc(doc(db, `digitalInvitations/${GROOM}`), { weddingDate: 1 }));
-    await assertSucceeds(getDoc(doc(asAnon(), `digitalInvitations/${GROOM}`)));
+    await assertFails(getDoc(doc(asAnon(), `digitalInvitations/${GROOM}`)));
+  });
+  test("groom CAN read their own parent doc", async () => {
+    await seed(async (db) => setDoc(doc(db, `digitalInvitations/${GROOM}`), { weddingDate: 1 }));
+    await assertSucceeds(getDoc(doc(asGroom(), `digitalInvitations/${GROOM}`)));
+  });
+  test("a different groom CANNOT read another groom's parent doc", async () => {
+    await seed(async (db) => setDoc(doc(db, `digitalInvitations/${GROOM}`), { weddingDate: 1 }));
+    await assertFails(getDoc(doc(asGroom(GROOM2), `digitalInvitations/${GROOM}`)));
+  });
+  test("admin CAN read any parent doc", async () => {
+    await seed(async (db) => setDoc(doc(db, `digitalInvitations/${GROOM}`), { weddingDate: 1 }));
+    await assertSucceeds(getDoc(doc(asAdmin(), `digitalInvitations/${GROOM}`)));
   });
   test("groom can WRITE their own parent doc", async () => {
     await assertSucceeds(setDoc(doc(asGroom(), `digitalInvitations/${GROOM}`), { weddingDate: 1 }));

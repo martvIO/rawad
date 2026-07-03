@@ -47,6 +47,9 @@ import {
   publicEventState,
 } from "../../lifecycle/status";
 import { isUsername } from "../../helpers";
+import { uidRateLimit, keyedRateLimit } from "../middleware/rateLimit";
+import { HOUR_MS } from "../../constants/time";
+import { RATE } from "../../constants/rateLimits";
 import { errorMessage } from "../errorDetail";
 
 export const lifecycleRouter = Router();
@@ -136,6 +139,7 @@ lifecycleRouter.post(
   "/cancel",
   requireAuth,
   requireRole("groom"),
+  uidRateLimit("lifecycleAction", RATE.LIFECYCLE_ACTION_PER_USER.limit, HOUR_MS),
   async (req: AuthRequest, res: Response) => {
     const uid = req.caller!.uid;
     try {
@@ -191,6 +195,7 @@ lifecycleRouter.post(
   "/cancel/undo",
   requireAuth,
   requireRole("groom"),
+  uidRateLimit("lifecycleAction", RATE.LIFECYCLE_ACTION_PER_USER.limit, HOUR_MS),
   async (req: AuthRequest, res: Response) => {
     const uid = req.caller!.uid;
     try {
@@ -223,6 +228,7 @@ lifecycleRouter.post(
   "/pause",
   requireAuth,
   requireRole("groom"),
+  uidRateLimit("lifecycleAction", RATE.LIFECYCLE_ACTION_PER_USER.limit, HOUR_MS),
   async (req: AuthRequest, res: Response) => {
     const uid = req.caller!.uid;
     const rawDate = req.body?.newDate;
@@ -264,6 +270,7 @@ lifecycleRouter.post(
   "/resume",
   requireAuth,
   requireRole("groom"),
+  uidRateLimit("lifecycleAction", RATE.LIFECYCLE_ACTION_PER_USER.limit, HOUR_MS),
   async (req: AuthRequest, res: Response) => {
     const uid = req.caller!.uid;
     try {
@@ -302,6 +309,15 @@ lifecycleRouter.post(
  */
 lifecycleRouter.get(
   "/public/:username",
+  // Per-username bucket + per-IP backstop so registered usernames can't be
+  // enumerated by status-code probing (audit: public status had no limiter).
+  keyedRateLimit(
+    "publicStatus",
+    (req) => (req.params.username ?? "").toString().toLowerCase(),
+    RATE.PUBLIC_STATUS_PER_NAME.limit,
+    HOUR_MS,
+    RATE.PUBLIC_STATUS_IP_BACKSTOP.limit,
+  ),
   async (req: Request, res: Response) => {
     const username = (req.params.username ?? "").toString().toLowerCase();
     if (!isUsername(username)) {
@@ -364,6 +380,7 @@ lifecycleRouter.post(
   "/:uid/confirm-cancel",
   requireAuth,
   requireAdmin,
+  uidRateLimit("lifecycleAdmin", RATE.LIFECYCLE_ADMIN_PER_ADMIN.limit, HOUR_MS),
   async (req: AuthRequest, res: Response) => {
     const { uid } = req.params;
     try {
@@ -394,6 +411,7 @@ lifecycleRouter.post(
   "/:uid/restore",
   requireAuth,
   requireAdmin,
+  uidRateLimit("lifecycleAdmin", RATE.LIFECYCLE_ADMIN_PER_ADMIN.limit, HOUR_MS),
   async (req: AuthRequest, res: Response) => {
     const { uid } = req.params;
     try {

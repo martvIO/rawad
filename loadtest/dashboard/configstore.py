@@ -41,11 +41,15 @@ DEFAULT_CONFIG: Dict[str, Any] = {
 }
 
 # Defaults mirror locustfile.py CREDENTIALS (env LOADTEST_*_USER/PASS override).
+# Passwords have NO baked-in default — set them in the gitignored loadtest/.env.
+# A real password must NEVER be committed here (see docs/security audit): an empty
+# default makes a missing credential fail the login loudly instead of silently
+# authenticating against production.
 DEFAULT_CREDENTIALS: Dict[str, str] = {
     "admin_user": "admin",
-    "admin_pass": "DawaAdmin2026",
+    "admin_pass": "",
     "groom_user": "groom",
-    "groom_pass": "DawaGroom2026",
+    "groom_pass": "",
 }
 
 # Credential-ish keys are stripped from any preset / config that gets persisted.

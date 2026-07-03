@@ -5,6 +5,7 @@
 //   POST /invites/submit           PUBLIC: submit physical reply
 //   POST /invites/digital          groom/admin: mint digital token
 //   POST /invites/digital/submit   PUBLIC: submit digital reply
+//   POST /invites/manual-sent      admin: stamp a manual (wa.me fallback) send
 //   GET  /invites/token/:token     PUBLIC: fetch a token record
 
 import { api } from "../utils/apiClient.js";
@@ -49,6 +50,14 @@ export async function createDigitalGuestInvite(input) {
  */
 export async function notifyDigitalGuest(input) {
   return api.post("/invites/notify", input);
+}
+
+/**
+ * Stamp a guest as sent-manually after the admin used the wa.me fallback
+ * modal. Admin-only. Body: `{ type: "physical"|"digital", groomUid, guestId }`.
+ */
+export async function markInviteManualSent(input) {
+  return api.post("/invites/manual-sent", input);
 }
 
 /**

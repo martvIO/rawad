@@ -53,6 +53,10 @@
       "Bash(npx skills@latest --help)"
     ]
   },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "playwright"
+  ],
   "hooks": {
     "SessionStart": [
       {
@@ -81,7 +85,11 @@
     ]
   },
   "enabledPlugins": {
-    "ui-ux-pro-max@ui-ux-pro-max-skill": true
+    "ui-ux-pro-max@ui-ux-pro-max-skill": true,
+    "design-research@designer-skills": true,
+    "ux-strategy@designer-skills": true,
+    "ui-design@designer-skills": true,
+    "design-ops@designer-skills": true
   },
   "defaultMode": "plan"
 }

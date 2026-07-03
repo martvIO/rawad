@@ -16,7 +16,8 @@ const tabIcon =
     <Ionicons name={name} size={size} color={color} />;
 
 export default function GroomLayout() {
-  const { t } = usePortal();
+  const { t, user } = usePortal();
+  const canUsePhotographer = user?.canUsePhotographer !== false;
   return (
     <ToastProvider>
       <DigitalProvider>
@@ -41,11 +42,26 @@ export default function GroomLayout() {
             options={{ title: t("tab_guests") || "المدعوون", tabBarIcon: tabIcon("people-outline") }}
           />
           <Tabs.Screen
+            name="photographer"
+            options={{
+              title: t("tab_photographer") || "المصور",
+              tabBarIcon: tabIcon("camera-outline"),
+              // Hidden from the tab bar (and unreachable) when the account can't use it.
+              href: canUsePhotographer ? undefined : null,
+            }}
+          />
+          <Tabs.Screen
+            name="design"
+            options={{ title: t("tab_design") || "التصميم", tabBarIcon: tabIcon("color-palette-outline") }}
+          />
+          <Tabs.Screen
             name="manage"
             options={{ title: t("tab_manage") || "إدارة", tabBarIcon: tabIcon("settings-outline") }}
           />
           <Tabs.Screen name="help" options={{ href: null }} />
           <Tabs.Screen name="terms" options={{ href: null }} />
+          <Tabs.Screen name="add-guest" options={{ href: null }} />
+          <Tabs.Screen name="design-preview" options={{ href: null }} />
         </Tabs>
       </DigitalProvider>
     </ToastProvider>

@@ -121,6 +121,25 @@ export async function updateDigitalGuest(groomUid, guestId, patch) {
   return api.patch(`/digital/${uid}/guests/${guestId}`, patch);
 }
 
+/**
+ * Bulk role edit — patch many guests' `ranks` in ONE request. `updates` is
+ * `[{ id, ranks: string[] }]`; the server commits them as a single (chunked)
+ * Firestore batch, so a bulk change is one API call, not one per guest. The
+ * caller pre-computes each guest's final ranks (Add = union, Replace = the set).
+ */
+export async function updateManyDigitalGuests(groomUid, updates) {
+  const uid = resolveUid(groomUid);
+  const clean = (Array.isArray(updates) ? updates : [])
+    .filter((u) => u && u.id)
+    .map((u) => ({
+      id: u.id,
+      ranks: Array.isArray(u.ranks)
+        ? u.ranks.map((r) => String(r || "").trim()).filter(Boolean)
+        : [],
+    }));
+  return api.patch(`/digital/${uid}/guests`, { updates: clean });
+}
+
 export async function removeDigitalGuest(groomUid, guestId) {
   const uid = resolveUid(groomUid);
   return api.delete(`/digital/${uid}/guests/${guestId}`);

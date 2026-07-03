@@ -71,6 +71,7 @@ export const usersRouter = Router();
 usersRouter.get(
   "/groom-profiles",
   requireAuth,
+  uidRateLimit("listGroomProfiles", RATE.GROOM_PROFILES_READ_PER_USER.limit, ONE_HOUR_MS),
   async (_req: AuthRequest, res: Response) => {
     try {
       res.json(await userStore.listGroomProfiles());
@@ -92,6 +93,7 @@ usersRouter.put(
   "/groom-profiles/:uid",
   requireAuth,
   requireAdmin,
+  uidRateLimit("putGroomProfile", RATE.GROOM_PROFILE_WRITE_PER_ADMIN.limit, ONE_HOUR_MS),
   async (req: AuthRequest, res: Response) => {
     const { uid } = req.params;
     const { username, displayName } = req.body ?? {};
@@ -122,6 +124,7 @@ usersRouter.delete(
   "/groom-profiles/:uid",
   requireAuth,
   requireAdmin,
+  uidRateLimit("deleteGroomProfile", RATE.GROOM_PROFILE_WRITE_PER_ADMIN.limit, ONE_HOUR_MS),
   async (req: AuthRequest, res: Response) => {
     const { uid } = req.params;
     try {
@@ -147,6 +150,7 @@ usersRouter.get(
   "/",
   requireAuth,
   requireAdmin,
+  uidRateLimit("listUsers", RATE.USERS_LIST_PER_ADMIN.limit, ONE_HOUR_MS),
   async (_req: AuthRequest, res: Response) => {
     try {
       res.json(await userStore.listUsers());
@@ -316,6 +320,7 @@ usersRouter.patch(
   "/:uid",
   requireAuth,
   requireAdmin,
+  uidRateLimit("patchUser", RATE.UPDATE_USER_PER_ADMIN.limit, ONE_HOUR_MS),
   async (req: AuthRequest, res: Response) => {
     const { uid } = req.params;
     const patch = req.body;
@@ -633,6 +638,7 @@ usersRouter.post(
   "/:uid/admin-claim",
   requireAuth,
   requireAdmin,
+  uidRateLimit("adminClaim", RATE.ADMIN_CLAIM_PER_ADMIN.limit, ONE_HOUR_MS),
   async (req: AuthRequest, res: Response) => {
     const callerUid = req.caller!.uid;
     const { uid } = req.params;

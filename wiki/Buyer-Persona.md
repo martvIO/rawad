@@ -3,8 +3,18 @@
 A starting persona for [[Dawa]], created 2026-06-20 as part of the
 [[CRO and IA Audit 2026-06-20]]. The owner reported being "somewhat blind" on a
 codified persona — so this is a **hypothesis grounded in the brief, NOT validated
-research.** Action: confirm/correct it against your last ~10 real customers (who
-actually paid, their town, plan, who decided, who paid) and 3–5 short calls.
+research.**
+
+> **2026-07-02 update** ([[UX Research Discovery 2026-07-02]]): the persona set was expanded to
+> **4 personas** — Rania "the organized bride" (primary; the couple operates the portal
+> *together*, per the owner interview), the older WhatsApp-only guest (sets the experience floor),
+> the field driver, and the operator-admin. **The validation plan below is impossible as written:
+> the owner confirmed there are 0 paying customers to date** (inner-circle testing only).
+> Validate instead via pilot weddings + prospects — first instrument: [[Usability Test Plan 2026-07]].
+
+~~Action: confirm/correct it against your last ~10 real customers (who
+actually paid, their town, plan, who decided, who paid) and 3–5 short calls.~~
+*(superseded — no past customers exist yet; see the 2026-07-02 update above)*
 
 > Note the split between **user** (the couple, who experiences the product) and
 > **economic buyer** (often a parent/family, who pays). The pitch must satisfy both.

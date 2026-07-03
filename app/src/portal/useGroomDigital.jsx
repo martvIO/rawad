@@ -21,7 +21,9 @@ import {
   setGuestRanks,
   addInvitationMedia,
   removeInvitationMedia,
+  addDigitalGuest,
   updateDigitalGuest,
+  updateManyDigitalGuests,
   removeDigitalGuest,
 } from "@dawa/core/services/digitalInvitation.js";
 import { localizeApiError } from "@dawa/core/utils/apiError.js";
@@ -57,6 +59,7 @@ export function DigitalProvider({ children }) {
   const [uploadState, setUploadState] = useState({ busy: false, progress: 0, pending: [] });
 
   const pendingPathsRef = useRef(new Map()); // storagePath -> media item (in-flight)
+  const pendingGuestsRef = useRef(new Map()); // id -> just-added guest (poll-race bridge)
   const subsRef = useRef([]);
   const uploadAbortRef = useRef(null);
 
@@ -78,13 +81,25 @@ export function DigitalProvider({ children }) {
     return { ...serverDoc, media };
   }, []);
 
+  // Bridge a just-added guest across the poll that hasn't indexed it yet, so a
+  // stale-in-flight poll can't momentarily drop it (guest twin of mergePending).
+  const mergePendingGuests = useCallback((list) => {
+    const arr = Array.isArray(list) ? [...list] : [];
+    const have = new Set(arr.map((g) => g.id));
+    for (const [id, g] of pendingGuestsRef.current) {
+      if (have.has(id)) pendingGuestsRef.current.delete(id);
+      else arr.unshift(g);
+    }
+    return arr;
+  }, []);
+
   const subscribe = useCallback(() => {
     if (!uid) return;
     subsRef.current = [
       subscribeDigitalGuests(
         uid,
         (list) => {
-          setGuests(list || []);
+          setGuests(mergePendingGuests(list));
           setLoading(false);
         },
         (e) => fail(e),
@@ -92,7 +107,7 @@ export function DigitalProvider({ children }) {
       subscribeDigitalMedia(uid, (d) => setDoc(d), (e) => fail(e), mergePending),
       subscribeDesigns(uid, (d) => setDesigns(d || []), () => {}),
     ];
-  }, [uid, fail, mergePending]);
+  }, [uid, fail, mergePending, mergePendingGuests]);
 
   const unsubscribeAll = useCallback(() => {
     subsRef.current.forEach((u) => {
@@ -178,6 +193,20 @@ export function DigitalProvider({ children }) {
     [uid, ranks, fail],
   );
 
+  // Add one guest. Throws to the caller (the Add screen handles the toast +
+  // duplicate_phone code). Optimistically prepends + bridges the poll race.
+  const addGuest = useCallback(
+    async ({ name, phone, ranks }) => {
+      const id = await addDigitalGuest(uid, { name, phone, ranks });
+      const optimistic = { id, name, phone, status: "pending", createdAt: Date.now() };
+      if (ranks?.length) optimistic.ranks = ranks;
+      pendingGuestsRef.current.set(id, optimistic);
+      setGuests((gs) => (gs.some((g) => g.id === id) ? gs : [optimistic, ...gs]));
+      return id;
+    },
+    [uid],
+  );
+
   const editGuest = useCallback(
     async (id, patch) => {
       await updateDigitalGuest(uid, id, patch); // throws to caller (sheet) on failure
@@ -186,10 +215,24 @@ export function DigitalProvider({ children }) {
     [uid],
   );
 
+  // Bulk role edit — ONE API call for many guests. `updates` is
+  // [{ id, ranks }] with each guest's FINAL ranks (caller computed Add/Replace).
+  // Optimistic: apply locally, then persist; throws to the caller on failure so
+  // the sheet can surface it (server-side it's a single Firestore batch).
+  const bulkUpdateGuests = useCallback(
+    async (updates) => {
+      const byId = new Map(updates.map((u) => [u.id, u.ranks]));
+      setGuests((gs) => gs.map((g) => (byId.has(g.id) ? { ...g, ranks: byId.get(g.id) } : g)));
+      await updateManyDigitalGuests(uid, updates);
+    },
+    [uid],
+  );
+
   const deleteGuest = useCallback(
     async (id) => {
       try {
         await removeDigitalGuest(uid, id);
+        pendingGuestsRef.current.delete(id);
         setGuests((gs) => gs.filter((g) => g.id !== id));
       } catch (e) {
         fail(e);
@@ -326,7 +369,9 @@ export function DigitalProvider({ children }) {
     setDate,
     addRank,
     removeRank,
+    addGuest,
     editGuest,
+    bulkUpdateGuests,
     deleteGuest,
     cycleGuestStatus,
     addMedia,

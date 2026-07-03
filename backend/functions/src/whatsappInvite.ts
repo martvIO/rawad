@@ -33,6 +33,7 @@ import {
   WhatsAppConfig,
   InviteSlot,
 } from "./whatsappConfig";
+import { reserveDailySend } from "./waRateLimit";
 
 export type InviteType = "physical" | "digital";
 export type InviteLocale = "ar" | "he";
@@ -112,6 +113,13 @@ export async function deliverInvite(
   if (!isConfigured(config) || !config.autoSendEnabled) return { ok: false, error: "not_configured" };
   const e164 = normalisePhone(String(input.phone || ""));
   if (!e164) return { ok: false, error: "invalid_phone" };
+
+  // Reserve a slot against the daily cap BEFORE hitting Meta. Over cap →
+  // "daily_cap"; the Send-tab frontend surfaces it in the manual-send fallback
+  // modal, so the admin delivers the overflow from their own WhatsApp (which
+  // does not consume the API cap) and stamps it "manual".
+  const reservation = await reserveDailySend(config.dailyCap);
+  if (!reservation.allowed) return { ok: false, error: "daily_cap" };
 
   const creds = { token: config.token, phoneId: config.phoneId };
   const tmpl = config.templates[inviteSlot(input.type, input.locale)];
@@ -206,6 +214,22 @@ export async function recordFailed(
   }).catch(() => undefined);
 }
 
+/** Stamp a MANUAL send — the admin delivered the invite themselves via a wa.me
+ *  tab after a failed/unconfigured auto-send (Send-tab fallback modal). No
+ *  waMessages index entry (there's no wamid), and isStatusProgression treats
+ *  "manual" as receipt-proof — only a real later resend overwrites it.
+ *  Unlike recordSent/recordFailed (best-effort side stamps during a send),
+ *  this stamp IS the endpoint's whole job, so write errors propagate to the
+ *  caller (POST /invites/manual-sent → 500) instead of being swallowed. */
+export async function recordManualSent(
+  stampGuest: (patch: Record<string, unknown>) => Promise<unknown>,
+): Promise<void> {
+  await stampGuest({
+    inviteWaStatus: "manual",
+    inviteWaStatusAt: Date.now(),
+  });
+}
+
 // ─── Webhook status extraction ──────────────────────────────────────────────
 
 export interface StatusUpdate {
@@ -246,8 +270,12 @@ const STATUS_RANK: Record<string, number> = { sent: 1, delivered: 2, read: 3 };
  * Whether `next` should overwrite the currently-stored `cur` status. Receipts
  * can arrive out of order (a late "delivered" after "read"); we only ever move
  * forward. "failed" is always recordable unless the message was already read.
+ * "manual" is admin-asserted, not receipt-derived: a duplicate/late receipt for
+ * the pre-fallback wamid must never clobber it (only a real resend via
+ * recordSent overwrites, which stamps directly).
  */
 export function isStatusProgression(cur: string | undefined, next: string): boolean {
+  if (cur === "manual") return false;
   if (next === "failed") return cur !== "read";
   const c = STATUS_RANK[cur ?? ""] ?? 0;
   const n = STATUS_RANK[next] ?? 0;

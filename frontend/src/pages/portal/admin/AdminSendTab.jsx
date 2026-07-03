@@ -14,6 +14,7 @@ import { logErr } from "../../../utils/logger.js";
 import { useListFilter, filterList } from "../../../utils/searchFilter.js";
 import { SearchBar } from "../../../components/SearchBar.jsx";
 import { FilterChips } from "../../../components/FilterChips.jsx";
+import { WaSendFallbackModal } from "./WaSendFallbackModal.jsx";
 
 // Guest ranks may be the new `ranks: string[]` or a legacy single `rank: string`.
 function guestRanks(g) {
@@ -41,6 +42,7 @@ const WA_STATUS_STYLE = {
   delivered: { icon: "✓",  color: "#4b9fd4", bg: "rgba(75,159,212,.14)" },
   read:      { icon: "👁", color: "#4cc97a", bg: "rgba(76,201,122,.15)" },
   failed:    { icon: "⚠",  color: "#d47a4b", bg: "rgba(212,122,75,.18)" },
+  manual:    { icon: "✍",  color: "#b48bd4", bg: "rgba(180,139,212,.14)" },
 };
 // Replace {الاسم}/{name}/{שם} placeholders with the guest's name.
 const personalize = (msg, name) =>
@@ -50,6 +52,7 @@ export function AdminSendTab() {
   const {
     users, guests, adminSelectedGroom, setAdminSelectedGroom,
     t, lang, sendInviteLink, sendDigitalInviteLink, digitalGuestsForSelectedGroom,
+    prepareResendFallback, markManualSent,
     guestConfirmationStatus, showToast, adminMode,
   } = usePortal();
 
@@ -62,6 +65,11 @@ export function AdminSendTab() {
   // Per-groom WhatsApp message for DIGITAL guests, typed on this page. Keyed by
   // groom username so each groom keeps its own draft while switching around.
   const [digitalMsgByGroom, setDigitalMsgByGroom] = useState({});
+  // Manual-send fallback modal — { failures: [payload, …] } when a send didn't
+  // go out (single send, bulk summary, or a clicked ⚠ failed pill).
+  const [fallback, setFallback] = useState(null);
+  // Guards the ⚠ pill against double-fire while a re-mint is in flight.
+  const [pillBusy, setPillBusy] = useState(false);
 
   useEffect(() => {
     const groomUser = adminSelectedGroom ? users.find((u) => u.username === adminSelectedGroom) : null;
@@ -109,10 +117,20 @@ export function AdminSendTab() {
 
     let ok = 0;
     let fail = 0;
+    const failures = [];
     for (let i = 0; i < n; i++) {
       // Sequential awaits keep us under the per-user rate limit.
-      const res = await sendInviteLink(guestList[i], { silent: true });
-      if (res?.ok) ok++; else fail++;
+      const g = guestList[i];
+      const res = await sendInviteLink(g, { silent: true });
+      if (res?.ok) ok++;
+      else {
+        fail++;
+        // Failures without a fallback payload (early exits) still get a summary
+        // row so the admin sees WHO failed — just without copy/open buttons.
+        failures.push(
+          res?.fallback ?? { guestId: g.id, name: g.name, phone: g.phone, error: res?.error || "send_failed" },
+        );
+      }
       if (i < n - 1) {
         await new Promise((resolve) => setTimeout(resolve, 300));
       }
@@ -122,6 +140,7 @@ export function AdminSendTab() {
         ? `נשלחו: ${ok.toLocaleString("en")} · נכשלו: ${fail.toLocaleString("en")}`
         : `تم الإرسال: ${ok.toLocaleString("en")} · فشل: ${fail.toLocaleString("en")}`,
     );
+    if (failures.length) setFallback({ failures });
   };
             const groomList = users.filter(u => u.role === "groom");
             // Show ALL of the groom's guests (confirmed + not). Each card labels
@@ -386,14 +405,43 @@ export function AdminSendTab() {
                                     background: REPLY_STATUS.pending.bg, color: REPLY_STATUS.pending.color,
                                   }}>{t("reply_pending")}</span>
                                 )}
-                                {/* WhatsApp delivery status — sent → delivered → read (or failed),
-                                    advanced by the Meta receipt webhook. */}
+                                {/* WhatsApp delivery status — sent → delivered → read (or failed /
+                                    manual), advanced by the Meta receipt webhook. The FAILED pill is
+                                    clickable: it rebuilds the manual-send payload (reusing or
+                                    re-minting the token) and reopens the fallback modal. */}
                                 {WA_STATUS_STYLE[g.inviteWaStatus] && (
-                                  <span style={{
-                                    fontSize: 10, padding: "2px 8px", borderRadius: 20, fontWeight: 700,
-                                    background: WA_STATUS_STYLE[g.inviteWaStatus].bg,
-                                    color: WA_STATUS_STYLE[g.inviteWaStatus].color,
-                                  }}>{WA_STATUS_STYLE[g.inviteWaStatus].icon} {t("wa_status_" + g.inviteWaStatus)}</span>
+                                  g.inviteWaStatus === "failed" ? (
+                                    <button
+                                      onClick={async () => {
+                                        if (pillBusy) return;
+                                        setPillBusy(true);
+                                        try {
+                                          // Mirror exactly what this row's send button would send.
+                                          const payload = await prepareResendFallback(g, {
+                                            digital: !!sec.digital,
+                                            groomUid: selectedGroomUid,
+                                            customMessage: sec.digital ? personalize(digitalMsg, g.name) : undefined,
+                                            noDesign: sec.digital ? noDesign : false,
+                                          });
+                                          if (payload) setFallback({ failures: [payload] });
+                                        } finally { setPillBusy(false); }
+                                      }}
+                                      title={t("wa_fallback_title")}
+                                      style={{
+                                        fontSize: 10, padding: "2px 8px", borderRadius: 20, fontWeight: 700,
+                                        background: WA_STATUS_STYLE.failed.bg,
+                                        color: WA_STATUS_STYLE.failed.color,
+                                        border: "none", cursor: "pointer", fontFamily: "inherit",
+                                        opacity: pillBusy ? 0.6 : 1,
+                                      }}
+                                    >{WA_STATUS_STYLE.failed.icon} {t("wa_status_failed")}</button>
+                                  ) : (
+                                    <span style={{
+                                      fontSize: 10, padding: "2px 8px", borderRadius: 20, fontWeight: 700,
+                                      background: WA_STATUS_STYLE[g.inviteWaStatus].bg,
+                                      color: WA_STATUS_STYLE[g.inviteWaStatus].color,
+                                    }}>{WA_STATUS_STYLE[g.inviteWaStatus].icon} {t("wa_status_" + g.inviteWaStatus)}</span>
+                                  )
                                 )}
                               </div>
                               <div style={{ fontSize: 11, color: "#5a5040", direction: "ltr", textAlign: "right" }}>{g.phone}</div>
@@ -457,9 +505,13 @@ export function AdminSendTab() {
                                 </div>
                               )}
                             </div>
-                            <button onClick={() => sec.digital
-                                      ? sendDigitalInviteLink(g, selectedGroomUid, personalize(digitalMsg, g.name), { noDesign })
-                                      : sendInviteLink(g)}
+                            <button onClick={async () => {
+                                      const res = sec.digital
+                                        ? await sendDigitalInviteLink(g, selectedGroomUid, personalize(digitalMsg, g.name), { noDesign })
+                                        : await sendInviteLink(g);
+                                      // Send didn't go out → open the manual-send fallback modal.
+                                      if (!res?.ok && res?.fallback) setFallback({ failures: [res.fallback] });
+                                    }}
                                     title={g.inviteLinkSentAt ? t("guests_invite_sent") : t("admin_send_to_one")}
                                     style={{
                                       padding: "8px 14px", borderRadius: 10, border: "none",
@@ -480,6 +532,17 @@ export function AdminSendTab() {
                     ))}
                   </>
                 )}
+
+                {/* Manual-send fallback — copy / open-WhatsApp for failed sends. */}
+                <WaSendFallbackModal
+                  open={!!fallback}
+                  onClose={() => setFallback(null)}
+                  failures={fallback?.failures || []}
+                  onManualSent={markManualSent}
+                  t={t}
+                  lang={lang}
+                  showToast={showToast}
+                />
               </div>
             );
 }

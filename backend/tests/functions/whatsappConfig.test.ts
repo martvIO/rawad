@@ -54,6 +54,29 @@ describe("resolveWhatsAppConfig", () => {
     expect(resolveWhatsAppConfig({ waDailyCap: "nope" }, ENV).dailyCap).toBe(DEFAULT_DAILY_CAP);
   });
 
+  it("reminder + your-photos + credentials templates resolve DB over env, blank when unset", () => {
+    const env = {
+      ...ENV,
+      WHATSAPP_REMINDER_TEMPLATE_AR: "env_reminder_ar",
+      WHATSAPP_YOURPHOTOS_TEMPLATE: "env_yourphotos",
+      WHATSAPP_CREDENTIALS_TEMPLATE_HE: "env_cred_he",
+    } as NodeJS.ProcessEnv;
+    const cfg = resolveWhatsAppConfig(
+      { waTemplateReminderHe: "db_reminder_he", waTemplateYourPhotos: "db_yourphotos" },
+      env,
+    );
+    expect(cfg.reminderTemplates.ar).toBe("env_reminder_ar"); // env fallback
+    expect(cfg.reminderTemplates.he).toBe("db_reminder_he"); // DB wins
+    expect(cfg.yourPhotosTemplate).toBe("db_yourphotos"); // DB wins over env
+    expect(cfg.credentialsTemplates.he).toBe("env_cred_he");
+    expect(cfg.credentialsTemplates.ar).toBe(""); // unset → blank
+    // Unset everything → all blank (feature dormant, no accidental sends).
+    const bare = resolveWhatsAppConfig({}, ENV);
+    expect(bare.reminderTemplates.ar).toBe("");
+    expect(bare.reminderTemplates.he).toBe("");
+    expect(bare.yourPhotosTemplate).toBe("");
+  });
+
   it("fallbackText uses DB when set, else a built-in default per language", () => {
     const def = resolveWhatsAppConfig({}, ENV).fallbackText;
     expect(def.ar.length).toBeGreaterThan(0);

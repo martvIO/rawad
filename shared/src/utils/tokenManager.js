@@ -206,6 +206,23 @@ export function peekIdToken() {
 }
 
 /**
+ * Snapshot the cached tokens WITHOUT triggering a refresh. Used to seed a
+ * WebView's localStorage so an embedded web session (e.g. the native design
+ * editor's invitation preview) authenticates as the same groom. Returns all
+ * four persisted fields so the WebView can also refresh on its own.
+ *
+ * @returns {{ idToken: string|null, refreshToken: string|null, expiresAt: number, uid: string|null }}
+ */
+export function peekTokens() {
+  return {
+    idToken: memoryState.idToken || null,
+    refreshToken: memoryState.refreshToken || null,
+    expiresAt: memoryState.expiresAt || 0,
+    uid: memoryState.uid || null,
+  };
+}
+
+/**
  * Force-refresh the ID token. Throws on failure and clears the tokens
  * so callers can route the user to the login screen. Coalesces concurrent
  * calls into a single in-flight request.

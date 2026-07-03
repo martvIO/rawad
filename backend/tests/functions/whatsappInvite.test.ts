@@ -10,6 +10,7 @@ import {
   buildInviteSendComponents,
   deliverInvite,
   notifyGuestText,
+  recordManualSent,
   extractStatusUpdates,
   isStatusProgression,
 } from "../../functions/src/whatsappInvite";
@@ -142,6 +143,32 @@ describe("notifyGuestText", () => {
     const body = JSON.parse(init.body as string);
     expect(body.to).toBe("972544642743");
     expect(body.text.body).toBe("نراكم قريباً");
+  });
+});
+
+describe("recordManualSent", () => {
+  it("stamps exactly { inviteWaStatus: 'manual', inviteWaStatusAt: <number> }", async () => {
+    const stamp = vi.fn().mockResolvedValue(undefined);
+    await recordManualSent(stamp);
+    expect(stamp).toHaveBeenCalledTimes(1);
+    const patch = stamp.mock.calls[0][0] as Record<string, unknown>;
+    expect(patch.inviteWaStatus).toBe("manual");
+    expect(typeof patch.inviteWaStatusAt).toBe("number");
+    // No waMessages index / extra fields — a manual stamp has no wamid.
+    expect(Object.keys(patch).sort()).toEqual(["inviteWaStatus", "inviteWaStatusAt"]);
+  });
+
+  it("propagates a rejecting stampGuest (the endpoint must 500, not fake success)", async () => {
+    const stamp = vi.fn().mockRejectedValue(new Error("store down"));
+    await expect(recordManualSent(stamp)).rejects.toThrow("store down");
+  });
+});
+
+describe("isStatusProgression — manual stamps", () => {
+  it("never lets a webhook receipt overwrite 'manual'", () => {
+    for (const next of ["sent", "delivered", "read", "failed"]) {
+      expect(isStatusProgression("manual", next)).toBe(false);
+    }
   });
 });
 

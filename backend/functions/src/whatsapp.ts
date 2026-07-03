@@ -139,10 +139,30 @@ export function verifyWebhookChallenge(
   const challenge = query["hub.challenge"];
   // The admin-set verify token (from config) wins; env is the fallback.
   const expected = expectedToken || process.env.WHATSAPP_VERIFY_TOKEN;
-  if (mode === "subscribe" && expected && token === expected && typeof challenge === "string") {
+  if (
+    mode === "subscribe" &&
+    expected &&
+    typeof token === "string" &&
+    typeof challenge === "string" &&
+    // Constant-time compare — matches verifyWebhookSignature; avoids leaking the
+    // verify token via `===` short-circuit timing (defense-in-depth).
+    timingSafeStrEq(token, expected)
+  ) {
     return challenge;
   }
   return null;
+}
+
+/** Constant-time string equality (length-guarded — timingSafeEqual throws on mismatch). */
+function timingSafeStrEq(a: string, b: string): boolean {
+  const ba = Buffer.from(a);
+  const bb = Buffer.from(b);
+  if (ba.length !== bb.length) return false;
+  try {
+    return crypto.timingSafeEqual(ba, bb);
+  } catch {
+    return false;
+  }
 }
 
 /**

@@ -132,6 +132,7 @@ export function usePortalState({ onBack, t, lang, setLang }) {
     revealedId: guestsHook.revealedId, setRevealedId: guestsHook.setRevealedId,
     swipeStartRef: guestsHook.swipeStartRef,
     sendInviteLink: sendInvites.sendInviteLink, sendDigitalInviteLink: sendInvites.sendDigitalInviteLink,
+    prepareResendFallback: sendInvites.prepareResendFallback, markManualSent: sendInvites.markManualSent,
     digitalGuestsForSelectedGroom: sendInvites.digitalGuestsForSelectedGroom,
 
     // delivery

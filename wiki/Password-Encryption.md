@@ -54,14 +54,21 @@ Anything without the `enc:v1:` prefix is treated as legacy plaintext.
   share an ephemeral key) — clients fall back to plaintext-over-TLS, exactly as
   before, so it is **zero-regression**. `GET /api/health` reports
   `encryption: true|false` so monitoring can catch a deploy that forgot the secret.
-- **Status:** committed (`dc22fd6`) but the prod secret is **not yet provisioned**
-  → the layer is inert in production until `PASSWORD_ENC_PRIVATE_KEY` is set.
+- **Status:** LIVE in production and **verified end-to-end 2026-07-03** after a
+  full redeploy: `/api/health` reports `encryption: true`, `/auth/pubkey` serves
+  the RSA-OAEP-256 key (kid `v1`), a probe envelope encrypted against the live
+  pubkey round-tripped to `401 invalid_credentials` (server decrypt works), and
+  a real browser login captured on the wire sent `enc:v1:…` — plaintext never
+  left the page. Enforcement (`REQUIRE_ENCRYPTED_PASSWORDS=true`, added in
+  [[Backend Security Hardening 2026-07-01]]) is **ON**: a plaintext password is
+  rejected with `400 encryption_required`.
 
 ## Rollout gating
 
-Backward-compatible: the server accepts both encrypted and plaintext. Env
-`REQUIRE_ENCRYPTED_PASSWORDS=true` makes it reject plaintext on `/auth` + `/users`
-(encrypted-only) — flip it on **after** all clients encrypt. The
+Backward-compatible by design: without the env flag the server accepts both
+encrypted and plaintext. `REQUIRE_ENCRYPTED_PASSWORDS=true` makes it reject
+plaintext on `/auth` + `/users` (encrypted-only) — **now enabled in production**
+(never enforced under the emulator, so local/e2e plaintext still works). The
 [[REST API Architecture|apiClient]] retries once on `bad_encrypted_field` (stale
 ephemeral key) or `encryption_required` (transient pubkey outage), re-fetching a
 fresh key.

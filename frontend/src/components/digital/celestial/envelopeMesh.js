@@ -497,8 +497,10 @@ function makeSealTex(pal) {
     }
     x.closePath(); x.fillStyle = fill; x.fill(); x.restore();
   };
-  star(0, 1.0, "rgba(0,0,0,0.45)");
-  star(0, 0.96, "rgba(255,248,224,0.06)");
+  if (pal.sealStarEnabled) {                 // default OFF — groom opts in via the design editor
+    star(0, 1.0, "rgba(0,0,0,0.45)");
+    star(0, 0.96, "rgba(255,248,224,0.06)");
+  }
 
   // The دعوة brand mark, stamped in gold foil — a dark deboss shadow under a
   // vertically graded foil face — drawn from the icon's raw SVG paths via Path2D

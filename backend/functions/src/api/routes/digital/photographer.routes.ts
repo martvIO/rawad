@@ -7,7 +7,7 @@ import { RATE } from "../../../constants/rateLimits";
 import { touchUnindexedPhotographerFiles } from "../../../faceIndex/backfill";
 import { STORAGE_PHOTOG_PREFIX,MAX_GUEST_NAME_LEN,MAX_PHOTOG_BYTES,SAFE_NAME_RE } from "./constants";
 import { photographerCol } from "./firestore";
-import { uploadAndGetUrl,deleteStorageObjectSilently,parseMultipart } from "./storage";
+import { uploadAndGetUrl,deleteStorageObjectSilently,parseMultipart,isSafeMediaContentType } from "./storage";
 import { canActOnUid,authenticatePhotographerRead } from "./access";
 import { safeDetail } from "./project";
 import { Router } from "express";
@@ -49,6 +49,7 @@ router.get(
 router.post(
   "/:uid/photographer/upload",
   requireAuth,
+  uidRateLimit("photogUpload", RATE.PHOTOG_UPLOAD_PER_USER.limit, HOUR_MS),
   async (req: AuthRequest, res: Response) => {
     if (!canActOnUid(req, req.params.uid)) {
       res.status(403).json({ error: "forbidden" });
@@ -67,6 +68,14 @@ router.post(
     }
     if (parsed.file.truncated) {
       res.status(413).json({ error: "file_too_large", maxBytes: MAX_PHOTOG_BYTES });
+      return;
+    }
+    // image/* or video/* only, and NOT image/svg+xml. photographerFiles is
+    // public-read once published; previously ANY content-type (incl. text/html
+    // and script-bearing SVG) was accepted and served inline from the Google
+    // Storage domain — a phishing / JS-host vector. (isSafeMediaContentType)
+    if (!isSafeMediaContentType(parsed.file.contentType)) {
+      res.status(415).json({ error: "unsupported_content_type" });
       return;
     }
 

@@ -40,6 +40,12 @@ import {
   verifyStreamToken,
   STREAM_TOKEN_TTL_MS,
 } from "../streamToken";
+import { uidRateLimit } from "../middleware/rateLimit";
+import { HOUR_MS } from "../../constants/time";
+import { RATE } from "../../constants/rateLimits";
+
+/** Firebase UID / RTDB-safe key shape — blocks path-injection via `/ . # $ [ ]`. */
+const SAFE_UID_RE = /^[A-Za-z0-9_-]{1,128}$/;
 
 // ─── Schema constants (mirror database.rules.json /liveLocationsByGroom) ──────
 
@@ -204,6 +210,7 @@ liveLocationsRouter.get(
 liveLocationsRouter.post(
   "/:groomUid/stream-token",
   requireAuth,
+  uidRateLimit("streamToken", RATE.STREAM_TOKEN_PER_USER.limit, HOUR_MS),
   (req: AuthRequest, res: Response) => {
     const { groomUid } = req.params;
     if (!canReadGroom(req, groomUid)) {
@@ -411,7 +418,9 @@ function parseGroomUidList(input: unknown): string[] | null {
   if (!Array.isArray(input)) return null;
   const out: string[] = [];
   for (const entry of input) {
-    if (typeof entry === "string" && entry.length > 0 && entry.length <= 128) {
+    // Format-validate (not just length) so a crafted groomUid can't inject
+    // extra RTDB path segments via `/` (audit: defense-in-depth on the path).
+    if (typeof entry === "string" && SAFE_UID_RE.test(entry)) {
       out.push(entry);
     }
   }

@@ -140,3 +140,38 @@ describe("POST /invites/digital is admin-only", () => {
     expect(json.error).toBe("write_failed");
   });
 });
+
+describe("POST /invites/manual-sent is admin-only", () => {
+  const MANUAL_BODY = { ...BODY, type: "physical" };
+
+  it("rejects an unauthenticated caller with 401", async () => {
+    const { status } = await postInvite("/invites/manual-sent", null, MANUAL_BODY);
+    expect(status).toBe(401);
+  });
+
+  it("rejects a groom with 403 admins_only", async () => {
+    const { status, json } = await postInvite("/invites/manual-sent", "groom-token", MANUAL_BODY);
+    expect(status).toBe(403);
+    expect(json.error).toBe("admins_only");
+  });
+
+  it("rejects a driver with 403 admins_only", async () => {
+    const { status, json } = await postInvite("/invites/manual-sent", "driver-token", MANUAL_BODY);
+    expect(status).toBe(403);
+    expect(json.error).toBe("admins_only");
+  });
+
+  it("lets an admin through the authorization layer into the handler", async () => {
+    // The admin clears requireAuth + requireAdmin and REACHES the handler's own
+    // body validation — the type check runs BEFORE any DB access, so a bad type
+    // yields the handler's 400 invalid_type. Asserting that exact shape proves
+    // (1) admins are NOT rejected by the authz layer, and (2) the route is
+    // actually wired (a 404 here would be a false "pass").
+    const { status, json } = await postInvite("/invites/manual-sent", "admin-token", {
+      ...BODY,
+      type: "carrier_pigeon",
+    });
+    expect(status).toBe(400);
+    expect(json.error).toBe("invalid_type");
+  });
+});

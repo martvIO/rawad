@@ -54,6 +54,7 @@ import { createGroomAccount, GroomAccountError } from "../services/createGroomAc
 import { getWhatsAppConfig, isConfigured } from "../../whatsappConfig";
 import { sendWhatsAppTemplate } from "../../whatsapp";
 import { inviteLocale } from "../../whatsappInvite";
+import { reserveDailySend } from "../../waRateLimit";
 
 const LS_API = "https://api.lemonsqueezy.com/v1";
 const CURRENCY = "ils";
@@ -73,6 +74,17 @@ function lsStoreId(): string | null {
 }
 function lsWebhookSecret(): string | null {
   return process.env.LEMONSQUEEZY_WEBHOOK_SECRET || null;
+}
+
+/**
+ * Whether Lemon Squeezy is fully configured for the checkout + webhook flow:
+ * API key + store id + webhook secret + at least the Premium variant. This mirrors
+ * what `POST /links/:token/intent` actually enforces, so `/api/health` can surface
+ * a deploy that forgot the LS secrets. VIP is optional — Premium is the minimum
+ * sellable package. Never throws (safe to call on the health path).
+ */
+export function isLemonSqueezyConfigured(): boolean {
+  return !!(lsApiKey() && lsStoreId() && lsWebhookSecret() && variantIdFor("premium"));
 }
 
 /** POST a JSON:API body to the Lemon Squeezy REST API; returns parsed JSON. */
@@ -338,6 +350,14 @@ async function deliverCredentials(
     const tmpl = cfg.credentialsTemplates[lang];
     if (!isConfigured(cfg) || !cfg.autoSendEnabled || !tmpl) {
       await tokenRef.update({ status: "delivery_failed", deliveryError: "not_configured" });
+      return;
+    }
+    // Respect the shared daily cap. On cap, mark delivery_failed/daily_cap — the
+    // admin reads the generated password from the Payment Links tab (graceful
+    // degrade), same path as any other credentials-delivery failure.
+    const reservation = await reserveDailySend(cfg.dailyCap);
+    if (!reservation.allowed) {
+      await tokenRef.update({ status: "delivery_failed", deliveryError: "daily_cap" });
       return;
     }
     const loginUrl = `${PUBLIC_BASE_URL}/portal/login`;
@@ -663,6 +683,7 @@ paymentsRouter.get(
   "/links",
   requireAuth,
   requireAdmin,
+  uidRateLimit("getPaymentLinks", RATE.PAYMENT_LINKS_READ_PER_ADMIN.limit, HOUR_MS),
   async (_req: AuthRequest, res: Response) => {
     try {
       const db = getDatabase();

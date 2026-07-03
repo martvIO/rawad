@@ -144,6 +144,7 @@ function clampNum(v, min, max, fallback) {
 //     stars?: boolean        // arabesque across flap + shell (default ON)
 //     starDensity?: number   // 1..4 tiling frequency (default 2)
 //     starIntensity?: number // 0..1 opacity (default null → mesh per-surface)
+//     sealStar?: boolean     // compass star debossed on the wax seal (default OFF)
 //   }
 export function resolveEnvelopePalette(theme, overrides) {
   const base = themeToEnvelopePalette(theme);
@@ -166,6 +167,7 @@ export function resolveEnvelopePalette(theme, overrides) {
     starsEnabled: o.stars !== false,
     starDensity: clampNum(o.starDensity, 1, 4, 2),
     starIntensity: clampNum(o.starIntensity, 0, 1, null),
+    sealStarEnabled: o.sealStar === true,           // wax-seal compass star — default OFF
   };
 }
 

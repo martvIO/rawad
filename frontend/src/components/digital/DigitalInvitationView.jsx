@@ -12,7 +12,7 @@ import { getDigitalTheme, getDigitalFont } from "../../styles/digitalThemes.js";
 import { DEFAULT_EYEBROW, DEFAULT_MEAL_OPTIONS, DEFAULT_BLESSING, DEFAULT_WELCOME } from "../../data/digitalInviteDefaults.js";
 import { localize, localizeItems, localizeList } from "../../utils/localize.js";
 import { ensureDigitalFonts } from "../../utils/digitalFonts.js";
-import { LangToggle, SorekButton } from "./inviteShared.jsx";
+import { LangToggle } from "./inviteShared.jsx";
 import { Hero } from "./sections/InviteHero.jsx";
 import { StorySection } from "./sections/InviteStory.jsx";
 import { GallerySection } from "./sections/InviteGallery.jsx";
@@ -41,6 +41,7 @@ export function DigitalInvitationView({
   onOpenSorek,
   showEnvelope = false,
   demo = false,
+  fullscreen = false,
   alreadyAnswered = false,
   rsvpDone = false,
   boardingPassEnabled = false,
@@ -113,7 +114,11 @@ export function DigitalInvitationView({
   const showDock = on(design?.footerDockEnabled);
   const showMusic = on(design?.musicEnabled) && !!musicUrl;
   const showHeroMedia = on(design?.heroMediaEnabled) && heroMedia.length > 0;
-  const showEnvelopeNow = isPublic && showEnvelope && on(design?.envelopeEnabled);
+  // Envelope shows wherever a caller explicitly opts in via showEnvelope (public
+  // guest page + groom previews). The old `isPublic` guard suppressed it in every
+  // preview; visibility is now driven purely by the explicit prop, so the admin
+  // preview modal (passes neither) stays off.
+  const showEnvelopeNow = showEnvelope && on(design?.envelopeEnabled);
 
   const rsvpOpts = {
     companions: on(design?.rsvpCompanionsEnabled),
@@ -148,15 +153,15 @@ export function DigitalInvitationView({
   const navItems = useMemo(() => {
     const L = (ar, he) => (lang === "he" ? he : ar);
     return [
-      { id: "inv-top", label: L("الأعلى", "למעלה"), show: true },
-      { id: "inv-story", label: L("القصة", "הסיפור"), show: showStory },
-      { id: "inv-gallery", label: L("الصور", "התמונות"), show: showGallery },
-      { id: "inv-details", label: L("التفاصيل", "הפרטים"), show: showDetails },
-      { id: "inv-venue", label: L("المكان", "המקום"), show: showVenue },
-      { id: "inv-countdown", label: L("العدّ التنازلي", "ספירה לאחור"), show: showCountdown },
-      { id: "rsvp", label: L("تأكيد الحضور", "אישור הגעה"), show: true },
-      { id: "inv-gift", label: L("هدية", "מתנה"), show: showGift },
-      { id: "inv-guestbook", label: L("التهاني", "ברכות"), show: showGuestbook },
+      { id: "inv-top", label: L("الأعلى", "למעלה"), icon: "⬆️", show: true },
+      { id: "inv-story", label: L("القصة", "הסיפור"), icon: "📖", show: showStory },
+      { id: "inv-gallery", label: L("الصور", "התמונות"), icon: "🖼️", show: showGallery },
+      { id: "inv-details", label: L("التفاصيل", "הפרטים"), icon: "📋", show: showDetails },
+      { id: "inv-venue", label: L("المكان", "המקום"), icon: "📍", show: showVenue },
+      { id: "inv-countdown", label: L("العدّ التنازلي", "ספירה לאחור"), icon: "⏳", show: showCountdown },
+      { id: "rsvp", label: L("تأكيد الحضور", "אישור הגעה"), icon: "✅", show: true },
+      { id: "inv-gift", label: L("هدية", "מתנה"), icon: "🎁", show: showGift },
+      { id: "inv-guestbook", label: L("التهاني", "ברכות"), icon: "💌", show: showGuestbook },
     ].filter((it) => it.show);
   }, [lang, showStory, showGallery, showDetails, showVenue, showCountdown, showGift, showGuestbook]);
 
@@ -190,6 +195,7 @@ export function DigitalInvitationView({
     <div
       ref={rootRef}
       className="dawa-inv"
+      lang={lang}
       style={{
         minHeight: "100vh",
         background: theme.bg,
@@ -205,16 +211,12 @@ export function DigitalInvitationView({
         <LangToggle lang={lang} setLang={setLang} theme={theme} font={font} />
       )}
 
-      {(mode === "preview" || (isPublic && typeof onOpenSorek === "function")) && (
-        <SorekButton lang={lang} isPublic={isPublic} onClick={onOpenSorek} theme={theme} font={font} />
-      )}
-
       <CelestialAmbience
         theme={theme}
         font={font}
         lang={lang}
         mode={mode}
-        fixed={isPublic}
+        fixed={isPublic || fullscreen}
         immersive3d={on(design?.immersive3d)}
         showEnvelope={showEnvelopeNow}
         demo={demo}
@@ -312,7 +314,18 @@ export function DigitalInvitationView({
         />
       )}
 
-      <InviteNavMenu items={navItems} theme={theme} font={font} lang={lang} fixed={isPublic} />
+      <InviteNavMenu
+        items={navItems}
+        theme={theme}
+        font={font}
+        lang={lang}
+        fixed={isPublic}
+        sorek={
+          mode === "preview" || (isPublic && typeof onOpenSorek === "function")
+            ? { label: lang === "he" ? "התמונות שלך" : "صورك", icon: "📸", onClick: onOpenSorek }
+            : null
+        }
+      />
 
       {mode === "preview" && (
         <div

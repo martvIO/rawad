@@ -3,6 +3,15 @@
     ".read": false,
     ".write": false,
 
+    "securityBlocks": {
+      // Server-only (Admin SDK). Account / IP / fingerprint deny-lists written
+      // by the security API + auto-blocker and read via the /admin/security REST
+      // endpoint — never client-readable or -writable. Explicit deny mirrors the
+      // default-deny root so nobody opens the subtree by accident.
+      ".read": false,
+      ".write": false
+    },
+
     "users": {
       // مدير يقرأ القائمة كاملة؛ كل مستخدم يقرأ سجله الخاص فقط
       ".read": "auth != null && auth.token.role === 'admin'",
@@ -102,7 +111,7 @@
           "locationUpdatedAt":{ ".validate": "!newData.exists() || newData.isNumber()" },
           "inviteLinkToken":  { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 64)" },
           "inviteLinkSentAt": { ".validate": "!newData.exists() || newData.isNumber()" },
-          "inviteWaStatus":    { ".validate": "!newData.exists() || newData.val() === 'sent' || newData.val() === 'delivered' || newData.val() === 'read' || newData.val() === 'failed'" },
+          "inviteWaStatus":    { ".validate": "!newData.exists() || newData.val() === 'sent' || newData.val() === 'delivered' || newData.val() === 'read' || newData.val() === 'failed' || newData.val() === 'manual'" },
           "inviteWaMessageId": { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 128)" },
           "inviteWaSentAt":    { ".validate": "!newData.exists() || newData.isNumber()" },
           "inviteWaStatusAt":  { ".validate": "!newData.exists() || newData.isNumber()" },

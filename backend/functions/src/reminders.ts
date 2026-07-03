@@ -10,8 +10,9 @@
 // guests live in digitalInvitations/{uid}/guests with status pending|attending|absent.
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { getFirestore } from "firebase-admin/firestore";
-import { sendWhatsAppText } from "./whatsapp";
+import { sendWhatsAppTemplate } from "./whatsapp";
 import { getWhatsAppConfig, isConfigured } from "./whatsappConfig";
+import { reserveDailySend } from "./waRateLimit";
 import { DAY_MS } from "./constants/time";
 
 /** Days before the wedding to send the reminder. */
@@ -79,9 +80,10 @@ export const sendRsvpReminders = onSchedule(
     const now = Date.now();
     let sent = 0;
     let considered = 0;
+    let skippedNoTemplate = 0;
 
     const invitations = await db.collection("digitalInvitations").get();
-    for (const inv of invitations.docs) {
+    outer: for (const inv of invitations.docs) {
       const parent = inv.data() as { defaultDesignId?: string };
       const designId = parent.defaultDesignId;
       if (!designId) continue;
@@ -95,8 +97,26 @@ export const sendRsvpReminders = onSchedule(
         const gd = g.data() as { phone?: string; reminderSentAt?: unknown; name?: string; locale?: string };
         if (!guestNeedsReminder(gd)) continue;
         considered++;
-        const text = reminderText(gd.locale, gd.name);
-        const r = await sendWhatsAppText(gd.phone as string, text, creds);
+
+        // Business-initiated reminders MUST be an approved template (guests never
+        // open the 24h free-form window). Skip the guest when the template for
+        // their language isn't configured — a free-form send would just bounce.
+        const lang = gd.locale === "he" ? "he" : "ar";
+        const tmpl = cfg.reminderTemplates[lang];
+        if (!tmpl) { skippedNoTemplate++; continue; }
+
+        // Respect the shared daily cap. Reminders have no manual fallback, so on
+        // cap we simply stop the run (the counter is shared with invites/photos).
+        const reservation = await reserveDailySend(cfg.dailyCap);
+        if (!reservation.allowed) {
+          console.warn(`[reminders] daily cap reached (${cfg.dailyCap}) — stopping run early`);
+          break outer;
+        }
+
+        const components = [
+          { type: "body", parameters: [{ type: "text", text: (gd.name || "").trim() || "—" }] },
+        ];
+        const r = await sendWhatsAppTemplate(gd.phone as string, tmpl, lang, components, creds);
         if (r.ok) {
           await g.ref.update({ reminderSentAt: now });
           sent++;
@@ -105,6 +125,9 @@ export const sendRsvpReminders = onSchedule(
         }
       }
     }
-    console.log(`[reminders] run complete — considered ${considered}, sent ${sent}`);
+    console.log(
+      `[reminders] run complete — considered ${considered}, sent ${sent}` +
+        (skippedNoTemplate ? `, skipped ${skippedNoTemplate} (no template configured)` : ""),
+    );
   },
 );

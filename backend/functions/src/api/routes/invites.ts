@@ -27,7 +27,7 @@ import {
   requireAuth,
   requireAdmin,
 } from "../middleware/auth";
-import { ipRateLimit, uidRateLimit, tokenRateLimit } from "../middleware/rateLimit";
+import { ipRateLimit, uidRateLimit, tokenRateLimit, keyedRateLimit } from "../middleware/rateLimit";
 import { isFiniteInRange, normalisePhone } from "../../helpers";
 import { writeAudit } from "../../audit";
 import { MAX_LEN } from "../../constants/limits";
@@ -45,6 +45,7 @@ import {
   notifyGuestText,
   recordSent,
   recordFailed,
+  recordManualSent,
   inviteLocale,
   InviteType,
   InviteLocale,
@@ -98,7 +99,18 @@ export const invitesRouter = Router();
  * the form. Returns 404 on missing tokens so the page can render an
  * "invalid invitation" message.
  */
-invitesRouter.get("/token/:token", async (req: Request, res: Response) => {
+invitesRouter.get(
+  "/token/:token",
+  // Per-token bucket + per-IP backstop so token existence can't be enumerated
+  // by status-code probing (audit: public token-lookup had no limiter).
+  keyedRateLimit(
+    "inviteLookup",
+    (req) => (req.params.token ?? "").toString(),
+    RATE.INVITE_LOOKUP_PER_TOKEN.limit,
+    HOUR_MS,
+    RATE.INVITE_LOOKUP_IP_BACKSTOP.limit,
+  ),
+  async (req: Request, res: Response) => {
   const { token } = req.params;
   if (!TOKEN_HEX_RE.test(token)) {
     res.status(400).json({ error: "invalid_token_format" });
@@ -627,6 +639,69 @@ invitesRouter.post(
   }
 );
 
+// ─── POST /invites/manual-sent ────────────────────────────────────────────────
+//
+// Admin-only "I sent it myself" stamp — backs the Send-tab fallback modal's
+// open-WhatsApp button: when an auto-send failed (or WhatsApp isn't configured)
+// the admin delivers the invite via a wa.me tab and this marks the guest so the
+// status pill reflects reality. Stamps inviteWaStatus:"manual" on the guest
+// record (RTDB for physical, Firestore for digital). Deliberately writes NO
+// waMessages index entry — there is no wamid, so webhook receipts can never
+// advance a manual stamp; only a real later resend overwrites it.
+//
+// Body: `{ type: "physical"|"digital", groomUid, guestId }`. Returns `{ ok: true }`.
+invitesRouter.post(
+  "/manual-sent",
+  requireAuth,
+  requireAdmin,
+  uidRateLimit("inviteManualSent", CREATE_INVITE_MAX_PER_HOUR, HOUR_MS),
+  async (req: AuthRequest, res: Response) => {
+    const callerUid = req.caller!.uid;
+    const groomUid = (req.body?.groomUid ?? "").toString();
+    const guestId = (req.body?.guestId ?? "").toString();
+    const type = (req.body?.type ?? "").toString();
+    if (!groomUid || !guestId) {
+      res.status(400).json({ error: "missing_required" });
+      return;
+    }
+    if (type !== "physical" && type !== "digital") {
+      res.status(400).json({ error: "invalid_type" });
+      return;
+    }
+    // Path-segment safety (same shape as schemas/common.ts zId): both ids are
+    // interpolated into RTDB/Firestore paths — a "/" in either would let the
+    // existence check pass on a nested leaf and the update() corrupt it.
+    if (!/^[A-Za-z0-9_-]{1,128}$/.test(groomUid) || !/^[A-Za-z0-9_-]{1,128}$/.test(guestId)) {
+      res.status(400).json({ error: "invalid_id" });
+      return;
+    }
+    try {
+      if (type === "digital") {
+        // Same doc path the digital mint route stamps.
+        const guestRef = getFirestore().doc(`digitalInvitations/${groomUid}/guests/${guestId}`);
+        const snap = await guestRef.get();
+        if (!snap.exists) {
+          res.status(404).json({ error: "guest_not_found" });
+          return;
+        }
+        await recordManualSent((patch) => guestRef.update(patch));
+      } else {
+        const guestRef = getDatabase().ref(`guestsByGroom/${groomUid}/${guestId}`);
+        const snap = await guestRef.get();
+        if (!snap.exists()) {
+          res.status(404).json({ error: "guest_not_found" });
+          return;
+        }
+        await recordManualSent((patch) => guestRef.update(patch));
+      }
+      await writeAudit(callerUid, "inviteManualSent", { groomUid, guestId, type });
+      res.json({ ok: true });
+    } catch (err) {
+      res.status(500).json({ error: "write_failed", detail: errorMessage(err) });
+    }
+  }
+);
+
 // ─── POST /invites/digital/submit (PUBLIC) ────────────────────────────────────
 
 /**
@@ -829,6 +904,13 @@ invitesRouter.post(
 // approved wish appears on every guest's invitation regardless of their design.
 invitesRouter.get(
   "/digital/wishes/:token",
+  keyedRateLimit(
+    "wishesRead",
+    (req) => (req.params.token ?? "").toString(),
+    RATE.WISHES_READ_PER_TOKEN.limit,
+    HOUR_MS,
+    RATE.WISHES_READ_IP_BACKSTOP.limit,
+  ),
   async (req: Request, res: Response) => {
     const token = (req.params.token ?? "").toString();
     if (!TOKEN_HEX_RE.test(token)) { res.status(400).json({ error: "invalid_token_format" }); return; }

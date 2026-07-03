@@ -35,10 +35,13 @@ import { digitalRouter } from "./routes/digital";
 import { photoFacesRouter } from "./routes/photoFaces";
 import { adminRouter } from "./routes/admin";
 import { whatsappRouter } from "./routes/whatsapp.routes";
-import { paymentsRouter } from "./routes/payments";
+import { paymentsRouter, isLemonSqueezyConfigured } from "./routes/payments";
 import { decryptPasswordFields } from "./middleware/decryptPasswordFields";
 import { isEncryptionAvailable } from "./passwordCrypto";
 import { captureError, sentryEnabled } from "../sentry";
+import { requestLog } from "./middleware/requestLog";
+import { blockCheck } from "./middleware/blockCheck";
+import { securityRouter } from "./routes/security";
 // NOTE: additional routers (users, guests, ...) are mounted as their files
 // are created in subsequent migration steps. The import + app.use lines
 // below are added incrementally.
@@ -65,6 +68,20 @@ export const app = express();
 const TRUSTED_PROXY_HOPS = Number(process.env.TRUSTED_PROXY_HOPS) || 1;
 app.set("trust proxy", TRUSTED_PROXY_HOPS);
 
+// Don't advertise Express as the server (removes a trivial fingerprint).
+app.disable("x-powered-by");
+
+// Baseline security response headers on every API response (defense-in-depth;
+// no dependency needed for a JSON API). nosniff stops content-type sniffing of
+// any error body; DENY framing since nothing here is meant to be embedded;
+// no-referrer avoids leaking token-bearing URLs (e.g. SSE ?token=) via Referer.
+app.use((_req: Request, res: Response, next: NextFunction) => {
+  res.set("X-Content-Type-Options", "nosniff");
+  res.set("X-Frame-Options", "DENY");
+  res.set("Referrer-Policy", "no-referrer");
+  next();
+});
+
 app.use(cors({
   origin: buildCorsOriginCheck(),
   credentials: false, // We use Bearer tokens, not cookies.
@@ -78,6 +95,17 @@ app.use(express.json({ limit: JSON_BODY_LIMIT }));
 // name and arrive as "/auth/login". Normalize both shapes by removing a
 // leading "/api" so routers can be mounted at "/auth" once.
 app.use(stripApiPrefix);
+
+// Per-request access logging (Cloud Logging) + path-scan detection. Mounted
+// before the routers so its res.on("finish") hook sees the final status of
+// every request, including 404s.
+app.use(requestLog);
+
+// Block enforcement: refuse a blocked IP / device fingerprint on EVERY route
+// (including public forms) before any handler runs. Account blocks are enforced
+// separately by Firebase Auth (disable + token revoke) via requireAuth.
+// Fail-open — a block-store error never locks everyone out.
+app.use(blockCheck);
 
 // ─── Routers ──────────────────────────────────────────────────────────────────
 
@@ -99,6 +127,8 @@ app.use("/proofs", proofsRouter);
 // capture the literal "photos" path segment.
 app.use("/digital/photos", photoFacesRouter);
 app.use("/digital", digitalRouter);
+// Mount /admin/security BEFORE /admin so the more specific prefix matches first.
+app.use("/admin/security", securityRouter);
 app.use("/admin", adminRouter);
 app.use("/whatsapp", whatsappRouter);
 app.use("/payments", paymentsRouter);
@@ -120,6 +150,10 @@ app.get("/health", (_req, res) => {
     uptimeSeconds: Math.floor(process.uptime()),
     encryption: isEncryptionAvailable(),
     monitoring: sentryEnabled, // false until SENTRY_DSN is provisioned
+    // `payments` surfaces whether Lemon Squeezy is fully wired (API key + store +
+    // webhook secret + Premium variant) so monitoring can catch a deploy that
+    // dropped the LS secrets, without exposing any secret value.
+    payments: isLemonSqueezyConfigured(),
   });
 });
 
