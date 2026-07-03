@@ -111,7 +111,7 @@
           "locationUpdatedAt":{ ".validate": "!newData.exists() || newData.isNumber()" },
           "inviteLinkToken":  { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 64)" },
           "inviteLinkSentAt": { ".validate": "!newData.exists() || newData.isNumber()" },
-          "inviteWaStatus":    { ".validate": "!newData.exists() || newData.val() === 'sent' || newData.val() === 'delivered' || newData.val() === 'read' || newData.val() === 'failed'" },
+          "inviteWaStatus":    { ".validate": "!newData.exists() || newData.val() === 'sent' || newData.val() === 'delivered' || newData.val() === 'read' || newData.val() === 'failed' || newData.val() === 'manual'" },
           "inviteWaMessageId": { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 128)" },
           "inviteWaSentAt":    { ".validate": "!newData.exists() || newData.isNumber()" },
           "inviteWaStatusAt":  { ".validate": "!newData.exists() || newData.isNumber()" },
