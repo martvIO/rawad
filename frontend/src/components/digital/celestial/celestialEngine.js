@@ -60,6 +60,10 @@ export function createCelestialWorld(canvas, opts = {}) {
     envelope = null, // { colors, monogram } → enables the 3D intro envelope
   } = opts;
 
+  // Mutable so rebuildEnvelope() can swap in a fresh design (e.g. the demo page
+  // loads the admin-published design AFTER the sealed envelope was first built).
+  let liveEnvelope = envelope;
+
   const cfg = TIERS[tier] || TIERS[2];
   const startUniforms = u0 || { isLight: false, bg: [0, 0, 0], core: [1, 1, 1], glow: [1, 1, 1] };
 
@@ -103,6 +107,10 @@ export function createCelestialWorld(canvas, opts = {}) {
       uCore: { value: new THREE.Color().setRGB(...startUniforms.core) },
       uGlow: { value: new THREE.Color().setRGB(...startUniforms.glow) },
       uIsLight: { value: startUniforms.isLight ? 1 : 0 },
+      // Per-design starfield overrides (default 1 = theme baseline): background
+      // star SIZE multiplier and CLARITY/opacity multiplier. Colour rides uCore/uGlow.
+      uStarSize: { value: typeof startUniforms.starSize === "number" ? startUniforms.starSize : 1 },
+      uStarOpacity: { value: typeof startUniforms.starOpacity === "number" ? startUniforms.starOpacity : 1 },
     },
     vertexShader: VERT,
     fragmentShader: FRAG,
@@ -178,6 +186,8 @@ export function createCelestialWorld(canvas, opts = {}) {
     material.uniforms.uCore.value.setRGB(...u.core);
     material.uniforms.uGlow.value.setRGB(...u.glow);
     material.uniforms.uIsLight.value = u.isLight ? 1 : 0;
+    if (typeof u.starSize === "number") material.uniforms.uStarSize.value = u.starSize;
+    if (typeof u.starOpacity === "number") material.uniforms.uStarOpacity.value = u.starOpacity;
     material.blending = u.isLight ? THREE.NormalBlending : THREE.AdditiveBlending;
     material.needsUpdate = true;
     if (u.bg) bgColor.setRGB(...u.bg);
@@ -344,11 +354,11 @@ export function createCelestialWorld(canvas, opts = {}) {
   }
 
   function enterEnvelope() {
-    if (!envelope || env || disposed) return;
+    if (!liveEnvelope || env || disposed) return;
     env = buildEnvelope({
-      colors: envelope.colors,
-      monogram: envelope.monogram,
-      content: envelope.content,
+      colors: liveEnvelope.colors,
+      monogram: liveEnvelope.monogram,
+      content: liveEnvelope.content,
     });
     env.group.position.set(0, 0, 0);
     scene.add(env.group);
@@ -367,6 +377,16 @@ export function createCelestialWorld(canvas, opts = {}) {
     if (env.refreshCard && typeof document !== "undefined" && document.fonts && document.fonts.ready) {
       document.fonts.ready.then(() => { if (env && env.refreshCard) env.refreshCard(); }).catch(() => {});
     }
+  }
+
+  // Swap the sealed envelope's design (names / colours / stars) after mount.
+  // Only while still SEALED (mode === "envelope") — never mid-open, so a late
+  // design load (e.g. the demo's admin-published design) can't disrupt a reveal.
+  function rebuildEnvelope(next) {
+    if (disposed || !next || mode !== "envelope") return;
+    liveEnvelope = next;
+    if (env) { scene.remove(env.group); env.dispose(); env = null; }
+    enterEnvelope();
   }
 
   function openEnvelope(cbs) {
@@ -418,6 +438,7 @@ export function createCelestialWorld(canvas, opts = {}) {
     setTilt: (x, y) => { input.tiltRef.current = [x, y]; },
     setPaused: (v) => { paused = !!v; if (!v) { windowStart = performance.now(); frames = 0; lastNow = performance.now(); } },
     enterEnvelope,
+    rebuildEnvelope,
     openEnvelope,
     resize,
     dispose,

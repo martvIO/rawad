@@ -1,4 +1,4 @@
-import { MAX_DESIGN_TITLE_LEN,MAX_GUEST_NAME_LEN,MAX_GUEST_PHONE_LEN,MAX_GUEST_RANK_LEN,MAX_GUEST_NOTE_LEN,MAX_BRIDE_NAME_LEN,MAX_VENUE_LEN,MAX_VENUE_ADDR_LEN,MAX_CUSTOM_MSG_LEN,MAX_STORY_LEN,MAX_EVENT_TITLE_LEN,MAX_EVENT_TIME_LEN,MAX_EVENT_VENUE_LEN,MAX_EVENT_ADDR_LEN,MAX_MAP_URL_LEN,MAX_GIFT_IBAN_LEN,MAX_GIFT_NOTE_LEN,MAX_MUSIC_URL_LEN,MAX_EVENT_ICON_LEN,MAX_EVENTS,MAX_RANK_ITEMS,MAX_EYEBROW_LEN,MAX_MONOGRAM_LEN,MAX_VENUE_CITY_LEN,MAX_ACCESS_NOTE_LEN,MAX_DRESS_CODE_LEN,MAX_BLESSING_LEN,MAX_WELCOME_LEN,MAX_SHARE_MSG_LEN,MAX_STORY_WHEN_LEN,MAX_STORY_TITLE_LEN,MAX_STORY_BODY_LEN,MAX_STORY_ITEMS,MAX_DETAIL_META_LEN,MAX_DETAIL_TITLE_LEN,MAX_DETAIL_BODY_LEN,MAX_DETAIL_ITEMS,MAX_HOTEL_NAME_LEN,MAX_HOTEL_WALK_LEN,MAX_HOTEL_ITEMS,MAX_WISH_WHO_LEN,MAX_WISH_WHAT_LEN,MAX_WISH_ITEMS,MAX_MEAL_OPTION_LEN,MAX_MEAL_OPTIONS,MAX_CAPTION_LEN,MAX_CAPTION_ENTRIES,MAX_GUEST_STATUSES,HEX_COLOR_RE,ENVELOPE_COLOR_KEYS,STAR_DENSITY_MIN,STAR_DENSITY_MAX,STAR_INTENSITY_MIN,STAR_INTENSITY_MAX,BACKGROUND_COLOR_KEYS,BACKGROUND_BOOL_KEYS,BG_CIRCLE_COUNT_MIN,BG_CIRCLE_COUNT_MAX,BG_UNIT_MIN,BG_UNIT_MAX,THEME_COLORS,FONT_FAMILIES } from "./constants";
+import { MAX_DESIGN_TITLE_LEN,MAX_GUEST_NAME_LEN,MAX_GUEST_PHONE_LEN,MAX_GUEST_RANK_LEN,MAX_GUEST_NOTE_LEN,MAX_BRIDE_NAME_LEN,MAX_VENUE_LEN,MAX_VENUE_ADDR_LEN,MAX_CUSTOM_MSG_LEN,MAX_STORY_LEN,MAX_EVENT_TITLE_LEN,MAX_EVENT_TIME_LEN,MAX_EVENT_VENUE_LEN,MAX_EVENT_ADDR_LEN,MAX_MAP_URL_LEN,MAX_GIFT_IBAN_LEN,MAX_GIFT_NOTE_LEN,MAX_MUSIC_URL_LEN,MAX_EVENT_ICON_LEN,MAX_EVENTS,MAX_RANK_ITEMS,MAX_EYEBROW_LEN,MAX_MONOGRAM_LEN,MAX_VENUE_CITY_LEN,MAX_ACCESS_NOTE_LEN,MAX_DRESS_CODE_LEN,MAX_BLESSING_LEN,MAX_WELCOME_LEN,MAX_SHARE_MSG_LEN,MAX_STORY_WHEN_LEN,MAX_STORY_TITLE_LEN,MAX_STORY_BODY_LEN,MAX_STORY_ITEMS,MAX_DETAIL_META_LEN,MAX_DETAIL_TITLE_LEN,MAX_DETAIL_BODY_LEN,MAX_DETAIL_ITEMS,MAX_HOTEL_NAME_LEN,MAX_HOTEL_WALK_LEN,MAX_HOTEL_ITEMS,MAX_WISH_WHO_LEN,MAX_WISH_WHAT_LEN,MAX_WISH_ITEMS,MAX_MEAL_OPTION_LEN,MAX_MEAL_OPTIONS,MAX_CAPTION_LEN,MAX_CAPTION_ENTRIES,MAX_GUEST_STATUSES,HEX_COLOR_RE,ENVELOPE_COLOR_KEYS,STAR_DENSITY_MIN,STAR_DENSITY_MAX,STAR_INTENSITY_MIN,STAR_INTENSITY_MAX,BACKGROUND_COLOR_KEYS,BACKGROUND_BOOL_KEYS,BG_CIRCLE_COUNT_MIN,BG_CIRCLE_COUNT_MAX,BG_UNIT_MIN,BG_UNIT_MAX,STARFIELD_SIZE_MIN,STARFIELD_SIZE_MAX,STARFIELD_OPACITY_MIN,STARFIELD_OPACITY_MAX,THEME_COLORS,FONT_FAMILIES } from "./constants";
 
 // ─── Sanitizers ───────────────────────────────────────────────────────────────
 
@@ -233,6 +233,15 @@ interface MediaSettings {
   title?: Localized;
   envelope?: EnvelopeSettings;
   background?: BackgroundSettings;
+  starfield?: StarfieldSettings;
+}
+
+// Per-design tuning of the celestial background starfield: one star colour +
+// size multiplier + clarity/opacity multiplier. All optional; unset → theme default.
+interface StarfieldSettings {
+  color?: string;
+  size?: number;
+  opacity?: number;
 }
 
 interface EnvelopeSettings {
@@ -545,6 +554,13 @@ function sanitizeMediaSettings(body: unknown): Sanitized<MediaSettings> {
     out.background = bg.value;
   }
 
+  // ── Background starfield tuning (colour / size / clarity) ─────────────────
+  if (data.starfield !== undefined) {
+    const sf = sanitizeStarfield(data.starfield);
+    if (!sf.ok) return sf;
+    out.starfield = sf.value;
+  }
+
   const boolKeys: (keyof MediaSettings)[] = [
     "storyEnabled",
     "eventsEnabled",
@@ -661,6 +677,33 @@ function sanitizeBackground(v: unknown): Sanitized<BackgroundSettings> {
   }
   // `image` is intentionally NOT read from client input — the upload/remove routes
   // own it server-side. Anything the client sends here is ignored.
+  return { ok: true, value: out };
+}
+
+/**
+ * Sanitize the background-starfield override: validate the star colour as hex,
+ * clamp size + opacity (clamp, never reject), and drop empty/absent keys so partial
+ * overrides persist cleanly with set({merge:true}). `null` / `{}` ⇒ reset to defaults.
+ */
+function sanitizeStarfield(v: unknown): Sanitized<StarfieldSettings> {
+  if (v === null) return { ok: true, value: {} };
+  if (typeof v !== "object" || Array.isArray(v)) {
+    return { ok: false, error: "invalid_starfield", field: "starfield" };
+  }
+  const o = v as Record<string, unknown>;
+  const out: StarfieldSettings = {};
+  if (o.color !== undefined && o.color !== "") {
+    if (typeof o.color !== "string" || !HEX_COLOR_RE.test(o.color)) {
+      return { ok: false, error: "invalid_starfield_color", field: "starfield.color" };
+    }
+    out.color = o.color.toLowerCase();
+  }
+  if (typeof o.size === "number" && Number.isFinite(o.size)) {
+    out.size = clampRange(o.size, STARFIELD_SIZE_MIN, STARFIELD_SIZE_MAX);
+  }
+  if (typeof o.opacity === "number" && Number.isFinite(o.opacity)) {
+    out.opacity = clampRange(o.opacity, STARFIELD_OPACITY_MIN, STARFIELD_OPACITY_MAX);
+  }
   return { ok: true, value: out };
 }
 

@@ -243,6 +243,7 @@ export function DigitalInvitationView({
         dateText={dateText}
         envelopeOverrides={design?.envelope && typeof design.envelope === "object" ? design.envelope : null}
         background={design?.background && typeof design.background === "object" ? design.background : null}
+        starfield={design?.starfield && typeof design.starfield === "object" ? design.starfield : null}
       />
 
       <Hero

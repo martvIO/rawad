@@ -41,7 +41,7 @@ export function CelestialAmbience({
   theme, font, lang, mode = "public", fixed = true, immersive3d = true,
   showEnvelope = false, guestName = "", monogram = "",
   namesAr = "", namesHe = "", eyebrow = "", blessing = "", welcome = "", dateText = "",
-  envelopeOverrides = null, background = null,
+  envelopeOverrides = null, background = null, starfield = null,
 }) {
   const cap = useDeviceCapability();
   const [downgraded, setDowngraded] = useState(celDowngraded);
@@ -149,6 +149,7 @@ export function CelestialAmbience({
                   fixed={false}
                   tier={cap.tier}
                   onFpsDowngrade={onFpsDowngrade}
+                  starfield={starfield}
                   envelope={envActiveRef.current ? envelopeProp : null}
                   onReady={(w) => { worldRef.current = w; }}
                   elevated={false}
@@ -180,6 +181,7 @@ export function CelestialAmbience({
             fixed={fixed}
             tier={cap.tier}
             onFpsDowngrade={onFpsDowngrade}
+            starfield={starfield}
             envelope={envActiveRef.current ? envelopeProp : null}
             onReady={(w) => { worldRef.current = w; }}
             elevated={envActive}

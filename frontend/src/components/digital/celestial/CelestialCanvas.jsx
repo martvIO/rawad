@@ -13,7 +13,7 @@ import { useTiltParallax } from "../../../hooks/useTiltParallax.js";
 // the engine — which force-loses the GL context to free it immediately — never
 // poisons a reused canvas. React StrictMode's mount→unmount→remount, and any
 // real remount, each get a brand-new canvas.
-export default function CelestialCanvas({ theme, mode = "public", fixed = true, tier = 2, onFpsDowngrade, envelope = null, onReady, elevated = false }) {
+export default function CelestialCanvas({ theme, mode = "public", fixed = true, tier = 2, onFpsDowngrade, envelope = null, starfield = null, onReady, elevated = false }) {
   const containerRef = useRef(null);
   const worldRef = useRef(null);
   const scrollRef = useRef(0);
@@ -23,6 +23,8 @@ export default function CelestialCanvas({ theme, mode = "public", fixed = true, 
   fpsCbRef.current = onFpsDowngrade;
   const themeRef = useRef(theme);
   themeRef.current = theme;
+  const starfieldRef = useRef(starfield);
+  starfieldRef.current = starfield;
   // Envelope config is captured at mount (the engine builds it once); a ref
   // avoids re-running the create effect when the parent re-renders.
   const envelopeRef = useRef(envelope);
@@ -51,7 +53,7 @@ export default function CelestialCanvas({ theme, mode = "public", fixed = true, 
     let world;
     try {
       world = createCelestialWorld(canvas, {
-        uniforms: themeToUniforms(themeRef.current),
+        uniforms: themeToUniforms(themeRef.current, starfieldRef.current),
         tier: interactive ? tier : Math.min(tier, 1),
         interactive,
         inputRefs: { scrollRef, pointerRef, tiltRef },
@@ -68,7 +70,7 @@ export default function CelestialCanvas({ theme, mode = "public", fixed = true, 
       return undefined;
     }
     worldRef.current = world;
-    world.setTheme(themeToUniforms(themeRef.current));
+    world.setTheme(themeToUniforms(themeRef.current, starfieldRef.current));
     // Hand the engine up so the parent can drive openEnvelope() from the tap.
     if (onReadyRef.current) onReadyRef.current(world);
 
@@ -109,11 +111,27 @@ export default function CelestialCanvas({ theme, mode = "public", fixed = true, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Live theme re-skin — uniform-only update, no rebuild, so switching theme
-  // (or AR/HE) restyles the world instantly.
+  // Live theme + starfield re-skin — uniform-only update, no rebuild, so switching
+  // theme (or AR/HE) and tuning the background-star colour/size/clarity restyle the
+  // world instantly. Keyed on a stable serialization of the starfield override so
+  // it only fires on a real change, not every parent re-render.
+  const sfKey = JSON.stringify(starfield || null);
   useEffect(() => {
-    worldRef.current?.setTheme(themeToUniforms(theme));
-  }, [theme]);
+    worldRef.current?.setTheme(themeToUniforms(theme, starfield));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [theme, sfKey]);
+
+  // Re-bake the sealed 3D envelope when its design content changes after mount
+  // (names / colours / stars) — e.g. the demo page swaps in the admin-published
+  // design a beat after first paint. Keyed on the serialized config; the first
+  // run is skipped because the engine already built it at mount.
+  const envKey = envelope ? JSON.stringify(envelope) : "";
+  const envFirstRef = useRef(true);
+  useEffect(() => {
+    if (envFirstRef.current) { envFirstRef.current = false; return; }
+    if (envKey) worldRef.current?.rebuildEnvelope?.(envelope);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [envKey]);
 
   return (
     <div

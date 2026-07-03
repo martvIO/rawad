@@ -308,6 +308,7 @@ export function DesignEditorBody({ groomUid, designId, adminDemoMode = false, on
         apply("mediaCaptions", next.mediaCaptions && typeof next.mediaCaptions === "object" ? next.mediaCaptions : {});
         apply("envelope", next.envelope && typeof next.envelope === "object" ? next.envelope : {});
         apply("background", next.background && typeof next.background === "object" ? next.background : {});
+        apply("starfield", next.starfield && typeof next.starfield === "object" ? next.starfield : {});
         apply("themeColor", next.themeColor || "gold");
         apply("fontFamily", next.fontFamily || "amiri");
         return merged;
@@ -388,6 +389,7 @@ export function DesignEditorBody({ groomUid, designId, adminDemoMode = false, on
       if (key === "mediaCaptions") return { ...prev, mediaCaptions: cur.mediaCaptions || {} };
       if (key === "envelope") return { ...prev, envelope: cur.envelope || {} };
       if (key === "background") return { ...prev, background: cur.background || {} };
+      if (key === "starfield") return { ...prev, starfield: cur.starfield || {} };
       if (key === "themeColor") return { ...prev, themeColor: cur.themeColor || "gold" };
       if (key === "fontFamily") return { ...prev, fontFamily: cur.fontFamily || "amiri" };
       return { ...prev, [key]: cur[key] || "" };
@@ -464,6 +466,33 @@ export function DesignEditorBody({ groomUid, designId, adminDemoMode = false, on
     const n = nextEnv(subKey, value);
     setField("envelope", n);
     flush("envelope", n);
+  };
+
+  // ── Background-starfield overrides (one buffered nested object, like `envelope`) —
+  // colour / size / clarity of the celestial particle field. A subkey set to
+  // null/"" is removed → falls back to the theme default.
+  const starOverrides = f.starfield && typeof f.starfield === "object" ? f.starfield : {};
+  const nextStar = (subKey, value) => {
+    const n = { ...starOverrides };
+    if (value == null || value === "") delete n[subKey];
+    else n[subKey] = value;
+    return n;
+  };
+  const setStarField = (subKey, value) => {
+    if (!editable) return;
+    const n = nextStar(subKey, value);
+    setField("starfield", n);
+    flush("starfield", n);
+  };
+  const bufferStarField = (subKey, value) => {
+    if (!editable) return;
+    setField("starfield", nextStar(subKey, value));
+  };
+  const commitStarField = (subKey, value) => {
+    if (!editable) return;
+    const n = nextStar(subKey, value);
+    setField("starfield", n);
+    flush("starfield", n);
   };
 
   // ── Custom background overrides ───────────────────────────────────────────
@@ -1202,6 +1231,18 @@ export function DesignEditorBody({ groomUid, designId, adminDemoMode = false, on
               eyebrow: leaf(f.eyebrow, editLang),
             }}
           />
+        </Section>
+
+        {/* Background starfield (celestial particles behind the 3D envelope) */}
+        <Section title={tt(lang, "نجوم الخلفية (الفضاء ثلاثي الأبعاد)", "כוכבי הרקע (החלל התלת-ממדי)")}>
+          <div style={{ fontSize: 11, color: C.dim, marginBottom: 12, lineHeight: 1.6 }}>
+            {tt(lang,
+              "تحكّم بالنجوم الصغيرة المتلألئة في خلفية المشهد ثلاثي الأبعاد حوالين المكتوب: لونها، حجمها، ووضوحها. اتركها كما هي لتتبع لون التصميم.",
+              "שליטה בכוכבים הקטנים המנצנצים ברקע התלת-ממדי סביב המעטפה: הצבע, הגודל והבהירות. השאר כברירת מחדל כדי לעקוב אחר צבע העיצוב.")}
+          </div>
+          <EnvColorRow testid="design-star-color" label={tt(lang, "لون النجوم", "צבע הכוכבים")} value={starOverrides.color} defaultHex="#ffffff" presets={["#ffffff", "#ffe9b0", "#bcd4ff", "#e8b4b8"]} disabled={!editable} onPick={(hex) => setStarField("color", hex)} onReset={() => setStarField("color", null)} />
+          <RangeRow testid="design-star-size" label={tt(lang, "حجم النجوم", "גודל הכוכבים")} min={0.4} max={2.5} step={0.1} value={starOverrides.size ?? 1} disabled={!editable} onInput={(v) => bufferStarField("size", v)} onCommit={(v) => commitStarField("size", v)} />
+          <RangeRow testid="design-star-opacity" label={tt(lang, "وضوح النجوم", "בהירות הכוכבים")} min={0} max={2} step={0.1} value={starOverrides.opacity ?? 1} disabled={!editable} onInput={(v) => bufferStarField("opacity", v)} onCommit={(v) => commitStarField("opacity", v)} />
         </Section>
 
         {/* Custom background */}

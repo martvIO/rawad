@@ -6,6 +6,7 @@
 export const VERT = /* glsl */ `
   uniform float uTime;
   uniform float uSizeScale;   // dpr * tier size factor — keeps motes a constant visual size
+  uniform float uStarSize;    // per-design background-star SIZE multiplier (1 = theme baseline)
   uniform float uCull;        // 1.0 = all visible; FPS guard lowers this to thin the field live
   attribute float aSeed;
   attribute float aSize;
@@ -39,7 +40,7 @@ export const VERT = /* glsl */ `
     vAlpha = smoothstep(150.0, 95.0, dist) * smoothstep(1.0, 14.0, dist);
     vTwinkle = 0.55 + 0.45 * sin(uTime * 2.0 * aSpeed + aSeed * 20.0);
 
-    gl_PointSize = aSize * uSizeScale * (300.0 / max(dist, 1.0));
+    gl_PointSize = aSize * uSizeScale * uStarSize * (300.0 / max(dist, 1.0));
     gl_Position = projectionMatrix * mv;
 
     // Screen-space side-weighting for legibility: keep the central ~45% of the
@@ -57,6 +58,7 @@ export const FRAG = /* glsl */ `
   uniform vec3 uCore;
   uniform vec3 uGlow;
   uniform float uIsLight;
+  uniform float uStarOpacity; // per-design background-star CLARITY/opacity multiplier (1 = baseline)
   varying float vAlpha;
   varying float vTwinkle;
 
@@ -76,6 +78,6 @@ export const FRAG = /* glsl */ `
       ? halo * 0.28 * vAlpha * vTwinkle
       : (core * 0.9 + halo * 0.4) * vAlpha * vTwinkle;
 
-    gl_FragColor = vec4(col, a);
+    gl_FragColor = vec4(col, a * uStarOpacity);
   }
 `;

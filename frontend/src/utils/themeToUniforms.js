@@ -28,7 +28,10 @@ function petalStops(theme) {
   return [hexToRgb(theme?.accent), hexToRgb(theme?.sparkleGlow)];
 }
 
-export function themeToUniforms(theme) {
+// `starfield` (optional) is the groom/admin per-design override for the background
+// stars: { color?: "#rrggbb", size?: number, opacity?: number }. When a field is
+// set it overrides the theme baseline; unset fields fall back to the theme.
+export function themeToUniforms(theme, starfield) {
   const bg = hexToRgb(theme?.bg);
   const isLight = luminance(bg) > 0.5;
   const gradient = Array.isArray(theme?.gradientStops) ? theme.gradientStops : [];
@@ -43,11 +46,18 @@ export function themeToUniforms(theme) {
   const glow = hexToRgb(theme?.sparkleGlow);
   const deep = hexToRgb(gradient[2] || theme?.accent);
 
+  // Per-design starfield overrides. A custom colour paints BOTH the core + halo;
+  // size / opacity are shader multipliers (default 1 = theme baseline).
+  const sf = starfield && typeof starfield === "object" ? starfield : null;
+  const sfColor = sf && typeof sf.color === "string" ? hexToRgb(sf.color) : null;
+
   return {
     isLight,
     bg,
-    core: isLight ? deep : sparkle,
-    glow: isLight ? accent : glow,
+    core: sfColor || (isLight ? deep : sparkle),
+    glow: sfColor || (isLight ? accent : glow),
+    starSize: sf && typeof sf.size === "number" ? sf.size : 1,
+    starOpacity: sf && typeof sf.opacity === "number" ? sf.opacity : 1,
     accent,
     deep,
     mono: hexToRgb(mono[1] || mono[0] || theme?.accent),
