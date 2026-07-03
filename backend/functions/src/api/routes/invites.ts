@@ -45,6 +45,7 @@ import {
   notifyGuestText,
   recordSent,
   recordFailed,
+  recordManualSent,
   inviteLocale,
   InviteType,
   InviteLocale,
@@ -632,6 +633,69 @@ invitesRouter.post(
       const phone = (guestSnap.data() as { phone?: string } | undefined)?.phone;
       const send = await notifyGuestText(phone, message);
       res.json({ send });
+    } catch (err) {
+      res.status(500).json({ error: "write_failed", detail: errorMessage(err) });
+    }
+  }
+);
+
+// ─── POST /invites/manual-sent ────────────────────────────────────────────────
+//
+// Admin-only "I sent it myself" stamp — backs the Send-tab fallback modal's
+// open-WhatsApp button: when an auto-send failed (or WhatsApp isn't configured)
+// the admin delivers the invite via a wa.me tab and this marks the guest so the
+// status pill reflects reality. Stamps inviteWaStatus:"manual" on the guest
+// record (RTDB for physical, Firestore for digital). Deliberately writes NO
+// waMessages index entry — there is no wamid, so webhook receipts can never
+// advance a manual stamp; only a real later resend overwrites it.
+//
+// Body: `{ type: "physical"|"digital", groomUid, guestId }`. Returns `{ ok: true }`.
+invitesRouter.post(
+  "/manual-sent",
+  requireAuth,
+  requireAdmin,
+  uidRateLimit("inviteManualSent", CREATE_INVITE_MAX_PER_HOUR, HOUR_MS),
+  async (req: AuthRequest, res: Response) => {
+    const callerUid = req.caller!.uid;
+    const groomUid = (req.body?.groomUid ?? "").toString();
+    const guestId = (req.body?.guestId ?? "").toString();
+    const type = (req.body?.type ?? "").toString();
+    if (!groomUid || !guestId) {
+      res.status(400).json({ error: "missing_required" });
+      return;
+    }
+    if (type !== "physical" && type !== "digital") {
+      res.status(400).json({ error: "invalid_type" });
+      return;
+    }
+    // Path-segment safety (same shape as schemas/common.ts zId): both ids are
+    // interpolated into RTDB/Firestore paths — a "/" in either would let the
+    // existence check pass on a nested leaf and the update() corrupt it.
+    if (!/^[A-Za-z0-9_-]{1,128}$/.test(groomUid) || !/^[A-Za-z0-9_-]{1,128}$/.test(guestId)) {
+      res.status(400).json({ error: "invalid_id" });
+      return;
+    }
+    try {
+      if (type === "digital") {
+        // Same doc path the digital mint route stamps.
+        const guestRef = getFirestore().doc(`digitalInvitations/${groomUid}/guests/${guestId}`);
+        const snap = await guestRef.get();
+        if (!snap.exists) {
+          res.status(404).json({ error: "guest_not_found" });
+          return;
+        }
+        await recordManualSent((patch) => guestRef.update(patch));
+      } else {
+        const guestRef = getDatabase().ref(`guestsByGroom/${groomUid}/${guestId}`);
+        const snap = await guestRef.get();
+        if (!snap.exists()) {
+          res.status(404).json({ error: "guest_not_found" });
+          return;
+        }
+        await recordManualSent((patch) => guestRef.update(patch));
+      }
+      await writeAudit(callerUid, "inviteManualSent", { groomUid, guestId, type });
+      res.json({ ok: true });
     } catch (err) {
       res.status(500).json({ error: "write_failed", detail: errorMessage(err) });
     }
