@@ -107,7 +107,10 @@ export const RATE = Object.freeze({
    *  multipart bodies (50 MB media, 200 MB photographer) so cap per-caller
    *  frequency to bound self-inflicted Storage/egress cost. */
   MEDIA_UPLOAD_PER_USER: perHour(120),
-  PHOTOG_UPLOAD_PER_USER: perHour(120),
+  /** Photographer dumps a whole event's photos in one session — a wedding album
+   *  is routinely many hundreds of files, so 120/h wrongly blocked the legit case
+   *  (429 after 120). Sized for a full event upload while still bounding abuse. */
+  PHOTOG_UPLOAD_PER_USER: perHour(2000),
   /** People-gallery read-heavy routes (index/cluster status, clusters, config)
    *  — polled by the gallery UI; generous per-caller cap on own-tenant reads. */
   GALLERY_READ_PER_USER: perHour(600),
