@@ -33,6 +33,7 @@ import {
   WhatsAppConfig,
   InviteSlot,
 } from "./whatsappConfig";
+import { reserveDailySend } from "./waRateLimit";
 
 export type InviteType = "physical" | "digital";
 export type InviteLocale = "ar" | "he";
@@ -112,6 +113,13 @@ export async function deliverInvite(
   if (!isConfigured(config) || !config.autoSendEnabled) return { ok: false, error: "not_configured" };
   const e164 = normalisePhone(String(input.phone || ""));
   if (!e164) return { ok: false, error: "invalid_phone" };
+
+  // Reserve a slot against the daily cap BEFORE hitting Meta. Over cap →
+  // "daily_cap"; the Send-tab frontend surfaces it in the manual-send fallback
+  // modal, so the admin delivers the overflow from their own WhatsApp (which
+  // does not consume the API cap) and stamps it "manual".
+  const reservation = await reserveDailySend(config.dailyCap);
+  if (!reservation.allowed) return { ok: false, error: "daily_cap" };
 
   const creds = { token: config.token, phoneId: config.phoneId };
   const tmpl = config.templates[inviteSlot(input.type, input.locale)];

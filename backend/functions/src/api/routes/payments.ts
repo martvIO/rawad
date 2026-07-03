@@ -54,6 +54,7 @@ import { createGroomAccount, GroomAccountError } from "../services/createGroomAc
 import { getWhatsAppConfig, isConfigured } from "../../whatsappConfig";
 import { sendWhatsAppTemplate } from "../../whatsapp";
 import { inviteLocale } from "../../whatsappInvite";
+import { reserveDailySend } from "../../waRateLimit";
 
 const LS_API = "https://api.lemonsqueezy.com/v1";
 const CURRENCY = "ils";
@@ -349,6 +350,14 @@ async function deliverCredentials(
     const tmpl = cfg.credentialsTemplates[lang];
     if (!isConfigured(cfg) || !cfg.autoSendEnabled || !tmpl) {
       await tokenRef.update({ status: "delivery_failed", deliveryError: "not_configured" });
+      return;
+    }
+    // Respect the shared daily cap. On cap, mark delivery_failed/daily_cap — the
+    // admin reads the generated password from the Payment Links tab (graceful
+    // degrade), same path as any other credentials-delivery failure.
+    const reservation = await reserveDailySend(cfg.dailyCap);
+    if (!reservation.allowed) {
+      await tokenRef.update({ status: "delivery_failed", deliveryError: "daily_cap" });
       return;
     }
     const loginUrl = `${PUBLIC_BASE_URL}/portal/login`;

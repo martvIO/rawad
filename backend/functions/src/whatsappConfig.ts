@@ -26,6 +26,13 @@ export interface WhatsAppConfig {
   // Approved template names for the post-payment account-credentials message
   // (username + password + login link). db ?? env, per language.
   credentialsTemplates: { ar: string; he: string };
+  // Approved template name for the daily RSVP-reminder nudge (body var {{1}} =
+  // guest name). db ?? env, per language. Unset → the reminder job skips that
+  // language (free-form can't be delivered outside the 24h window).
+  reminderTemplates: { ar: string; he: string };
+  // Approved template name for the "your photos are ready" broadcast (body var
+  // {{1}} = gallery link). db ?? env. Unset → the photo-share flow no-ops.
+  yourPhotosTemplate: string;
   fallbackText: { ar: string; he: string }; // db ?? built-in default
 }
 
@@ -79,6 +86,11 @@ export function resolveWhatsAppConfig(
       ar: pick(db.waTemplateCredentialsAr, env.WHATSAPP_CREDENTIALS_TEMPLATE_AR),
       he: pick(db.waTemplateCredentialsHe, env.WHATSAPP_CREDENTIALS_TEMPLATE_HE),
     },
+    reminderTemplates: {
+      ar: pick(db.waTemplateReminderAr, env.WHATSAPP_REMINDER_TEMPLATE_AR),
+      he: pick(db.waTemplateReminderHe, env.WHATSAPP_REMINDER_TEMPLATE_HE),
+    },
+    yourPhotosTemplate: pick(db.waTemplateYourPhotos, env.WHATSAPP_YOURPHOTOS_TEMPLATE),
     fallbackText: {
       ar: pick(db.waFallbackTextAr) || DEFAULT_FALLBACK_AR,
       he: pick(db.waFallbackTextHe) || DEFAULT_FALLBACK_HE,
