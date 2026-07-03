@@ -268,3 +268,6 @@ Touched: Password-Encryption, index
 
 ## [2026-07-03 15:50] session | Couple names joined with "&" + deployed
 Touched: Digital-Invitations, Tasks-Backlog
+
+## [2026-07-03 17:15] session | Fixed digital-invite envelope not showing
+Touched: Digital-Invitations

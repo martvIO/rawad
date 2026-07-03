@@ -222,3 +222,23 @@ function bundled, keeping function + hosting consistent). Also: the deploy servi
 `cloudscheduler.jobs.update`, so a **full** `firebase deploy` 403s on the 6 scheduled functions —
 deploy `--only hosting,functions:digitalInvitePreview,functions:digitalOgImage` for invite changes.
 Both filed in [[Tasks-Backlog]]. See [[Architecture-Decisions]].
+
+## Envelope مكتوب now replays on EVERY open — global "opened" flag removed (2026-07-03)
+**Bug (owner-reported):** a sent digital invitation didn't show the sealed مكتوب intro when the guest
+opened it — it went straight to the invitation. **Root cause:** the envelope was gated by a **single
+global** localStorage key `dawa-invite-opened` (`CelestialAmbience.jsx`) — once **any** digital
+invite was opened on a device, `readOpened()` returned true and
+`doEnvelope = showEnvelope && !opened && …` suppressed the envelope on **every** subsequent invite.
+The demo appeared to work only because `DigitalInvitationPage` reset the flag to `"0"` on mount; real
+invites never reset it. So a groom opening one link to test hid the مكتوب on all the others (and any
+device that opened a prior invite).
+**Fix (owner decision: replay on every open):** removed the flag mechanism entirely —
+`OPENED_KEY`/`readOpened()`/`markOpened()` deleted, `opened` is now `useState(false)` (never
+persisted), the now-unused `demo` prop threaded out of `CelestialAmbience` + `DigitalInvitationView`,
+and the dead demo-reset block dropped from `DigitalInvitationPage`. Each guest always sees the sealed
+مكتوب before it opens; re-opening the same link replays it. The device-capability gate is unchanged —
+the envelope still only renders on WebGL-capable devices and only when the design's
+`envelopeEnabled !== false` (a groom who toggled the envelope off in their editor still has none).
+**Verified live** on `/d/demo/demo` with `dawa-invite-opened=1` pre-set (the exact bug trigger): the
+sealed envelope still appears (bundle `index-BK7dNB6-.js`), opening completes to the invitation, and
+no flag is written afterwards. See [[Architecture-Decisions]].
