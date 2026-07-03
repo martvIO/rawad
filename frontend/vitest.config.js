@@ -36,6 +36,9 @@ export default defineConfig({
             "src/__tests__/hooks/**/*.test.{js,jsx,ts,tsx}",
           ],
           environment: "jsdom",
+          // Keep unit tests hermetic: a developer's local .env must not leak in.
+          // ForgotPasswordPage tests assume the no-SITE_KEY (reCAPTCHA inert) path.
+          env: { VITE_RECAPTCHA_V2_SITE_KEY: "" },
           // jest-dom matchers (toBeDisabled, toBeInTheDocument, …) for RTL tests.
           setupFiles: ["./src/__tests__/setup.js"],
           testTimeout: 10000,
