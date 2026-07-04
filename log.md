@@ -298,3 +298,6 @@ Touched: Authentication, Architecture-Decisions, Payments, Security-Model
 
 ## [2026-07-05 00:55] session | Direct-to-Storage photographer uploads (resumable, 2GB)
 Touched: Digital-Invitations
+
+## [2026-07-05 01:35] session | Added 5 terms/privacy clauses (AR+HE) + Haifa-exclusive jurisdiction
+Touched: none
