@@ -427,3 +427,34 @@ Deploy: `hosting,functions:api,functions:digitalInvitePreview`. Editor UI itself
 - Verified via Playwright: sealed = paused/opacity 0; entrance staggers visibly through the
   melting cover at +300/+800ms (auto-open AND manual tap); reduced-motion = instant content;
   1062 unit tests pass. See [[Visual-Design-System]].
+
+## Direct-to-Storage photographer uploads — resumable, 2GB, no function limits (2026-07-05)
+The earlier queue/retry/rate-cap fix wasn't enough: EVERY file still went through the `api` Cloud
+Function, which buffers the whole request body in its 512 MiB memory (Functions v2 exposes it as
+`req.rawBody`), plus a 2-min client upload timeout — so large videos OOM'd / timed out and big batches
+stalled. **Fix (owner picked direct-to-cloud, 2GB cap):** the browser now uploads STRAIGHT to GCS.
+- **Flow:** (1) `POST /digital/:uid/photographer/create-upload {name,contentType,size}` → the server
+  mints a GCS **resumable upload session** (`bucket.file(path).createResumableUpload`, which uses the
+  SDK's OAuth to initiate — NOT signing — so it needs no "Service Account Token Creator" role, unlike
+  `getSignedUrl`; that is exactly why the old `uploadAndGetUrl` avoided signed URLs). Returns
+  `{uploadUrl, storagePath}`. (2) The browser PUTs the whole file to the session URI (single-shot,
+  `Content-Range: bytes 0-{n}/{n}`), XHR for progress, **no timeout** → multi-GB videos + hours-long
+  uploads never abort. (3) `POST /digital/:uid/photographer/register {storagePath,name}` verifies the
+  object landed under the caller's own folder + is safe media, then writes the metadata doc (whose
+  onCreate triggers face indexing). `storage.ts` gains `createUploadSession` + `getUploadedObjectInfo`.
+- **Cap:** `MAX_BYTES.PHOTOGRAPHER` 200MB→**2GB**; a separate `PHOTOGRAPHER_LEGACY` (200MB) caps the
+  fallback route (the function can't buffer more). Rate: `PHOTOG_UPLOAD_PER_USER` gates create-upload,
+  new `PHOTOG_REGISTER_PER_USER` (4000/h) gates register.
+- **Fallback:** the frontend tries direct; on any non-abort failure for a file ≤200MB it falls back to
+  the legacy through-function multipart route (insurance for a CORS/rollout hiccup); bigger files
+  re-throw so the bounded-concurrency queue + per-file retry (prior fix) retry the direct path instead
+  of wasting a 413.
+- **CORS (one-time, out-of-band — NOT committed):** the bucket CORS config was set via the admin SDK
+  (`bucket.setCorsConfiguration`) to allow PUT from the app origins (`*.web.app`, `invite.dawa.to`,
+  `dawa.to`, localhost) — required for the browser→GCS PUT. Re-run if origins change.
+- **Verified:** `createResumableUpload` succeeds without Token-Creator; a **real browser cross-origin
+  PUT** from `dawa-aa793.web.app` to a session URI (with `Content-Range`) returned 200 and the object
+  landed; `/create-upload` is live (401 without auth); 512 backend + 550 frontend unit tests pass. The
+  authenticated groom UI flow itself is auth-gated (emulator needs Java 11+) so not browser-tested end
+  to end; the fallback + the verified mechanism de-risk it. Deploy:
+  `hosting,functions:api,functions:digitalInvitePreview`. See [[Face Matching]], [[Architecture-Decisions]].
