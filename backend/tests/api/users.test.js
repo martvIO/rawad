@@ -30,32 +30,44 @@ describe("GET /users (admin only)", () => {
 });
 
 describe("POST /users (create) + DELETE round-trip", () => {
-  it("admin can create then delete a groom user", async () => {
+  it("admin can create then delete a groom user (password generated server-side)", async () => {
     const username = `apitest${String(Date.now()).slice(-6)}`;
     const create = await api("POST", "/users", {
       token: S.admin.idToken,
-      body: { username, password: "StrongPass1!", role: "groom" },
+      body: { username, role: "groom" },
     });
     expect(create.status).toBe(200);
     expect(create.json?.uid).toBeTruthy();
+    // No phone in the emulator → show-once fallback with the generated password.
+    expect(create.json?.credentials?.delivered).toBe(false);
+    expect(create.json?.credentials?.password).toMatch(/^.{16}$/);
 
     const del = await api("DELETE", `/users/${create.json.uid}`, { token: S.admin.idToken });
     expect([200, 204]).toContain(del.status);
   });
 
+  it("400s when a password is supplied for a groom (server-generated only)", async () => {
+    const { status, json } = await api("POST", "/users", {
+      token: S.admin.idToken,
+      body: { username: `nopw${String(Date.now()).slice(-6)}`, password: "StrongPass1!", role: "groom" },
+    });
+    expect(status).toBe(400);
+    expect(json?.error).toBe("password_not_allowed");
+  });
+
   it("409s on a duplicate username", async () => {
     const { status, json } = await api("POST", "/users", {
       token: S.admin.idToken,
-      body: { username: "groom", password: "StrongPass1!", role: "groom" },
+      body: { username: "groom", role: "groom" },
     });
     expect(status).toBe(409);
     expect(json?.error).toBe("username_taken");
   });
 
-  it("400s on a weak password", async () => {
+  it("400s on a weak password for an admin-role create (manual password kept)", async () => {
     const { status, json } = await api("POST", "/users", {
       token: S.admin.idToken,
-      body: { username: `weak${String(Date.now()).slice(-6)}`, password: "123", role: "groom" },
+      body: { username: `weak${String(Date.now()).slice(-6)}`, password: "123", role: "admin" },
     });
     expect(status).toBe(400);
     expect(json?.error).toBe("weak_password");
@@ -64,7 +76,7 @@ describe("POST /users (create) + DELETE round-trip", () => {
   it("403s when a non-admin tries to create a user", async () => {
     const { status } = await api("POST", "/users", {
       token: S.groom.idToken,
-      body: { username: `nope${String(Date.now()).slice(-6)}`, password: "StrongPass1!", role: "groom" },
+      body: { username: `nope${String(Date.now()).slice(-6)}`, role: "groom" },
     });
     expect(status).toBe(403);
   });

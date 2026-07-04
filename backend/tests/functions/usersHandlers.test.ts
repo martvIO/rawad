@@ -22,7 +22,7 @@ import express from "express";
 import type { Server } from "node:http";
 import { inMemoryUserStore } from "./support/inMemoryUserStore";
 
-const { CLAIMS, STORE } = vi.hoisted(() => {
+const { CLAIMS, STORE, SEND } = vi.hoisted(() => {
   // Skip the in-memory per-uid rate limiter (read at module load in rateLimit.ts).
   process.env.FUNCTIONS_EMULATOR = "true";
   return {
@@ -32,6 +32,11 @@ const { CLAIMS, STORE } = vi.hoisted(() => {
       "driver-token": { uid: "driver-uid", role: "driver", username: "driver" },
     } as Record<string, Record<string, unknown>>,
     STORE: { current: null as ReturnType<typeof inMemoryUserStore>["store"] | null },
+    // Controllable double for the WhatsApp credentials sender.
+    SEND: {
+      result: { delivered: true } as { delivered: boolean; error?: string },
+      calls: [] as Array<Record<string, unknown>>,
+    },
   };
 });
 
@@ -78,11 +83,25 @@ vi.mock("../../functions/src/api/stores/userStore", () => {
       authDeleteUser: d("authDeleteUser"),
       authGetUser: d("authGetUser"),
       authRevokeTokens: d("authRevokeTokens"),
+      readGeneratedPassword: d("readGeneratedPassword"),
     },
   };
 });
 
+// Stub the WhatsApp credentials sender — delivery outcome is set per test via
+// SEND.result; every call is recorded so tests can assert phone/lang/username.
+vi.mock("../../functions/src/api/services/credentialsDelivery", () => ({
+  sendCredentialsWhatsApp: async (args: Record<string, unknown>) => {
+    SEND.calls.push(args);
+    return SEND.result;
+  },
+}));
+
 import { usersRouter } from "../../functions/src/api/routes/users";
+import {
+  isEncryptedField,
+  decryptField,
+} from "../../functions/src/api/passwordCrypto";
 
 let server: Server;
 let baseUrl: string;
@@ -108,15 +127,19 @@ beforeEach(() => {
     users: {
       u1: { username: "ali", role: "groom", phoneE164: "+972501111111" },
       "admin-uid": { username: "admin", role: "admin" },
+      "admin2-uid": { username: "admin2", role: "admin" },
     },
-    usernameIndex: { ali: "u1", admin: "admin-uid" },
+    usernameIndex: { ali: "u1", admin: "admin-uid", admin2: "admin2-uid" },
     phoneIndex: { "972501111111": "u1" },
     authUsers: {
       u1: { uid: "u1", customClaims: { role: "groom", username: "ali" } },
       "admin-uid": { uid: "admin-uid", customClaims: { role: "admin", username: "admin" } },
+      "admin2-uid": { uid: "admin2-uid", customClaims: { role: "admin", username: "admin2" } },
     },
   });
   STORE.current = mem.store;
+  SEND.result = { delivered: true };
+  SEND.calls.length = 0;
 });
 
 async function req(method: string, path: string, token: string | null, body?: unknown) {
@@ -131,24 +154,87 @@ async function req(method: string, path: string, token: string | null, body?: un
   return { status: res.status, json };
 }
 
+// Groom/driver creation: NO password (server-generated). Admin creation keeps one.
 const NEW_USER = {
   username: "Sara",
-  password: "Abcd1234",
   role: "groom",
   phoneE164: "+972502222222",
 };
+const NEW_ADMIN = {
+  username: "Boss",
+  password: "Abcd1234",
+  role: "admin",
+};
 
-describe("POST /users — create", () => {
-  it("admin creates a user: profile + both indices + claims written, returns { uid }", async () => {
+describe("POST /users — create (groom/driver: generated password)", () => {
+  it("creates a groom: profile + indices + claims + mustChangePassword + encrypted temp password", async () => {
     const { status, json } = await req("POST", "/users", "admin-token", { ...NEW_USER });
     expect(status).toBe(200);
     const uid = json.uid;
     expect(uid).toBeTruthy();
     expect(mem.rtdb.users[uid].username).toBe("sara"); // lowercased
     expect(mem.rtdb.users[uid].createdBy).toBe("admin-uid");
+    expect(mem.rtdb.users[uid].mustChangePassword).toBe(true);
     expect(mem.rtdb.usernameIndex.sara).toBe(uid);
     expect(mem.rtdb.phoneIndex["972502222222"]).toBe(uid);
     expect(mem.authUsers[uid].customClaims).toEqual({ role: "groom", username: "sara" });
+    // Temp password stored as an enc:v1 envelope that decrypts to the Auth password.
+    const stored = mem.rtdb.generatedPasswords[uid];
+    expect(isEncryptedField(stored.password)).toBe(true);
+    expect(decryptField(stored.password)).toBe(mem.authUsers[uid].password);
+  });
+
+  it("delivered send → credentials has no plaintext; sender got phone/lang/username", async () => {
+    SEND.result = { delivered: true };
+    const { json } = await req("POST", "/users", "admin-token", { ...NEW_USER, lang: "he" });
+    expect(json.credentials).toEqual({ delivered: true });
+    expect(json.credentials.password).toBeUndefined();
+    expect(SEND.calls).toHaveLength(1);
+    expect(SEND.calls[0].phoneE164).toBe("+972502222222");
+    expect(SEND.calls[0].lang).toBe("he");
+    expect(SEND.calls[0].username).toBe("sara");
+  });
+
+  it("failed send → show-once fallback: plaintext returned, matches the Auth password", async () => {
+    SEND.result = { delivered: false, error: "send_failed" };
+    const { json } = await req("POST", "/users", "admin-token", { ...NEW_USER });
+    expect(json.credentials.delivered).toBe(false);
+    expect(json.credentials.deliveryError).toBe("send_failed");
+    expect(json.credentials.password).toBe(mem.authUsers[json.uid].password);
+  });
+
+  it("no phone → send skipped, no_phone fallback with plaintext", async () => {
+    const { username, role } = NEW_USER;
+    const { status, json } = await req("POST", "/users", "admin-token", { username, role });
+    expect(status).toBe(200);
+    expect(SEND.calls).toHaveLength(0);
+    expect(json.credentials.delivered).toBe(false);
+    expect(json.credentials.deliveryError).toBe("no_phone");
+    expect(json.credentials.password).toBe(mem.authUsers[json.uid].password);
+    expect(mem.rtdb.users[json.uid].phoneE164).toBeUndefined();
+    expect(Object.values(mem.rtdb.phoneIndex)).not.toContain(json.uid);
+  });
+
+  it("generated password satisfies the strength policy (16 chars)", async () => {
+    SEND.result = { delivered: false, error: "send_failed" };
+    const { json } = await req("POST", "/users", "admin-token", { ...NEW_USER });
+    const pw: string = json.credentials.password;
+    expect(pw).toHaveLength(16);
+    expect(pw).toMatch(/[A-Z]/);
+    expect(pw).toMatch(/[a-z]/);
+    expect(pw).toMatch(/[0-9]/);
+  });
+
+  it("rejects a supplied password for groom/driver (400 password_not_allowed)", async () => {
+    const { status, json } = await req("POST", "/users", "admin-token", { ...NEW_USER, password: "Abcd1234" });
+    expect(status).toBe(400);
+    expect(json.error).toBe("password_not_allowed");
+  });
+
+  it("rejects an invalid lang (400)", async () => {
+    const { status, json } = await req("POST", "/users", "admin-token", { ...NEW_USER, lang: "en" });
+    expect(status).toBe(400);
+    expect(json.error).toBe("invalid_lang");
   });
 
   it("defaults feature flags (attendance/photographer ON, boarding-pass OFF)", async () => {
@@ -171,12 +257,6 @@ describe("POST /users — create", () => {
     expect(json.error).toBe("invalid_username");
   });
 
-  it("rejects a weak password (400)", async () => {
-    const { status, json } = await req("POST", "/users", "admin-token", { ...NEW_USER, password: "weak" });
-    expect(status).toBe(400);
-    expect(json.error).toBe("weak_password");
-  });
-
   it("rejects a taken username (409)", async () => {
     const { status, json } = await req("POST", "/users", "admin-token", { ...NEW_USER, username: "ali" });
     expect(status).toBe(409);
@@ -189,20 +269,6 @@ describe("POST /users — create", () => {
     expect(json.error).toBe("phone_taken");
   });
 
-  it("creates a phone-less user: no Auth phoneNumber, no phoneIndex entry, no profile phoneE164", async () => {
-    // Phone is optional end-to-end (Issue 6). Omitting phoneE164 must create a
-    // valid account with no Auth phoneNumber and no /phoneIndex row.
-    const { username, password, role } = NEW_USER;
-    const { status, json } = await req("POST", "/users", "admin-token", { username, password, role });
-    expect(status).toBe(200);
-    const uid = json.uid;
-    expect(uid).toBeTruthy();
-    expect(mem.rtdb.users[uid].username).toBe("sara");
-    expect(mem.rtdb.users[uid].phoneE164).toBeUndefined();
-    expect(Object.values(mem.rtdb.phoneIndex)).not.toContain(uid);
-    expect(mem.authUsers[uid].phoneNumber).toBeUndefined();
-  });
-
   it("treats an empty-string phoneE164 as absent (no phone)", async () => {
     const { status, json } = await req("POST", "/users", "admin-token", { ...NEW_USER, phoneE164: "" });
     expect(status).toBe(200);
@@ -210,6 +276,108 @@ describe("POST /users — create", () => {
     expect(mem.rtdb.users[uid].phoneE164).toBeUndefined();
     expect(Object.values(mem.rtdb.phoneIndex)).not.toContain(uid);
     expect(mem.authUsers[uid].phoneNumber).toBeUndefined();
+  });
+});
+
+describe("POST /users — create (admin role: manual password, unchanged)", () => {
+  it("creates an admin with the typed password; no forced change, no stored temp password", async () => {
+    const { status, json } = await req("POST", "/users", "admin-token", { ...NEW_ADMIN });
+    expect(status).toBe(200);
+    const uid = json.uid;
+    expect(mem.authUsers[uid].password).toBe("Abcd1234");
+    expect(mem.rtdb.users[uid].mustChangePassword).toBeUndefined();
+    expect(mem.rtdb.generatedPasswords?.[uid]).toBeUndefined();
+    expect(json.credentials).toBeUndefined();
+    expect(SEND.calls).toHaveLength(0);
+  });
+
+  it("rejects a weak password (400)", async () => {
+    const { status, json } = await req("POST", "/users", "admin-token", { ...NEW_ADMIN, password: "weak" });
+    expect(status).toBe(400);
+    expect(json.error).toBe("weak_password");
+  });
+});
+
+describe("POST /users/:uid/reset-password — regenerate & resend", () => {
+  it("resets a groom: new generated Auth password, tokens revoked, flag re-armed, envelope stored", async () => {
+    SEND.result = { delivered: true };
+    const before = mem.authUsers.u1.password;
+    const { status, json } = await req("POST", "/users/u1/reset-password", "admin-token", {});
+    expect(status).toBe(200);
+    expect(json.ok).toBe(true);
+    expect(json.credentials).toEqual({ delivered: true });
+    expect(mem.authUsers.u1.password).toBeTruthy();
+    expect(mem.authUsers.u1.password).not.toBe(before);
+    expect(mem.revoked).toContain("u1");
+    expect(mem.rtdb.users.u1.mustChangePassword).toBe(true);
+    expect(decryptField(mem.rtdb.generatedPasswords.u1.password)).toBe(mem.authUsers.u1.password);
+    expect(SEND.calls[0].phoneE164).toBe("+972501111111");
+    expect(SEND.calls[0].lang).toBe("ar"); // default
+    expect(SEND.calls[0].username).toBe("ali");
+  });
+
+  it("failed delivery → plaintext in the response (show-once fallback)", async () => {
+    SEND.result = { delivered: false, error: "daily_cap" };
+    const { json } = await req("POST", "/users/u1/reset-password", "admin-token", { lang: "he" });
+    expect(json.credentials.delivered).toBe(false);
+    expect(json.credentials.deliveryError).toBe("daily_cap");
+    expect(json.credentials.password).toBe(mem.authUsers.u1.password);
+    expect(SEND.calls[0].lang).toBe("he");
+  });
+
+  it("rejects an admin target (409 use_manual_password)", async () => {
+    const { status, json } = await req("POST", "/users/admin2-uid/reset-password", "admin-token", {});
+    expect(status).toBe(409);
+    expect(json.error).toBe("use_manual_password");
+  });
+
+  it("blocks self-reset (409) and 404s a ghost", async () => {
+    const self = await req("POST", "/users/admin-uid/reset-password", "admin-token", {});
+    expect(self.status).toBe(409);
+    expect(self.json.error).toBe("cannot_self_set");
+    const ghost = await req("POST", "/users/ghost/reset-password", "admin-token", {});
+    expect(ghost.status).toBe(404);
+    expect(ghost.json.error).toBe("not_found");
+  });
+
+  it("rejects an invalid lang (400) and a non-admin caller (403)", async () => {
+    const bad = await req("POST", "/users/u1/reset-password", "admin-token", { lang: "en" });
+    expect(bad.status).toBe(400);
+    expect(bad.json.error).toBe("invalid_lang");
+    const groom = await req("POST", "/users/u1/reset-password", "groom-token", {});
+    expect(groom.status).toBe(403);
+    expect(groom.json.error).toBe("admins_only");
+  });
+});
+
+describe("GET /users/:uid/temp-password — audited re-reveal", () => {
+  it("404s when no temp password is stored", async () => {
+    const { status, json } = await req("GET", "/users/u1/temp-password", "admin-token");
+    expect(status).toBe(404);
+    expect(json.error).toBe("not_found");
+  });
+
+  it("decrypts and returns the stored envelope after a create", async () => {
+    SEND.result = { delivered: true };
+    const created = await req("POST", "/users", "admin-token", { ...NEW_USER });
+    const uid = created.json.uid;
+    const { status, json } = await req("GET", `/users/${uid}/temp-password`, "admin-token");
+    expect(status).toBe(200);
+    expect(json.password).toBe(mem.authUsers[uid].password);
+    expect(json.createdAt).toEqual(expect.any(Number));
+  });
+
+  it("passes a legacy plaintext entry through as-is", async () => {
+    mem.rtdb.generatedPasswords = { u1: { password: "Legacy1234", createdAt: 123 } };
+    const { status, json } = await req("GET", "/users/u1/temp-password", "admin-token");
+    expect(status).toBe(200);
+    expect(json.password).toBe("Legacy1234");
+  });
+
+  it("a non-admin caller is rejected (403)", async () => {
+    const { status, json } = await req("GET", "/users/u1/temp-password", "groom-token");
+    expect(status).toBe(403);
+    expect(json.error).toBe("admins_only");
   });
 });
 
@@ -298,12 +466,19 @@ describe("POST /users/:uid/admin-claim — promote/demote", () => {
   });
 });
 
-describe("PUT /users/:uid/password — set password", () => {
-  it("updates the password and revokes refresh tokens", async () => {
-    const { status } = await req("PUT", "/users/u1/password", "admin-token", { newPassword: "NewPass1" });
+describe("PUT /users/:uid/password — set password (admin targets only)", () => {
+  it("updates another admin's password and revokes refresh tokens", async () => {
+    const { status } = await req("PUT", "/users/admin2-uid/password", "admin-token", { newPassword: "NewPass1" });
     expect(status).toBe(200);
-    expect(mem.authUsers.u1.password).toBe("NewPass1");
-    expect(mem.revoked).toContain("u1");
+    expect(mem.authUsers["admin2-uid"].password).toBe("NewPass1");
+    expect(mem.revoked).toContain("admin2-uid");
+  });
+
+  it("rejects a groom/driver target (409 use_reset_endpoint)", async () => {
+    const { status, json } = await req("PUT", "/users/u1/password", "admin-token", { newPassword: "NewPass1" });
+    expect(status).toBe(409);
+    expect(json.error).toBe("use_reset_endpoint");
+    expect(mem.authUsers.u1.password).toBeUndefined(); // untouched
   });
 
   it("rejects a weak password (400)", async () => {
@@ -352,7 +527,7 @@ describe("GET reads + groom profiles", () => {
   it("GET /users (admin) lists users; a groom is rejected admins_only", async () => {
     const ok = await req("GET", "/users", "admin-token");
     expect(ok.status).toBe(200);
-    expect(ok.json.map((u: any) => u.uid).sort()).toEqual(["admin-uid", "u1"]);
+    expect(ok.json.map((u: any) => u.uid).sort()).toEqual(["admin-uid", "admin2-uid", "u1"]);
     const no = await req("GET", "/users", "groom-token");
     expect(no.status).toBe(403);
     expect(no.json.error).toBe("admins_only");

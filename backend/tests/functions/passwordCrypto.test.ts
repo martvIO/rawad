@@ -12,6 +12,7 @@ import * as crypto from "node:crypto";
 import {
   ENVELOPE_PREFIX,
   isEncryptedField,
+  encryptField,
   decryptField,
   getPublicKeyMeta,
   isEncryptionAvailable,
@@ -115,6 +116,19 @@ describe("passwordCrypto — configured secret", () => {
     expect(() => decryptField(`${ENVELOPE_PREFIX}AAAA`)).toThrow(PasswordDecryptError);
   });
 
+  it("encryptField (at-rest storage) round-trips through decryptField", () => {
+    const env = encryptField("TempPass!42abcd");
+    expect(env).not.toBeNull();
+    expect(isEncryptedField(env)).toBe(true);
+    expect(decryptField(env as string)).toBe("TempPass!42abcd");
+  });
+
+  it("encryptField envelope fits the RTDB .validate cap (≤512 chars)", () => {
+    // 2048-bit RSA ciphertext → 256 bytes → ~344 base64 chars + prefix.
+    const env = encryptField("A".repeat(128)) as string;
+    expect(env.length).toBeLessThanOrEqual(512);
+  });
+
   it("never leaks OpenSSL/padding detail in the error message", () => {
     let caught: unknown;
     try {
@@ -142,6 +156,10 @@ describe("passwordCrypto — production with no key", () => {
 
   it("decryptField throws rather than silently accepting", () => {
     expect(() => decryptField(`${ENVELOPE_PREFIX}AAAA`)).toThrow(PasswordDecryptError);
+  });
+
+  it("encryptField returns null — callers store plaintext (legacy posture)", () => {
+    expect(encryptField("TempPass!42abcd")).toBeNull();
   });
 });
 

@@ -44,6 +44,14 @@ import { userStore } from "../stores/userStore";
 import { MAX_LEN } from "../../constants/limits";
 import { HOUR_MS } from "../../constants/time";
 import { RATE } from "../../constants/rateLimits";
+import { generateStrongPassword } from "../../passwordGen";
+import {
+  encryptField,
+  isEncryptedField,
+  decryptField,
+  PasswordDecryptError,
+} from "../passwordCrypto";
+import { sendCredentialsWhatsApp } from "../services/credentialsDelivery";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -166,14 +174,28 @@ usersRouter.get(
  * Admin-only. Creates a portal user with role groom/driver/admin.
  * Migrated from the `createPortalUser` onCall in users.ts.
  *
- * Body: `{ username, password, role, phoneE164?, displayName? }`
- * Returns: `{ uid }`
+ * Password policy is role-dependent:
+ *   - admin  → the caller supplies the password (strength-validated), exactly
+ *              as before. Trusted operators hand credentials over directly.
+ *   - groom/driver → the password is GENERATED server-side (a supplied one is
+ *              rejected), the profile gets `mustChangePassword: true` (the
+ *              portal blocks every dashboard behind the forced change screen),
+ *              the credentials are auto-sent over WhatsApp (lang: ar|he,
+ *              default ar), and the temp password is stored encrypted in
+ *              /generatedPasswords/{uid} for the audited admin re-reveal.
+ *
+ * Body: `{ username, role, phoneE164?, displayName?, lang? }` (+ `password`
+ *       for role=admin only)
+ * Returns: `{ uid }` for admin; for groom/driver additionally
+ *       `credentials: { delivered, deliveryError?, password? }` — the
+ *       plaintext is included ONLY when delivery failed (show-once fallback).
  *
  * Side effects (all in one update):
  *   - Firebase Auth user created with synthetic email + custom claims
  *   - /users/{uid}                  → profile written
  *   - /usernameIndex/{username}     → uid (uniqueness guard)
  *   - /phoneIndex/{phoneIndexKey}   → uid (only if phone supplied)
+ *   - /generatedPasswords/{uid}     → enc:v1 envelope (groom/driver only)
  *   - audit log entry
  */
 usersRouter.post(
@@ -189,12 +211,24 @@ usersRouter.post(
       res.status(400).json({ error: "invalid_username" });
       return;
     }
-    if (!isStrongPassword(input.password)) {
-      res.status(400).json({ error: "weak_password" });
-      return;
-    }
     if (!isRole(input.role)) {
       res.status(400).json({ error: "invalid_role" });
+      return;
+    }
+    const generated = input.role !== "admin";
+    if (generated) {
+      // Admin-typed passwords are not accepted for groom/driver — the server
+      // generates one so no weak/long-lived password can be handed out.
+      if (input.password !== undefined) {
+        res.status(400).json({ error: "password_not_allowed" });
+        return;
+      }
+      if (input.lang !== undefined && input.lang !== "ar" && input.lang !== "he") {
+        res.status(400).json({ error: "invalid_lang" });
+        return;
+      }
+    } else if (!isStrongPassword(input.password)) {
+      res.status(400).json({ error: "weak_password" });
       return;
     }
     const hasPhone = typeof input.phoneE164 === "string" && input.phoneE164.length > 0;
@@ -206,6 +240,8 @@ usersRouter.post(
     const username = input.username.toLowerCase();
     const email = syntheticEmail(username);
     const phoneIdx = hasPhone ? phoneIndexKey(input.phoneE164 as string) : null;
+    const lang: "ar" | "he" = input.lang === "he" ? "he" : "ar";
+    const password = generated ? generateStrongPassword() : (input.password as string);
 
     try {
       if ((await userStore.readUsernameOwner(username)) !== null) {
@@ -225,7 +261,7 @@ usersRouter.post(
         phoneNumber?: string;
       } = {
         email,
-        password: input.password as string,
+        password,
         displayName: input.displayName?.slice(0, MAX_DISPLAY_NAME_LEN),
         disabled: false,
       };
@@ -252,18 +288,45 @@ usersRouter.post(
       // Boarding-pass / wallet feature defaults OFF — needs Apple/Google
       // credentials the admin enables deliberately per groom.
       profile.canUseBoardingPass = input.canUseBoardingPass === true;
+      // Cleared by POST /auth/change-password (or a phone-OTP reset).
+      if (generated) profile.mustChangePassword = true;
 
       const updates: Record<string, unknown> = {};
       updates[`users/${userRecord.uid}`] = profile;
       updates[`usernameIndex/${username}`] = userRecord.uid;
       if (phoneIdx) updates[`phoneIndex/${phoneIdx}`] = userRecord.uid;
+      if (generated) {
+        // Encrypted at rest (enc:v1 envelope); plaintext only if the key is
+        // unset — the node is function-only either way (.read: false).
+        updates[`generatedPasswords/${userRecord.uid}`] = {
+          password: encryptField(password) ?? password,
+          createdAt: Date.now(),
+        };
+      }
       await userStore.applyUpdates(updates);
+
+      let credentials: CredentialsResult | undefined;
+      if (generated) {
+        credentials = await deliverGeneratedPassword({
+          phoneE164: hasPhone ? (input.phoneE164 as string) : null,
+          lang,
+          username,
+          password,
+        });
+      }
 
       await writeAudit(callerUid, "createPortalUser", {
         uid: userRecord.uid,
         role: input.role,
+        ...(credentials
+          ? {
+              generated: true,
+              delivered: credentials.delivered,
+              ...(credentials.deliveryError ? { deliveryError: credentials.deliveryError } : {}),
+            }
+          : {}),
       });
-      res.json({ uid: userRecord.uid });
+      res.json(credentials ? { uid: userRecord.uid, credentials } : { uid: userRecord.uid });
     } catch (err) {
       res.status(500).json({ error: "create_failed", detail: errorMessage(err) });
     }
@@ -583,8 +646,11 @@ usersRouter.delete(
 /**
  * PUT /users/:uid/password
  *
- * Admin-only. Set another user's password and revoke their refresh tokens.
+ * Admin-only. Set another ADMIN's password and revoke their refresh tokens.
  * Admins cannot use this on themselves (must use the self-service flow).
+ * Groom/driver targets are rejected — their passwords are server-generated
+ * via POST /users/:uid/reset-password so a manual, never-expiring password
+ * can't be handed out through this back door.
  * Migrated from `adminSetPassword` onCall.
  *
  * Body: `{ newPassword: string }`
@@ -616,12 +682,139 @@ usersRouter.put(
     }
 
     try {
+      const profile = await userStore.readUser(uid);
+      const role = (profile as Record<string, unknown> | null)?.role;
+      if (role === "groom" || role === "driver") {
+        res.status(409).json({ error: "use_reset_endpoint" });
+        return;
+      }
       await userStore.authUpdateUser(uid, { password: newPassword });
       await userStore.authRevokeTokens(uid);
       await writeAudit(callerUid, "adminSetPassword", { uid });
       res.json({ ok: true });
     } catch (err) {
       res.status(500).json({ error: "set_password_failed", detail: errorMessage(err) });
+    }
+  }
+);
+
+/**
+ * POST /users/:uid/reset-password
+ *
+ * Admin-only regenerate-and-resend for a GROOM/DRIVER: issues a fresh
+ * generated password, revokes the target's sessions, re-arms the forced
+ * first-login change, stores the temp password encrypted, and re-delivers it
+ * over WhatsApp (same show-once fallback contract as POST /users). This is
+ * both the routine reset path and the recovery path when the original
+ * credentials message never arrived.
+ *
+ * Body: `{ lang?: "ar" | "he" }` (default "ar")
+ * Returns: `{ ok: true, credentials: { delivered, deliveryError?, password? } }`
+ * — plaintext included ONLY when delivery failed.
+ */
+usersRouter.post(
+  "/:uid/reset-password",
+  requireAuth,
+  requireAdmin,
+  uidRateLimit("adminResetPassword", RATE.RESET_PASSWORD_PER_ADMIN.limit, ONE_HOUR_MS),
+  async (req: AuthRequest, res: Response) => {
+    const callerUid = req.caller!.uid;
+    const { uid } = req.params;
+    const langInput = (req.body ?? {}).lang;
+
+    if (langInput !== undefined && langInput !== "ar" && langInput !== "he") {
+      res.status(400).json({ error: "invalid_lang" });
+      return;
+    }
+    if (uid === callerUid) {
+      res.status(409).json({ error: "cannot_self_set" });
+      return;
+    }
+
+    try {
+      const profileVal = await userStore.readUser(uid);
+      if (profileVal === null) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      const profile = profileVal as unknown as ExistingUserProfile;
+      if (profile.role !== "groom" && profile.role !== "driver") {
+        // Admin passwords stay manual — see PUT /users/:uid/password.
+        res.status(409).json({ error: "use_manual_password" });
+        return;
+      }
+
+      const password = generateStrongPassword();
+      await userStore.authUpdateUser(uid, { password });
+      // Bounce any live session: the next login lands on the forced-change gate.
+      await userStore.authRevokeTokens(uid);
+      await userStore.applyUpdates({
+        [`users/${uid}/mustChangePassword`]: true,
+        [`generatedPasswords/${uid}`]: {
+          password: encryptField(password) ?? password,
+          createdAt: Date.now(),
+        },
+      });
+
+      const credentials = await deliverGeneratedPassword({
+        phoneE164: typeof profile.phoneE164 === "string" && profile.phoneE164 ? profile.phoneE164 : null,
+        lang: langInput === "he" ? "he" : "ar",
+        username: profile.username,
+        password,
+      });
+
+      await writeAudit(callerUid, "adminResetPassword", {
+        uid,
+        delivered: credentials.delivered,
+        ...(credentials.deliveryError ? { deliveryError: credentials.deliveryError } : {}),
+      });
+      res.json({ ok: true, credentials });
+    } catch (err) {
+      res.status(500).json({ error: "reset_password_failed", detail: errorMessage(err) });
+    }
+  }
+);
+
+/**
+ * GET /users/:uid/temp-password
+ *
+ * Admin-only re-reveal of a stored generated password — exists only between
+ * account creation/reset and the user's first-login change (which purges the
+ * node). Values are enc:v1 envelopes decrypted server-side; legacy plaintext
+ * entries pass through. Every successful reveal is audit-logged.
+ */
+usersRouter.get(
+  "/:uid/temp-password",
+  requireAuth,
+  requireAdmin,
+  uidRateLimit("revealTempPassword", RATE.TEMP_PASSWORD_REVEAL_PER_ADMIN.limit, ONE_HOUR_MS),
+  async (req: AuthRequest, res: Response) => {
+    const { uid } = req.params;
+    try {
+      const rec = await userStore.readGeneratedPassword(uid);
+      const stored = rec?.password;
+      if (typeof stored !== "string" || stored.length === 0) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      let password = stored;
+      if (isEncryptedField(stored)) {
+        try {
+          password = decryptField(stored);
+        } catch (err) {
+          if (err instanceof PasswordDecryptError) {
+            // Envelope present but the key is unset/rotated — regenerate via
+            // POST /users/:uid/reset-password instead.
+            res.status(409).json({ error: "encryption_unavailable" });
+            return;
+          }
+          throw err;
+        }
+      }
+      await writeAudit(req.caller!.uid, "revealTempPassword", { uid });
+      res.json({ password, createdAt: rec?.createdAt ?? null });
+    } catch (err) {
+      res.status(500).json({ error: "read_failed", detail: errorMessage(err) });
     }
   }
 );
@@ -669,10 +862,13 @@ usersRouter.post(
 
 interface CreatePortalUserInput {
   username: string;
-  password: string;
+  /** Admin role only — groom/driver passwords are server-generated. */
+  password?: string;
   phoneE164?: string;
   role: "groom" | "driver" | "admin";
   displayName?: string;
+  /** WhatsApp credentials-message language (groom/driver; default "ar"). */
+  lang?: "ar" | "he";
   canSeeAttendance?: boolean;
   canUsePhotographer?: boolean;
   canUseBoardingPass?: boolean;
@@ -692,7 +888,45 @@ interface ExistingUserProfile {
   displayName?: string | null;
 }
 
+/** What POST /users and POST /users/:uid/reset-password report back about the
+ *  generated credentials. `password` is present ONLY when delivery failed —
+ *  the admin's show-once fallback. */
+interface CredentialsResult {
+  delivered: boolean;
+  deliveryError?: string;
+  password?: string;
+}
+
 // ─── Internals ────────────────────────────────────────────────────────────────
+
+/**
+ * Deliver a freshly generated password over WhatsApp (when a phone exists) and
+ * shape the `credentials` result: delivered → no plaintext in the response;
+ * not delivered (no phone / config off / send failure) → include the plaintext
+ * once so the admin can pass it on manually.
+ */
+async function deliverGeneratedPassword(args: {
+  phoneE164: string | null;
+  lang: "ar" | "he";
+  username: string;
+  password: string;
+}): Promise<CredentialsResult> {
+  if (!args.phoneE164) {
+    return { delivered: false, deliveryError: "no_phone", password: args.password };
+  }
+  const result = await sendCredentialsWhatsApp({
+    phoneE164: args.phoneE164,
+    lang: args.lang,
+    username: args.username,
+    password: args.password,
+  });
+  if (result.delivered) return { delivered: true };
+  return {
+    delivered: false,
+    deliveryError: result.error ?? "send_failed",
+    password: args.password,
+  };
+}
 
 // errorMessage (suppress-by-default 5xx detail) is now shared — see ../errorDetail.
 import { errorMessage } from "../errorDetail";

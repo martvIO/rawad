@@ -591,6 +591,13 @@ authRouter.post(
       const auth = getAuth();
       await auth.updateUser(targetUid, { password: newPassword });
       await auth.revokeRefreshTokens(targetUid);
+      // The user just chose their own password, so a pending forced first-login
+      // change is satisfied: clear the flag and purge the stored temp password
+      // (mirrors POST /auth/change-password).
+      await db.ref().update({
+        [`users/${targetUid}/mustChangePassword`]: null,
+        [`generatedPasswords/${targetUid}`]: null,
+      });
       // Best-effort cleanup of the throw-away phone-auth user — but ONLY when it
       // is genuinely a separate identity. Portal users created WITH a phone carry
       // that number as their Firebase Auth `phoneNumber` (see userStore/

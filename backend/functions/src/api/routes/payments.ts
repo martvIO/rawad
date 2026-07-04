@@ -51,10 +51,9 @@ import {
 import { generateStrongPassword } from "../../passwordGen";
 import { userStore } from "../stores/userStore";
 import { createGroomAccount, GroomAccountError } from "../services/createGroomAccount";
-import { getWhatsAppConfig, isConfigured } from "../../whatsappConfig";
-import { sendWhatsAppTemplate } from "../../whatsapp";
+import { sendCredentialsWhatsApp } from "../services/credentialsDelivery";
 import { inviteLocale } from "../../whatsappInvite";
-import { reserveDailySend } from "../../waRateLimit";
+import { encryptField, isEncryptedField, decryptField } from "../passwordCrypto";
 
 const LS_API = "https://api.lemonsqueezy.com/v1";
 const CURRENCY = "ils";
@@ -289,7 +288,9 @@ async function provisionPaidOrder(body: LsWebhookBody): Promise<void> {
         paymentCreatedAt: linkCreatedAt,
       },
       buildExtraUpdates: (newUid) => ({
-        [`generatedPasswords/${newUid}`]: { password, createdAt: paidAt, token },
+        // Encrypted at rest (enc:v1 envelope); plaintext only if the key is
+        // unset — the node is function-only either way (.read: false).
+        [`generatedPasswords/${newUid}`]: { password: encryptField(password) ?? password, createdAt: paidAt, token },
         [`purchases/${token}`]: {
           uid: newUid,
           packageId: pkg.id,
@@ -332,10 +333,12 @@ async function provisionPaidOrder(body: LsWebhookBody): Promise<void> {
 }
 
 /**
- * Send the new groom their login credentials over WhatsApp (Meta-approved
- * template per language) and stamp the token delivered / delivery_failed.
+ * Send the new groom their login credentials over WhatsApp (via the shared
+ * credentialsDelivery service) and stamp the token delivered / delivery_failed.
  * Never throws — a delivery failure must not 5xx the webhook (which would make
- * LS re-deliver, and re-provision is already short-circuited).
+ * LS re-deliver, and re-provision is already short-circuited). On failure the
+ * admin reads the generated password from the Payment Links tab (graceful
+ * degrade).
  */
 async function deliverCredentials(
   token: string,
@@ -345,48 +348,18 @@ async function deliverCredentials(
   password: string,
 ): Promise<void> {
   const tokenRef = getDatabase().ref(`paymentTokens/${token}`);
+  const result = await sendCredentialsWhatsApp({ phoneE164, lang, username, password });
   try {
-    const cfg = await getWhatsAppConfig();
-    const tmpl = cfg.credentialsTemplates[lang];
-    if (!isConfigured(cfg) || !cfg.autoSendEnabled || !tmpl) {
-      await tokenRef.update({ status: "delivery_failed", deliveryError: "not_configured" });
-      return;
-    }
-    // Respect the shared daily cap. On cap, mark delivery_failed/daily_cap — the
-    // admin reads the generated password from the Payment Links tab (graceful
-    // degrade), same path as any other credentials-delivery failure.
-    const reservation = await reserveDailySend(cfg.dailyCap);
-    if (!reservation.allowed) {
-      await tokenRef.update({ status: "delivery_failed", deliveryError: "daily_cap" });
-      return;
-    }
-    const loginUrl = `${PUBLIC_BASE_URL}/portal/login`;
-    const components = [
-      {
-        type: "body",
-        parameters: [
-          { type: "text", text: username },
-          { type: "text", text: password },
-          { type: "text", text: loginUrl },
-        ],
-      },
-    ];
-    const result = await sendWhatsAppTemplate(phoneE164, tmpl, lang, components, {
-      token: cfg.token,
-      phoneId: cfg.phoneId,
-    });
-    if (result.ok) {
+    if (result.delivered) {
       await tokenRef.update({ status: "delivered", deliveredAt: Date.now() });
     } else {
       await tokenRef.update({
         status: "delivery_failed",
-        deliveryError: (result.error || "send_failed").slice(0, 240),
+        deliveryError: result.error ?? "send_failed",
       });
     }
-  } catch (err) {
-    await tokenRef
-      .update({ status: "delivery_failed", deliveryError: (errorMessage(err) ?? "send_failed").slice(0, 240) })
-      .catch(() => undefined);
+  } catch {
+    /* best-effort stamp — never 5xx the webhook over it */
   }
 }
 
@@ -698,8 +671,19 @@ paymentsRouter.get(
           const pkg = getPackage(rec.packageId);
           const createdUid = typeof rec.createdUid === "string" ? rec.createdUid : null;
           // Generated password is shown only until the groom's first-login
-          // change purges generatedPasswords/{uid}.
-          const generatedPassword = createdUid ? passwords[createdUid]?.password ?? null : null;
+          // change purges generatedPasswords/{uid}. Stored as an enc:v1
+          // envelope — decrypt for the admin here; legacy plaintext entries
+          // pass through; an undecryptable envelope (key rotated/unset)
+          // degrades to null rather than failing the whole list.
+          const stored = createdUid ? passwords[createdUid]?.password ?? null : null;
+          let generatedPassword: string | null = stored;
+          if (stored && isEncryptedField(stored)) {
+            try {
+              generatedPassword = decryptField(stored);
+            } catch {
+              generatedPassword = null;
+            }
+          }
           return {
             token,
             status: rec.status ?? null,

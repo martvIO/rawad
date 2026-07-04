@@ -96,6 +96,10 @@ export function inMemoryUserStore(seed: UserStoreSeed = {}): {
     async readPhoneOwner(phoneIndexKey) {
       return (rtdb.phoneIndex[phoneIndexKey] as string) ?? null;
     },
+    async readGeneratedPassword(uid) {
+      const v = (rtdb.generatedPasswords as Obj | undefined)?.[uid];
+      return v === undefined ? null : { ...v };
+    },
 
     async applyUpdates(updates) {
       for (const [path, value] of Object.entries(updates)) setAt(rtdb, path, value);

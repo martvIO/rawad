@@ -23,6 +23,10 @@ export const RATE = Object.freeze({
   CREATE_USER_PER_ADMIN: perHour(30),
   DELETE_USER_PER_ADMIN: perHour(30),
   SET_PASSWORD_PER_ADMIN: perHour(30),
+  /** Admin regenerate-and-resend of a groom/driver temp password. */
+  RESET_PASSWORD_PER_ADMIN: perHour(30),
+  /** Admin re-reveal of a stored temp password (audited per hit). */
+  TEMP_PASSWORD_REVEAL_PER_ADMIN: perHour(60),
   ATTACH_LOC_PER_ADMIN: perHour(30),
   UPDATE_USER_PER_ADMIN: perHour(60),
   /** Admin minting a paid-signup payment link (matches the legacy 20/hr). */

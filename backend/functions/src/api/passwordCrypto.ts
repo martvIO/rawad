@@ -44,6 +44,7 @@ const ALG = "RSA-OAEP-256";
 
 interface KeyState {
   privateKey: crypto.KeyObject | null;
+  publicKey: crypto.KeyObject | null;
   /** SPKI DER, base64 — served verbatim to clients, non-secret. */
   publicKeySpkiB64: string | null;
   ephemeral: boolean;
@@ -71,6 +72,7 @@ function loadKeyState(): KeyState {
       const publicKey = crypto.createPublicKey(privateKey);
       return {
         privateKey,
+        publicKey,
         publicKeySpkiB64: publicSpkiB64(publicKey),
         ephemeral: false,
       };
@@ -83,7 +85,7 @@ function loadKeyState(): KeyState {
           "parsed; password encryption is DISABLED. Fix the secret (PKCS8 PEM).",
         err,
       );
-      return { privateKey: null, publicKeySpkiB64: null, ephemeral: false };
+      return { privateKey: null, publicKey: null, publicKeySpkiB64: null, ephemeral: false };
     }
   }
 
@@ -98,6 +100,7 @@ function loadKeyState(): KeyState {
     );
     return {
       privateKey,
+      publicKey,
       publicKeySpkiB64: publicSpkiB64(publicKey),
       ephemeral: true,
     };
@@ -110,7 +113,7 @@ function loadKeyState(): KeyState {
       "password encryption is DISABLED (clients send plaintext over TLS). " +
       "Provision the secret to enable the layer.",
   );
-  return { privateKey: null, publicKeySpkiB64: null, ephemeral: false };
+  return { privateKey: null, publicKey: null, publicKeySpkiB64: null, ephemeral: false };
 }
 
 let _state: KeyState | null = null;
@@ -182,6 +185,32 @@ export function decryptField(value: string): string {
     throw new PasswordDecryptError("decrypt_failed");
   }
   return plain.toString("utf8");
+}
+
+/**
+ * Encrypt a plaintext value into an `enc:v1:` envelope with the server's own
+ * public key — the AT-REST counterpart of the in-transit layer, used to store
+ * generated temp passwords in /generatedPasswords/{uid} so they are never
+ * plaintext in the database. Returns null when encryption is unavailable
+ * (no configured key in prod): callers then store the plaintext as before —
+ * absence of the `enc:v1:` prefix is the signal, and the node is already
+ * unreadable by clients (`.read: false`), so this degrades to today's posture.
+ *
+ * RSA-OAEP-SHA256 caps the plaintext at ~190 bytes for a 2048-bit key — far
+ * above any password we generate or accept (max 128 chars).
+ */
+export function encryptField(plaintext: string): string | null {
+  const s = state();
+  if (!s.publicKey) return null;
+  const ciphertext = crypto.publicEncrypt(
+    {
+      key: s.publicKey,
+      padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
+      oaepHash: "sha256",
+    },
+    Buffer.from(plaintext, "utf8"),
+  );
+  return ENVELOPE_PREFIX + ciphertext.toString("base64");
 }
 
 /**

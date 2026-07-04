@@ -64,6 +64,8 @@ export interface UserStore {
   readUsernameOwner(username: string): Promise<string | null>;
   /** Resolve /phoneIndex/{key} → owning uid, or null when free. */
   readPhoneOwner(phoneIndexKey: string): Promise<string | null>;
+  /** Read /generatedPasswords/{uid} (enc:v1 envelope or legacy plaintext), or null when absent. */
+  readGeneratedPassword(uid: string): Promise<Record<string, unknown> | null>;
 
   // ── RTDB writes ──
   /** Atomic root multi-path update (a null value deletes that path). */
@@ -127,6 +129,10 @@ function makeFirebaseUserStore(): UserStore {
     async readPhoneOwner(phoneIndexKey) {
       const snap = await getDatabase().ref(`phoneIndex/${phoneIndexKey}`).get();
       return snap.exists() ? (snap.val() as string) : null;
+    },
+    async readGeneratedPassword(uid) {
+      const snap = await getDatabase().ref(`generatedPasswords/${uid}`).get();
+      return snap.exists() ? (snap.val() as Record<string, unknown>) : null;
     },
 
     async applyUpdates(updates) {
