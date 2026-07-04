@@ -399,3 +399,31 @@ Deploy: `hosting,functions:api,functions:digitalInvitePreview`. Editor UI itself
   render paths (custom-background + normal 3D world).
 - Verified via Playwright on `/d/demo/demo?demo=1`: cue centered, auto-open at ~5s, manual tap
   unaffected, zero console errors. See [[Visual-Design-System]].
+
+## Content entrance cascade gated on envelope open (2026-07-04, same session as auto-open)
+- **Problem:** the hero's staggered entrance (dawa-inv-rise cascade, per-element delays in
+  `InviteStyles.jsx`) fired on MOUNT — behind the opaque envelope canvas — so when the envelope
+  opened, the guest saw a static hero "pop" with the animation long finished.
+- **Signal:** new optional `onOpened` prop on `CelestialAmbience` (fire-once effect): fires at
+  `phase === "done"` or as soon as the envelope is not actually `covering` the content
+  (`envActive && (customBg || wantWorld)` — the wantWorld term catches a mid-intro FPS downgrade
+  tearing the normal-mode world down with phase stuck "sealed"). `DigitalInvitationView` holds
+  `inviteRevealed`, stamps `.is-opened` on the `.dawa-inv` root, with a 15s failsafe timeout so
+  content can never stay hidden.
+- **CSS gate:** `.dawa-inv:not(.is-opened) <hero entrance selectors> { animation-play-state:
+  paused; }` — fill-mode `both` holds each element at its from-frame (opacity 0) until the class
+  lands; the whole delay-staggered cascade then plays from t=0. The prefers-reduced-motion blanket
+  (`animation: none !important`) overrides the gate, so reduced-motion guests (who also get no
+  envelope) see content instantly. Non-hero `dawa-inv-rise` users (RSVP success, guestbook, nav
+  menu) are NOT gated.
+- **Cross-blend fix (found by adversarial review):** in normal mode the elevated `CelestialCanvas`
+  wrapper kept an OPAQUE `background: theme.bg` until phase "gone" (650ms after "done") with no
+  fade — the cascade's first 650ms burned invisibly (eyebrow ~72% consumed). New `fading` prop
+  (`phase === "done"`) melts that backdrop to transparent over .6s while still elevated, so the
+  hero rises in beneath the star field — true cross-blend, matching the custom-bg branch's
+  existing fading wrapper.
+- **Gotcha (cost a build break):** `InviteStyles.jsx` is a JS template literal — CSS comments in
+  it must never contain backticks.
+- Verified via Playwright: sealed = paused/opacity 0; entrance staggers visibly through the
+  melting cover at +300/+800ms (auto-open AND manual tap); reduced-motion = instant content;
+  1062 unit tests pass. See [[Visual-Design-System]].

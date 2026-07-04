@@ -42,7 +42,7 @@ export function CelestialAmbience({
   theme, font, lang, mode = "public", fixed = true, immersive3d = true,
   showEnvelope = false, guestName = "", monogram = "",
   namesAr = "", namesHe = "", eyebrow = "", blessing = "", welcome = "", dateText = "",
-  envelopeOverrides = null, background = null, starfield = null,
+  envelopeOverrides = null, background = null, starfield = null, onOpened = null,
 }) {
   const cap = useDeviceCapability();
   const [downgraded, setDowngraded] = useState(celDowngraded);
@@ -130,6 +130,24 @@ export function CelestialAmbience({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [envActive, worldReady, phase]);
 
+  // Tell the parent the intro is out of the content's way, exactly once: the
+  // envelope just opened (phase "done" — its fade-out is starting, so the
+  // content entrance can cross-blend with it), this mount never ran an
+  // envelope (incapable device / preview / showEnvelope off), or a mid-intro
+  // FPS downgrade tore the normal-mode world down with the phase stuck
+  // "sealed". `covering` = the envelope canvas is genuinely still mounted on
+  // top of the content: in custom-bg mode that's the latch alone; in normal
+  // mode the canvas render also requires wantWorld (live, drops on downgrade).
+  const openedNotified = useRef(false);
+  const covering = envActive && (customBg || wantWorld);
+  useEffect(() => {
+    if (openedNotified.current || typeof onOpened !== "function") return;
+    if (!covering || phase === "done") {
+      openedNotified.current = true;
+      onOpened();
+    }
+  }, [covering, phase, onOpened]);
+
   const envelopeProp = {
     colors: resolveEnvelopePalette(theme, envelopeOverrides),
     monogram,
@@ -199,6 +217,7 @@ export function CelestialAmbience({
             envelope={envActiveRef.current ? envelopeProp : null}
             onReady={(w) => { worldRef.current = w; setWorldReady(true); }}
             elevated={envActive}
+            fading={phase === "done"}
           />
         </Suspense>
         {envActive && (

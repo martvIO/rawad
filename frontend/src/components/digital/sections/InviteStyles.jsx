@@ -89,6 +89,25 @@ function ViewStyles({ theme, fixed }) {
     .dawa-inv .dawa-inv-hero-media-item img, .dawa-inv .dawa-inv-hero-media-item video { width: 100%; display: block; max-height: 56vh; object-fit: cover; }
     .dawa-inv .dawa-inv-cue { position: absolute; bottom: 28px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 10px; font-size: 11px; font-style: italic; letter-spacing: 3px; text-transform: uppercase; opacity: .7; animation: dawa-inv-cue 2.4s ease-in-out infinite; }
     .dawa-inv .dawa-inv-cue-line { width: 1px; height: 34px; }
+    /* Entrance gate: the hero cascade above fires on MOUNT, while the opaque
+     * envelope canvas still covers the page — finished long before the guest
+     * can see it. Hold every entrance animation paused at its from-frame
+     * (fill-mode both) until DigitalInvitationView stamps .is-opened on the
+     * root (envelope opened, or no envelope ran), so the rise plays as the
+     * canvas fades out. The prefers-reduced-motion block below wins over this
+     * (its "animation: none !important" shorthand resets play-state), so
+     * reduced-motion guests still see content instantly. */
+    .dawa-inv:not(.is-opened) .dawa-inv-hero-frame,
+    .dawa-inv:not(.is-opened) .dawa-inv-hero-logo,
+    .dawa-inv:not(.is-opened) .dawa-inv-hero-flourish,
+    .dawa-inv:not(.is-opened) .dawa-inv-hero-eyebrow,
+    .dawa-inv:not(.is-opened) .dawa-inv-monogram,
+    .dawa-inv:not(.is-opened) .dawa-inv-crown,
+    .dawa-inv:not(.is-opened) .dawa-inv-couple,
+    .dawa-inv:not(.is-opened) .dawa-inv-amp,
+    .dawa-inv:not(.is-opened) .dawa-inv-dateline,
+    .dawa-inv:not(.is-opened) .dawa-inv-greet,
+    .dawa-inv:not(.is-opened) .dawa-inv-hero-media { animation-play-state: paused; }
 
     /* Story timeline */
     .dawa-inv .dawa-inv-timeline { position: relative; padding: 20px 0; }

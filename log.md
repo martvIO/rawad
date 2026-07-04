@@ -289,3 +289,6 @@ Touched: Digital-Invitations
 
 ## [2026-07-04 15:15] session | Envelope cue centering + 5s auto-open
 Touched: Digital-Invitations
+
+## [2026-07-04 15:45] session | Envelope-gated entrance cascade + cross-blend
+Touched: Digital-Invitations

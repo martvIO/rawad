@@ -13,7 +13,7 @@ import { useTiltParallax } from "../../../hooks/useTiltParallax.js";
 // the engine — which force-loses the GL context to free it immediately — never
 // poisons a reused canvas. React StrictMode's mount→unmount→remount, and any
 // real remount, each get a brand-new canvas.
-export default function CelestialCanvas({ theme, mode = "public", fixed = true, tier = 2, onFpsDowngrade, envelope = null, starfield = null, onReady, elevated = false }) {
+export default function CelestialCanvas({ theme, mode = "public", fixed = true, tier = 2, onFpsDowngrade, envelope = null, starfield = null, onReady, elevated = false, fading = false }) {
   const containerRef = useRef(null);
   const worldRef = useRef(null);
   const scrollRef = useRef(0);
@@ -145,8 +145,12 @@ export default function CelestialCanvas({ theme, mode = "public", fixed = true, 
         zIndex: elevated ? 999 : 0,
         // While elevated, paint an opaque backdrop so the invitation content
         // behind can't flash through in the instant between the canvas mounting
-        // and the WebGL scene drawing its first frame.
-        background: elevated ? theme.bg : undefined,
+        // and the WebGL scene drawing its first frame. `fading` (envelope just
+        // opened, done→gone window) melts that backdrop away while still
+        // elevated, so the content's entrance cascade cross-blends in beneath
+        // the star field instead of popping when the z-index drops.
+        background: elevated && !fading ? theme.bg : "transparent",
+        transition: "background-color .6s ease",
         pointerEvents: "none",
       }}
     />

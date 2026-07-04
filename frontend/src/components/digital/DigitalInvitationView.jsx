@@ -7,7 +7,7 @@
 // All theming flows from the `design` prop (snapshot or live doc) via the
 // shared digitalThemes tokens, so theme/font switching keeps working. The
 // component owns no token / auth state — that lives in the route wrapper.
-import { useEffect,useMemo,useRef } from "react";
+import { useEffect,useMemo,useRef,useState } from "react";
 import { getDigitalTheme, getDigitalFont } from "../../styles/digitalThemes.js";
 import { DEFAULT_EYEBROW, DEFAULT_MEAL_OPTIONS, DEFAULT_BLESSING, DEFAULT_WELCOME } from "../../data/digitalInviteDefaults.js";
 import { localize, localizeItems, localizeList } from "../../utils/localize.js";
@@ -72,6 +72,19 @@ export function DigitalInvitationView({
   const font = getDigitalFont(design?.fontFamily);
   const isPublic = mode === "public";
   const rootRef = useRef(null);
+
+  // The hero's entrance cascade is held paused (InviteStyles `:not(.is-opened)`
+  // gate) until the envelope intro gets out of the way, so the rise plays as
+  // the envelope canvas fades — not invisibly behind it on mount. Flipped by
+  // CelestialAmbience's onOpened (immediately when no envelope runs); the
+  // timeout is a failsafe so content can never stay hidden if that signal
+  // is lost (envelope auto-opens at 5s + open animation ≈ well under 15s).
+  const [inviteRevealed, setInviteRevealed] = useState(false);
+  useEffect(() => {
+    if (inviteRevealed) return undefined;
+    const id = setTimeout(() => setInviteRevealed(true), 15000);
+    return () => clearTimeout(id);
+  }, [inviteRevealed]);
 
   // Load the extended Arabic+Hebrew wedding fonts only when an invitation
   // actually renders (lazy — other pages don't pay for them).
@@ -208,7 +221,7 @@ export function DigitalInvitationView({
   return (
     <div
       ref={rootRef}
-      className="dawa-inv"
+      className={"dawa-inv" + (inviteRevealed ? " is-opened" : "")}
       lang={lang}
       style={{
         minHeight: "100vh",
@@ -244,6 +257,7 @@ export function DigitalInvitationView({
         envelopeOverrides={design?.envelope && typeof design.envelope === "object" ? design.envelope : null}
         background={design?.background && typeof design.background === "object" ? design.background : null}
         starfield={design?.starfield && typeof design.starfield === "object" ? design.starfield : null}
+        onOpened={() => setInviteRevealed(true)}
       />
 
       <Hero
