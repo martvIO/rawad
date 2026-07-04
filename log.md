@@ -292,3 +292,6 @@ Touched: Digital-Invitations
 
 ## [2026-07-04 15:45] session | Envelope-gated entrance cascade + cross-blend
 Touched: Digital-Invitations
+
+## [2026-07-04 16:15] session | Generated groom/driver passwords + forced first-login change
+Touched: Authentication, Architecture-Decisions, Payments, Security-Model

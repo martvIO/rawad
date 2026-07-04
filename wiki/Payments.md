@@ -50,8 +50,15 @@ maps to an LS variant id via `variantIdFor(id)` → env `LS_VARIANT_ID_<ID>`.
 ## RTDB paths (Function-only unless noted)
 `paymentTokens/{token}` (state machine), `usernameReservations` + `phoneReservations`
 (soft reservations), `generatedPasswords/{uid}` (admin-visible fallback, purged on first
-change; read only via `GET /payments/links`), `purchases/{token}` (admin-readable ledger),
-`/users/{uid}` adds `paymentPackageId` + `mustChangePassword` (+ legacy `payment*` KPI fields).
+change; read only via `GET /payments/links` — now **decrypted server-side**), `purchases/{token}`
+(admin-readable ledger), `/users/{uid}` adds `paymentPackageId` + `mustChangePassword` (+ legacy
+`payment*` KPI fields).
+
+**As of 2026-07-04** the webhook stores the generated password as an `enc:v1:` RSA-OAEP
+envelope (not plaintext), and the WhatsApp send was extracted to the shared
+`api/services/credentialsDelivery.ts` (`deliverCredentials` now just stamps token status
+around it). The same machinery + encryption is reused by admin-created groom/driver accounts
+— see [[Authentication]] (generated-credentials section) and [[Architecture Decisions]].
 
 ## Files
 - backend: `api/routes/payments.ts` (LS checkout + `order_created` webhook +
