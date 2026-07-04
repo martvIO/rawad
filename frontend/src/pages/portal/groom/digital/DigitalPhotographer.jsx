@@ -30,8 +30,8 @@ const filesStatusOf = (f) => {
 };
 
 // Mirror of MAX_PHOTOG_BYTES on the server (functions/src/constants/limits.ts).
-// 200 MB ceiling matches the multipart parser limit.
-const MAX_PHOTOG_BYTES = 200 * 1024 * 1024;
+// 2 GB ceiling — direct-to-Storage uploads have no function-memory limit.
+const MAX_PHOTOG_BYTES = 2 * 1024 * 1024 * 1024;
 
 const iconFor = (type = "") => {
   if (type.startsWith("image")) return "🖼";
@@ -243,8 +243,8 @@ export function DigitalPhotographer() {
     if (oversized.length) {
       const names = oversized.map(f => f.name).join("، ");
       showToast(lang === "he"
-        ? `קבצים חורגים מ-200MB: ${names}`
-        : `ملفات تتجاوز 200 MB: ${names}`);
+        ? `קבצים חורגים מ-2GB: ${names}`
+        : `ملفات تتجاوز 2 غيغابايت: ${names}`);
       arr = arr.filter(f => f.size <= MAX_PHOTOG_BYTES);
       if (!arr.length) return;
     }

@@ -32,6 +32,43 @@ async function uploadAndGetUrl(
 }
 
 /**
+ * Start a GCS RESUMABLE upload session for `path` and return the session URI the
+ * BROWSER PUTs the file bytes to directly — bypassing the function (no 512 MiB
+ * buffering, no 2-min timeout, handles multi-GB videos). Uses the SDK's OAuth to
+ * initiate (NOT signing), so it needs no "Service Account Token Creator" role,
+ * unlike getSignedUrl(). `origin` ties the session's CORS to the caller's origin.
+ */
+async function createUploadSession(
+  path: string,
+  contentType: string,
+  origin?: string
+): Promise<string> {
+  const opts: { metadata: { contentType: string }; origin?: string } = { metadata: { contentType } };
+  if (origin) opts.origin = origin;
+  const [uri] = await getStorage().bucket().file(path).createResumableUpload(opts);
+  return uri;
+}
+
+/**
+ * After the browser finishes a direct upload, read back the finalized object so
+ * the caller can write the metadata doc. Returns null if the object never landed.
+ */
+async function getUploadedObjectInfo(
+  path: string
+): Promise<{ url: string; contentType: string; size: number } | null> {
+  const file = getStorage().bucket().file(path);
+  const [exists] = await file.exists();
+  if (!exists) return null;
+  const [meta] = await file.getMetadata();
+  const url = await getDownloadURL(file);
+  return {
+    url,
+    contentType: (meta.contentType as string) || "application/octet-stream",
+    size: Number(meta.size) || 0,
+  };
+}
+
+/**
  * Best-effort delete of a Storage object. Logs but never throws — the
  * Firestore record (or media[] entry) has already been pruned, and a
  * dangling Storage object is recoverable via a sweep.
@@ -173,5 +210,5 @@ function pickExtensionFromFilename(filename: string, fallback: string): string {
 }
 
 
-export { uploadAndGetUrl, deleteStorageObjectSilently, deleteStorageFolder, kindOf, parseMultipart, hasAllowedPrefix, isSafeMediaContentType, pickExtensionFromFilename };
+export { uploadAndGetUrl, createUploadSession, getUploadedObjectInfo, deleteStorageObjectSilently, deleteStorageFolder, kindOf, parseMultipart, hasAllowedPrefix, isSafeMediaContentType, pickExtensionFromFilename };
 export type { ParsedMultipart };

@@ -464,22 +464,94 @@ export async function fetchPublishedPhotographerFiles(groomUid) {
   }
 }
 
+// Upload a photographer file. Prefers a DIRECT-to-Storage resumable upload
+// (browser → GCS, bypassing the 512 MiB / 2-min function → multi-GB videos,
+// hours-long uploads, faster). Falls back to the legacy through-function multipart
+// route if the direct path is unavailable (old server / CORS / transient error).
+// `opts`: { signal, onProgress(fraction) }. Returns the optimistic record.
+// Files up to this size can fall back through the function (its 512 MiB memory);
+// bigger files (large videos) only use the direct path — a fallback would just
+// stream 200 MB and 413, wasting bandwidth.
+const PHOTOG_FALLBACK_MAX_BYTES = 200 * 1024 * 1024;
+
 export async function uploadPhotographerFile(groomUid, file, opts) {
   const uid = resolveUid(groomUid);
+  try {
+    return await directPhotographerUpload(uid, file, opts);
+  } catch (err) {
+    if (err?.name === "AbortError") throw err;
+    // Direct path unavailable (old server / CORS) → fall back through the function,
+    // but only for files the function can actually handle. Large files re-throw so
+    // the caller's retry re-attempts the direct path instead of wasting a 413.
+    if (file.size > PHOTOG_FALLBACK_MAX_BYTES) throw err;
+    return await legacyPhotographerUpload(uid, file, opts);
+  }
+}
+
+async function directPhotographerUpload(uid, file, opts) {
+  // 1. Mint a resumable upload session (server authorizes + rate-limits).
+  const { uploadUrl, storagePath } = await api.post(
+    `/digital/${uid}/photographer/create-upload`,
+    { name: file.name, contentType: file.type || "application/octet-stream", size: file.size },
+    { signal: opts?.signal },
+  );
+  // 2. PUT the bytes straight to Storage — no timeout, so a huge file can take as
+  //    long as the network needs; progress + abort via XHR.
+  await putFileToStorage(uploadUrl, file, opts);
+  // 3. Register the finished object (writes the metadata doc → face indexing).
+  const rec = await api.post(
+    `/digital/${uid}/photographer/register`,
+    { storagePath, name: file.name },
+    { signal: opts?.signal },
+  );
+  return {
+    id: rec?.id ?? null, url: rec?.url ?? null,
+    storagePath: rec?.storagePath ?? storagePath, key: rec?.id ?? null,
+    name: file.name, type: rec?.type || file.type, uploadedAt: Date.now(),
+  };
+}
+
+async function legacyPhotographerUpload(uid, file, opts) {
   const formData = new FormData();
   formData.append("file", file, file.name);
   const data = await api.upload(`/digital/${uid}/photographer/upload`, formData, opts);
-  // Returns the full record so callers can register the upload as a
-  // pending optimistic entry. `key` kept for back-compat with old callers.
   return {
-    id: data?.id ?? null,
-    url: data?.url ?? null,
-    storagePath: data?.storagePath ?? null,
-    key: data?.id ?? null,
-    name: file.name,
-    type: file.type,
-    uploadedAt: Date.now(),
+    id: data?.id ?? null, url: data?.url ?? null, storagePath: data?.storagePath ?? null,
+    key: data?.id ?? null, name: file.name, type: file.type, uploadedAt: Date.now(),
   };
+}
+
+// Single-shot PUT of the whole file to a GCS resumable-session URI. Deliberately
+// sets NO xhr.timeout so multi-GB uploads over hours don't abort; reports progress
+// and honours the caller's AbortSignal.
+function putFileToStorage(url, file, opts) {
+  return new Promise((resolve, reject) => {
+    if (opts?.signal?.aborted) { reject(new DOMException("Aborted", "AbortError")); return; }
+    const xhr = new XMLHttpRequest();
+    xhr.open("PUT", url, true);
+    xhr.setRequestHeader("Content-Type", file.type || "application/octet-stream");
+    if (file.size > 0) xhr.setRequestHeader("Content-Range", `bytes 0-${file.size - 1}/${file.size}`);
+    const onProgress = typeof opts?.onProgress === "function" ? opts.onProgress : null;
+    if (onProgress && xhr.upload) {
+      xhr.upload.onprogress = (e) => { if (e.lengthComputable) onProgress(e.loaded / e.total); };
+    }
+    let onAbort = null;
+    const cleanup = () => { if (onAbort && opts?.signal) opts.signal.removeEventListener("abort", onAbort); };
+    xhr.onload = () => {
+      cleanup();
+      if (xhr.status >= 200 && xhr.status < 300) resolve();
+      // 5xx (and 0 / 308) are transient → surface as network_error so the caller's
+      // retry re-attempts; 4xx are permanent.
+      else reject(new Error(xhr.status >= 500 || xhr.status === 0 || xhr.status === 308 ? "network_error" : `storage_put_${xhr.status}`));
+    };
+    xhr.onerror = () => { cleanup(); reject(new Error("network_error")); };
+    xhr.onabort = () => { cleanup(); reject(new DOMException("Aborted", "AbortError")); };
+    if (opts?.signal) {
+      onAbort = () => xhr.abort();
+      opts.signal.addEventListener("abort", onAbort, { once: true });
+    }
+    xhr.send(file);
+  });
 }
 
 export async function renamePhotographerFile(groomUid, fileId, newName) {

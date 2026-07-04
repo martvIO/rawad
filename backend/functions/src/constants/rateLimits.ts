@@ -113,8 +113,12 @@ export const RATE = Object.freeze({
   MEDIA_UPLOAD_PER_USER: perHour(120),
   /** Photographer dumps a whole event's photos in one session — a wedding album
    *  is routinely many hundreds of files, so 120/h wrongly blocked the legit case
-   *  (429 after 120). Sized for a full event upload while still bounding abuse. */
+   *  (429 after 120). Sized for a full event upload while still bounding abuse.
+   *  Gates BOTH the legacy multipart upload and the direct-upload session mint. */
   PHOTOG_UPLOAD_PER_USER: perHour(2000),
+  /** Metadata registration after a direct upload — one cheap Firestore write per
+   *  finished file. Higher than the session mint so it's never the bottleneck. */
+  PHOTOG_REGISTER_PER_USER: perHour(4000),
   /** People-gallery read-heavy routes (index/cluster status, clusters, config)
    *  — polled by the gallery UI; generous per-caller cap on own-tenant reads. */
   GALLERY_READ_PER_USER: perHour(600),

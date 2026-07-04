@@ -35,6 +35,9 @@ export const MAX_LEN = Object.freeze({
 export const MAX_BYTES = Object.freeze({
   PROOF: 6 * 1024 * 1024, //   6 MB — delivery-proof photo
   INVITE_MEDIA: 50 * 1024 * 1024, //  50 MB — digital-invite background
-  PHOTOGRAPHER: 200 * 1024 * 1024, // 200 MB — photographer files
+  PHOTOGRAPHER: 2 * 1024 * 1024 * 1024, // 2 GB — photographer files (direct-to-Storage resumable upload)
+  // Cap for the THROUGH-FUNCTION fallback route only: the `api` function buffers
+  // the whole body in its 512 MiB memory, so the legacy multipart path must stay small.
+  PHOTOGRAPHER_LEGACY: 200 * 1024 * 1024, // 200 MB
   MOCKUP: 50 * 1024 * 1024, //  50 MB — design-request mockup
 });
