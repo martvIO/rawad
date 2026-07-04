@@ -47,10 +47,14 @@ export function CelestialEnvelopeOverlay({ phase, guestName, theme, font, lang, 
               color: theme.accent,
               fontSize: 13,
               letterSpacing: 3,
+              // letter-spacing adds trailing space after the last glyph, which
+              // textAlign:center counts as content — indent the inline-start by
+              // the same amount so the visible text sits on true center.
+              textIndent: 3,
               textTransform: "uppercase",
               fontStyle: "italic",
               marginBottom: 18,
-              animation: "dawa-inv-cue 2.6s ease-in-out infinite",
+              animation: "dawa-inv-cue-c 2.6s ease-in-out infinite",
             }}
           >
             — {lang === "he" ? "לחץ לפתיחת ההזמנה" : "اضغط لفتح الدعوة"} —

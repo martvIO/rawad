@@ -5,6 +5,7 @@ import { useDeviceCapability } from "../../../hooks/useDeviceCapability.js";
 import { celDowngraded, markCelDowngraded } from "../celestial/downgradeStore.js";
 import { resolveEnvelopePalette } from "../../../utils/themeToEnvelopePalette.js";
 import { resolveBackground } from "../../../utils/themeToBackground.js";
+import { TIMING } from "../../../config/index.js";
 
 // Single owner of the invitation's backdrop AND intro envelope. It decides,
 // per device capability and the groom's flags:
@@ -53,6 +54,9 @@ export function CelestialAmbience({
   // Envelope reveal phases: sealed → opening → revealing → done → gone.
   const [phase, setPhase] = useState("sealed");
   const worldRef = useRef(null);
+  // Flipped by the canvas's onReady — the auto-open countdown must not start
+  // until the sealed envelope is actually on screen (lazy chunk loaded).
+  const [worldReady, setWorldReady] = useState(false);
 
   // Honor a mid-session "reduce motion" toggle by tearing the world down live.
   const [reduceMotion, setReduceMotion] = useState(false);
@@ -116,6 +120,16 @@ export function CelestialAmbience({
     });
   };
 
+  // Auto-open: if the guest doesn't tap the sealed envelope, open it for them.
+  // Cleared on tap (phase leaves "sealed"); onOpen's own guard makes a late
+  // firing a no-op anyway.
+  useEffect(() => {
+    if (!envActive || !worldReady || phase !== "sealed") return undefined;
+    const id = setTimeout(onOpen, TIMING.ENVELOPE_AUTO_OPEN_MS);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [envActive, worldReady, phase]);
+
   const envelopeProp = {
     colors: resolveEnvelopePalette(theme, envelopeOverrides),
     monogram,
@@ -151,7 +165,7 @@ export function CelestialAmbience({
                   onFpsDowngrade={onFpsDowngrade}
                   starfield={starfield}
                   envelope={envActiveRef.current ? envelopeProp : null}
-                  onReady={(w) => { worldRef.current = w; }}
+                  onReady={(w) => { worldRef.current = w; setWorldReady(true); }}
                   elevated={false}
                 />
               </Suspense>
@@ -183,7 +197,7 @@ export function CelestialAmbience({
             onFpsDowngrade={onFpsDowngrade}
             starfield={starfield}
             envelope={envActiveRef.current ? envelopeProp : null}
-            onReady={(w) => { worldRef.current = w; }}
+            onReady={(w) => { worldRef.current = w; setWorldReady(true); }}
             elevated={envActive}
           />
         </Suspense>

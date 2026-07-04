@@ -110,6 +110,8 @@ export const TIMING = {
   TOAST_MS: 3200,
   /** Stagger between WhatsApp tab-opens when bulk-sending invites. */
   WA_STAGGER_MS: 300,
+  /** Sealed digital-invite envelope opens by itself if the guest doesn't tap. */
+  ENVELOPE_AUTO_OPEN_MS: 5000,
 };
 
 // ─── Geolocation constants ───────────────────────────────────────────────────

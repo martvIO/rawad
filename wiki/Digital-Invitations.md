@@ -381,3 +381,21 @@ clarity/opacity**.
   big, bright CYAN background stars (`glError 0`); the shader compiles + the envelope still opens.
 Deploy: `hosting,functions:api,functions:digitalInvitePreview`. Editor UI itself not browser-verified
 (auth-gated; emulator needs Java 11+). See [[Visual-Design-System]], [[Architecture-Decisions]].
+
+## Envelope tap-cue centering fix + 5s auto-open (2026-07-04)
+- **Cue off-center bug:** the sealed overlay's "اضغط لفتح الدعوة" hint reused the `dawa-inv-cue`
+  keyframe (`InviteStyles.jsx`), whose frames bake in `translate(-50%, …)` — correct for the
+  `left:50%`-anchored `.dawa-inv-cue` class, but on the overlay's full-width block it dragged the
+  line half a viewport left (clipped at the screen edge). Fix: new `dawa-inv-cue-c` keyframe (same
+  opacity/bob pulse, `translateY` only) used by `CelestialEnvelopeOverlay.jsx`; plus `textIndent: 3`
+  to balance the `letterSpacing: 3` trailing-space overhang under `textAlign: center`. **Rule:** any
+  keyframe that bakes a `-50%` translate must only be applied to `left:50%`-anchored elements.
+- **Auto-open:** if the guest doesn't tap, the envelope opens itself after
+  `TIMING.ENVELOPE_AUTO_OPEN_MS` (5000, `shared/src/config/index.js` — owner picked 5s). A
+  `useEffect` in `CelestialAmbience.jsx` arms a timeout only when `phase === "sealed"` **and**
+  `worldReady` (new state flipped by the canvas `onReady`, so the countdown starts when the sealed
+  envelope is actually visible, not while the lazy three.js chunk downloads). Cleanup clears it on
+  tap; `onOpen`'s existing `phase !== "sealed"` guard makes any late firing a no-op. Covers both
+  render paths (custom-background + normal 3D world).
+- Verified via Playwright on `/d/demo/demo?demo=1`: cue centered, auto-open at ~5s, manual tap
+  unaffected, zero console errors. See [[Visual-Design-System]].

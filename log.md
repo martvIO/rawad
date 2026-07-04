@@ -286,3 +286,6 @@ Touched: Digital-Invitations
 
 ## [2026-07-04 02:40] session | Background-star controls + stale-demo-envelope fix
 Touched: Digital-Invitations
+
+## [2026-07-04 15:15] session | Envelope cue centering + 5s auto-open
+Touched: Digital-Invitations
