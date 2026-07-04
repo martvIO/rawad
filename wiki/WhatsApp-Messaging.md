@@ -70,6 +70,64 @@ button to send it manually. Decisions (grilled):
   digital guest only a digital one) — never off `adminMode`, which would wrap a
   physical token in a dead `/d/` URL after a mode switch.
 
+## Production number migration (grilled 2026-07-04)
+
+Migrating off Meta's test number onto a real dedicated number. Decisions (grilled):
+
+- **Owner's WhatsApp Business app number stays untouched** — registering it on the
+  Cloud API would kill the app account. Instead: **buy a new Israeli prepaid
+  SIM/eSIM** (~₪10–25/mo; 019 / Rami Levy / Golan / HOT…) and keep the line alive
+  forever (recycled numbers can lose the WhatsApp identity).
+- **Same WABA** as the test number — templates + webhook subscription carry over;
+  effectively only `waPhoneId` (adminSettings) changes. **Zero code changes** —
+  the whole switch is Meta-side setup + runtime config.
+- **Display name:** `Dawa | دعوة` (fallback `Dawa دعوة` if the `|` is rejected).
+- **Billing:** card added to the WABA during setup — real-number template sends
+  are paid (~₪0.12/marketing msg); without a card every send fails (131042).
+- **No registered business → stay unverified:** 250 business-initiated
+  conversations/rolling-24h; `waDailyCap: 250` default already matches.
+- **Permanent System-User token** replaces the temp-24h token in
+  `backend/functions/.env` (`WHATSAPP_TOKEN`) + functions redeploy.
+- **Hybrid Playwright session:** Claude drives Meta dashboards; owner types
+  password/2FA, card, token (durable secrets never enter chat); owner relays SMS
+  OTP + 6-digit two-step PIN (must be saved!) for Claude to type.
+- **Two phases:** A (before SIM): state discovery, system-user token, billing,
+  template check via the admin WhatsApp tab, webhook check. B (after SIM): add
+  number + verify + PIN, repoint `waPhoneId`, end-to-end verify (test-send →
+  receipt pills → real Send-tab invite → functions logs).
+
+Plan file: `~/.claude/plans/i-have-a-phone-concurrent-treehouse.md`. See
+[[Architecture Decisions]].
+
+### Execution state (2026-07-04 session)
+
+- **Meta layout (3 WABAs on portfolio dawa.invitation / 1712519413221653):**
+  - Test WABA `942343588815705` — test number +1 555-149-3969 (phone-id
+    `1094938557046441`), the 4 approved invite templates, prod currently points here.
+  - `DA’WA` WABA `1359891659538015` — holds +972 52-934-8797 (owner's other number,
+    Offline, untouched — NOT ours to register).
+  - **NEW production WABA `Dawa` = `990436760646692`** — created via dev-console
+    "Add phone number" wizard; holds **+972 52-581-5460, phone-id `1135726059632019`**,
+    OTP-verified, display name "Dawa" (accepted without review).
+- **Done this session:** permanent never-expiry system-user token (user `dawa-backend`,
+  perms whatsapp_business_messaging+management) in `backend/functions/.env` →
+  functions deployed; new WABA assigned to dawa-backend (full access); app
+  subscribed to new WABA webhooks (`success:true`; callback =
+  `…cloudfunctions.net/whatsappWebhook`, fields incl. `messages` — verified via
+  `GET /{app-id}/subscriptions`); 4 invite templates re-created on the new WABA
+  (URL base kept `https://dawa-aa793.web.app` to match prod `PUBLIC_BASE_URL`);
+  NEW `dawa_rsvp_reminder_ar/he` templates created (body `{{1}}`=guest name) —
+  closes the reminders no-template gap.
+- **Blocked on Meta:** WABA `account_review_status: PENDING` → number registration
+  refused ("Unverified WABA"); all 6 new templates PENDING review. No violations in
+  Business Support Home — just the automatic queue.
+- **Owner TODO:** add a payment method to WABA 990436760646692 (deferred; sends
+  will fail 131042 until then). Billing locale pre-selected Israel/USD/Jerusalem —
+  ILS not offered by Meta.
+- **Remaining once review clears:** `POST /{phone-id}/register` with the saved PIN →
+  flip `/adminSettings.waPhoneId → 1135726059632019` + `waWabaId → 990436760646692`
+  (+ set `waTemplateReminderAr/He`) → test-send → watch receipt pills + functions logs.
+
 UI: `frontend/src/pages/portal/admin/WaSendFallbackModal.jsx` (admin-only, so it
 lives beside the Send tab, not in `components/`); failure payloads surface from
 `handleWaSend` in `usePortalSendInvites.js`. Verified end-to-end via Playwright
