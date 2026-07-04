@@ -36,6 +36,19 @@ A `invalid_credentials` / "wrong username or password" failure on the deployed s
 
 Seed/dev defaults (`e2e/helpers/seed.ts`): `admin/Admin1234`, `groom/Groom1234`, `driver/Driver1234` — but **production passwords drift from these**, so a 401 with the seed value just means prod was changed.
 
+## Generated credentials + forced first-login change (2026-07-04)
+Admin-created **grooms and drivers** never get an admin-typed password: `POST /users`
+generates one server-side (`passwordGen.ts`, 16-char CSPRNG), sets
+`mustChangePassword: true`, auto-sends the WhatsApp credentials template
+(ar/he, admin-picked), and returns the plaintext once **only if delivery failed**
+(show-once modal with copy + wa.me). Admin-role creation keeps the manual field.
+Admin resets for groom/driver = same generate+resend (`POST /users/:uid/reset-password`);
+`PUT /users/:uid/password` now rejects groom/driver targets. Temp passwords rest in
+`/generatedPasswords/{uid}` as `enc:v1:` envelopes (transit keypair reused); audited
+admin re-reveal via `GET /users/:uid/temp-password`. First `/auth/change-password`
+(or phone-OTP reset) clears the flag + purges the envelope. Same machinery as the
+paid-signup flow — see [[Payments]]; rationale in [[Architecture Decisions]].
+
 ## Password encryption (in-body, defense-in-depth)
 As of 2026-06-13, the client RSA-encrypts the `password`/`newPassword` field as an
 `enc:v1:` envelope before POSTing to `/auth/login`, `/auth/reset-password`, and the

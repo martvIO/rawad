@@ -22,7 +22,7 @@ _(people, places, organizations, products — pages that describe a thing)_
 _(ideas, frameworks, patterns, principles — pages that describe a concept)_
 
 - [[REST API Architecture]] — Express-on-Cloud-Functions REST layer; no Firebase SDK on the client
-- [[Authentication]] — synthetic email, JWT custom claims, token manager, phone-OTP reset
+- [[Authentication]] — synthetic email, JWT custom claims, token manager, phone-OTP reset; + generated groom/driver credentials with forced first-login change (2026-07-04)
 - [[Polling and Realtime]] — REST polling (15–30s) for most data; SSE for live driver GPS
 - [[Security Model]] — three enforced server-side layers + non-authoritative UI guard; + 2026-07-01 monitoring/blocking/validation layer
 - [[Password Encryption]] — client RSA-OAEP-encrypts password fields as `enc:v1:` envelopes (defense-in-depth on top of HTTPS); backend middleware decrypts ahead of /auth + /users; LIVE in prod with plaintext rejection enforced, verified E2E 2026-07-03
