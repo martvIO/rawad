@@ -25,21 +25,40 @@ process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
 process.env.FIREBASE_STORAGE_EMULATOR_HOST = "127.0.0.1:9199";
 process.env.GCLOUD_PROJECT = PROJECT_ID;
 
-// Write to the SAME RTDB namespace the Cloud Functions read in the emulator.
-// In the emulator the Functions runtime's FIREBASE_CONFIG advertises the LEGACY
-// default instance (https://dawa-aa793.firebaseio.com → namespace "dawa-aa793"),
-// NOT the modern "<project>-default-rtdb". Seeding the modern namespace left the
-// functions reading an empty legacy namespace (guests list empty, confirmations
-// "unknown_groom", etc.). The app only ever touches RTDB through the Admin SDK
-// (which bypasses security rules), so the namespace choice is purely about where
-// data lives — matching the functions is what makes seeded reads work.
+// Write to the SAME RTDB namespace the Cloud Functions read in the emulator —
+// which namespace that is depends on the firebase-tools version: older CLIs
+// advertise the LEGACY default instance in the runtime's FIREBASE_CONFIG
+// (https://dawa-aa793.firebaseio.com → namespace "dawa-aa793"), newer CLIs the
+// modern "<project>-default-rtdb". Seeding only one left the functions reading
+// an empty namespace on the other CLI generation (guests list empty,
+// confirmations "unknown_groom", etc. — this bit both directions, 2026-06-29
+// and 2026-07-04). The app only ever touches RTDB through the Admin SDK (which
+// bypasses security rules), so the namespace choice is purely about where data
+// lives — seeding BOTH namespaces makes the seed CLI-version-proof.
 admin.initializeApp({
   projectId: PROJECT_ID,
   databaseURL: `http://127.0.0.1:9000/?ns=${PROJECT_ID}`,
 });
+const modernApp = admin.initializeApp(
+  {
+    projectId: PROJECT_ID,
+    databaseURL: `http://127.0.0.1:9000/?ns=${PROJECT_ID}-default-rtdb`,
+  },
+  "modern-ns",
+);
 
 const auth = admin.auth();
-const rtdb = admin.database();
+const rtdbs = [admin.database(), modernApp.database()];
+
+// Apply each write to BOTH namespaces (see header). push() mints the key once
+// so the two copies stay under identical paths.
+const dbSet = (path, val) => Promise.all(rtdbs.map((db) => db.ref(path).set(val)));
+const dbRemove = (path) => Promise.all(rtdbs.map((db) => db.ref(path).remove()));
+const dbPush = async (path, val) => {
+  const key = rtdbs[0].ref(path).push().key;
+  await dbSet(`${path}/${key}`, val);
+  return key;
+};
 
 const USERS = [
   { username: "admin", password: "Admin1234", role: "admin", displayName: "Test Admin", phone: "+972500000001" },
@@ -71,33 +90,33 @@ async function ensureUser({ username, password, role, displayName, phone }) {
     console.log(`[seed] created: ${username} (${user.uid})`);
   }
   await auth.setCustomUserClaims(user.uid, { role, username });
-  await rtdb.ref(`users/${user.uid}`).set({
+  await dbSet(`users/${user.uid}`, {
     username, role, displayName, phoneE164: phone, createdAt: Date.now(),
   });
-  await rtdb.ref(`usernameIndex/${username}`).set(user.uid);
+  await dbSet(`usernameIndex/${username}`, user.uid);
   // Mirror production userStore: phoneIndex is written in lock-step with
   // usernameIndex. The phone-OTP password reset (/auth/reset-password) resolves
   // the account via phoneIndex/{digits}, so without this the reset 404s.
-  await rtdb.ref(`phoneIndex/${phone.replace(/^\+/, "")}`).set(user.uid);
+  await dbSet(`phoneIndex/${phone.replace(/^\+/, "")}`, user.uid);
   return user.uid;
 }
 
 async function seedGroomProfile(uid, username, displayName) {
-  await rtdb.ref(`groomProfiles/${uid}`).set({ username, displayName });
+  await dbSet(`groomProfiles/${uid}`, { username, displayName });
 }
 
 async function seedGuests(groomUid, groomUsername) {
   // Clear any prior seeded guests so reseeding is idempotent (avoids
   // accumulating duplicates across emulator restarts).
-  await rtdb.ref(`guestsByGroom/${groomUid}`).remove();
+  await dbRemove(`guestsByGroom/${groomUid}`);
   for (const g of GUESTS) {
-    const ref = await rtdb.ref(`guestsByGroom/${groomUid}`).push({
+    const key = await dbPush(`guestsByGroom/${groomUid}`, {
       ...g,
       groomUid,
       groomUsername,
       createdAt: Date.now(),
     });
-    console.log(`[seed] guest: ${g.name} -> ${ref.key}`);
+    console.log(`[seed] guest: ${g.name} -> ${key}`);
   }
 }
 
@@ -110,12 +129,12 @@ async function assignDriver(driverUid, groomUid) {
     assignedGrooms: { ...(claims.assignedGrooms || {}), [groomUid]: true },
   };
   await auth.setCustomUserClaims(driverUid, next);
-  await rtdb.ref(`driverAssignments/${driverUid}/${groomUid}`).set(true);
+  await dbSet(`driverAssignments/${driverUid}/${groomUid}`, true);
   console.log(`[seed] assigned driver ${driverUid} -> groom ${groomUid}`);
 }
 
 async function seedAdminSettings() {
-  await rtdb.ref("adminSettings").set({
+  await dbSet("adminSettings", {
     messageBody: "Dear {name}, you are invited!",
     formLink: "/confirm/groom",
   });
