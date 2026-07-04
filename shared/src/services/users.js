@@ -74,10 +74,24 @@ export async function removeGroomProfile(uid) {
  * Create a portal user. Server validates uniqueness on username + phone,
  * mints custom claims, writes /users + indices + groom profile.
  *
- * @param {{username, password, role, phoneE164?, displayName?}} input
+ * Groom/driver: send NO password (the server generates one, sets
+ * mustChangePassword and WhatsApps the credentials); the response then carries
+ * `credentials: { delivered, deliveryError?, password? }` — plaintext present
+ * ONLY when delivery failed (show-once fallback). Admin role: send `password`.
+ *
+ * @param {{username, role, password?, phoneE164?, displayName?, lang?}} input
  */
 export async function createPortalUser(input) {
   return api.post("/users", input);
+}
+
+/**
+ * Regenerate a groom/driver's password and resend it over WhatsApp (admin).
+ * Re-arms the forced first-login change and revokes the target's sessions.
+ * Returns `{ ok, credentials }` with the same show-once contract as create.
+ */
+export async function adminResetUserPassword(uid, lang) {
+  return api.post(`/users/${uid}/reset-password`, lang ? { lang } : {});
 }
 
 export async function deletePortalUser(uid) {

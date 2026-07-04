@@ -14,6 +14,7 @@ import {
   createPortalUser, deletePortalUser,
   updatePortalUser as updatePortalUserSrv,
   adminSetPassword as adminSetPasswordSrv,
+  adminResetUserPassword,
   patchUserInRTDB,
   upsertGroomProfile, removeGroomProfile,
 } from "../../services/users.js";
@@ -101,11 +102,16 @@ export function usePortalUsers({ authed, isAdmin, currentUid, userType, driverSe
     return [];
   }, [isAdmin, adminUsers, optimisticUsers, userType, driverServingGroom]);
 
-  // Admin user-creation form
+  // Admin user-creation form. Password is typed for role=admin ONLY —
+  // groom/driver passwords are generated server-side (the field is hidden).
   const [newUserRole,  setNewUserRole]  = useState("groom");
   const [newUserName,  setNewUserName]  = useState("");
   const [newUserPass,  setNewUserPass]  = useState("");
   const [newUserPhone, setNewUserPhone] = useState("");
+  // لغة رسالة الواتساب التي تحمل بيانات الدخول (عريس/مرسل) — افتراضياً عربية.
+  const [newUserLang,    setNewUserLang]    = useState("ar");
+  // «بدون هاتف الآن» — يتخطّى شرط الهاتف الإلزامي للعريس/المرسل عن قصد.
+  const [newUserNoPhone, setNewUserNoPhone] = useState(false);
 
   // Admin user-edit modal (full row selected; null = modal closed)
   const [editingUser, setEditingUser] = useState(null);
@@ -118,8 +124,18 @@ export function usePortalUsers({ authed, isAdmin, currentUid, userType, driverSe
   // الهاتف اختياري: الخادم (route ‎/users‎ + userStore) ينشئ الحساب بلا رقم
   // هاتف عند غيابه — لا phoneNumber في Auth، ولا قيد في phoneIndex.
   const addUser = async (opts = {}) => {
-    if (!newUserName.trim() || !newUserPass.trim()) { showToast(t("admin_required")); return null; }
-    if (!isStrongPassword(newUserPass)) { showToast(t("pwd_weak")); return null; }
+    const isAdminRole = newUserRole === ROLES.ADMIN;
+    const typedPhone  = newUserPhone.trim();
+    if (!newUserName.trim()) { showToast(t("admin_required")); return null; }
+    if (isAdminRole) {
+      // حساب مدير: كلمة المرور تُكتب يدوياً (كما كان) وتُتحقّق قوّتها.
+      if (!newUserPass.trim()) { showToast(t("admin_required")); return null; }
+      if (!isStrongPassword(newUserPass)) { showToast(t("pwd_weak")); return null; }
+    } else if (!typedPhone && !newUserNoPhone) {
+      // عريس/مرسل: الهاتف إلزامي (لتسليم كلمة المرور عبر واتساب + استرجاع
+      // OTP) إلا إذا فعّل الأدمن «بدون هاتف الآن» عن قصد.
+      showToast(t("admin_phone_required")); return null;
+    }
     const username   = newUserName.trim().toLowerCase();
     const role       = newUserRole;
     // صلاحيتا العريس (افتراضاً مُفعّلتان). تُمرَّران من نموذج الإنشاء.
@@ -127,10 +143,9 @@ export function usePortalUsers({ authed, isAdmin, currentUid, userType, driverSe
     const canUsePhotographer = opts.canUsePhotographer !== false;
     // بطاقة المحفظة — افتراضاً متوقّفة (يفعّلها الأدمن لكل عريس).
     const canUseBoardingPass = opts.canUseBoardingPass === true;
-    // الهاتف اختياري: إذا تُرك فارغاً لا نُرسل phoneE164 إطلاقاً (لا بادئة
-    // وهميّة مثل +1202555…) — الخادم ينشئ الحساب بلا هاتف.
-    const typedPhone = newUserPhone.trim();
-    const payload = { username, password: newUserPass, role, canSeeAttendance, canUsePhotographer, canUseBoardingPass };
+    const payload = { username, role, canSeeAttendance, canUsePhotographer, canUseBoardingPass };
+    if (isAdminRole) payload.password = newUserPass;
+    else payload.lang = newUserLang; // لغة رسالة بيانات الدخول
     if (typedPhone) payload.phoneE164 = typedPhone;
     try {
       const result = await createPortalUser(payload);
@@ -145,12 +160,30 @@ export function usePortalUsers({ authed, isAdmin, currentUid, userType, driverSe
           upsertGroomProfile(uid, { username }).catch(() => {});
         }
       }
-      setNewUserName(""); setNewUserPass(""); setNewUserPhone("");
-      showToast(t("admin_added"));
-      return newRow;
+      setNewUserName(""); setNewUserPass(""); setNewUserPhone(""); setNewUserNoPhone(false);
+      // النتيجة تحمل credentials للعريس/المرسل: delivered=true → أُرسلت
+      // بواتساب؛ وإلا فالصفحة تعرض كلمة المرور مرة واحدة (مودال النسخ).
+      // NOTE: never log `result`/`credentials` — may contain a plaintext password.
+      const credentials = result?.credentials ?? null;
+      showToast(credentials?.delivered ? t("admin_pw_sent_wa") : t("admin_added"));
+      return { ...newRow, credentials };
     } catch (e) {
       logErr("addUser", e);
       showToast(localizeApiError(e, t, t("admin_taken")));
+      return null;
+    }
+  };
+
+  // إعادة تعيين كلمة مرور عريس/مرسل: الخادم يولّد كلمة جديدة، يفصل الجلسات،
+  // يعيد تفعيل «تغيير إلزامي عند أول دخول»، ويرسلها بواتساب. تُعيد credentials
+  // (بنفس عقد الإنشاء) أو null عند الفشل.
+  const resetUserPassword = async (uid, lang) => {
+    try {
+      const result = await adminResetUserPassword(uid, lang);
+      return result?.credentials ?? { delivered: false };
+    } catch (e) {
+      logErr("resetUserPassword", e);
+      showToast(localizeApiError(e, t));
       return null;
     }
   };
@@ -308,9 +341,10 @@ export function usePortalUsers({ authed, isAdmin, currentUid, userType, driverSe
   return {
     groomProfiles,
     adminUsers, users, usersLoading,
-    addUser, deleteUser,
+    addUser, deleteUser, resetUserPassword,
     newUserRole, setNewUserRole, newUserName, setNewUserName,
     newUserPass, setNewUserPass, newUserPhone, setNewUserPhone,
+    newUserLang, setNewUserLang, newUserNoPhone, setNewUserNoPhone,
     editingUser, startEditUser, cancelEditUser, saveUserEdit,
   };
 }

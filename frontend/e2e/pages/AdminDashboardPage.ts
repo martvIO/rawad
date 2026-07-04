@@ -58,18 +58,44 @@ export class AdminDashboardPage {
     await this.page.goto("/portal/admin/send");
   }
 
-  async createUser(opts: { username: string; password: string; role?: "groom" | "driver" | "admin"; phoneE164?: string }): Promise<void> {
+  /**
+   * Create a portal user through the add-user form.
+   * Admin role: `password` is required (manual field, as before).
+   * Groom/driver: the password is server-generated — the form has NO password
+   * field; without a phone we tick "no phone yet", and the generated password
+   * comes back in a show-once TempPasswordModal (the emulator has no WhatsApp
+   * sender), which this helper closes — pass `keepTempModalOpen` to inspect it.
+   */
+  async createUser(opts: {
+    username: string;
+    password?: string;
+    role?: "groom" | "driver" | "admin";
+    phoneE164?: string;
+    keepTempModalOpen?: boolean;
+  }): Promise<void> {
     const role = opts.role ?? "groom";
     if (role === "groom")  await this.newRoleGroom.click();
     if (role === "driver") await this.newRoleDriver.click();
     if (role === "admin")  await this.newRoleAdmin.click();
     await this.newUserField.fill(opts.username);
-    await this.newPassField.fill(opts.password);
+    if (role === "admin") {
+      await this.newPassField.fill(opts.password ?? "");
+    }
     if (opts.phoneE164) {
       const phoneInput = this.page.locator(".phone-input-native");
       await phoneInput.fill(opts.phoneE164.replace(/^\+972/, ""));
+    } else if (role !== "admin") {
+      await this.page.getByTestId("chk-no-phone").check();
     }
     await this.createUserBtn.click();
+    if (role !== "admin" && !opts.keepTempModalOpen) {
+      // WhatsApp delivery can't succeed in the test env → the show-once
+      // temp-password modal opens; close it so the list is interactable.
+      const tempPw = this.page.getByTestId("temp-pw-value");
+      await tempPw.waitFor({ state: "visible", timeout: 10_000 });
+      await this.page.keyboard.press("Escape");
+      await tempPw.waitFor({ state: "hidden", timeout: 5_000 });
+    }
   }
 
   userRow(username: string): Locator {

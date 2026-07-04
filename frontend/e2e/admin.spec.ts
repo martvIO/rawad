@@ -49,7 +49,7 @@ test.describe("Admin — user CRUD", () => {
     const admin = new AdminDashboardPage(page);
     await admin.gotoUsers();
     const uniqueUsername = `tgroom${Date.now().toString().slice(-6)}`;
-    await admin.createUser({ username: uniqueUsername, password: "Test1234A", role: "groom" });
+    await admin.createUser({ username: uniqueUsername, role: "groom" });
     // Optimistic UI inserts the row immediately
     await expect(admin.userRow(uniqueUsername)).toBeVisible({ timeout: 10_000 });
   });
@@ -58,7 +58,7 @@ test.describe("Admin — user CRUD", () => {
     const admin = new AdminDashboardPage(page);
     await admin.gotoUsers();
     const uniqueUsername = `tdriver${Date.now().toString().slice(-6)}`;
-    await admin.createUser({ username: uniqueUsername, password: "Test1234A", role: "driver" });
+    await admin.createUser({ username: uniqueUsername, role: "driver" });
     await expect(admin.userRow(uniqueUsername)).toBeVisible({ timeout: 10_000 });
   });
 
@@ -77,7 +77,7 @@ test.describe("Admin — user CRUD", () => {
     const admin = new AdminDashboardPage(page);
     await admin.gotoUsers();
     const uniqueUsername = `tdel${Date.now().toString().slice(-6)}`;
-    await admin.createUser({ username: uniqueUsername, password: "Test1234A", role: "groom" });
+    await admin.createUser({ username: uniqueUsername, role: "groom" });
     await expect(admin.userRow(uniqueUsername)).toBeVisible({ timeout: 10_000 });
     await admin.deleteUser(uniqueUsername);
     await expect(admin.userRow(uniqueUsername)).toHaveCount(0, { timeout: 10_000 });

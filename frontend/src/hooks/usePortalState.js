@@ -149,10 +149,13 @@ export function usePortalState({ onBack, t, lang, setLang }) {
     // users (admin) / synthetic single-entry list for drivers
     users: usersHook.users, usersLoading: usersHook.usersLoading,
     addUser: usersHook.addUser, deleteUser: usersHook.deleteUser, groomProfiles: usersHook.groomProfiles,
+    resetUserPassword: usersHook.resetUserPassword,
     newUserRole: usersHook.newUserRole, setNewUserRole: usersHook.setNewUserRole,
     newUserName: usersHook.newUserName, setNewUserName: usersHook.setNewUserName,
     newUserPass: usersHook.newUserPass, setNewUserPass: usersHook.setNewUserPass,
     newUserPhone: usersHook.newUserPhone, setNewUserPhone: usersHook.setNewUserPhone,
+    newUserLang: usersHook.newUserLang, setNewUserLang: usersHook.setNewUserLang,
+    newUserNoPhone: usersHook.newUserNoPhone, setNewUserNoPhone: usersHook.setNewUserNoPhone,
     editingUser: usersHook.editingUser, startEditUser: usersHook.startEditUser,
     cancelEditUser: usersHook.cancelEditUser, saveUserEdit: usersHook.saveUserEdit,
 

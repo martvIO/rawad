@@ -12,12 +12,37 @@ import { RoleGuard } from "../../../components/RoleGuard.jsx";
 import { Num } from "../../../components/Num.jsx";
 import { PasswordRules } from "../../../components/PasswordRules.jsx";
 import { PhoneInput } from "../../../components/PhoneInput.jsx";
+import { TempPasswordModal } from "./TempPasswordModal.jsx";
 import { isStrongPassword } from "../../../utils/password.js";
 import { isPlaceholderPhone } from "../../../utils/phone.js";
 import { C } from "../../../styles/theme.js";
 import { useListFilter } from "../../../utils/searchFilter.js";
 import { SearchBar } from "../../../components/SearchBar.jsx";
 import { SkeletonList } from "../../../components/Skeleton.jsx";
+
+// ── مبدّل لغة رسالة الواتساب (ar/he) — يُستخدم في الإنشاء وإعادة التعيين ──
+function LangToggle({ value, onChange, t, disabled, idPrefix = "new" }) {
+  return (
+    <div>
+      <div style={{ fontSize: 12, color: C.goldDim, marginBottom: 6 }}>{t("admin_send_lang")}</div>
+      <div style={{ display: "flex", gap: 8 }}>
+        {[["ar", "العربية"], ["he", "עברית"]].map(([val, label]) => {
+          const active = value === val;
+          return (
+            <button key={val} data-testid={`btn-${idPrefix}-lang-${val}`} disabled={disabled}
+                    onClick={() => onChange(val)} style={{
+              flex: 1, padding: "8px 0", borderRadius: 10, cursor: "pointer",
+              background: active ? "rgba(201,168,76,.18)" : "rgba(255,255,255,.04)",
+              border: `1.5px solid ${active ? C.gold : "rgba(255,255,255,.08)"}`,
+              color: active ? C.gold : C.dim,
+              fontWeight: 800, fontSize: 12, fontFamily: "inherit",
+            }}>{label}</button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 // ── حقول البحث النصّي + حقول الهاتف (ثابتة على مستوى الوحدة) ──────────
 const USERS_FIELDS = ["username", "displayName", (u) => u.role];
@@ -67,8 +92,10 @@ function FlagToggle({ label, hint, value, onChange, disabled }) {
 
 // ── مربّع تعديل مضمَّن (Inline Edit Modal) ──────────────────────────
 // يظهر عند الضغط على «تعديل» في سطر المستخدم ويتيح تغيير:
-//   username  |  password (اختياري)  |  phone (اختياري)  |  role  |  الصلاحيات
-function EditModal({ user, onSave, onCancel, t, lang }) {
+//   username  |  phone (اختياري)  |  role  |  الصلاحيات
+// كلمة المرور: للمدراء حقل يدوي (كما كان)؛ للعريس/المرسل زرّ «إعادة تعيين»
+// يولّد كلمة جديدة في الخادم ويرسلها بواتساب (onResetPassword).
+function EditModal({ user, onSave, onCancel, onResetPassword, t, lang }) {
   const [username,    setUsername]    = useState(user.username    ?? "");
   const [displayName, setDisplayName] = useState(user.displayName ?? "");
   const [phoneE164,   setPhoneE164]   = useState(
@@ -77,14 +104,29 @@ function EditModal({ user, onSave, onCancel, t, lang }) {
   const [role,        setRole]        = useState(user.role        ?? "groom");
   const [newPass,     setNewPass]     = useState("");
   const [saving,      setSaving]      = useState(false);
+  // إعادة تعيين كلمة مرور عريس/مرسل — لغة رسالة الواتساب + حالة الإرسال.
+  const [resetLang,   setResetLang]   = useState("ar");
+  const [resetting,   setResetting]   = useState(false);
   // صلاحيتا العريس — افتراضاً مُفعّلتان (backward-compatible).
   const [canSee,   setCanSee]   = useState(user.canSeeAttendance   !== false);
   const [canPhoto, setCanPhoto] = useState(user.canUsePhotographer !== false);
   // بطاقة المحفظة — افتراضاً متوقّفة.
   const [canBoarding, setCanBoarding] = useState(user.canUseBoardingPass === true);
 
+  // الحقل اليدوي يخصّ المدراء فقط — الخادم يرفضه للعريس/المرسل (409).
+  const manualPassword = role === "admin";
   const canSave = username.trim() &&
-    (newPass.length === 0 || isStrongPassword(newPass));
+    (!manualPassword || newPass.length === 0 || isStrongPassword(newPass));
+
+  const handleReset = async () => {
+    if (resetting || saving) return;
+    setResetting(true);
+    try {
+      await onResetPassword(user.uid ?? user.id, resetLang);
+    } finally {
+      setResetting(false);
+    }
+  };
 
   const handleSave = async () => {
     if (!canSave) return;
@@ -99,7 +141,7 @@ function EditModal({ user, onSave, onCancel, t, lang }) {
       patch.phoneE164 = phoneE164.trim();
     if (role !== (user.role || "groom"))
       patch.role = role;
-    if (newPass.trim())
+    if (manualPassword && newPass.trim())
       patch.newPassword = newPass.trim();
     // صلاحيتا العريس — نُرسلهما دائماً للعرسان؛ saveUserEdit يقارن ويكتب المتغيّر فقط.
     if (role === "groom") {
@@ -198,20 +240,45 @@ function EditModal({ user, onSave, onCancel, t, lang }) {
           <PhoneInput value={phoneE164} onChange={setPhoneE164} t={t} lang={lang} disabled={saving} />
         </div>
 
-        {/* كلمة مرور جديدة — اختيارية */}
-        <div style={{ fontSize: 12, color: C.goldDim, marginBottom: 6 }}>
-          {t("admin_user_edit_new_password")}
-          <span style={{ color: C.dim, fontWeight: 400, marginInlineStart: 6 }}>
-            ({t("admin_user_edit_new_password_hint")})
-          </span>
-        </div>
-        <input className="input-field" type="password" disabled={saving}
-               value={newPass} onChange={e => setNewPass(e.target.value)}
-               placeholder="••••••••"
-               style={{ marginBottom: newPass ? 8 : 20, direction: "ltr", textAlign: "right" }} />
-        {newPass.length > 0 && (
-          <div style={{ marginBottom: 16 }}>
-            <PasswordRules password={newPass} t={t} compact />
+        {/* كلمة المرور: حقل يدوي للمدراء، إعادة تعيين مُولَّدة للعريس/المرسل */}
+        {manualPassword ? (
+          <>
+            <div style={{ fontSize: 12, color: C.goldDim, marginBottom: 6 }}>
+              {t("admin_user_edit_new_password")}
+              <span style={{ color: C.dim, fontWeight: 400, marginInlineStart: 6 }}>
+                ({t("admin_user_edit_new_password_hint")})
+              </span>
+            </div>
+            <input className="input-field" type="password" disabled={saving}
+                   value={newPass} onChange={e => setNewPass(e.target.value)}
+                   placeholder="••••••••"
+                   style={{ marginBottom: newPass ? 8 : 20, direction: "ltr", textAlign: "right" }} />
+            {newPass.length > 0 && (
+              <div style={{ marginBottom: 16 }}>
+                <PasswordRules password={newPass} t={t} compact />
+              </div>
+            )}
+          </>
+        ) : (
+          <div style={{
+            marginBottom: 18, padding: "12px 14px", borderRadius: 12,
+            background: "rgba(255,255,255,.03)", border: "1px solid rgba(255,255,255,.1)",
+          }}>
+            <div style={{ fontSize: 12, color: C.goldDim, fontWeight: 700, marginBottom: 4 }}>
+              {t("admin_user_edit_new_password")}
+            </div>
+            <div style={{ fontSize: 10.5, color: C.dim, lineHeight: 1.6, marginBottom: 10 }}>
+              {t("admin_reset_pw_hint")}
+            </div>
+            <div style={{ marginBottom: 10 }}>
+              <LangToggle value={resetLang} onChange={setResetLang} t={t}
+                          disabled={resetting || saving} idPrefix="reset" />
+            </div>
+            <button data-testid="btn-reset-password" className="ghost-btn"
+                    style={{ width: "100%" }} disabled={resetting || saving}
+                    onClick={handleReset}>
+              🔑 {resetting ? t("admin_resetting_pw") : t("admin_reset_pw")}
+            </button>
           </div>
         )}
 
@@ -263,20 +330,25 @@ function EditModal({ user, onSave, onCancel, t, lang }) {
 // ══════════════════════════════════════════════════════════════════════
 function UserManagerInner() {
   const {
-    t, lang,
+    t, lang, showToast,
     // القائمة الحيّة (Firebase RTDB) + الإضافات التفاؤلية مدموجة في `users`
     users, usersLoading,
-    addUser, deleteUser, saveUserEdit,
+    addUser, deleteUser, saveUserEdit, resetUserPassword,
     newUserRole, setNewUserRole,
     newUserName, setNewUserName,
     newUserPass, setNewUserPass,
     newUserPhone, setNewUserPhone,
+    newUserLang, setNewUserLang,
+    newUserNoPhone, setNewUserNoPhone,
   } = usePortal();
 
   // ── الحالة المحلية ──────────────────────────────────────────────────
   const [filter,         setFilter]         = useState("all");
   const [confirmDelete,  setConfirmDelete]  = useState(null); // uid المراد حذفه
   const [editingUser,    setEditingUser]    = useState(null); // المستخدم الذي يُعدَّل
+  // بيانات الدخول المُولَّدة التي لم تُرسل بواتساب — تُعرض مرة واحدة للنسخ.
+  // NOTE: never log this — it carries a plaintext password.
+  const [tempCreds,      setTempCreds]      = useState(null);
   // صلاحيتا العريس الجديد — افتراضاً مُفعّلتان.
   const [newCanSee,   setNewCanSee]   = useState(true);
   const [newCanPhoto, setNewCanPhoto] = useState(true);
@@ -311,6 +383,23 @@ function UserManagerInner() {
     if (result?.uid) {
       setFilter(result.role);        // اقفز للتبويب الموافق
       setNewCanSee(true); setNewCanPhoto(true); setNewCanBoarding(false); // أعد الصلاحيات للوضع الافتراضي
+      // كلمة مرور مُولَّدة لم تُرسل بواتساب → اعرضها مرة واحدة للنسخ اليدوي.
+      const creds = result.credentials;
+      if (creds && !creds.delivered && creds.password) {
+        setTempCreds({ username: result.username, password: creds.password, phoneE164: result.phoneE164 });
+      }
+    }
+  };
+
+  // ── إعادة تعيين كلمة مرور (من مودال التعديل) ─────────────────────────
+  const handleResetPassword = async (uid, resetLang) => {
+    const creds = await resetUserPassword(uid, resetLang);
+    if (!creds) return; // الخطأ ظهر Toast من الـ hook
+    if (creds.delivered) {
+      showToast(t("admin_pw_sent_wa"));
+    } else if (creds.password) {
+      const target = users.find(u => (u.uid ?? u.id) === uid) || editingUser || {};
+      setTempCreds({ username: target.username, password: creds.password, phoneE164: target.phoneE164 });
     }
   };
 
@@ -371,27 +460,60 @@ function UserManagerInner() {
                value={newUserName} onChange={e => setNewUserName(e.target.value)}
                style={{ marginBottom: 14, direction: "ltr", textAlign: "right" }} />
 
-        {/* كلمة المرور ✱ */}
-        <div style={{ fontSize: 12, color: C.goldDim, marginBottom: 6 }}>
-          {t("login_pass")} <span style={{ color: C.red }}>*</span>
-        </div>
-        <input data-testid="field-new-pass" className="input-field" type="password" placeholder="••••••••"
-               value={newUserPass} onChange={e => setNewUserPass(e.target.value)}
-               style={{ marginBottom: 10, direction: "ltr", textAlign: "right" }} />
-        <div style={{ marginBottom: 14 }}>
-          <PasswordRules password={newUserPass} t={t} />
-        </div>
+        {/* كلمة المرور — للمدراء فقط؛ العريس/المرسل تُولَّد لهم تلقائياً */}
+        {newUserRole === "admin" ? (
+          <>
+            <div style={{ fontSize: 12, color: C.goldDim, marginBottom: 6 }}>
+              {t("login_pass")} <span style={{ color: C.red }}>*</span>
+            </div>
+            <input data-testid="field-new-pass" className="input-field" type="password" placeholder="••••••••"
+                   value={newUserPass} onChange={e => setNewUserPass(e.target.value)}
+                   style={{ marginBottom: 10, direction: "ltr", textAlign: "right" }} />
+            <div style={{ marginBottom: 14 }}>
+              <PasswordRules password={newUserPass} t={t} />
+            </div>
+          </>
+        ) : (
+          <div data-testid="autogen-hint" style={{
+            fontSize: 11.5, color: C.goldDim, lineHeight: 1.7, marginBottom: 14,
+            padding: "10px 12px", borderRadius: 10,
+            background: "rgba(201,168,76,.06)", border: "1px solid rgba(201,168,76,.22)",
+          }}>
+            🔑 {t("admin_pw_autogen_hint")}
+          </div>
+        )}
 
-        {/* الهاتف (اختياري) */}
+        {/* الهاتف — إلزامي للعريس/المرسل (وجهة رسالة بيانات الدخول)، اختياري للمدير */}
         <div style={{ fontSize: 12, color: C.goldDim, marginBottom: 6 }}>
           {t("phone_field_label")}
-          <span style={{ color: C.dim, fontWeight: 400, marginInlineStart: 6 }}>
-            ({t("field_address_optional")})
-          </span>
+          {newUserRole === "admin" ? (
+            <span style={{ color: C.dim, fontWeight: 400, marginInlineStart: 6 }}>
+              ({t("field_address_optional")})
+            </span>
+          ) : (
+            !newUserNoPhone && <span style={{ color: C.red }}> *</span>
+          )}
         </div>
-        <div style={{ marginBottom: 18 }}>
-          <PhoneInput value={newUserPhone} onChange={setNewUserPhone} t={t} lang={lang} />
+        <div style={{ marginBottom: newUserRole === "admin" ? 18 : 10 }}>
+          <PhoneInput value={newUserPhone} onChange={setNewUserPhone} t={t} lang={lang}
+                      disabled={newUserRole !== "admin" && newUserNoPhone} />
         </div>
+        {newUserRole !== "admin" && (
+          <div style={{ marginBottom: 18 }}>
+            {/* «بدون هاتف الآن» — تخطٍّ مقصود لشرط الهاتف؛ تُعرض كلمة المرور للنسخ */}
+            <label data-testid="chk-no-phone-label" style={{
+              display: "flex", alignItems: "center", gap: 8, cursor: "pointer",
+              fontSize: 12, color: newUserNoPhone ? C.gold : C.dim, fontWeight: 700,
+              marginBottom: 12, userSelect: "none",
+            }}>
+              <input data-testid="chk-no-phone" type="checkbox" checked={newUserNoPhone}
+                     onChange={e => { setNewUserNoPhone(e.target.checked); if (e.target.checked) setNewUserPhone(""); }}
+                     style={{ accentColor: "#c9a84c", width: 16, height: 16 }} />
+              {t("admin_no_phone_yet")}
+            </label>
+            <LangToggle value={newUserLang} onChange={setNewUserLang} t={t} idPrefix="new" />
+          </div>
+        )}
 
         {/* صلاحيات العريس الجديد — للعرسان فقط */}
         {newUserRole === "groom" && (
@@ -425,7 +547,9 @@ function UserManagerInner() {
 
         <button data-testid="btn-create-user" className="gold-btn" style={{ width: "100%" }}
                 onClick={handleCreate}
-                disabled={!newUserName.trim() || !isStrongPassword(newUserPass)}>
+                disabled={!newUserName.trim() || (newUserRole === "admin"
+                  ? !isStrongPassword(newUserPass)
+                  : (!newUserPhone.trim() && !newUserNoPhone))}>
           ➕ {t("admin_create")}
         </button>
       </div>
@@ -567,10 +691,19 @@ function UserManagerInner() {
           user={editingUser}
           onSave={handleSaveEdit}
           onCancel={() => setEditingUser(null)}
+          onResetPassword={handleResetPassword}
           t={t}
           lang={lang}
         />
       )}
+
+      {/* ── كلمة المرور المؤقتة (تُعرض مرة واحدة عند فشل إرسال الواتساب) ── */}
+      <TempPasswordModal
+        creds={tempCreds}
+        onClose={() => setTempCreds(null)}
+        t={t}
+        showToast={showToast}
+      />
     </>
   );
 }

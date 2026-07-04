@@ -34,6 +34,11 @@ const CODE_KEYS = {
   token_expired:       "err_token_expired",
   expired:             "err_token_expired",
   used:                "err_token_used",
+  // Generated-credentials flow (admin user management)
+  password_not_allowed:   "err_password_not_allowed",
+  use_reset_endpoint:     "err_use_reset_endpoint",
+  use_manual_password:    "err_use_manual_password",
+  encryption_unavailable: "err_temp_pw_unavailable",
 };
 
 function resolveT(tOrLang) {
