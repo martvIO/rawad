@@ -1,0 +1,396 @@
+- generic:
+  - generic:
+    - generic:
+      - iframe
+    - generic:
+      - iframe
+    - generic:
+      - iframe
+    - generic:
+      - iframe
+    - generic [ref=f26e10]:
+      - generic [ref=f26e13]:
+        - generic [ref=f26e14]:
+          - link "Meta logo" [ref=f26e16] [cursor=pointer]:
+            - /url: /?no_redirect=true
+            - img "Meta logo" [ref=f26e18]
+          - tablist [ref=f26e27]:
+            - link "My Apps" [ref=f26e28] [cursor=pointer]:
+              - /url: /apps/
+              - generic [ref=f26e31]: My Apps
+            - link "Required actions" [ref=f26e32] [cursor=pointer]:
+              - /url: /required-actions/
+              - generic [ref=f26e35]: Required actions
+            - tab "Docs" [ref=f26e36] [cursor=pointer]:
+              - generic [ref=f26e39]: Docs
+            - tab "Tools" [ref=f26e41] [cursor=pointer]:
+              - generic [ref=f26e44]: Tools
+            - tab "Support" [ref=f26e46] [cursor=pointer]:
+              - generic [ref=f26e49]: Support
+        - generic [ref=f26e51]:
+          - generic [ref=f26e52]:
+            - generic [ref=f26e58]: Search input
+            - textbox "Search input" [ref=f26e69]:
+              - /placeholder: Search...
+          - link [ref=f26e72] [cursor=pointer]:
+            - /url: "#"
+          - link "Facebook" [ref=f26e77] [cursor=pointer]:
+            - /url: "#"
+            - img "Facebook" [ref=f26e82]
+      - generic [ref=f26e83]:
+        - generic [ref=f26e85]:
+          - generic [ref=f26e88]:
+            - generic [ref=f26e91]:
+              - generic [ref=f26e97]: Searchable selector for all apps
+              - combobox "Searchable selector for all apps Dawa" [ref=f26e102] [cursor=pointer]:
+                - generic [ref=f26e107]:
+                  - generic:
+                    - generic: Dawa
+            - navigation [ref=f26e111]:
+              - list [ref=f26e112]:
+                - listitem [ref=f26e113]:
+                  - button "Dashboard" [ref=f26e115] [cursor=pointer]
+                  - generic:
+                    - listitem:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - generic: Dashboard
+                - listitem [ref=f26e121]:
+                  - button "Required actions" [ref=f26e123] [cursor=pointer]
+                  - generic:
+                    - listitem:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - generic: Required actions
+                - listitem [ref=f26e129]:
+                  - button "Use cases" [ref=f26e131] [cursor=pointer]
+                  - generic:
+                    - listitem:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - generic: Use cases
+                - listitem [ref=f26e137]:
+                  - generic [ref=f26e138]:
+                    - button "Facebook Login for Business" [ref=f26e140] [cursor=pointer]
+                    - generic:
+                      - listitem:
+                        - generic:
+                          - generic:
+                            - generic:
+                              - generic: Facebook Login for Business
+                          - button "Toggle group" [disabled] [ref=f26e146]:
+                            - generic [ref=f26e149]: Toggle group
+                  - list [ref=f26e152]:
+                    - generic [ref=f26e153]:
+                      - button "Settings" [ref=f26e155] [cursor=pointer]
+                      - generic:
+                        - listitem:
+                          - generic:
+                            - generic:
+                              - generic:
+                                - generic: Settings
+                    - generic [ref=f26e160]:
+                      - button "Quickstart" [ref=f26e162] [cursor=pointer]
+                      - generic:
+                        - listitem:
+                          - generic:
+                            - generic:
+                              - generic:
+                                - generic: Quickstart
+                    - generic [ref=f26e167]:
+                      - button "Configurations" [ref=f26e169] [cursor=pointer]
+                      - generic:
+                        - listitem:
+                          - generic:
+                            - generic:
+                              - generic:
+                                - generic: Configurations
+                    - generic [ref=f26e174]:
+                      - button "Templates" [ref=f26e176] [cursor=pointer]
+                      - generic:
+                        - listitem:
+                          - generic:
+                            - generic:
+                              - generic:
+                                - generic: Templates
+                - listitem [ref=f26e181]:
+                  - button "Testing" [ref=f26e183] [cursor=pointer]
+                  - generic:
+                    - listitem:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - generic: Testing
+                - listitem [ref=f26e189]:
+                  - button "Publish" [ref=f26e191] [cursor=pointer]
+                  - generic:
+                    - listitem:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - generic: Publish
+          - generic [ref=f26e197]:
+            - navigation [ref=f26e198]:
+              - list [ref=f26e199]:
+                - listitem [ref=f26e200]:
+                  - generic [ref=f26e201]:
+                    - button "App settings" [ref=f26e203] [cursor=pointer]
+                    - generic:
+                      - listitem:
+                        - generic:
+                          - generic:
+                            - generic:
+                              - generic: App settings
+                          - button "Toggle group" [disabled] [ref=f26e209]:
+                            - generic [ref=f26e212]: Toggle group
+                  - list [ref=f26e215]:
+                    - generic [ref=f26e216]:
+                      - button "Basic" [ref=f26e218] [cursor=pointer]
+                      - generic:
+                        - listitem:
+                          - generic:
+                            - generic:
+                              - generic:
+                                - generic: Basic
+                    - generic [ref=f26e223]:
+                      - button "Advanced" [ref=f26e225] [cursor=pointer]
+                      - generic:
+                        - listitem:
+                          - generic:
+                            - generic:
+                              - generic:
+                                - generic: Advanced
+                - listitem [ref=f26e230]:
+                  - generic [ref=f26e231]:
+                    - button "App roles" [ref=f26e233] [cursor=pointer]
+                    - generic:
+                      - listitem:
+                        - generic:
+                          - generic:
+                            - generic:
+                              - generic: App roles
+                          - button "Toggle group" [disabled] [ref=f26e239]:
+                            - generic [ref=f26e242]: Toggle group
+                  - list [ref=f26e245]:
+                    - generic [ref=f26e246]:
+                      - button "Roles" [ref=f26e248] [cursor=pointer]
+                      - generic:
+                        - listitem:
+                          - generic:
+                            - generic:
+                              - generic:
+                                - generic: Roles
+                    - generic [ref=f26e253]:
+                      - button "Test users" [ref=f26e255] [cursor=pointer]
+                      - generic:
+                        - listitem:
+                          - generic:
+                            - generic:
+                              - generic:
+                                - generic: Test users
+                - listitem [ref=f26e260]:
+                  - button "Alert Inbox" [ref=f26e262] [cursor=pointer]
+                  - generic:
+                    - listitem:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - generic: Alert Inbox
+            - separator [ref=f26e268]
+            - generic [ref=f26e269]:
+              - button "Activity Log" [ref=f26e270] [cursor=pointer]:
+                - generic [ref=f26e273]: Activity Log
+              - button "Help" [ref=f26e277] [cursor=pointer]:
+                - generic [ref=f26e280]: Help
+              - button "Open/close side nav" [ref=f26e285] [cursor=pointer]:
+                - generic [ref=f26e288]: Open/close side nav
+        - generic [ref=f26e296]:
+          - navigation "Breadcrumb" [ref=f26e298]:
+            - generic [ref=f26e299]:
+              - link "Use cases" [ref=f26e300] [cursor=pointer]:
+                - /url: "#"
+                - heading "Use cases" [level=4] [ref=f26e301]
+              - heading "Customize" [level=4] [ref=f26e303]
+          - generic [ref=f26e307]:
+            - heading "Customize use case" [level=2] [ref=f26e308]
+            - generic [ref=f26e309]: Customize use case settings and permissions to make your app work the way you want it to.
+          - generic [ref=f26e310]:
+            - generic [ref=f26e316]:
+              - generic [ref=f26e318]:
+                - generic [ref=f26e324]: Use case switcher
+                - combobox "Use case switcher Connect on WhatsApp" [ref=f26e329] [cursor=pointer]:
+                  - generic [ref=f26e338]: Connect on WhatsApp
+              - navigation "Main Use Cases" [ref=f26e345]:
+                - list [ref=f26e346]:
+                  - generic [ref=f26e347]:
+                    - listitem [ref=f26e349]:
+                      - button "Overview" [ref=f26e351] [cursor=pointer]
+                      - generic:
+                        - listitem:
+                          - generic:
+                            - generic:
+                              - generic:
+                                - generic: Overview
+                    - listitem [ref=f26e355]:
+                      - generic [ref=f26e356]:
+                        - button "Basic setup" [expanded] [ref=f26e358] [cursor=pointer]
+                        - generic:
+                          - listitem:
+                            - generic:
+                              - generic:
+                                - generic:
+                                  - generic: Basic setup
+                              - button "Toggle group" [ref=f26e361] [cursor=pointer]:
+                                - generic [ref=f26e364]: Toggle group
+                      - list [ref=f26e368]:
+                        - generic [ref=f26e369]:
+                          - button "Step 1. Try it out" [ref=f26e371] [cursor=pointer]
+                          - generic:
+                            - listitem:
+                              - generic:
+                                - generic:
+                                  - generic:
+                                    - generic: Step 1. Try it out
+                        - generic [ref=f26e376]:
+                          - button "Step 2. Production setup" [ref=f26e378] [cursor=pointer]
+                          - generic:
+                            - listitem:
+                              - generic:
+                                - generic:
+                                  - generic:
+                                    - generic: Step 2. Production setup
+                        - generic [ref=f26e383]:
+                          - button "Step 3. Business verification" [ref=f26e385] [cursor=pointer]
+                          - generic:
+                            - listitem:
+                              - generic:
+                                - generic:
+                                  - generic:
+                                    - generic: Step 3. Business verification
+                        - generic [ref=f26e390]:
+                          - button "Next steps" [ref=f26e392] [cursor=pointer]
+                          - generic:
+                            - listitem:
+                              - generic:
+                                - generic:
+                                  - generic:
+                                    - generic: Next steps
+                    - listitem [ref=f26e398]:
+                      - generic [ref=f26e399]:
+                        - button "Become a Partner" [expanded] [ref=f26e401] [cursor=pointer]
+                        - generic:
+                          - listitem:
+                            - generic:
+                              - generic:
+                                - generic:
+                                  - generic: Become a Partner
+                              - button "Toggle group" [ref=f26e404] [cursor=pointer]:
+                                - generic [ref=f26e407]: Toggle group
+                      - list [ref=f26e411]:
+                        - generic [ref=f26e412]:
+                          - button "Become Tech Provider" [ref=f26e414] [cursor=pointer]
+                          - generic:
+                            - listitem:
+                              - generic:
+                                - generic:
+                                  - generic:
+                                    - generic: Become Tech Provider
+                    - listitem [ref=f26e420]:
+                      - generic [ref=f26e421]:
+                        - button "Other tools" [expanded] [ref=f26e423] [cursor=pointer]
+                        - generic:
+                          - listitem:
+                            - generic:
+                              - generic:
+                                - generic:
+                                  - generic: Other tools
+                              - button "Toggle group" [ref=f26e426] [cursor=pointer]:
+                                - generic [ref=f26e429]: Toggle group
+                      - list [ref=f26e433]:
+                        - generic [ref=f26e434]:
+                          - button "Tools" [ref=f26e436] [cursor=pointer]
+                          - generic:
+                            - listitem:
+                              - generic:
+                                - generic:
+                                  - generic:
+                                    - generic: Tools
+                        - generic [ref=f26e441]:
+                          - button "Permissions and features" [ref=f26e443] [cursor=pointer]
+                          - generic:
+                            - listitem:
+                              - generic:
+                                - generic:
+                                  - generic:
+                                    - generic: Permissions and features
+                        - generic [ref=f26e448]:
+                          - button "Resources" [ref=f26e450] [cursor=pointer]
+                          - generic:
+                            - listitem:
+                              - generic:
+                                - generic:
+                                  - generic:
+                                    - generic: Resources
+            - generic [ref=f26e512]:
+              - generic [ref=f26e513]:
+                - heading "Step 2. Production setup" [level=2] [ref=f26e515]
+                - text: Set up one or more accounts to contact your customers through WhatsApp APIs.
+                - list [ref=f26e518]:
+                  - listitem [ref=f26e519]:
+                    - button "Configure Webhooks About 3 minutes to complete" [ref=f26e520] [cursor=pointer]:
+                      - listitem [ref=f26e524]:
+                        - generic [ref=f26e530]:
+                          - heading "Configure Webhooks" [level=4] [ref=f26e531]
+                          - generic [ref=f26e532]: About 3 minutes to complete
+                  - separator [ref=f26e536]
+                  - listitem [ref=f26e537]:
+                    - button "Register your WhatsApp phone number About 1 minute to complete task" [ref=f26e538] [cursor=pointer]:
+                      - listitem [ref=f26e542]:
+                        - generic [ref=f26e548]:
+                          - heading "Register your WhatsApp phone number" [level=4] [ref=f26e549]
+                          - generic [ref=f26e550]: About 1 minute to complete task
+                  - separator [ref=f26e554]
+                  - listitem [ref=f26e555]:
+                    - button "Add payment to send business-initiated messages About 1 minute to complete task" [ref=f26e556] [cursor=pointer]:
+                      - listitem [ref=f26e560]:
+                        - generic [ref=f26e566]:
+                          - heading "Add payment to send business-initiated messages" [level=4] [ref=f26e567]
+                          - generic [ref=f26e568]: About 1 minute to complete task
+                  - separator [ref=f26e572]
+                  - listitem [ref=f26e573]:
+                    - button "Test your registered number About 2 minutes to complete task" [ref=f26e574] [cursor=pointer]:
+                      - listitem [ref=f26e578]:
+                        - generic [ref=f26e584]:
+                          - heading "Test your registered number" [level=4] [ref=f26e585]
+                          - generic [ref=f26e586]: About 2 minutes to complete task
+                - heading "Upon completion, your registered number can receive and send messages." [level=4] [ref=f26e590]
+              - generic [ref=f26e596]:
+                - 'heading "Next: Business Verification" [level=3] [ref=f26e599]'
+                - button "Get started" [ref=f26e600] [cursor=pointer]:
+                  - generic [ref=f26e604]: Get started
+  - generic [ref=f26e462]:
+    - separator [ref=f26e463]
+    - generic [ref=f26e464]:
+      - generic [ref=f26e467]: Developer assistant
+      - generic [ref=f26e468]:
+        - button [ref=f26e470] [cursor=pointer]:
+          - img [ref=f26e472]
+        - button [ref=f26e474] [cursor=pointer]:
+          - img [ref=f26e475]
+    - generic [ref=f26e480]: Starting chat...
+  - dialog "Learn how to customize use cases" [ref=f26e483]:
+    - generic [ref=f26e484]:
+      - generic [ref=f26e488]:
+        - generic [ref=f26e489]:
+          - heading "Learn how to customize use cases" [level=3] [ref=f26e490]
+          - text: Explore the different ways to make sure your use cases work the way you want them to.
+        - button "Close" [active] [ref=f26e492] [cursor=pointer]:
+          - generic [ref=f26e495]: Close
+      - generic [ref=f26e499]:
+        - button "Take tour" [ref=f26e500] [cursor=pointer]:
+          - generic [ref=f26e504]: Take tour
+        - button "Done" [ref=f26e505] [cursor=pointer]:
+          - generic [ref=f26e509]: Done
