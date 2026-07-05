@@ -25,6 +25,7 @@
 // circular import (apiClient imports this module).
 
 import { API_BASE_URL } from "../config/index.js";
+import { getPasswordEncryptor } from "../adapters/crypto.js";
 import { logWarn } from "./logger.js";
 import { PRESERVE_KEYS } from "./digits.js";
 
@@ -60,7 +61,8 @@ function bytesToB64(buf) {
 
 async function importPublicKey() {
   const subtle = globalThis.crypto?.subtle;
-  if (!subtle) return null; // ancient browser / insecure context → plaintext
+  const custom = getPasswordEncryptor(); // native (Hermes has no WebCrypto)
+  if (!subtle && !custom) return null; // ancient browser / insecure context → plaintext
 
   let meta;
   try {
@@ -78,6 +80,10 @@ async function importPublicKey() {
   }
 
   if (!meta || typeof meta.key !== "string") return null;
+  // Injected platform encryptor (native): keep the raw SPKI base64 — the impl
+  // parses it per-encrypt and throws on corruption, which encryptPassword
+  // catches (same plaintext fallback as a failing subtle.importKey).
+  if (!subtle) return { customKeyB64: meta.key };
   try {
     return await subtle.importKey(
       "spki",
@@ -117,6 +123,10 @@ export async function encryptPassword(plaintext) {
   const key = await getPublicKey();
   if (!key) return null;
   try {
+    if (key.customKeyB64) {
+      const b64 = await getPasswordEncryptor()(key.customKeyB64, String(plaintext));
+      return typeof b64 === "string" && b64 ? ENVELOPE_PREFIX + b64 : null;
+    }
     const data = new TextEncoder().encode(String(plaintext));
     const cipher = await globalThis.crypto.subtle.encrypt(
       { name: "RSA-OAEP" },
