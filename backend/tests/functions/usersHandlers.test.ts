@@ -405,6 +405,23 @@ describe("PUT /users/:uid — update", () => {
     expect(json.error).toBe("cannot_self_demote");
   });
 
+  it("demoting another admin to groom re-arms mustChangePassword (invariant)", async () => {
+    // A user moved into groom/driver carried an admin-chosen, never-forced
+    // password; force a first-login change so the generated-password invariant
+    // holds across role transitions.
+    const { status } = await req("PUT", "/users/admin2-uid", "admin-token", { role: "groom" });
+    expect(status).toBe(200);
+    expect(mem.rtdb.users["admin2-uid"].role).toBe("groom");
+    expect(mem.rtdb.users["admin2-uid"].mustChangePassword).toBe(true);
+  });
+
+  it("promoting a groom to admin does NOT set mustChangePassword", async () => {
+    const { status } = await req("PUT", "/users/u1", "admin-token", { role: "admin" });
+    expect(status).toBe(200);
+    expect(mem.rtdb.users.u1.role).toBe("admin");
+    expect(mem.rtdb.users.u1.mustChangePassword).toBeUndefined();
+  });
+
   it("rejects a username already taken by someone else (409)", async () => {
     const { status, json } = await req("PUT", "/users/u1", "admin-token", { username: "admin" });
     expect(status).toBe(409);
@@ -426,6 +443,13 @@ describe("DELETE /users/:uid — delete", () => {
     expect(mem.rtdb.usernameIndex.ali).toBeUndefined();
     expect(mem.rtdb.phoneIndex["972501111111"]).toBeUndefined();
     expect(mem.authUsers.u1).toBeUndefined();
+  });
+
+  it("purges an un-consumed generated temp password (no orphaned credential)", async () => {
+    mem.rtdb.generatedPasswords = { u1: { password: "enc:v1:whatever", createdAt: 1 } };
+    const { status } = await req("DELETE", "/users/u1", "admin-token");
+    expect(status).toBe(200);
+    expect(mem.rtdb.generatedPasswords.u1).toBeUndefined();
   });
 
   it("blocks self-delete (409)", async () => {

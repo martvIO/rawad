@@ -5,6 +5,7 @@
 // unchanged.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { isStrongPassword } from "../../utils/password.js";
+import { isCompletePhone } from "../../components/PhoneInput.jsx";
 import { logErr } from "../../utils/logger.js";
 import { localizeApiError } from "../../utils/apiError.js";
 import { ROLES } from "../../constants/roles.js";
@@ -131,9 +132,11 @@ export function usePortalUsers({ authed, isAdmin, currentUid, userType, driverSe
       // حساب مدير: كلمة المرور تُكتب يدوياً (كما كان) وتُتحقّق قوّتها.
       if (!newUserPass.trim()) { showToast(t("admin_required")); return null; }
       if (!isStrongPassword(newUserPass)) { showToast(t("pwd_weak")); return null; }
-    } else if (!typedPhone && !newUserNoPhone) {
+    } else if (!newUserNoPhone && !isCompletePhone(typedPhone)) {
       // عريس/مرسل: الهاتف إلزامي (لتسليم كلمة المرور عبر واتساب + استرجاع
-      // OTP) إلا إذا فعّل الأدمن «بدون هاتف الآن» عن قصد.
+      // OTP) إلا إذا فعّل الأدمن «بدون هاتف الآن» عن قصد. نتحقّق من اكتمال
+      // الرقم لطوله ولاحقته حسب الدولة (لا مجرّد وجوده) حتى لا تُرسل البيانات
+      // إلى رقم ناقص/خاطئ.
       showToast(t("admin_phone_required")); return null;
     }
     const username   = newUserName.trim().toLowerCase();

@@ -24,18 +24,36 @@ const OPEN_BTN = { ...BTN, background: "linear-gradient(135deg,#25d366,#1ea84d)"
 export function TempPasswordModal({ creds, onClose, t, showToast }) {
   if (!creds) return null;
   const loginUrl = `${window.location.origin}/portal/login`;
-  // The same three fields the WhatsApp template would have carried.
-  const text = `${t("login_user")}: ${creds.username}\n${t("login_pass")}: ${creds.password}\n${loginUrl}`;
-  const wa = creds.phoneE164 ? buildWaLink(creds.phoneE164, text) : null;
+  // Copy carries the full credentials (clipboard, not persisted).
+  const copyText = `${t("login_user")}: ${creds.username}\n${t("login_pass")}: ${creds.password}\n${loginUrl}`;
+  // The wa.me message deliberately OMITS the password: window.open records the
+  // URL in the admin's browser history, and a credential in the URL would
+  // survive there — defeating the "shown once" guarantee. The admin pastes the
+  // password (copied to the clipboard on click) into the opened WhatsApp chat.
+  const waText = `${t("login_user")}: ${creds.username}\n${loginUrl}`;
+  const wa = creds.phoneE164 ? buildWaLink(creds.phoneE164, waText) : null;
 
   const copy = async () => {
     try {
-      await navigator.clipboard.writeText(text);
+      await navigator.clipboard.writeText(copyText);
       showToast(t("wa_fallback_copied"));
     } catch {
       // Clipboard unavailable/denied — the box below stays selectable.
       showToast(t("wa_fallback_copy_failed"));
     }
+  };
+
+  // Open WhatsApp with the password-less message, and copy the PASSWORD to the
+  // clipboard so the admin can paste it into the chat without it ever entering
+  // the URL / browser history.
+  const openWa = async () => {
+    try {
+      await navigator.clipboard.writeText(creds.password);
+      showToast(t("admin_temp_pw_wa_paste"));
+    } catch {
+      /* clipboard denied — admin copies from the visible field below */
+    }
+    window.open(wa, "_blank", "noopener");
   };
 
   return (
@@ -50,11 +68,7 @@ export function TempPasswordModal({ creds, onClose, t, showToast }) {
             📋 {t("wa_fallback_copy")}
           </button>
           {wa && (
-            <button
-              data-testid="temp-pw-open-wa"
-              style={OPEN_BTN}
-              onClick={() => window.open(wa, "_blank", "noopener")}
-            >
+            <button data-testid="temp-pw-open-wa" style={OPEN_BTN} onClick={openWa}>
               {t("wa_fallback_open")}
             </button>
           )}

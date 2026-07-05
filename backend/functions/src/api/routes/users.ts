@@ -570,6 +570,14 @@ usersRouter.put(
       }
       if (newRole !== null && newRole !== profile.role) {
         updates[`users/${uid}/role`] = newRole;
+        // Preserve the generated-password invariant across role changes: a user
+        // demoted from admin to groom/driver still carries an admin-chosen,
+        // never-forced password. Re-arm the forced first-login change so they
+        // must pick their own (the admin re-sends a fresh one via reset if the
+        // current password is unknown to the user).
+        if (newRole === "groom" || newRole === "driver") {
+          updates[`users/${uid}/mustChangePassword`] = true;
+        }
       }
       if (newDisplayName !== undefined) {
         updates[`users/${uid}/displayName`] = newDisplayName ?? null;
@@ -633,6 +641,10 @@ usersRouter.delete(
       updates[`driverAssignments/${uid}`] = null;
       updates[`guestsByGroom/${uid}`] = null;
       updates[`liveLocationsByGroom/${uid}`] = null;
+      // Purge any un-consumed generated temp password so deleting an account
+      // before its first-login change doesn't orphan the stored credential
+      // (plaintext when the encryption key is unset). Idempotent if absent.
+      updates[`generatedPasswords/${uid}`] = null;
       await userStore.applyUpdates(updates);
 
       await writeAudit(callerUid, "deletePortalUser", { uid });

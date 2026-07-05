@@ -11,7 +11,7 @@ import { usePortal } from "../../../context/PortalContext.jsx";
 import { RoleGuard } from "../../../components/RoleGuard.jsx";
 import { Num } from "../../../components/Num.jsx";
 import { PasswordRules } from "../../../components/PasswordRules.jsx";
-import { PhoneInput } from "../../../components/PhoneInput.jsx";
+import { PhoneInput, isCompletePhone } from "../../../components/PhoneInput.jsx";
 import { TempPasswordModal } from "./TempPasswordModal.jsx";
 import { isStrongPassword } from "../../../utils/password.js";
 import { isPlaceholderPhone } from "../../../utils/phone.js";
@@ -113,8 +113,10 @@ function EditModal({ user, onSave, onCancel, onResetPassword, t, lang }) {
   // بطاقة المحفظة — افتراضاً متوقّفة.
   const [canBoarding, setCanBoarding] = useState(user.canUseBoardingPass === true);
 
-  // الحقل اليدوي يخصّ المدراء فقط — الخادم يرفضه للعريس/المرسل (409).
-  const manualPassword = role === "admin";
+  // الحقل اليدوي يخصّ المدراء فقط — يتبع الدور المحفوظ (user.role) لا مبدّل
+  // الدور غير المحفوظ، لأنّ الخادم يفرض على الدور المحفوظ؛ لو اعتمدنا على الحالة
+  // المسودّة لظهر زرّ «إعادة التعيين» لمدير قبل حفظ الترقية/الخفض فرجع 409.
+  const manualPassword = (user.role ?? "groom") === "admin";
   const canSave = username.trim() &&
     (!manualPassword || newPass.length === 0 || isStrongPassword(newPass));
 
@@ -393,12 +395,15 @@ function UserManagerInner() {
 
   // ── إعادة تعيين كلمة مرور (من مودال التعديل) ─────────────────────────
   const handleResetPassword = async (uid, resetLang) => {
+    // احسب الهدف قبل إغلاق المودال (editingUser سيصبح null).
+    const target = users.find(u => (u.uid ?? u.id) === uid) || editingUser || {};
     const creds = await resetUserPassword(uid, resetLang);
     if (!creds) return; // الخطأ ظهر Toast من الـ hook
+    // أغلق مودال التعديل حتى يظهر التوست/المودال (التوست خلف المودال بترتيب z).
+    setEditingUser(null);
     if (creds.delivered) {
       showToast(t("admin_pw_sent_wa"));
     } else if (creds.password) {
-      const target = users.find(u => (u.uid ?? u.id) === uid) || editingUser || {};
       setTempCreds({ username: target.username, password: creds.password, phoneE164: target.phoneE164 });
     }
   };
@@ -549,7 +554,7 @@ function UserManagerInner() {
                 onClick={handleCreate}
                 disabled={!newUserName.trim() || (newUserRole === "admin"
                   ? !isStrongPassword(newUserPass)
-                  : (!newUserPhone.trim() && !newUserNoPhone))}>
+                  : (!newUserNoPhone && !isCompletePhone(newUserPhone)))}>
           ➕ {t("admin_create")}
         </button>
       </div>
