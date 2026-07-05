@@ -13,6 +13,8 @@ export default {
     orientation: "portrait",
     userInterfaceStyle: "dark",
     backgroundColor: "#07070a",
+    // Brand icon/splash derived from the gold دعوة seal (frontend favicon).
+    icon: "./assets/icon.png",
     // RTL: both Arabic and Hebrew render right-to-left (see app/_layout.jsx).
     ios: {
       bundleIdentifier: "to.dawa.app",
@@ -25,7 +27,10 @@ export default {
     android: {
       package: "to.dawa.app",
       backgroundColor: "#07070a",
-      adaptiveIcon: { backgroundColor: "#07070a" },
+      adaptiveIcon: {
+        foregroundImage: "./assets/adaptive-icon.png",
+        backgroundColor: "#07070a",
+      },
       // expo-contacts injects WRITE_CONTACTS (app only reads); SYSTEM_ALERT_WINDOW
       // comes from the template and triggers Play Console scrutiny — neither is used.
       blockedPermissions: [
@@ -37,6 +42,15 @@ export default {
       "expo-router",
       "expo-secure-store",
       "expo-font",
+      [
+        "expo-splash-screen",
+        {
+          image: "./assets/splash-icon.png",
+          resizeMode: "contain",
+          backgroundColor: "#07070a",
+          imageWidth: 220,
+        },
+      ],
       [
         "expo-image-picker",
         {
