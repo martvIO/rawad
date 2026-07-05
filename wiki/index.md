@@ -40,7 +40,7 @@ _(ideas, frameworks, patterns, principles — pages that describe a concept)_
 - [[Communication Settings]] — admin contact channels + public /settings/public + landing WhatsApp CTAs
 - [[Admin Analytics]] — admin operator command center: server-aggregated GET /admin/analytics + recharts page (composition/revenue/operations/rsvp/designs/triage/trends)
 - [[Conversion KPIs]] — North Star (paid weddings/month) + funnel KPIs + weekly cadence; flags the untracked top-of-funnel (WhatsApp-click) gap
-- [[Mobile App]] — groom-only Android+iOS Capacitor app (separate `app/` package reusing frontend/); phased roadmap (foundation → push → self-serve signup w/ iOS IAP + Android Lemon Squeezy); Phase 1 built 2026-06-25
+- [[Mobile App]] — groom-only Android+iOS **Expo SDK 56** app (`app/` + shared `@dawa/core`); Phases 0–3b built; **publish-prep 2026-07-05**: drift fixes (datetime, native photographer upload, design parity), permission hardening, brand icon/splash, emulator+prod QA before Play/App Store submission
 
 ## Sources
 

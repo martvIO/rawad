@@ -149,6 +149,41 @@ Windows, no Mac), and runs the existing Three.js 3D via `expo-gl`.
 - **Verified:** backend `tsc` + **471/471** unit tests (incl. new `patchMany` +
   500-chunk tests), app Metro bundle ✅, `expo-doctor` 21/21 ✅, i18n guard ✅.
 
+## Publish prep (2026-07-05) — grilled decisions + store readiness
+
+Grilling session before Google Play / App Store submission. Decisions:
+
+- **Scope:** QA + fix + store-prep in-session; the owner runs `eas build`/`eas submit`
+  with his own accounts (all three exist: Expo, Apple Developer, Play Console).
+- **QA strategy:** hybrid — deep destructive QA against the **Firebase emulator
+  stack** (seeded `groom/Groom1234`), then a contained **prod smoke** on a dedicated
+  test groom (same account doubles as Apple's App-Review demo login). Android SDK +
+  ARM64 emulator installed locally on the Mac (headless cmdline-tools, JDK 21 —
+  RN 0.85 Gradle can't run on the machine's JDK 26).
+- **Drift fixes shipped** (app was frozen 2026-07-01 while web/backend moved):
+  1. Wedding **date+time** picker (web moved to datetime-local; app was date-only
+     and silently wiped the hour) — iOS single datetime picker, Android two-step.
+  2. **Native photographer upload**: shared `putFileToStorage` was web-XHR-only
+     (`xhr.send(plainObject)` with no `size` on native) — added an injectable
+     **binary-upload adapter** (`shared/src/adapters/upload.js` + native impl on
+     expo-file-system `File.createUploadTask` PUT) + lifted the web's bounded
+     queue/3-attempt retry into `shared/src/utils/uploadQueue.js`; app cap 200MB→2GB.
+  3. **Design-editor parity**: native starfield section (color/size/opacity), missing
+     `stars`/`sealStar` toggles, `starIntensity` default 0.22/step .05, background
+     `imageOverlay`/`circle*` controls, and an explicit-false **toggle-persistence
+     bugfix** (switches passed `v || null` → OFF never persisted server-side).
+- **Store identity/config:** icon + splash generated from the gold دعوة brand seal
+  on `#07070a`; privacy-policy URL `https://dawa-aa793.web.app/terms`;
+  `ITSAppUsesNonExemptEncryption=false`; permissions hardened at prebuild —
+  `READ_CONTACTS` + Arabic `NSContactsUsageDescription` now actually generated
+  (the stale on-disk native folders had NEITHER → contacts picker would have
+  hard-crashed iOS), `RECORD_AUDIO` dropped (`microphonePermission:false` — camera
+  calls are images-only), `WRITE_CONTACTS` + `SYSTEM_ALERT_WINDOW` blocked.
+- `extra` URLs in `app.config.js` are now **env-overridable** (`DAWA_API_BASE_URL`,
+  `DAWA_SSE_BASE_URL`, `DAWA_WEB_BASE_URL` at config-eval time) for emulator QA.
+
+See [[Architecture-Decisions]], [[Digital Invitations]]. Session log 2026-07-05.
+
 ## Roadmap (later)
 
 1. **Push:** FCM + APNs (`expo-notifications`), device-token registry, Cloud
