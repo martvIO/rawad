@@ -370,6 +370,7 @@ export default function Design() {
             <DatePickerField
               label={he ? "תאריך החתונה" : "تاريخ الزفاف"}
               value={ed.f.weddingDate || null}
+              mode="datetime"
               onChange={(ms) => { ed.setField("weddingDate", ms); ed.flush("weddingDate", ms); }}
               placeholder={he ? "בחר תאריך" : "اختر التاريخ"}
             />
@@ -414,22 +415,37 @@ export default function Design() {
             {ENV_COLORS.map((sk) => (
               <HexField key={sk} label={L(ENV_COLOR_LABELS[sk], he)} value={ed.envelope[sk] || ""} onCommit={(v) => ed.setNested("envelope", sk, v)} />
             ))}
+            <View style={styles.toggleRow}>
+              <Text style={styles.toggleLabel}>{he ? "כוכבים על כל המעטפה" : "نجوم على كامل المظروف"}</Text>
+              <Switch value={ed.envelope.stars !== false} onValueChange={(v) => ed.setNested("envelope", "stars", v)} trackColor={{ true: C.gold, false: "#333" }} thumbColor="#fff" />
+            </View>
+            <View style={styles.toggleRow}>
+              <Text style={styles.toggleLabel}>{he ? "כוכב על החותם" : "نجمة على الختم"}</Text>
+              <Switch value={ed.envelope.sealStar === true} onValueChange={(v) => ed.setNested("envelope", "sealStar", v)} trackColor={{ true: C.gold, false: "#333" }} thumbColor="#fff" />
+            </View>
             <Stepper label={he ? "צפיפות כוכבים" : "كثافة النجوم"} value={ed.envelope.starDensity ?? 2} min={1} max={4} step={1} onChange={(v) => ed.setNested("envelope", "starDensity", v)} />
-            <Stepper label={he ? "עוצמת כוכבים" : "شدة النجوم"} value={ed.envelope.starIntensity ?? 0.5} min={0} max={1} step={0.25} onChange={(v) => ed.setNested("envelope", "starIntensity", v)} />
+            <Stepper label={he ? "עוצמת כוכבים" : "شدة النجوم"} value={ed.envelope.starIntensity ?? 0.22} min={0} max={1} step={0.05} onChange={(v) => ed.setNested("envelope", "starIntensity", v)} />
+          </Section>
+
+          {/* ── Background starfield (particles behind the 3D envelope) ── */}
+          <Section title={he ? "כוכבי הרקע (החלל התלת-ממדי)" : "نجوم الخلفية (الفضاء ثلاثي الأبعاد)"}>
+            <HexField label={he ? "צבע הכוכבים" : "لون النجوم"} value={ed.starfield.color || ""} placeholder="#ffffff" onCommit={(v) => ed.setNested("starfield", "color", v)} />
+            <Stepper label={he ? "גודל הכוכבים" : "حجم النجوم"} value={ed.starfield.size ?? 1} min={0.4} max={2.5} step={0.1} onChange={(v) => ed.setNested("starfield", "size", v)} />
+            <Stepper label={he ? "בהירות הכוכבים" : "وضوح النجوم"} value={ed.starfield.opacity ?? 1} min={0} max={2} step={0.1} onChange={(v) => ed.setNested("starfield", "opacity", v)} />
           </Section>
 
           {/* ── Custom background ──────────────────────────────── */}
           <Section title={he ? "רקע מותאם" : "خلفية مخصّصة"}>
             <View style={styles.toggleRow}>
               <Text style={styles.toggleLabel}>{he ? "השתמש ברקע שלי" : "استخدم خلفيتي"}</Text>
-              <Switch value={ed.background.enabled === true} onValueChange={(v) => ed.setNested("background", "enabled", v || null)} trackColor={{ true: C.gold, false: "#333" }} thumbColor="#fff" />
+              <Switch value={ed.background.enabled === true} onValueChange={(v) => ed.setNested("background", "enabled", v)} trackColor={{ true: C.gold, false: "#333" }} thumbColor="#fff" />
             </View>
             {ed.background.enabled ? (
               <>
                 <HexField label={he ? "צבע רקע" : "لون الخلفية"} value={ed.background.color || ""} onCommit={(v) => ed.setNested("background", "color", v)} />
                 <View style={styles.toggleRow}>
                   <Text style={styles.toggleLabel}>{he ? "מעבר צבע" : "تدرّج"}</Text>
-                  <Switch value={ed.background.gradient === true} onValueChange={(v) => ed.setNested("background", "gradient", v || null)} trackColor={{ true: C.gold, false: "#333" }} thumbColor="#fff" />
+                  <Switch value={ed.background.gradient === true} onValueChange={(v) => ed.setNested("background", "gradient", v)} trackColor={{ true: C.gold, false: "#333" }} thumbColor="#fff" />
                 </View>
                 {ed.background.gradient ? (
                   <>
@@ -439,13 +455,20 @@ export default function Design() {
                 ) : null}
                 <Stepper label={he ? "עיגולים" : "الدوائر"} value={ed.background.circleCount ?? 0} min={0} max={6} step={1} onChange={(v) => ed.setNested("background", "circleCount", v)} />
                 <HexField label={he ? "צבע עיגולים" : "لون الدوائر"} value={ed.background.circleColor || ""} onCommit={(v) => ed.setNested("background", "circleColor", v)} />
+                <Stepper label={he ? "גודל העיגולים" : "حجم الدوائر"} value={ed.background.circleSize ?? 0.5} min={0} max={1} step={0.05} onChange={(v) => ed.setNested("background", "circleSize", v)} />
+                <Stepper label={he ? "שקיפות העיגולים" : "شفافية الدوائر"} value={ed.background.circleOpacity ?? 0.18} min={0} max={1} step={0.05} onChange={(v) => ed.setNested("background", "circleOpacity", v)} />
+                <Stepper label={he ? "ריכוך העיגולים" : "نعومة الدوائر"} value={ed.background.circleSoftness ?? 0.6} min={0} max={1} step={0.05} onChange={(v) => ed.setNested("background", "circleSoftness", v)} />
+                <View style={styles.toggleRow}>
+                  <Text style={styles.toggleLabel}>{he ? "תנועת ריחוף" : "حركة انسياب"}</Text>
+                  <Switch value={ed.background.circleMotion !== false} onValueChange={(v) => ed.setNested("background", "circleMotion", v)} trackColor={{ true: C.gold, false: "#333" }} thumbColor="#fff" />
+                </View>
                 <View style={styles.toggleRow}>
                   <Text style={styles.toggleLabel}>{he ? "עלי כותרת" : "بتلات"}</Text>
-                  <Switch value={ed.background.petals === true} onValueChange={(v) => ed.setNested("background", "petals", v || null)} trackColor={{ true: C.gold, false: "#333" }} thumbColor="#fff" />
+                  <Switch value={ed.background.petals !== false} onValueChange={(v) => ed.setNested("background", "petals", v)} trackColor={{ true: C.gold, false: "#333" }} thumbColor="#fff" />
                 </View>
                 <View style={styles.toggleRow}>
                   <Text style={styles.toggleLabel}>{he ? "נצנוצים" : "لمعان"}</Text>
-                  <Switch value={ed.background.sparkles === true} onValueChange={(v) => ed.setNested("background", "sparkles", v || null)} trackColor={{ true: C.gold, false: "#333" }} thumbColor="#fff" />
+                  <Switch value={ed.background.sparkles !== false} onValueChange={(v) => ed.setNested("background", "sparkles", v)} trackColor={{ true: C.gold, false: "#333" }} thumbColor="#fff" />
                 </View>
                 <View style={styles.bgImgRow}>
                   {ed.background.image?.url ? (
@@ -457,6 +480,9 @@ export default function Design() {
                     <Pressable style={[styles.ghostBtn, uploadBusy && styles.dim]} onPress={() => pickAndUpload("background")}><Text style={styles.ghostBtnText}>🖼 {he ? "העלה רקע" : "رفع خلفية"}</Text></Pressable>
                   )}
                 </View>
+                {ed.background.image?.url ? (
+                  <Stepper label={he ? "כהות מעל התמונה" : "تعتيم فوق الصورة"} value={ed.background.imageOverlay ?? 0.45} min={0} max={1} step={0.05} onChange={(v) => ed.setNested("background", "imageOverlay", v)} />
+                ) : null}
               </>
             ) : null}
           </Section>

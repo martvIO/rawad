@@ -46,6 +46,7 @@ export function useDesignEditor(uid, designId, { onError } = {}) {
         TOGGLE_KEYS.forEach((k) => apply(k, next[k] !== false));
         apply("envelope", objOr(next.envelope, {}));
         apply("background", objOr(next.background, {}));
+        apply("starfield", objOr(next.starfield, {}));
         apply("themeColor", next.themeColor || "gold");
         apply("fontFamily", next.fontFamily || "amiri");
         return merged;
@@ -78,6 +79,7 @@ export function useDesignEditor(uid, designId, { onError } = {}) {
         if (TOGGLE_KEYS.includes(key)) return { ...prev, [key]: cur[key] !== false };
         if (key === "envelope") return { ...prev, envelope: objOr(cur.envelope, {}) };
         if (key === "background") return { ...prev, background: objOr(cur.background, {}) };
+        if (key === "starfield") return { ...prev, starfield: objOr(cur.starfield, {}) };
         if (key === "themeColor") return { ...prev, themeColor: cur.themeColor || "gold" };
         if (key === "fontFamily") return { ...prev, fontFamily: cur.fontFamily || "amiri" };
         if (key === "weddingDate") return { ...prev, weddingDate: cur.weddingDate ?? null };
@@ -151,7 +153,8 @@ export function useDesignEditor(uid, designId, { onError } = {}) {
     [f, setField],
   );
 
-  // ── Nested object fields (envelope / background) ─────────────────────────────
+  // ── Nested object fields (envelope / background / starfield) ─────────────────
+  // A subkey set to null/"" is removed → falls back to the theme default.
   const setNested = useCallback(
     (parent, subKey, value) => {
       const cur = objOr(f[parent], {});
@@ -208,6 +211,7 @@ export function useDesignEditor(uid, designId, { onError } = {}) {
     fontFamily: f.fontFamily || doc?.fontFamily || "amiri",
     envelope: objOr(f.envelope, {}),
     background: objOr(f.background, {}),
+    starfield: objOr(f.starfield, {}),
     setField,
     flush,
     toggle,
