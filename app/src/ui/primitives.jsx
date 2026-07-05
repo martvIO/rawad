@@ -8,6 +8,7 @@ import {
   Pressable,
   Image,
   Modal,
+  Platform,
   ScrollView,
   ActivityIndicator,
   StyleSheet,
@@ -30,6 +31,14 @@ export function fmtDate(ms) {
   if (!ms) return "";
   const d = new Date(ms);
   return `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`;
+}
+
+// Same, plus a zero-padded 24h time: "D/M/YYYY HH:mm".
+export function fmtDateTime(ms) {
+  if (!ms) return "";
+  const d = new Date(ms);
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${fmtDate(ms)} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 export function SectionLabel({ children }) {
@@ -190,16 +199,20 @@ export function BottomSheet({ visible, onClose, title, children }) {
 }
 
 // Native date picker field. `value` is epoch ms (or null); emits epoch ms.
-// v1 is date-only (mode="date") — full date+time can be layered later.
-export function DatePickerField({ label, value, onChange, placeholder }) {
+// mode="date" (default) picks a day; mode="datetime" also picks a time — iOS
+// has a combined picker, Android chains a date dialog into a time dialog.
+export function DatePickerField({ label, value, onChange, placeholder, mode = "date" }) {
   const [show, setShow] = useState(false);
+  // Android datetime two-step: the picked Y/M/D while the time dialog is open.
+  const [timeBase, setTimeBase] = useState(null);
+  const twoStep = mode === "datetime" && Platform.OS === "android";
   return (
     <View style={styles.fieldWrap}>
       {label ? <Text style={styles.label}>{label}</Text> : null}
       <View style={styles.dateRow}>
         <Pressable style={styles.dateInput} onPress={() => setShow(true)}>
           <Text style={[styles.dateText, !value && styles.datePlaceholder]}>
-            {value ? fmtDate(value) : placeholder || "—"}
+            {value ? (mode === "datetime" ? fmtDateTime(value) : fmtDate(value)) : placeholder || "—"}
           </Text>
         </Pressable>
         {value ? (
@@ -209,10 +222,26 @@ export function DatePickerField({ label, value, onChange, placeholder }) {
       {show ? (
         <DateTimePicker
           value={value ? new Date(value) : new Date()}
-          mode="date"
+          mode={twoStep ? "date" : mode}
           onChange={(event, selected) => {
             setShow(false);
-            if (event.type === "set" && selected) onChange(selected.getTime());
+            if (event.type !== "set" || !selected) return;
+            if (twoStep) setTimeBase(selected);
+            else onChange(selected.getTime());
+          }}
+        />
+      ) : null}
+      {timeBase ? (
+        <DateTimePicker
+          value={value ? new Date(value) : new Date()}
+          mode="time"
+          is24Hour
+          onChange={(event, selected) => {
+            setTimeBase(null);
+            if (event.type !== "set" || !selected) return;
+            const d = new Date(timeBase);
+            d.setHours(selected.getHours(), selected.getMinutes(), 0, 0);
+            onChange(d.getTime());
           }}
         />
       ) : null}

@@ -168,7 +168,7 @@ export default function Dashboard() {
         <View style={styles.card}>
           <SectionLabel>📅 {tt(lang, "تاريخ الزفاف", "תאריך החתונה")}</SectionLabel>
           <Text style={styles.hint}>{tt(lang, "يُستخدم للعد التنازلي في صفحة الدعوة", "ישמש לעד-לאחור בעמוד ההזמנה")}</Text>
-          <DatePickerField value={weddingDate} onChange={setDate} placeholder={tt(lang, "اختر تاريخاً", "בחר תאריך")} />
+          <DatePickerField mode="datetime" value={weddingDate} onChange={setDate} placeholder={tt(lang, "اختر تاريخاً", "בחר תאריך")} />
         </View>
 
         {/* Guest ranks */}

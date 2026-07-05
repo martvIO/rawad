@@ -130,7 +130,7 @@ export default function Manage() {
               <View style={styles.card}>
                 <Text style={styles.cardTitleGold}>{t("lc_postpone_title")}</Text>
                 <Text style={styles.muted}>{t("lc_postpone_desc")}</Text>
-                <DatePickerField label={t("lc_new_date")} value={newDate} onChange={setNewDate} />
+                <DatePickerField mode="datetime" label={t("lc_new_date")} value={newDate} onChange={setNewDate} />
                 <Btn
                   label={t("lc_pause_btn")}
                   onPress={() => run(() => pauseWedding(newDate || null))}
