@@ -18,6 +18,7 @@
 //   /digital/:uid/public                       — unauthenticated read
 
 import { api } from "../utils/apiClient.js";
+import { getBinaryUpload } from "../adapters/upload.js";
 import { createPoller } from "../utils/poller.js";
 import { getStoredUid } from "../utils/tokenManager.js";
 import { logErr } from "../utils/logger.js";
@@ -525,6 +526,10 @@ async function legacyPhotographerUpload(uid, file, opts) {
 // sets NO xhr.timeout so multi-GB uploads over hours don't abort; reports progress
 // and honours the caller's AbortSignal.
 function putFileToStorage(url, file, opts) {
+  // Native injects an expo-file-system uploader (XHR can't stream an RN
+  // { uri } descriptor); web never registers one → identical XHR path below.
+  const binaryUpload = getBinaryUpload();
+  if (binaryUpload) return binaryUpload(url, file, opts);
   return new Promise((resolve, reject) => {
     if (opts?.signal?.aborted) { reject(new DOMException("Aborted", "AbortError")); return; }
     const xhr = new XMLHttpRequest();

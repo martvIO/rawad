@@ -8,6 +8,7 @@ import {
   subscribeDigitalMedia, setPhotographerPublished,
 } from "../../../../services/digitalInvitation.js";
 import { getGallery, patchGallery } from "../../../../services/gallery.js";
+import { runUploadQueue } from "@dawa/core/utils/uploadQueue.js";
 import { logErr } from "../../../../utils/logger.js";
 import { localizeApiError } from "../../../../utils/apiError.js";
 import { load, save, removeKey } from "../../../../utils/storage.js";
@@ -49,54 +50,6 @@ const fmtDate = (ts, lang) => {
     numberingSystem: "latn",
   });
 };
-
-// How many files upload at once. Firing every file in one Promise.allSettled made
-// the browser queue them behind ~6 sockets and the WAITING requests burned their
-// 2-min timeout → mass failures on big albums. A bounded queue keeps only a few
-// XHRs live at a time so none stalls in the queue.
-const UPLOAD_CONCURRENCY = 4;
-const UPLOAD_MAX_ATTEMPTS = 3; // 1 try + 2 retries on transient (timeout/network) failures
-
-// Upload `files` through a bounded-concurrency queue with per-file retry on
-// transient failures. Returns results in Promise.allSettled shape, in order.
-async function runUploads(files, uid, controller, onFileProgress, onFileDone) {
-  const results = new Array(files.length);
-  let next = 0;
-  const uploadOne = async (f, i) => {
-    let lastErr;
-    for (let attempt = 1; attempt <= UPLOAD_MAX_ATTEMPTS; attempt++) {
-      if (controller.signal.aborted) {
-        return { status: "rejected", reason: new DOMException("Aborted", "AbortError") };
-      }
-      try {
-        const rec = await uploadPhotographerFile(uid, f, { signal: controller.signal, onProgress: onFileProgress(i) });
-        return { status: "fulfilled", value: rec };
-      } catch (err) {
-        lastErr = err;
-        const isAbort = err?.name === "AbortError";
-        const transient = err?.message === "request_timeout" || err?.message === "network_error";
-        if (isAbort || !transient || attempt === UPLOAD_MAX_ATTEMPTS) break;
-        onFileProgress(i)(0); // reset this file's bar before the retry
-        await new Promise((r) => setTimeout(r, 500 * attempt)); // small backoff
-      }
-    }
-    return { status: "rejected", reason: lastErr };
-  };
-  const worker = async () => {
-    while (!controller.signal.aborted) {
-      const i = next++;
-      if (i >= files.length) return;
-      results[i] = await uploadOne(files[i], i);
-      onFileDone();
-    }
-  };
-  await Promise.all(Array.from({ length: Math.min(UPLOAD_CONCURRENCY, files.length) }, worker));
-  // Abort can leave tail entries unset — normalize so callers can read .status.
-  for (let i = 0; i < results.length; i++) {
-    if (!results[i]) results[i] = { status: "rejected", reason: new DOMException("Aborted", "AbortError") };
-  }
-  return results;
-}
 
 export function DigitalPhotographer() {
   const { t, lang, currentUid, showToast, canUsePhotographer } = usePortal();
@@ -283,9 +236,18 @@ export function DigitalPhotographer() {
       setProgress(fracs.reduce((a, b) => a + b, 0) / fracs.length);
     };
     try {
-      // Bounded-concurrency queue + per-file retry (see runUploads) — reliable for
-      // hundreds of photos where "fire everything at once" timed out in the queue.
-      const results = await runUploads(arr, uid, controller, onFileProgress, () => setUploadedCount((c) => c + 1));
+      // Bounded-concurrency queue + per-file retry (see utils/uploadQueue.js) —
+      // reliable for hundreds of photos where "fire everything at once" timed
+      // out in the queue.
+      const results = await runUploadQueue(
+        arr,
+        (f, i) => uploadPhotographerFile(uid, f, { signal: controller.signal, onProgress: onFileProgress(i) }),
+        {
+          signal: controller.signal,
+          onRetryReset: (i) => onFileProgress(i)(0), // reset this file's bar before the retry
+          onItemDone: () => setUploadedCount((c) => c + 1),
+        },
+      );
 
       // Always revoke + clear every preview so pending state can't strand.
       previews.forEach(p => URL.revokeObjectURL(p.url));

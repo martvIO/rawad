@@ -15,6 +15,7 @@ import {
   StyleSheet,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
+import { File } from "expo-file-system";
 import { ScreenHeader } from "../../src/ui/ScreenHeader.jsx";
 import { usePortal } from "../../src/portal/PortalContext.jsx";
 import { useGroomDigital } from "../../src/portal/useGroomDigital.jsx";
@@ -27,12 +28,14 @@ import {
   removePhotographerFile,
   setPhotographerPublished,
 } from "@dawa/core/services/digitalInvitation.js";
+import { runUploadQueue } from "@dawa/core/utils/uploadQueue.js";
 import { useListFilter } from "@dawa/core/utils/searchFilter.js";
 import { localizeApiError } from "@dawa/core/utils/apiError.js";
 import { C, space, radius, type } from "../../src/ui/theme.js";
 
 // Mirror of MAX_PHOTOG_BYTES on the server (functions/src/constants/limits.ts).
-const MAX_PHOTOG_BYTES = 200 * 1024 * 1024;
+// 2 GB ceiling — direct-to-Storage uploads have no function-memory limit.
+const MAX_PHOTOG_BYTES = 2 * 1024 * 1024 * 1024;
 
 function fileKind(f) {
   if (f?.kind) return f.kind;
@@ -104,15 +107,22 @@ export default function Photographer() {
       const picked = [];
       const rejected = [];
       for (const a of assets) {
-        if (a.fileSize && a.fileSize > MAX_PHOTOG_BYTES) { rejected.push(a.fileName || ""); continue; }
+        // Real byte size — create-upload requires it (finite > 0 ≤ 2GB); the
+        // picker omits fileSize on some platforms, so stat the file directly.
+        let size = Number(a.fileSize) || 0;
+        if (!size) {
+          try { size = new File(a.uri).size || 0; } catch { size = 0; }
+        }
+        if (size > MAX_PHOTOG_BYTES) { rejected.push(a.fileName || ""); continue; }
         const isVideo = a.type === "video";
         picked.push({
           uri: a.uri,
           name: a.fileName || `photo.${isVideo ? "mp4" : "jpg"}`,
           type: a.mimeType || (isVideo ? "video/mp4" : "image/jpeg"),
+          size,
         });
       }
-      if (rejected.length) toast.show(he ? "קבצים גדולים מדי (200MB)" : "ملفات كبيرة جداً (200MB)");
+      if (rejected.length) toast.show(he ? "קבצים גדולים מדי (2GB)" : "ملفات كبيرة جداً (2GB)");
       if (!picked.length) return;
 
       const stamp = Date.now();
@@ -122,8 +132,12 @@ export default function Photographer() {
       const ctrl = new AbortController();
       abortRef.current = ctrl;
 
-      const results = await Promise.allSettled(
-        picked.map((f) => uploadPhotographerFile(uid, { uri: f.uri, name: f.name, type: f.type }, { signal: ctrl.signal })),
+      // Bounded-concurrency queue + per-file retry (see @dawa/core
+      // utils/uploadQueue.js) — same behavior as the web photographer page.
+      const results = await runUploadQueue(
+        picked,
+        (f) => uploadPhotographerFile(uid, f, { signal: ctrl.signal }),
+        { signal: ctrl.signal },
       );
       const added = [];
       results.forEach((r, i) => {
