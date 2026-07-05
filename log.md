@@ -301,3 +301,6 @@ Touched: Digital-Invitations
 
 ## [2026-07-05 01:35] session | Added 5 terms/privacy clauses (AR+HE) + Haifa-exclusive jurisdiction
 Touched: none
+
+## [2026-07-05 10:10] session | Harden generated-password flow (adversarial review fixes)
+Touched: Authentication

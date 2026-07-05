@@ -49,6 +49,16 @@ admin re-reveal via `GET /users/:uid/temp-password`. First `/auth/change-passwor
 (or phone-OTP reset) clears the flag + purges the envelope. Same machinery as the
 paid-signup flow — see [[Payments]]; rationale in [[Architecture Decisions]].
 
+**Invariant hardening (adversarial review, 2026-07-05):** the "groom/driver never
+carry an admin-chosen, never-forced password" invariant is preserved across the
+whole lifecycle — `DELETE /users/:uid` purges the stored envelope (no orphaned
+credential), `PUT /users/:uid` re-arms `mustChangePassword` when a user is moved
+*into* groom/driver, and the show-once modal keeps the plaintext **out of the
+`wa.me` URL** (it would persist in the admin's browser history) — the WhatsApp
+button copies the password to the clipboard instead. Create/reset also require a
+*complete* phone (`isCompletePhone`: per-country length + prefix), so credentials
+can't auto-send to a half-typed number.
+
 ## Password encryption (in-body, defense-in-depth)
 As of 2026-06-13, the client RSA-encrypts the `password`/`newPassword` field as an
 `enc:v1:` envelope before POSTing to `/auth/login`, `/auth/reset-password`, and the
