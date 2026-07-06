@@ -20,6 +20,7 @@ import {
   getStoredUid,
 } from "@dawa/core/utils/tokenManager.js";
 import { signIn, fetchProfile, signOutNow } from "@dawa/core/services/auth.js";
+import { setAuthChangeCallback } from "@dawa/core/utils/apiClient.js";
 
 const PortalContext = createContext(null);
 
@@ -65,6 +66,17 @@ export function PortalProvider({ children }) {
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  // When apiClient exhausts a refresh (mid-session token death: account revoked,
+  // refresh token expired), it clears tokens and fires this. Null the user so the
+  // groom layout's guard routes back to /login instead of rendering a dead UI
+  // whose every poll 401s. (Web wires the same in usePortalAuth.)
+  useEffect(() => {
+    setAuthChangeCallback((u) => {
+      if (!u) setUser(null);
+    });
+    return () => setAuthChangeCallback(null);
   }, []);
 
   const login = useCallback(async (username, password) => {

@@ -1,9 +1,11 @@
 // Shown when an admin/driver account logs in — this app is groom-only.
+import { useRouter } from "expo-router";
 import { usePortal } from "../src/portal/PortalContext.jsx";
 import { Screen, Card, Heading, Caption, PrimaryButton } from "../src/ui/components.jsx";
 
 export default function NotAGroom() {
   const { t, logout } = usePortal();
+  const router = useRouter();
   return (
     <Screen>
       <Card>
@@ -14,7 +16,10 @@ export default function NotAGroom() {
         </Caption>
         <PrimaryButton
           title={t("logout") || "تسجيل الخروج"}
-          onPress={logout}
+          onPress={async () => {
+            await logout();
+            router.replace("/login");
+          }}
           testID="btn-logout"
         />
       </Card>

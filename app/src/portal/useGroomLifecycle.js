@@ -18,7 +18,10 @@ export function useGroomLifecycle() {
       getMyLifecycle,
       (value) => {
         if (value) {
-          setStatus(value.status || "active");
+          // GET /lifecycle/me returns statusBlock() → { lifecycleStatus, ... }
+          // (matches the web hook). Reading value.status left this stuck on
+          // "active", hiding the paused/cancel banners + Resume/Undo actions.
+          setStatus(value.lifecycleStatus || "active");
           setData(value);
         }
         setLoading(false);

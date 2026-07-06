@@ -3,7 +3,7 @@
 // help/terms are registered here but hidden from the tab bar (push-only from the
 // per-screen header kebab). Each screen renders its own ScreenHeader (the Tabs
 // header is hidden).
-import { Tabs } from "expo-router";
+import { Tabs, Redirect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { usePortal } from "../../src/portal/PortalContext.jsx";
 import { ToastProvider } from "../../src/ui/Toast.jsx";
@@ -16,7 +16,10 @@ const tabIcon =
     <Ionicons name={name} size={size} color={color} />;
 
 export default function GroomLayout() {
-  const { t, user } = usePortal();
+  const { t, user, authReady } = usePortal();
+  // Mid-session token death nulls `user` (see PortalContext auth-change wiring).
+  // Route back to login instead of leaving the groom tabs rendering a dead UI.
+  if (authReady && !user) return <Redirect href="/login" />;
   const canUsePhotographer = user?.canUsePhotographer !== false;
   return (
     <ToastProvider>
