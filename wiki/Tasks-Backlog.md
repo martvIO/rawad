@@ -13,6 +13,7 @@ Prioritized work for [[Dawa]] (full list in `TASKS.md`).
 
 ## High
 - **TASK-001/002** — DigitalAddGuest submit hang + photo upload stuck state (likely resolved; confirm against [[Known Bugs]]).
+- **TASK-WA-1 (owner, blocks real-number cutover)** — pass Meta **business verification** for portfolio dawa.invitation (error 141010 hard-blocks registering +972 52-581-5460; see [[WhatsApp Messaging]] "Cutover execution 2026-07-06"). Fastest route: resume Security Centre → Business verification wizard with **legal business name = owner's personal legal name** (trade name "Dawa") + upload a personal **bank statement / tax document** bearing that name (address שדרות הציונות 36 א, חיפה). Alternative: register an עוסק פטור and use its certificate. Until then prod stays on the test number (allow-listed recipients only).
 
 ## Post-deploy (owner action) — [[Face Matching]]
 - **TASK-FACE-1** — enable the Firestore TTL policy that auto-deletes enrolled guest descriptors at token expiry (one-time, NOT in firebase.json):

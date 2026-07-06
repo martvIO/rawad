@@ -128,6 +128,62 @@ Plan file: `~/.claude/plans/i-have-a-phone-concurrent-treehouse.md`. See
   flip `/adminSettings.waPhoneId → 1135726059632019` + `waWabaId → 990436760646692`
   (+ set `waTemplateReminderAr/He`) → test-send → watch receipt pills + functions logs.
 
+### Cutover execution (grilled 2026-07-06)
+
+State re-checked live (read-only Graph GETs): WABA review **still PENDING**, number
+still unregistered (`status: PENDING`), but **all 7 templates APPROVED** (4 invite +
+2 reminder + hello_world) and owner confirms the **payment card is added** — the
+07-04 blockers are down to registration itself. Decisions (grilled):
+
+- **Recipients:** owner's own phone + one **cold** number (never messaged, never
+  allow-listed) — only the cold one proves "sends to any number". Numbers provided
+  live in-session.
+- **PIN:** owner provided the saved two-step PIN in-session (never persisted).
+  Fallback if Meta rejects it: WhatsApp Manager two-step reset, then retry.
+- **Order — direct-first, then flip** (flip = owner's signed-off DB change):
+  1. `POST /{phone-id}/register`, 2. direct Graph template sends (hello_world +
+  `dawa_invite_digital_ar`) to both recipients, 3. only then flip
+  `adminSettings.waPhoneId → 1135726059632019`, `waWabaId → 990436760646692`,
+  `waTemplateReminderAr/He → dawa_rsvp_reminder_ar/he`, 4. re-verify through the
+  app (admin test-send → Send-tab invite → receipt pills → functions logs).
+  Prod is never pointed at an unproven number; rollback = restore old phone-id.
+- **If register still refused (Unverified WABA):** escalate in-session — Business
+  Support Home, business verification if offered, Meta ticket — log exact state,
+  leave prod on the test number, retry a later session.
+- Caution: recipients should expect the message — a spam report on a fresh number
+  damages `quality_rating`.
+
+**Execution result (2026-07-06): still blocked — registration refused again.**
+
+- `POST /1135726059632019/register` (with the owner's PIN) → `(#100)` "Phone Link
+  to WABA Failed — **Unverified WABA**", same as 07-04. Card + approved templates
+  did NOT unblock it.
+- Root cause pinned via `health_status` on the WABA: WABA `AVAILABLE`, app
+  `AVAILABLE`, **BUSINESS `LIMITED` with error `141010` "The Business has not
+  passed business verification."** → Meta requires *business verification* of
+  portfolio dawa.invitation before any number can register on this WABA.
+- **Business verification wizard walked end-to-end (hybrid Playwright):** country
+  Israel → Sole proprietorship → "Not yet registered" (individual) → business
+  details (Dawa / שדרות הציונות 36 א חיפה 35312 / +972544642743 / dawa.to) → Meta
+  found **no matching record** → demands documents proving the legal name; accepted
+  types are business-only (bank statement / registration / tax doc / incorporation
+  cert). Owner has **no usable document** → wizard exited (progress not saved).
+  The likely-viable route documented for later: set legal business name = owner's
+  personal legal name (trade name "Dawa"), upload a personal bank statement /
+  tax document bearing that name.
+- **Support escalation dead end:** Business Support Home shows zero violations
+  ("Request review" disabled — nothing to appeal); Direct Support only offers the
+  no-reply "Report a problem" feedback form; the `/cases/async/create/dialog/`
+  URL renders empty (case creation not offered to this account).
+- **Prod untouched:** `waPhoneId` still points at the test number; nothing
+  regressed. The 07-04 assumption "no registered business → stay unverified" is
+  now **disproven for registration** — Meta hard-gates this WABA's number
+  registration on business verification (141010), not just conversation caps.
+- Unblock paths (owner): (a) resume the verification wizard with legal name =
+  personal name + a bank statement (\~30 min once the PDF exists); (b) register an
+  עוסק פטור and use its certificate; (c) stay on the test number + allow-listed
+  recipients until (a)/(b). Tracked in [[Tasks Backlog]].
+
 UI: `frontend/src/pages/portal/admin/WaSendFallbackModal.jsx` (admin-only, so it
 lives beside the Send tab, not in `components/`); failure payloads surface from
 `handleWaSend` in `usePortalSendInvites.js`. Verified end-to-end via Playwright

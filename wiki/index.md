@@ -36,7 +36,7 @@ _(ideas, frameworks, patterns, principles — pages that describe a concept)_
 - [[Load-Test Dashboard]] — local-only FastAPI+React control panel for the Locust suite; live SSE metrics, always-on LOADTEST-data cleanup (incl. new admin purge endpoint), archived run history + compare
 
 - [[Payments]] — Lemon Squeezy overlay checkout (admin-minted single-use pay links) + X-Signature-verified order_created webhook for paid groom self-signup
-- [[WhatsApp Messaging]] — WhatsApp Cloud API send + Meta webhook + daily scheduled RSVP reminders; + manual-send fallback (copy/open-WhatsApp modal on failed sends, clickable failed pill, persisted "manual" status)
+- [[WhatsApp Messaging]] — WhatsApp Cloud API send + Meta webhook + daily scheduled RSVP reminders; + manual-send fallback (copy/open-WhatsApp modal on failed sends, clickable failed pill, persisted "manual" status); real-number cutover BLOCKED on Meta business verification (141010, 2026-07-06 — unblock task TASK-WA-1)
 - [[Communication Settings]] — admin contact channels + public /settings/public + landing WhatsApp CTAs
 - [[Admin Analytics]] — admin operator command center: server-aggregated GET /admin/analytics + recharts page (composition/revenue/operations/rsvp/designs/triage/trends)
 - [[Conversion KPIs]] — North Star (paid weddings/month) + funnel KPIs + weekly cadence; flags the untracked top-of-funnel (WhatsApp-click) gap
