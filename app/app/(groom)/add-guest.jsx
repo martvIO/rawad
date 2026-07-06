@@ -16,7 +16,10 @@ import {
   StyleSheet,
 } from "react-native";
 import { useRouter } from "expo-router";
-import * as Contacts from "expo-contacts";
+// expo-contacts SDK 56 deprecated the top-level function API — getContactsAsync
+// now THROWS at runtime ("will throw in runtime"). Import the legacy module,
+// which keeps the same getContactsAsync/requestPermissionsAsync/Fields surface.
+import * as Contacts from "expo-contacts/legacy";
 import { ScreenHeader } from "../../src/ui/ScreenHeader.jsx";
 import { usePortal } from "../../src/portal/PortalContext.jsx";
 import { useGroomDigital } from "../../src/portal/useGroomDigital.jsx";
