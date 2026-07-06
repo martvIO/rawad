@@ -109,6 +109,21 @@ function HexField({ label, value, placeholder, onCommit }) {
   const [v, setV] = useState(value || "");
   useEffect(() => setV(value || ""), [value]);
   const swatch = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(v) ? v : placeholder;
+  // The backend only accepts empty or #rrggbb (6-digit). Normalize a #abc
+  // shorthand to #aabbcc and reject anything else BEFORE committing — otherwise
+  // the whole nested override object 400s and reverts (losing sibling colors).
+  const commit = () => {
+    let s = v.trim();
+    if (/^#[0-9a-fA-F]{3}$/.test(s)) {
+      s = "#" + s.slice(1).split("").map((c) => c + c).join("");
+    }
+    if (s === "" || /^#[0-9a-fA-F]{6}$/.test(s)) {
+      if (s !== v) setV(s);
+      onCommit(s);
+    } else {
+      setV(value || ""); // invalid → discard, restore last good
+    }
+  };
   return (
     <View style={styles.hexRow}>
       <View style={[styles.swatch, { backgroundColor: swatch || "#333" }]} />
@@ -118,7 +133,7 @@ function HexField({ label, value, placeholder, onCommit }) {
           style={styles.hexInput}
           value={v}
           onChangeText={setV}
-          onBlur={() => onCommit(v.trim())}
+          onBlur={commit}
           placeholder={placeholder || "#RRGGBB"}
           placeholderTextColor={C.dim}
           autoCapitalize="none"
@@ -361,8 +376,15 @@ export default function Design() {
                   value={value}
                   plain={PLAIN_SCALARS.has(key)}
                   onCommit={(text) => {
-                    if (localized) { ed.setLoc(key, editLang, text); ed.flush(key, { ...(ed.f[key] && typeof ed.f[key] === "object" ? ed.f[key] : {}), [editLang]: text }); }
-                    else { ed.setField(key, text); ed.flush(key, text); }
+                    if (localized) {
+                      ed.setLoc(key, editLang, text);
+                      // Promote a legacy plain string to { ar } before merging the
+                      // edited lang, or editing HE would drop the existing AR value.
+                      const base = ed.f[key] && typeof ed.f[key] === "object"
+                        ? ed.f[key]
+                        : (typeof ed.f[key] === "string" && ed.f[key] ? { ar: ed.f[key] } : {});
+                      ed.flush(key, { ...base, [editLang]: text });
+                    } else { ed.setField(key, text); ed.flush(key, text); }
                   }}
                 />
               );
@@ -400,7 +422,8 @@ export default function Design() {
               title={L(ARRAY_LABELS[key], he)}
               rows={Array.isArray(ed.f[key]) ? ed.f[key] : []}
               fields={ARRAY_ROW_FIELDS[key]}
-              onChange={(arr) => ed.commitArray(key, arr)}
+              onBuffer={(arr) => ed.setField(key, arr)}
+              onCommit={(arr) => ed.commitArray(key, arr)}
             />
           ))}
 
@@ -513,10 +536,13 @@ function ScalarInput({ label, value, plain, onCommit }) {
 
 // Generic array editor — add / edit (per-language) / remove rows. mealOptions has
 // no sub-fields: each row is a bare localized string held under the "" field.
-function ArrayEditor({ he, editLang, title, rows, fields, onChange }) {
+// `onBuffer` updates the dirty draft WITHOUT persisting (so a fresh empty row the
+// server would drop isn't reconciled away by the next poll); `onCommit` persists
+// on cell-blur and row-removal, matching the web editor's onChange/onCommit split.
+function ArrayEditor({ he, editLang, title, rows, fields, onBuffer, onCommit }) {
   const isBare = !fields.length;
-  const addRow = () => onChange([...rows, isBare ? { ar: "", he: "" } : {}]);
-  const removeRow = (i) => onChange(rows.filter((_, idx) => idx !== i));
+  const addRow = () => onBuffer([...rows, isBare ? { ar: "", he: "" } : {}]);
+  const removeRow = (i) => onCommit(rows.filter((_, idx) => idx !== i));
   const setCell = (i, field, text) => {
     const next = rows.map((r, idx) => {
       if (idx !== i) return r;
@@ -524,7 +550,7 @@ function ArrayEditor({ he, editLang, title, rows, fields, onChange }) {
       const cur = r[field] && typeof r[field] === "object" ? r[field] : {};
       return { ...r, [field]: { ...cur, [editLang]: text } };
     });
-    onChange(next);
+    onCommit(next);
   };
   return (
     <Section title={title} right={<Pressable onPress={addRow}><Text style={styles.addRow}>➕</Text></Pressable>}>
