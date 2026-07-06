@@ -310,3 +310,6 @@ Touched: Mobile-App
 
 ## [2026-07-06 12:50] session | Real-number cutover attempt — blocked on business verification
 Touched: WhatsApp Messaging, Tasks Backlog, index
+
+## [2026-07-06 13:20] session | Required Terms consent checkbox on guest PII forms
+Touched: Legal-Terms-and-Consent, index

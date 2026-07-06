@@ -30,6 +30,7 @@ _(ideas, frameworks, patterns, principles — pages that describe a concept)_
 - [[Face Matching]] — AWS Rekognition engine: guest "your photos" (camera-only Face Liveness → matches → ZIP) + OTP-gated "People" gallery; auto-send photos on publish; Cognito pool wired (us-east-1); consent + 30-day auto-purge
 - [[Optimistic UI Pattern]] — recurring bug class from the polling architecture, and its fix convention
 - [[Inline Styling Convention]] — 100% inline styles + `theme.js` tokens, no CSS framework
+- [[Legal Terms and Consent]] — `/terms` page (14 Terms + 5 Privacy sections, Haifa-exclusive jurisdiction) + required consent checkbox above submit on all public PII forms (confirm + manual invite), AR+HE (2026-07-06)
 - [[Visual Design System]] — bespoke design foundation: `theme.js` token scales, the inline-SVG Icon set, hover/press utilities, cold-load splash, favicon; + the 2026-06-20 visual-design refinement pass
 - [[Digit Normalization]] — Western ASCII digits everywhere: `numberingSystem: latn` dates, apiClient input scrubbing, DB migration script
 - [[List Search and Filter]] — reusable SearchBar + FilterChips + `useListFilter` on every portal list (12 lists); substring + phone-aware + hamza-insensitive
