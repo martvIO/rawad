@@ -184,6 +184,48 @@ Grilling session before Google Play / App Store submission. Decisions:
 
 See [[Architecture-Decisions]], [[Digital Invitations]]. Session log 2026-07-05.
 
+## Publish-prep QA execution (2026-07-06)
+
+Full on-device QA on **both** platforms (iOS 26 sim + Android 36 emulator, built
+locally: `expo run:ios`, `expo run:android`). Store hand-off checklist:
+`docs/STORE_SUBMISSION.md`.
+
+**Critical bugs found only by running the app** (unit tests + static review missed
+them because they're runtime/SDK-native):
+
+1. **Native login was impossible** — Hermes has no WebCrypto, so the shared
+   `passwordCrypto` fell back to plaintext, which prod REJECTS
+   (`REQUIRE_ENCRYPTED_PASSWORDS`). No store user could ever have logged in. Fixed
+   with an injectable password-encryptor adapter + a node-forge RSA-OAEP(SHA-256)
+   native impl (byte-compatible with the backend decrypt). Verified `POST /login →
+   200` on both iOS and Android.
+2. **Contacts picker crashed on SDK 56** — `expo-contacts` deprecated the top-level
+   `getContactsAsync` ("will throw in runtime"). The whole "select from contacts"
+   flow errored. Fixed by importing from `expo-contacts/legacy`. Verified E2E on
+   Android: picker opens → 3 contacts load → multi-select → 2 guests persist.
+3. **Contacts dropped Arabic-Indic digit phones** — `toLocalIL` stripped `٠٥٢…`
+   instead of converting. Fixed (`toWesternDigits` first) + regression test.
+   Verified E2E: a contact saved `٠٥٢١٢٣٤٥٦٧` imports as guest `0521234567`.
+
+**API + static sweep** (workflow): every groom endpoint the app calls hit live
+against the emulator — **35/35 pass**; a per-screen static audit surfaced **8
+confirmed bugs**, all fixed: lifecycle status read the wrong field (Manage stuck on
+"active"), no auth-redirect on mid-session token death, design-editor array-row
+auto-persist/poll-reconcile loss, HexField committing backend-invalid colors,
+localized-scalar HE-edit dropping the AR value, contacts first-phone-not-mobile,
+not-a-groom logout dead-end.
+
+**Verified on-device:** login + session stability (no refresh storms), contacts
+full flow, **Android two-step datetime picker** (date→time; time component persists
+— `weddingDate` saved with the hour), guest list/add/search, tab nav + RTL (RTL tab
+order needs one reload on iOS first-launch — RN `forceRTL` limitation, self-heals),
+brand icon/splash. **Gradle note:** local Android build needs Gradle 8.14.x (RN 0.85
++ Gradle 9 `IBM_SEMERU` clash); EAS is unaffected.
+
+**Still owner-gated:** prod smoke on a real test-groom, then `eas build`/`submit`.
+
+See `docs/STORE_SUBMISSION.md`, [[Architecture-Decisions]], [[Authentication]].
+
 ## Roadmap (later)
 
 1. **Push:** FCM + APNs (`expo-notifications`), device-token registry, Cloud

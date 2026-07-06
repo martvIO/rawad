@@ -304,3 +304,6 @@ Touched: none
 
 ## [2026-07-05 10:10] session | Harden generated-password flow (adversarial review fixes)
 Touched: Authentication
+
+## [2026-07-06 10:15] session | Expo publish-prep QA — login/contacts/datetime fixes, both platforms
+Touched: Mobile-App
