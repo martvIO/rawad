@@ -434,6 +434,7 @@ export const ar = {
   conf_form_thanks_title: "شكراً لك!",
   conf_form_thanks_body: "تم استلام بياناتك. سيتم التواصل معكم قريباً لتوصيل المكتوب.",
   conf_form_invalid: "يرجى تعبئة جميع الحقول المطلوبة",
+  consent_required: "يجب الموافقة على الشروط أولاً",
   share_geo_blocked_title: "تحديد الموقع محظور في هذه البيئة",
   share_geo_blocked_body: "بعض المتصفحات أو واجهات المعاينة تمنع الوصول للموقع. استخدم الطرق اليدوية البديلة:",
   share_help_btn: "كيف أحصل على إحداثياتي؟",

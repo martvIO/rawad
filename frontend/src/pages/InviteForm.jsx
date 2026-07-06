@@ -39,6 +39,8 @@ export function InviteForm({ t, lang, setLang }) {
   const [done, setDone] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [consent, setConsent] = useState(false);
+  const [consentErr, setConsentErr] = useState(false);
 
   // Pre-fill name + phone from the token ONCE. subscribeInviteToken polls, so it
   // re-fires repeatedly; the previous `if (!name)` check used a stale closure
@@ -77,7 +79,12 @@ export function InviteForm({ t, lang, setLang }) {
       setError(t("conf_form_invalid"));
       return;
     }
+    if (!consent) {
+      setConsentErr(true);
+      return;
+    }
     setError("");
+    setConsentErr(false);
     setBusy(true);
     try {
       const payload = {
@@ -270,11 +277,16 @@ export function InviteForm({ t, lang, setLang }) {
             <div data-testid="alert-conf-error" style={{ color: C.red, fontSize: 12, marginBottom: 12, textAlign: "center" }}>{error}</div>
           )}
 
+          <ConsentNotice
+            lang={lang}
+            checked={consent}
+            onChange={(v) => { setConsent(v); if (v) setConsentErr(false); }}
+            error={consentErr ? t("consent_required") : ""}
+          />
           <button data-testid="btn-conf-submit" className="gold-btn" style={{ width: "100%" }} onClick={submit}
                   disabled={busy || !name.trim() || !phone.trim() || !city.trim()}>
             {busy ? "…" : t("invite_submit")}
           </button>
-          <ConsentNotice lang={lang} />
         </div>
       </div>
     </div>

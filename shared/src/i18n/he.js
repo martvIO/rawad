@@ -424,6 +424,7 @@ export const he = {
   conf_form_thanks_title: "תודה לך!",
   conf_form_thanks_body: "פרטיך התקבלו. ניצור איתכם קשר בקרוב למסירת ההזמנה.",
   conf_form_invalid: "אנא מלא את כל השדות הנדרשים",
+  consent_required: "יש לאשר את התנאים תחילה",
   share_geo_blocked_title: "המיקום חסום בסביבה זו",
   share_geo_blocked_body: "חלק מהדפדפנים או ממשקי תצוגה חוסמים גישה למיקום. השתמש בשיטות הידניות:",
   share_help_btn: "כיצד מקבלים קואורדינטות?",

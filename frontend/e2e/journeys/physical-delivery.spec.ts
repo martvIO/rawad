@@ -42,6 +42,7 @@ test.describe("Journey — physical delivery", () => {
     await inv.gotoInvite(token);
     await guestPage.getByTestId("field-city").first().fill("Haifa");
     await inv.nameField.click(); // blur the city autocomplete
+    await guestPage.getByTestId("consent-checkbox").check(); // Terms consent is now required
     await expect(inv.submitBtn).toBeEnabled({ timeout: 10_000 });
     await inv.submitBtn.click();
     await expect(inv.thanksTitle).toBeVisible({ timeout: 10_000 });

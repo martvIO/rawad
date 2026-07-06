@@ -46,5 +46,7 @@ export class InvitationPage {
     if (opts.house)  await this.houseField.fill(opts.house);
     // Click outside to trigger CityField's onBlur (closes the suggestion menu)
     await this.nameField.click();
+    // The Terms consent checkbox is now REQUIRED before the form will submit.
+    await this.page.getByTestId("consent-checkbox").check();
   }
 }
