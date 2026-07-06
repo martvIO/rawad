@@ -104,11 +104,20 @@ export default function AddGuest() {
         fields: [Contacts.Fields.Name, Contacts.Fields.PhoneNumbers],
       });
       const rows = [];
+      let i = 0;
       for (const c of data || []) {
-        const num = c.phoneNumbers?.find((p) => p?.number)?.number;
+        // Prefer a mobile-labelled number so a contact whose FIRST number is a
+        // landline isn't dropped when it also has a valid mobile.
+        const nums = c.phoneNumbers || [];
+        const num = (
+          nums.find((p) => /cell|mobile|iphone|جوال|נייד/i.test(p?.label || "")) ||
+          nums.find((p) => p?.number)
+        )?.number;
         const name = (c.name || "").trim();
         if (!num || !name) continue;
-        rows.push({ id: c.id || `${name}-${num}`, name, phone: num });
+        // Index-suffixed fallback id so two label-less contacts sharing a
+        // name+number can't collide into one FlatList key / linked selection.
+        rows.push({ id: c.id || `${name}-${num}-${i++}`, name, phone: num });
       }
       if (!rows.length) {
         toast.show(he ? "לא נמצאו אנשי קשר עם טלפון" : "لا توجد جهات اتصال بأرقام هاتف");

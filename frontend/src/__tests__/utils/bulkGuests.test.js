@@ -16,6 +16,11 @@ describe("toLocalIL", () => {
     expect(toLocalIL("")).toBeNull();
     expect(toLocalIL("05242640941234")).toBeNull();
   });
+  it("converts Arabic-Indic / Persian digits (contacts import in-market)", () => {
+    expect(toLocalIL("٠٥٢٤٢٦٤٠٩٤")).toBe("0524264094"); // Arabic-Indic
+    expect(toLocalIL("۰۵۲۴۲۶۴۰۹۴")).toBe("0524264094"); // Persian
+    expect(toLocalIL("٥٢٤٢٦٤٠٩٤")).toBe("0524264094"); // no leading zero
+  });
 });
 
 describe("parseGuestLines", () => {

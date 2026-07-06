@@ -4,6 +4,7 @@
 // Israeli mobile, normalized to local 0XXXXXXXXX form); the server re-validates
 // and is authoritative. Duplicate phones within the paste (and against the
 // existing list) are flagged so they aren't added twice.
+import { toWesternDigits } from "./digits.js";
 
 /**
  * Normalize a raw phone to the canonical Israeli local form (0 + 9 national
@@ -11,7 +12,9 @@
  * plausible IL mobile number.
  */
 export function toLocalIL(phoneRaw) {
-  let d = String(phoneRaw || "").replace(/[^0-9]/g, "");
+  // Westernize first: Arabic-Indic/Persian digits (٠٥٢…) are the norm in this
+  // market. `[^0-9]` alone STRIPS them → the contact/guest is silently dropped.
+  let d = toWesternDigits(String(phoneRaw || "")).replace(/[^0-9]/g, "");
   if (d.startsWith("972")) d = d.slice(3);
   d = d.replace(/^0+/, "");
   if (d.length !== 9) return null;
