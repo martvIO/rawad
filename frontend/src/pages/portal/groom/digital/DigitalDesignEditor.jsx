@@ -1243,6 +1243,12 @@ export function DesignEditorBody({ groomUid, designId, adminDemoMode = false, on
           <EnvColorRow testid="design-star-color" label={tt(lang, "لون النجوم", "צבע הכוכבים")} value={starOverrides.color} defaultHex="#ffffff" presets={["#ffffff", "#ffe9b0", "#bcd4ff", "#e8b4b8"]} disabled={!editable} onPick={(hex) => setStarField("color", hex)} onReset={() => setStarField("color", null)} />
           <RangeRow testid="design-star-size" label={tt(lang, "حجم النجوم", "גודל הכוכבים")} min={0.4} max={2.5} step={0.1} value={starOverrides.size ?? 1} disabled={!editable} onInput={(v) => bufferStarField("size", v)} onCommit={(v) => commitStarField("size", v)} />
           <RangeRow testid="design-star-opacity" label={tt(lang, "وضوح النجوم", "בהירות הכוכבים")} min={0} max={2} step={0.1} value={starOverrides.opacity ?? 1} disabled={!editable} onInput={(v) => bufferStarField("opacity", v)} onCommit={(v) => commitStarField("opacity", v)} />
+
+          {/* Live example of the background stars — reacts instantly to the colour/
+              size/clarity controls above so the groom/admin sees the result before
+              publishing (mirrors the envelope preview, but with NO envelope so the
+              starfield fills the frame and is clearly visible). */}
+          <StarfieldPreview themeColor={themeColor} starfield={starOverrides} lang={lang} />
         </Section>
 
         {/* Custom background */}
@@ -1613,6 +1619,35 @@ function EnvelopePreview({ themeColor, overrides, content, lang }) {
       <button type="button" data-testid="design-env-play" onClick={play} style={{ position: "absolute", bottom: 10, left: "50%", transform: "translateX(-50%)", zIndex: 2, ...pillBtn(true) }}>
         {tt(lang, "▶ تشغيل الفتح", "▶ הפעלת פתיחה")}
       </button>
+    </div>
+  );
+}
+
+// Dedicated background-STARFIELD preview. Mounts CelestialCanvas with NO envelope
+// so the celestial particle field fills the frame and the groom/admin sees the star
+// colour / size / clarity react live while dragging the controls — an "example
+// before publishing". CelestialCanvas re-skins on a starfield change (uniform-only,
+// no rebuild), so the field updates instantly without remounting the WebGL context.
+function StarfieldPreview({ themeColor, starfield, lang }) {
+  const theme = useMemo(() => getDigitalTheme(themeColor), [themeColor]);
+  return (
+    <div
+      data-testid="design-star-preview"
+      style={{ position: "relative", height: 220, borderRadius: 14, overflow: "hidden", border: "1px solid rgba(201,168,76,.22)", background: theme.bg, marginTop: 14 }}
+    >
+      <Suspense fallback={null}>
+        <CelestialCanvas
+          theme={theme}
+          mode="preview"
+          fixed={false}
+          tier={2}
+          starfield={starfield}
+          elevated={false}
+        />
+      </Suspense>
+      <div style={{ position: "absolute", bottom: 8, insetInlineStart: 0, insetInlineEnd: 0, textAlign: "center", zIndex: 2, pointerEvents: "none", fontSize: 10, letterSpacing: 2, textTransform: "uppercase", color: "rgba(255,255,255,.7)", textShadow: "0 1px 4px rgba(0,0,0,.6)" }}>
+        {tt(lang, "مثال على النجوم", "דוגמת כוכבים")}
+      </div>
     </div>
   );
 }

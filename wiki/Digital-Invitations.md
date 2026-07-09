@@ -396,6 +396,22 @@ clarity/opacity**.
 Deploy: `hosting,functions:api,functions:digitalInvitePreview`. Editor UI itself not browser-verified
 (auth-gated; emulator needs Java 11+). See [[Visual-Design-System]], [[Architecture-Decisions]].
 
+### Follow-up: live starfield preview under the controls (2026-07-09)
+Owner: "when I edit the background stars, show me an example of how it'll look before I publish."
+The star `<Section>` had colour/size/clarity sliders but — unlike the envelope section (`EnvelopePreview`)
+and the background section (`BackgroundPreview`) — **no preview**. Added `StarfieldPreview`
+(`DigitalDesignEditor.jsx`, `testid design-star-preview`): a 220px framed panel that mounts
+`CelestialCanvas` in `mode="preview"` with **no envelope** (so the particle field fills the frame and is
+clearly visible) and `starfield={starOverrides}`. `CelestialCanvas` re-skins on a starfield change
+(uniform-only, no rebuild — [[Architecture-Decisions]]), so the field reacts **live** while dragging.
+Placed once in the shared `DesignEditorBody`, so it shows in **both** the admin demo tab (`AdminDemoTab`)
+and the groom design editor. **Verified in a real browser** via a throwaway dev-only public harness route
+(`/__devstar`, since the editor is auth-gated + MCP was down): the field renders and honours colour/size/
+opacity — `{}`→warm baseline, `{size:2.5,opacity:2,#ffe9b0}`→big bright blobs, `{size:0.4,#66e0ff}`→small
+cyan; live sliders take it from empty (opacity 0) to big bright cyan with no remount. Harness route +
+`_DevStarPreview.jsx` removed after; only `DigitalDesignEditor.jsx` shipped. This closes the earlier
+"editor UI not browser-verified" gap for the star controls.
+
 ## Envelope tap-cue centering fix + 5s auto-open (2026-07-04)
 - **Cue off-center bug:** the sealed overlay's "اضغط لفتح الدعوة" hint reused the `dawa-inv-cue`
   keyframe (`InviteStyles.jsx`), whose frames bake in `translate(-50%, …)` — correct for the
