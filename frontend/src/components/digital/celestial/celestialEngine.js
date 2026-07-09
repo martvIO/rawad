@@ -281,8 +281,12 @@ export function createCelestialWorld(canvas, opts = {}) {
     let tx, ty, tz, lx, ly, lz, fov, clearA, posEase;
 
     if (mode === "scroll") {
-      // Normal scene: scroll flies forward; ambient drift + parallax keep it alive.
-      tz = interactive ? 60 - input.scrollRef.current * 72 : 56 + Math.sin(t * 0.1) * 4;
+      // Normal scene: scroll flies the camera forward through the star slab;
+      // ambient drift + parallax keep it alive. A longer travel (108, was 72)
+      // makes the field visibly stream in as the guest scrolls down — the
+      // "stars entering the screen artistically" motion the owner asked for.
+      // The slab is 170 deep (z 40 → -130), so the camera never runs out of stars.
+      tz = interactive ? 60 - input.scrollRef.current * 108 : 56 + Math.sin(t * 0.1) * 4;
       tx = driftX + px; ty = driftY + py;
       lx = cam.x * 0.25; ly = cam.y * 0.25; lz = cam.z - 45;
       fov = SCENE_FOV; clearA = 0; posEase = 0.06;

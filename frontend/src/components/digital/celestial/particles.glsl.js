@@ -43,12 +43,13 @@ export const VERT = /* glsl */ `
     gl_PointSize = aSize * uSizeScale * uStarSize * (300.0 / max(dist, 1.0));
     gl_Position = projectionMatrix * mv;
 
-    // Screen-space side-weighting for legibility: keep the central ~45% of the
-    // viewport nearly clear (a faint 6% floor — "a little in the central") and
-    // let motes gather toward the left/right edges where there's no text. NDC is
-    // screen-space, so the clear corridor tracks the viewport, not world space.
+    // Screen-space side-weighting for legibility: the central corridor stays
+    // lighter than the edges, but keep a visible floor (18%, was 6%) so the
+    // starfield genuinely reads BEHIND the centered content as the guest scrolls
+    // — not just at the margins. Motes still gather toward the left/right edges.
+    // NDC is screen-space, so the corridor tracks the viewport, not world space.
     vec2 ndc = gl_Position.xy / gl_Position.w;
-    float edge = mix(0.06, 1.0, smoothstep(0.0, 0.62, abs(ndc.x)));
+    float edge = mix(0.18, 1.0, smoothstep(0.0, 0.62, abs(ndc.x)));
     vAlpha *= edge;
   }
 `;
@@ -71,11 +72,13 @@ export const FRAG = /* glsl */ `
     float halo = smoothstep(0.5, 0.12, d);
     vec3 col = mix(uGlow, uCore, core);
 
-    // Dark themes: bright additive core+halo. Light themes: softer halo-only
-    // motes (normal blending is set on the material), kept subtle so they read
-    // as floating dust over the pale background rather than muddy blobs.
+    // Dark themes: bright additive core+halo. Light themes: normal-blended dark
+    // motes — previously a very faint halo-only speck (0.28) that all but
+    // vanished on pale backgrounds. Give it a defined core + stronger halo so the
+    // starfield reads clearly on light designs too (still scaled live by the
+    // groom's uStarOpacity control, so it can be dialled back down).
     float a = uIsLight > 0.5
-      ? halo * 0.28 * vAlpha * vTwinkle
+      ? (core * 0.42 + halo * 0.5) * vAlpha * vTwinkle
       : (core * 0.9 + halo * 0.4) * vAlpha * vTwinkle;
 
     gl_FragColor = vec4(col, a * uStarOpacity);

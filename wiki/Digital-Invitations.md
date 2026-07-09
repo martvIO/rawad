@@ -412,6 +412,35 @@ cyan; live sliders take it from empty (opacity 0) to big bright cyan with no rem
 `_DevStarPreview.jsx` removed after; only `DigitalDesignEditor.jsx` shipped. This closes the earlier
 "editor UI not browser-verified" gap for the star controls.
 
+## Envelope no-flash + visible scrolling starfield (2026-07-09)
+Two owner reports on the public digital invitation.
+
+**Bug — the sealed مكتوب flashed a different design for ~1s.** On the demo, first paint used the
+built-in fallback design, then `getDemoDesignPublic()` swapped in the admin's design a beat later →
+`CelestialCanvas`'s envKey-keyed `rebuildEnvelope` re-baked the sealed envelope (seal colour pale→brown,
+pattern + star density changed — verified via Playwright at 150ms vs 1200ms). Fix (`DigitalInvitationPage.jsx`):
+the demo now starts with `doc = null` and holds a brief loader until `getDemoDesignPublic()` resolves
+(admin design, else the built-in fallback), so the envelope builds **once** with the final design — no
+swap, no re-bake. Real invites already seed `doc` from the embedded `__DAWA_INVITE__` snapshot, so they
+never flashed; the real-invite effect now also resolves `doc` to `{}` as a last resort so the new loader
+gate can never hang. **Verified**: envelope identical at 1.6s vs 3.2s (only ambient star drift differs).
+
+**Feature — make the 3D starfield clearly visible behind the content while scrolling, "entering
+artistically", tunable via the star controls.** The field already rendered + persisted (fixed canvas,
+z 0, behind content), but on LIGHT themes it was near-invisible and the scroll motion was gentle. Owner
+picked: brighter on ALL themes + stronger artistic scroll motion. Changes:
+- **`particles.glsl.js` (FRAG):** light-theme mote alpha `halo*0.28` (faint halo-only) → `core*0.42 + halo*0.5`
+  — defined, clearly-visible motes on pale backgrounds. Still normal-blended, still scaled live by the
+  groom's `uStarOpacity` control (can be dialled back).
+- **`particles.glsl.js` (VERT):** central-corridor legibility floor `mix(0.06,…)` → `mix(0.18,…)` so the
+  starfield genuinely reads BEHIND the centered content, not only at the margins.
+- **`celestialEngine.js`:** scroll camera travel `60 - scroll*72` → `*108` so the field streams past more
+  as the guest scrolls (the slab is 170 deep, so it never runs out of stars).
+All three ride the shared engine/shader, so they apply to every public invitation AND the editor previews
+(groom + admin demo + the new `StarfieldPreview`). **Verified** (headless Playwright, dev server, light
+ivory demo): stars distinctly visible across the scroll incl. behind content; hero/card text stays legible.
+Deploy: `hosting,functions:digitalInvitePreview`. See [[Visual-Design-System]], [[Architecture-Decisions]].
+
 ## Envelope tap-cue centering fix + 5s auto-open (2026-07-04)
 - **Cue off-center bug:** the sealed overlay's "اضغط لفتح الدعوة" hint reused the `dawa-inv-cue`
   keyframe (`InviteStyles.jsx`), whose frames bake in `translate(-50%, …)` — correct for the

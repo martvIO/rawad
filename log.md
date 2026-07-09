@@ -319,3 +319,6 @@ Touched: Digital-Invitations
 
 ## [2026-07-09 15:10] session | Live starfield preview in design editor (admin + groom)
 Touched: Digital-Invitations
+
+## [2026-07-09 16:40] session | Envelope no-flash + visible scrolling starfield
+Touched: Digital-Invitations

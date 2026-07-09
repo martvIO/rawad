@@ -138,26 +138,30 @@ function DigitalLandingMain({ t, lang, setLang }) {
     // below still refreshes it (and adds boardingPassEnabled/eventStatus).
     return readEmbeddedInvite(token) ?? undefined;
   });
-  // Demo first paint = the built-in fallback (instant, never blank); an effect
-  // below swaps in the admin-published demo design if one exists. For a real
-  // invite, seed from the embedded designSnapshot so the invitation + envelope
-  // render fully themed on first paint (no default-theme flash).
+  // Demo: start with NO design and hold a brief loader until the real demo
+  // design (the admin-published one, else the built-in fallback) is fetched —
+  // then the envelope builds ONCE with the final design. This removes the old
+  // fallback→admin swap that re-baked the sealed مكتوب a second after opening
+  // (the guest used to see a different envelope for ~1s). For a real invite,
+  // seed from the embedded designSnapshot so the invitation + envelope render
+  // fully themed on first paint (no default-theme flash, no re-bake).
   const [doc, setDoc] = useState(() => {
-    if (isDemo) return applyDemoOverrides(buildDemoFallbackDoc(), search);
+    if (isDemo) return null;
     return readEmbeddedInvite(token)?.designSnapshot ?? null;
   });
   const [done, setDone] = useState(false);
   const [approvedWishes, setApprovedWishes] = useState([]);
   const pingedRef = useRef(false);
 
-  // Demo: swap in the admin-published demo design if one exists; otherwise keep
-  // the built-in fallback already set above. Query overrides layer on top.
+  // Demo: fetch the design ONCE (admin-published if it exists, else the built-in
+  // fallback), then set it so the envelope builds a single time — no swap, no
+  // re-bake flash. Query overrides layer on top.
   useEffect(() => {
     if (!isDemo) return undefined;
     let active = true;
-    getDemoDesignPublic().then((snap) => {
-      if (active && snap) setDoc(applyDemoOverrides(snap, search));
-    });
+    getDemoDesignPublic()
+      .then((snap) => { if (active) setDoc(applyDemoOverrides(snap || buildDemoFallbackDoc(), search)); })
+      .catch(() => { if (active) setDoc(applyDemoOverrides(buildDemoFallbackDoc(), search)); });
     return () => { active = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isDemo]);
@@ -202,11 +206,13 @@ function DigitalLandingMain({ t, lang, setLang }) {
       return;
     }
     const groomUid = tokenRec.groomUid;
-    if (!groomUid) return;
+    // Last resort → an empty design ({}) renders the default-themed invitation.
+    // This guarantees `doc` always resolves so the loader gate can never hang.
+    if (!groomUid) { setDoc({}); return; }
     let active = true;
-    getDigitalInvitationPublic(groomUid).then((d) => {
-      if (active) setDoc(d);
-    });
+    getDigitalInvitationPublic(groomUid)
+      .then((d) => { if (active) setDoc(d || {}); })
+      .catch(() => { if (active) setDoc({}); });
     return () => {
       active = false;
     };
@@ -257,6 +263,10 @@ function DigitalLandingMain({ t, lang, setLang }) {
       </CenteredMessage>
     );
   }
+  // Hold a brief loader until the design is resolved, so the 3D envelope is built
+  // ONCE with the final design — never with a provisional one that re-bakes a
+  // beat later (the "different مكتوب for a second" flash).
+  if (!doc) return <LoadingScreen lang={lang} />;
 
   return (
     <DigitalInvitationView
