@@ -313,3 +313,6 @@ Touched: WhatsApp Messaging, Tasks Backlog, index
 
 ## [2026-07-06 13:20] session | Required Terms consent checkbox on guest PII forms
 Touched: Legal-Terms-and-Consent, index
+
+## [2026-07-09 14:05] session | صورك nav label always visible on digital invitation
+Touched: Digital-Invitations

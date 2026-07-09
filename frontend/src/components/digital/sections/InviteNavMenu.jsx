@@ -2,11 +2,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 // Section navigator for the digital invitation. An always-open vertical stack of
 // icon-only circular buttons pinned to the top inline-start (the right edge in
-// RTL). صورك sits on top with a bolder accent ring; the enabled sections follow,
-// each a transparent circle with a faint ring. The name of a circle is hidden by
-// default and revealed — as a frosted pill to its inner (left in RTL) side — only
-// when that circle is hovered / pressed / focused, or when its section is the one
-// currently in view (scroll-spy). No background fill on the circles themselves.
+// RTL). صورك sits on top with a bolder accent ring and its name pill ALWAYS
+// showing (guests shouldn't have to tap it to see the word). The enabled section
+// circles follow, each a transparent circle with a faint ring; a section's name
+// is hidden by default and revealed — as a frosted pill to its inner (left in
+// RTL) side — only when that circle is hovered / pressed / focused, or when its
+// section is the one currently in view (scroll-spy). No background fill on the
+// circles themselves.
 //
 // z-index stays below the envelope overlay (1000), so during the opening
 // 3D-envelope animation the column is hidden behind it and never fights the
@@ -111,7 +113,10 @@ export function InviteNavMenu({ items, theme, font, lang, fixed = true, sorek = 
   const renderCircle = ({ id, icon, label, onClick, isSorek = false }) => {
     const isActive = id === active;
     const isHover = id === hovered;                         // hover OR armed
-    const show = isActive || isHover;                       // reveal this name?
+    // صورك's name stays visible at all times — the guest shouldn't have to
+    // hover/tap to see it. Every other section circle keeps the reveal-on-
+    // demand behaviour (shown only while active or hovered).
+    const show = isSorek || isActive || isHover;            // reveal this name?
     const ring = isSorek || isActive || isHover ? theme.accent : theme.accentLine;
     const exempt = isExempt(id, isSorek);
 

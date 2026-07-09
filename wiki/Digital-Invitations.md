@@ -194,6 +194,20 @@ are **hidden by default**, revealed as a floating pill only when relevant.
   unit tests are **pre-existing** (tokenManager/storage/forgotPassword/groomPortal — confirmed failing
   at HEAD with all changes stashed), unrelated to this presentational change.
 
+### Follow-up: صورك name is always visible (2026-07-09)
+Owner request: guests shouldn't have to tap/hover the صورك circle to see its word — the
+label should stay visible at all times. **One-line, scoped change** in `InviteNavMenu.jsx`:
+the pill-visibility flag became `const show = isSorek || isActive || isHover` (was
+`isActive || isHover`). Only the صورك circle (`isSorek: true`) is forced always-on; every
+section circle keeps the reveal-on-demand behaviour (name shown only while active or
+hovered). No schema/rules/data change; purely presentational. Because the same
+`InviteNavMenu` renders under both `mode="public"` (the real sent-to-guests invitation)
+and `mode="preview"` (the النموذجية sample / groom editor / admin demo), the single change
+covers all of them. **Verified live** (headless Playwright on `\d\demo\demo?demo=1`, MCP was
+down so a standalone script was used): صورك label `opacity:1` at rest; القصة/الصور/التفاصيل/
+المكان/العدّ/تأكيد/التهاني all `opacity:0` at rest (الأعلى shows only because it's the active
+section at page-top — unchanged scroll-spy behaviour). Deployed (hosting + `digitalInvitePreview`).
+
 See [[Visual-Design-System]], [[Architecture-Decisions]].
 
 ## Couple-name connective → "&" across all surfaces (2026-07-03)
