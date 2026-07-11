@@ -35,6 +35,11 @@ function normalizeUser(u) {
     displayName: u.displayName ?? null,
     phoneE164: u.phoneE164 ?? null,
     mustChangePassword: u.mustChangePassword === true,
+    // First-sign-in onboarding (couple bride/groom names) — gates index.jsx/login.
+    onboardedAt: u.onboardedAt ?? null,
+    brideName: u.brideName ?? null,
+    groomName: u.groomName ?? null,
+    weddingDate: u.weddingDate ?? null,
     // Feature flags (default ON when the server omits them), matching the web
     // auth service. Dashboard stats + the Guests status-badge lock gate on these.
     canSeeAttendance: u.canSeeAttendance !== false,

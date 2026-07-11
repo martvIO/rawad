@@ -43,6 +43,13 @@
         // first-login password-change flag (cleared on change). See payments.ts.
         "paymentPackageId":   { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 64)" },
         "mustChangePassword": { ".validate": "!newData.exists() || newData.isBoolean()" },
+        // First-sign-in onboarding: the couple's bride/groom names + wedding date
+        // (written by POST /auth/onboarding via Admin SDK) and the onboarding-done
+        // flag that clears the onboarding gate. Seed the first digital design.
+        "brideName":   { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 120)" },
+        "groomName":   { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 120)" },
+        "weddingDate": { ".validate": "!newData.exists() || newData.isNumber()" },
+        "onboardedAt": { ".validate": "!newData.exists() || newData.isNumber()" },
         "lifecycleStatus":   { ".validate": "!newData.exists() || newData.val() === 'active' || newData.val() === 'cancel_pending' || newData.val() === 'cancelled' || newData.val() === 'paused'" },
         "cancelRequestedAt": { ".validate": "!newData.exists() || newData.isNumber()" },
         "cancelGraceEndsAt": { ".validate": "!newData.exists() || newData.isNumber()" },

@@ -48,6 +48,11 @@ export function usePortalAuth({ t, lang, navigate }) {
   // Forced first-login password change (auto-provisioned groom). Drives the gate
   // in PortalRouter that blocks every role dashboard until the password changes.
   const mustChangePassword = authUser?.mustChangePassword === true;
+  // First-sign-in onboarding (couple bride/groom names). Groom-only; the gate in
+  // PortalRouter shows the OnboardingScreen until the account carries onboardedAt.
+  // markOnboarded flips it optimistically on submit so the gate clears at once.
+  const needsOnboarding = userType === "groom" && !authUser?.onboardedAt;
+  const markOnboarded = () => setAuthUser((u) => (u ? { ...u, onboardedAt: Date.now() } : u));
 
   // ── Login form (transient) ──────────────────────────────────────────────────
   const [loginUser, setLoginUser] = useState("");
@@ -112,6 +117,7 @@ export function usePortalAuth({ t, lang, navigate }) {
     authUser,
     authed, authReady, userType, currentUid, currentUsername, isAdmin,
     canSeeAttendance, canUsePhotographer, canUseBoardingPass, mustChangePassword,
+    needsOnboarding, markOnboarded,
     loginUser, setLoginUser, loginPass, setLoginPass,
     loginError, setLoginError, loginLoading,
     handleLogin,

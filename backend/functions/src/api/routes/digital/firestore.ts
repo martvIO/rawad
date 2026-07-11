@@ -4,6 +4,7 @@ import {
   DocumentReference,
   Firestore,
 } from "firebase-admin/firestore";
+import { getDatabase } from "firebase-admin/database";
 import { AuthRequest } from "../../middleware/auth";
 import { COLL_ROOT,COLL_GUESTS,COLL_PHOTOG,COLL_DESIGNS,SCHEMA_VERSION,PARENT_ONLY_KEYS,DEMO_UID,DEMO_DESIGN_ID,DEMO_CONFIG_DOC } from "./constants";
 import { projectMediaDoc } from "./project";
@@ -79,6 +80,26 @@ async function ensureMigrated(uid: string): Promise<string> {
     if (designPayload.createdAt == null) designPayload.createdAt = Date.now();
     if (designPayload.designStatus == null) designPayload.designStatus = "draft";
     if (designPayload.designVersion == null) designPayload.designVersion = 1;
+
+    // Seed a brand-new first design from the groom's first-sign-in onboarding
+    // profile (account-level couple names + wedding date), so the editor's
+    // essentials open pre-filled. Best-effort — never block design creation. The
+    // localized name fields carry the same value in both languages (edited later).
+    try {
+      const uSnap = await getDatabase().ref(`users/${uid}`).get();
+      const u = uSnap.exists() ? (uSnap.val() as Record<string, unknown>) : null;
+      if (u) {
+        if (designPayload.groomDisplayName == null && typeof u.groomName === "string" && u.groomName) {
+          designPayload.groomDisplayName = { ar: u.groomName, he: u.groomName };
+        }
+        if (designPayload.brideName == null && typeof u.brideName === "string" && u.brideName) {
+          designPayload.brideName = { ar: u.brideName, he: u.brideName };
+        }
+        if (designPayload.weddingDate == null && typeof u.weddingDate === "number") {
+          designPayload.weddingDate = u.weddingDate;
+        }
+      }
+    } catch { /* seeding is best-effort */ }
 
     tx.set(designRef, designPayload);
     tx.set(pRef, { schemaVersion: SCHEMA_VERSION, defaultDesignId, designCount: 1 }, { merge: true });

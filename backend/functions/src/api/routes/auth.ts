@@ -254,6 +254,12 @@ authRouter.post(
       // Drives the forced first-login password-change gate (Portal.jsx). Included
       // on login so the gate triggers without waiting for the first /auth/me poll.
       mustChangePassword: profile?.mustChangePassword === true,
+      // First-sign-in onboarding gate (couple bride/groom names). onboardedAt unset
+      // → the groom sees the onboarding screen before the portal.
+      onboardedAt: profile?.onboardedAt ?? null,
+      brideName: profile?.brideName ?? null,
+      groomName: profile?.groomName ?? null,
+      weddingDate: profile?.weddingDate ?? null,
     });
   }
 );
@@ -350,8 +356,56 @@ authRouter.get("/me", requireAuth, async (req: AuthRequest, res: Response) => {
     canUsePhotographer: profile?.canUsePhotographer !== false,
     canUseBoardingPass: profile?.canUseBoardingPass === true,
     mustChangePassword: profile?.mustChangePassword === true,
+    onboardedAt: profile?.onboardedAt ?? null,
+    brideName: profile?.brideName ?? null,
+    groomName: profile?.groomName ?? null,
+    weddingDate: profile?.weddingDate ?? null,
     claims,
   });
+});
+
+// ─── POST /auth/onboarding ────────────────────────────────────────────────────
+
+/**
+ * First-sign-in onboarding for a groom (the couple): capture the bride & groom
+ * names (and optional wedding date) into the account record so the digital-
+ * invitation editor can pre-seed the first design. Self-service — the groom writes
+ * their own profile via the Admin SDK (client writes to /users are admin-only).
+ * Setting `onboardedAt` clears the onboarding gate (Portal.jsx / app index.jsx).
+ *
+ * Body:    `{ brideName: string, groomName: string, weddingDate?: number }`
+ * Returns: `{ ok: true, onboardedAt }`
+ */
+authRouter.post("/onboarding", requireAuth, async (req: AuthRequest, res: Response) => {
+  const uid = req.caller!.uid;
+  if (req.caller!.claims.role !== "groom") {
+    res.status(403).json({ error: "groom_only" });
+    return;
+  }
+  const body = (req.body ?? {}) as Record<string, unknown>;
+  const clean = (v: unknown) => (typeof v === "string" ? v.trim().slice(0, 120) : "");
+  const brideName = clean(body.brideName);
+  const groomName = clean(body.groomName);
+  if (!brideName || !groomName) {
+    res.status(400).json({ error: "names_required" });
+    return;
+  }
+  const weddingDate =
+    typeof body.weddingDate === "number" && Number.isFinite(body.weddingDate) ? body.weddingDate : null;
+  const onboardedAt = Date.now();
+  try {
+    const patch: Record<string, unknown> = {
+      [`users/${uid}/brideName`]: brideName,
+      [`users/${uid}/groomName`]: groomName,
+      [`users/${uid}/onboardedAt`]: onboardedAt,
+    };
+    if (weddingDate != null) patch[`users/${uid}/weddingDate`] = weddingDate;
+    await getDatabase().ref().update(patch);
+    await writeAudit(uid, "onboarding", { via: "self" });
+    res.json({ ok: true, onboardedAt });
+  } catch (err) {
+    res.status(500).json({ error: "onboarding_failed", detail: errorMessage(err) });
+  }
 });
 
 // ─── POST /auth/send-otp ──────────────────────────────────────────────────────
@@ -723,6 +777,11 @@ interface UserProfile {
   canUsePhotographer?: boolean;
   canUseBoardingPass?: boolean;
   mustChangePassword?: boolean;
+  // First-sign-in onboarding (POST /auth/onboarding).
+  brideName?: string;
+  groomName?: string;
+  weddingDate?: number;
+  onboardedAt?: number;
 }
 
 /**

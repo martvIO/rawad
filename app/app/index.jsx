@@ -17,6 +17,7 @@ export default function Index() {
   if (!user) return <Redirect href="/login" />;
   if (user.mustChangePassword) return <Redirect href="/change-password" />;
   if (user.role !== "groom") return <Redirect href="/not-a-groom" />;
+  if (!user.onboardedAt) return <Redirect href="/onboarding" />;
   return <Redirect href="/dashboard" />;
 }
 

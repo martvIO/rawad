@@ -2,7 +2,7 @@
 // the luxury invitation — text, dates, photos, story timeline, details, venue,
 // guestbook, RSVP options — sees a live preview, then submits for admin
 // approval. Section toggles let the groom hide any part of the design.
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { usePortal } from "../../../../context/PortalContext.jsx";
 import { localizeApiError } from "../../../../utils/apiError.js";
 import {
@@ -49,8 +49,33 @@ import {
   TOGGLE_KEYS,
   DESIGN_STATUS_META,
 } from "@dawa/core/data/digitalDesignSchema.js";
+import {
+  WIZARD_STEP_IDS,
+  WIZARD_STEPS,
+  stepTitle,
+  stepSubtitle,
+} from "@dawa/core/data/digitalDesignSteps.js";
+import { ProgressBar } from "../../../../components/ProgressBar.jsx";
+import { OnboardingChecklist } from "../../../../components/OnboardingChecklist.jsx";
 
 const tt = (lang, ar, he) => (lang === "he" ? he : ar);
+
+// Which content steps show the shared "content" chrome (edit-language toggle +
+// fill-sample). Style/advanced/review don't edit localized text, so they hide it.
+const CONTENT_STEP_IDS = ["essentials", "venue", "story", "rsvp"];
+
+// The active wizard step + view, shared with every <Section> so a section can
+// hide itself when the wizard isn't on its step (view "full" shows them all).
+const WizardCtx = createContext({ view: "full", activeStep: null });
+
+// Renders its children only when the wizard is on this step — or always, when the
+// groom has switched to the full-editor ("all sections at once") escape hatch.
+// Because the buffered field state lives in the parent, unmounting a step's
+// sections never loses edits, and autosave already fired on blur.
+function StepGroup({ id, activeStep, view, children }) {
+  if (view === "full") return children;
+  return id === activeStep ? children : null;
+}
 
 // ── Bilingual field helpers ───────────────────────────────────────────────
 // A localized text field is stored as { ar, he }. The editor edits one language
@@ -254,6 +279,24 @@ export function DesignEditorBody({ groomUid, designId, adminDemoMode = false, on
   // An APPROVED design is read-only until the groom presses "تعديل التصميم".
   // Reset per design so a fresh/approved design always starts locked.
   const [editUnlocked, setEditUnlocked] = useState(false);
+  // Guided wizard: "wizard" shows one step-card at a time (default for grooms);
+  // "full" is the escape hatch that shows every section at once (today's layout,
+  // and the default in admin demo mode). Persisted so a groom's choice sticks.
+  const [view, setView] = useState(() => {
+    if (adminDemoMode) return "full";
+    try { return localStorage.getItem("dawa_design_view") === "full" ? "full" : "wizard"; } catch { return "wizard"; }
+  });
+  const [stepIdx, setStepIdx] = useState(0);
+  const activeStep = WIZARD_STEP_IDS[stepIdx] || "essentials";
+  const setDesignView = (next) => {
+    setView(next);
+    try { localStorage.setItem("dawa_design_view", next); } catch { /* ignore */ }
+  };
+  const gotoStep = (idx) => {
+    const clamped = Math.max(0, Math.min(WIZARD_STEP_IDS.length - 1, idx));
+    setStepIdx(clamped);
+    try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch { /* ignore */ }
+  };
   const fileInputRef = useRef(null);
   const heroFileInputRef = useRef(null);
   const bgFileInputRef = useRef(null);
@@ -731,6 +774,15 @@ export function DesignEditorBody({ groomUid, designId, adminDemoMode = false, on
     onBlur: () => flush(key, typeof f[key] === "string" ? f[key].trim() : f[key]),
   });
 
+  // Wizard chrome visibility: the edit-language toggle + fill-sample belong to the
+  // content steps only (essentials/venue/story/rsvp); the full editor shows them.
+  const wizard = view === "wizard" && !adminDemoMode;
+  const showContentChrome = !wizard || CONTENT_STEP_IDS.includes(activeStep);
+  // Completeness signals surfaced on the Review step.
+  const doneNames = hasContent(f.brideName) && hasContent(f.groomDisplayName);
+  const doneDate = !!inputToEpoch(f.weddingDate);
+  const donePhoto = heroMedia.length > 0 || media.length > 0;
+
   return (
     <div style={{ animation: "fadeUp .3s ease" }}>
       {/* ── Title ──────────────────────────────────────────────────────────── */}
@@ -815,22 +867,25 @@ export function DesignEditorBody({ groomUid, designId, adminDemoMode = false, on
         );
       })()}
 
-      <button
-        data-testid="design-fill-sample"
-        onClick={fillSample}
-        disabled={!editable || busy}
-        style={{
-          width: "100%", padding: "10px 0", borderRadius: 10, marginBottom: 16,
-          background: "rgba(201,168,76,.08)", border: "1px dashed rgba(201,168,76,.4)",
-          color: C.gold, fontSize: 12, fontWeight: 800, cursor: editable && !busy ? "pointer" : "not-allowed",
-          fontFamily: "inherit",
-        }}
-      >
-        ✨ {tt(lang, "تعبئة الأقسام الفارغة بمحتوى نموذجي", "מלא חלקים ריקים בתוכן לדוגמה")}
-      </button>
+      {showContentChrome && (
+        <button
+          data-testid="design-fill-sample"
+          onClick={fillSample}
+          disabled={!editable || busy}
+          style={{
+            width: "100%", padding: "10px 0", borderRadius: 10, marginBottom: 16,
+            background: "rgba(201,168,76,.08)", border: "1px dashed rgba(201,168,76,.4)",
+            color: C.gold, fontSize: 12, fontWeight: 800, cursor: editable && !busy ? "pointer" : "not-allowed",
+            fontFamily: "inherit",
+          }}
+        >
+          ✨ {tt(lang, "تعبئة الأقسام الفارغة بمحتوى نموذجي", "מלא חלקים ריקים בתוכן לדוגמה")}
+        </button>
+      )}
 
       {/* Bilingual content tab — each text field below is saved per language, and
           the guest can toggle between them on the invitation. Fill both. */}
+      {showContentChrome && (
       <div style={{ marginBottom: 16 }}>
         <div style={{ fontSize: 11, color: C.dim, marginBottom: 6, fontWeight: 700 }}>
           {tt(lang, "لغة محتوى الدعوة — يُفضّل تعبئة النصّين (يبدّل الضيف بينهما)", "שפת תוכן ההזמנה — מלא את שני הטקסטים (האורח מחליף ביניהם)")}
@@ -857,15 +912,49 @@ export function DesignEditorBody({ groomUid, designId, adminDemoMode = false, on
           ))}
         </div>
       </div>
+      )}
 
+      {/* ── Guided-wizard chrome: progress + step title + full-editor escape ──── */}
+      {!adminDemoMode && (
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <div style={{ fontSize: 12, color: C.goldDim, fontWeight: 800 }}>
+              {wizard
+                ? tt(lang, `الخطوة ${stepIdx + 1} من ${WIZARD_STEP_IDS.length}`, `שלב ${stepIdx + 1} מתוך ${WIZARD_STEP_IDS.length}`)
+                : tt(lang, "المحرر الكامل — كل الأقسام", "עורך מלא — כל החלקים")}
+            </div>
+            <button
+              type="button"
+              data-testid="design-view-toggle"
+              onClick={() => setDesignView(wizard ? "full" : "wizard")}
+              style={{ ...pillBtn(true), fontSize: 11 }}
+            >
+              {wizard ? tt(lang, "🎛 المحرر الكامل", "🎛 עורך מלא") : tt(lang, "✨ الوضع الموجّه", "✨ מצב מודרך")}
+            </button>
+          </div>
+          {wizard && (
+            <div style={{ marginTop: 10 }}>
+              <ProgressBar value={stepIdx + 1} total={WIZARD_STEP_IDS.length} color={C.gold} />
+              <div style={{ marginTop: 6 }}>
+                <div style={{ fontSize: 18, fontWeight: 900, color: C.gold, fontFamily: "'Amiri','Frank Ruhl Libre',serif" }}>
+                  {WIZARD_STEPS[stepIdx]?.icon} {stepTitle(activeStep, lang)}
+                </div>
+                <div style={{ fontSize: 12, color: C.dim, marginTop: 2 }}>{stepSubtitle(activeStep, lang)}</div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      <WizardCtx.Provider value={{ view, activeStep }}>
       <div style={{ display: "grid", gridTemplateColumns: "minmax(280px, 1fr)", gap: 16 }}>
         {/* Names */}
-        <Section title={tt(lang, "أسماء العروسين", "שמות הזוג")}>
+        <Section step="essentials" title={tt(lang, "أسماء العروسين", "שמות הזוג")}>
           <FormField label={tt(lang, "اسم العريس *", "שם החתן *")}>
-            <input data-testid="design-groom-name" type="text" {...textProps("groomDisplayName", 120)} />
+            <input data-testid="design-groom-name" type="text" {...textProps("groomDisplayName", 120)} placeholder={tt(editLang, "مثال: أحمد", "למשל: אחמד")} />
           </FormField>
           <FormField label={tt(lang, "اسم العروس *", "שם הכלה *")}>
-            <input data-testid="design-bride-name" type="text" {...textProps("brideName", 120)} />
+            <input data-testid="design-bride-name" type="text" {...textProps("brideName", 120)} placeholder={tt(editLang, "مثال: سارة", "למשל: שרה")} />
           </FormField>
           <FormField label={tt(lang, "الحرفان في الشعار (مثل: ك&ل) — اتركه فارغاً للاشتقاق التلقائي", "מונוגרמה (למשל: כ&ל) — ריק = אוטומטי")}>
             <input data-testid="design-monogram" type="text" {...textProps("monogram", 12)} />
@@ -883,7 +972,7 @@ export function DesignEditorBody({ groomUid, designId, adminDemoMode = false, on
 
         {/* WhatsApp share-link description (og:description) — NOT shown on the
             invitation page itself, only in the WhatsApp link preview. */}
-        <Section title={tt(lang, "وصف الرابط على واتساب", "תיאור הקישור בוואטסאפ")}>
+        <Section step="rsvp" title={tt(lang, "وصف الرابط على واتساب", "תיאור הקישור בוואטסאפ")}>
           <div style={{ fontSize: 11, color: C.dim, marginBottom: 12, lineHeight: 1.6 }}>
             {tt(
               lang,
@@ -904,6 +993,7 @@ export function DesignEditorBody({ groomUid, designId, adminDemoMode = false, on
 
         {/* Featured media under the greeting */}
         <Section
+          step="essentials"
           title={tt(lang, "صور تحت الترحيب (وسائط مميزة)", "מדיה מתחת לברכה")}
           toggle={{ enabled: tog("heroMediaEnabled"), onChange: (c) => toggle("heroMediaEnabled", c), disabled: !editable, testid: "design-toggle-hero-media" }}
         >
@@ -947,7 +1037,7 @@ export function DesignEditorBody({ groomUid, designId, adminDemoMode = false, on
         </Section>
 
         {/* Wedding date + time */}
-        <Section title={tt(lang, "تاريخ الزفاف ووقته", "תאריך ושעת החתונה")}>
+        <Section step="essentials" title={tt(lang, "تاريخ الزفاف ووقته", "תאריך ושעת החתונה")}>
           <FormField label={tt(lang, "اختر اليوم والساعة", "בחר יום ושעה")}>
             <input
               data-testid="design-wedding-date"
@@ -971,6 +1061,7 @@ export function DesignEditorBody({ groomUid, designId, adminDemoMode = false, on
 
         {/* Story timeline */}
         <Section
+          step="story"
           title={tt(lang, "قصتنا (الخط الزمني)", "הסיפור שלנו (ציר זמן)")}
           toggle={{ enabled: tog("storyEnabled"), onChange: (c) => toggle("storyEnabled", c), disabled: !editable, testid: "design-toggle-story" }}
         >
@@ -995,6 +1086,7 @@ export function DesignEditorBody({ groomUid, designId, adminDemoMode = false, on
 
         {/* Gallery / photos */}
         <Section
+          step="story"
           title={tt(lang, "ألبوم الصور", "אלבום תמונות")}
           toggle={{ enabled: tog("galleryEnabled"), onChange: (c) => toggle("galleryEnabled", c), disabled: !editable, testid: "design-toggle-gallery" }}
         >
@@ -1043,6 +1135,7 @@ export function DesignEditorBody({ groomUid, designId, adminDemoMode = false, on
 
         {/* Details cards */}
         <Section
+          step="venue"
           title={tt(lang, "تفاصيل اليوم", "פרטי היום")}
           toggle={{ enabled: tog("detailsEnabled"), onChange: (c) => toggle("detailsEnabled", c), disabled: !editable, testid: "design-toggle-details" }}
         >
@@ -1067,6 +1160,7 @@ export function DesignEditorBody({ groomUid, designId, adminDemoMode = false, on
 
         {/* Venue */}
         <Section
+          step="venue"
           title={tt(lang, "مكان الحفل", "מקום האירוע")}
           toggle={{ enabled: tog("venueEnabled"), onChange: (c) => toggle("venueEnabled", c), disabled: !editable, testid: "design-toggle-venue" }}
         >
@@ -1103,6 +1197,7 @@ export function DesignEditorBody({ groomUid, designId, adminDemoMode = false, on
 
         {/* Countdown */}
         <Section
+          step="venue"
           title={tt(lang, "العد التنازلي", "ספירה לאחור")}
           toggle={{ enabled: tog("countdownEnabled"), onChange: (c) => toggle("countdownEnabled", c), disabled: !editable, testid: "design-toggle-countdown" }}
         >
@@ -1112,7 +1207,7 @@ export function DesignEditorBody({ groomUid, designId, adminDemoMode = false, on
         </Section>
 
         {/* RSVP options */}
-        <Section title={tt(lang, "خيارات تأكيد الحضور", "אפשרויות אישור הגעה")}>
+        <Section step="rsvp" title={tt(lang, "خيارات تأكيد الحضور", "אפשרויות אישור הגעה")}>
           <ToggleRow label={tt(lang, "عدّاد عدد الحضور (شاملاً المدعو)", "מונה מספר אורחים (כולל המוזמן)")} checked={tog("rsvpCompanionsEnabled")} disabled={!editable} testid="design-toggle-companions" onChange={(c) => toggle("rsvpCompanionsEnabled", c)} />
           <ToggleRow label={tt(lang, "تفضيل الطعام", "העדפת מנה")} checked={tog("rsvpMealEnabled")} disabled={!editable} testid="design-toggle-meal" onChange={(c) => toggle("rsvpMealEnabled", c)} />
           <ToggleRow label={tt(lang, "طلب أغنية", "בקשת שיר")} checked={tog("rsvpSongEnabled")} disabled={!editable} testid="design-toggle-song" onChange={(c) => toggle("rsvpSongEnabled", c)} />
@@ -1138,6 +1233,7 @@ export function DesignEditorBody({ groomUid, designId, adminDemoMode = false, on
 
         {/* Guestbook */}
         <Section
+          step="rsvp"
           title={tt(lang, "دفتر التهاني", "ספר ברכות")}
           toggle={{ enabled: tog("guestbookEnabled"), onChange: (c) => toggle("guestbookEnabled", c), disabled: !editable, testid: "design-toggle-guestbook" }}
         >
@@ -1163,6 +1259,7 @@ export function DesignEditorBody({ groomUid, designId, adminDemoMode = false, on
 
         {/* Gift */}
         <Section
+          step="rsvp"
           title={tt(lang, "هدية", "מתנה")}
           toggle={{ enabled: tog("giftEnabled"), onChange: (c) => toggle("giftEnabled", c), disabled: !editable, testid: "design-toggle-gift" }}
         >
@@ -1175,7 +1272,7 @@ export function DesignEditorBody({ groomUid, designId, adminDemoMode = false, on
         </Section>
 
         {/* Dress code */}
-        <Section title={tt(lang, "كود اللباس", "קוד לבוש")}>
+        <Section step="venue" title={tt(lang, "كود اللباس", "קוד לבוש")}>
           <FormField label={tt(lang, "وصف اللباس (يظهر ضمن التفاصيل)", "תיאור הלבוש")}>
             <input data-testid="design-dress-code" type="text" {...textProps("dressCode", 120)} />
           </FormField>
@@ -1183,6 +1280,7 @@ export function DesignEditorBody({ groomUid, designId, adminDemoMode = false, on
 
         {/* Music */}
         <Section
+          step="rsvp"
           title={tt(lang, "موسيقى الخلفية", "מוזיקת רקע")}
           toggle={{ enabled: tog("musicEnabled"), onChange: (c) => toggle("musicEnabled", c), disabled: !editable, testid: "design-toggle-music" }}
         >
@@ -1192,7 +1290,7 @@ export function DesignEditorBody({ groomUid, designId, adminDemoMode = false, on
         </Section>
 
         {/* Other section toggles */}
-        <Section title={tt(lang, "إظهار / إخفاء الأقسام", "הצג / הסתר חלקים")}>
+        <Section step="advanced" title={tt(lang, "إظهار / إخفاء الأقسام", "הצג / הסתר חלקים")}>
           <div style={{ fontSize: 11, color: C.dim, marginBottom: 12, lineHeight: 1.6 }}>
             {tt(lang, "كل الأقسام تظهر افتراضياً. أزل العلامة لإخفاء قسم.", "כל החלקים מוצגים כברירת מחדל. הסר סימון כדי להסתיר.")}
           </div>
@@ -1202,7 +1300,7 @@ export function DesignEditorBody({ groomUid, designId, adminDemoMode = false, on
         </Section>
 
         {/* Envelope (3D) customization */}
-        <Section title={tt(lang, "المظروف ثلاثي الأبعاد", "מעטפה תלת-ממדית")}>
+        <Section step="advanced" title={tt(lang, "المظروف ثلاثي الأبعاد", "מעטפה תלת-ממדית")}>
           <div style={{ fontSize: 11, color: C.dim, marginBottom: 12, lineHeight: 1.6 }}>
             {tt(lang, "خصّص ألوان المظروف والنجوم. اترك أي لون فارغاً لاستخدام لون القالب.", "התאם את צבעי המעטפה והכוכבים. השאר צבע ריק כדי להשתמש בצבע הערכה.")}
           </div>
@@ -1234,7 +1332,7 @@ export function DesignEditorBody({ groomUid, designId, adminDemoMode = false, on
         </Section>
 
         {/* Background starfield (celestial particles behind the 3D envelope) */}
-        <Section title={tt(lang, "نجوم الخلفية (الفضاء ثلاثي الأبعاد)", "כוכבי הרקע (החלל התלת-ממדי)")}>
+        <Section step="advanced" title={tt(lang, "نجوم الخلفية (الفضاء ثلاثي الأبعاد)", "כוכבי הרקע (החלל התלת-ממדי)")}>
           <div style={{ fontSize: 11, color: C.dim, marginBottom: 12, lineHeight: 1.6 }}>
             {tt(lang,
               "تحكّم بالنجوم الصغيرة المتلألئة في خلفية المشهد ثلاثي الأبعاد حوالين المكتوب: لونها، حجمها، ووضوحها. اتركها كما هي لتتبع لون التصميم.",
@@ -1252,7 +1350,7 @@ export function DesignEditorBody({ groomUid, designId, adminDemoMode = false, on
         </Section>
 
         {/* Custom background */}
-        <Section title={tt(lang, "الخلفية المخصّصة", "רקע מותאם אישית")}>
+        <Section step="advanced" title={tt(lang, "الخلفية المخصّصة", "רקע מותאם אישית")}>
           <div style={{ fontSize: 11, color: C.dim, marginBottom: 12, lineHeight: 1.6 }}>
             {tt(lang,
               "صمّم خلفية الدعوة: لون أو تدرّج أو صورة، مع دوائر زخرفية على الأطراف. فعّل \"استخدم خلفيتي\" ليراها كل المدعوين (يحلّ محل العالم ثلاثي الأبعاد؛ يبقى غلاف الفتح ثم يختفي تدريجياً).",
@@ -1308,7 +1406,7 @@ export function DesignEditorBody({ groomUid, designId, adminDemoMode = false, on
         </Section>
 
         {/* Theme */}
-        <Section title={tt(lang, "لون التصميم", "צבע העיצוב")}>
+        <Section step="style" title={tt(lang, "لون التصميم", "צבע העיצוב")}>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(110px, 1fr))", gap: 10 }}>
             {DIGITAL_THEME_KEYS.map((k) => {
               const t = DIGITAL_THEMES[k];
@@ -1325,7 +1423,7 @@ export function DesignEditorBody({ groomUid, designId, adminDemoMode = false, on
         </Section>
 
         {/* Font */}
-        <Section title={tt(lang, "نوع الخط", "סוג גופן")}>
+        <Section step="style" title={tt(lang, "نوع الخط", "סוג גופן")}>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 10 }}>
             {DIGITAL_FONT_KEYS.map((k) => {
               const fnt = DIGITAL_FONTS[k];
@@ -1341,6 +1439,20 @@ export function DesignEditorBody({ groomUid, designId, adminDemoMode = false, on
           </div>
         </Section>
 
+        <StepGroup id="review" activeStep={activeStep} view={view}>
+        {!adminDemoMode && (
+          <OnboardingChecklist
+            title={tt(lang, "جاهزية الدعوة", "מוכנות ההזמנה")}
+            steps={[
+              { label: tt(lang, "أسماء العروسين", "שמות החתן והכלה"), done: doneNames },
+              { label: tt(lang, "تاريخ ووقت الزفاف", "תאריך ושעת החתונה"), done: doneDate },
+              { label: tt(lang, "صورة واحدة على الأقل", "לפחות תמונה אחת"), done: donePhoto },
+            ]}
+            note={doneNames
+              ? tt(lang, "دعوتك جاهزة — أرسلها للاعتماد.", "ההזמנה מוכנה — שלחו לאישור.")
+              : tt(lang, "أضِف اسمَي العروسين لتتمكّن من الإرسال.", "הוסיפו את שמות החתן והכלה כדי לשלוח.")}
+          />
+        )}
         {/* Submit (groom) / Publish (admin demo) */}
         {adminDemoMode ? (
           <button data-testid="demo-publish-btn" className="gold-btn" onClick={onPublish} disabled={publishing} style={{ width: "100%", padding: "14px 0", fontSize: 14, marginTop: 4 }}>
@@ -1361,7 +1473,38 @@ export function DesignEditorBody({ groomUid, designId, adminDemoMode = false, on
             <DigitalInvitationView design={previewDesign} guestName={tt(editLang, "اسم الضيف", "שם האורח")} lang={editLang} mode="preview" />
           </div>
         </div>
+        </StepGroup>
       </div>
+      </WizardCtx.Provider>
+
+      {wizard && (
+        <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
+          <button
+            type="button"
+            data-testid="design-wizard-back"
+            onClick={() => gotoStep(stepIdx - 1)}
+            disabled={stepIdx === 0}
+            style={{ ...pillBtn(stepIdx !== 0), flex: "0 0 auto", padding: "12px 18px", fontSize: 13 }}
+          >
+            ← {tt(lang, "السابق", "הקודם")}
+          </button>
+          {stepIdx < WIZARD_STEP_IDS.length - 1 ? (
+            <button
+              type="button"
+              data-testid="design-wizard-next"
+              onClick={() => gotoStep(stepIdx + 1)}
+              className="gold-btn"
+              style={{ flex: 1, padding: "12px 0", fontSize: 14 }}
+            >
+              {activeStep === "advanced"
+                ? tt(lang, "التالي: المراجعة →", "הבא: סקירה →")
+                : tt(lang, "التالي →", "הבא →")}
+            </button>
+          ) : (
+            <div style={{ flex: 1 }} />
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -1499,7 +1642,10 @@ function StatusBanner({ status, doc, lang, onCancel, busy, editUnlocked, onEditA
   );
 }
 
-function Section({ title, children, toggle }) {
+function Section({ title, children, toggle, step }) {
+  const { view, activeStep } = useContext(WizardCtx);
+  // In wizard mode a section only renders on its own step; "full" shows them all.
+  if (step && view === "wizard" && step !== activeStep) return null;
   const dimmed = toggle && !toggle.enabled;
   return (
     <div className="gold-card" style={{ padding: 18, opacity: dimmed ? 0.6 : 1 }}>

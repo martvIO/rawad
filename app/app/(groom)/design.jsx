@@ -14,6 +14,7 @@ import {
   Switch,
   Image,
   Alert,
+  Keyboard,
   StyleSheet,
 } from "react-native";
 import { useRouter } from "expo-router";
@@ -23,7 +24,7 @@ import { usePortal } from "../../src/portal/PortalContext.jsx";
 import { useGroomDigital } from "../../src/portal/useGroomDigital.jsx";
 import { useDesignEditor } from "../../src/portal/useDesignEditor.js";
 import { useToast } from "../../src/ui/Toast.jsx";
-import { Chip, DatePickerField, IconButton } from "../../src/ui/primitives.jsx";
+import { Chip, DatePickerField, IconButton, ProgressBar } from "../../src/ui/primitives.jsx";
 import { createDesign, deleteDesign, submitDesignById, cancelDesignById } from "@dawa/core/services/digitalInvitation.js";
 import {
   SCALAR_KEYS,
@@ -34,6 +35,15 @@ import {
   DESIGN_STATUS_META,
   isLocalizedScalar,
 } from "@dawa/core/data/digitalDesignSchema.js";
+import {
+  WIZARD_STEP_IDS,
+  WIZARD_STEPS,
+  stepTitle,
+  stepSubtitle,
+  stepForScalarKey,
+  stepForArrayKey,
+  stepForToggleKey,
+} from "@dawa/core/data/digitalDesignSteps.js";
 import { DIGITAL_THEMES, DIGITAL_FONTS } from "@dawa/core/styles/digitalThemes.js";
 import { localizeApiError } from "@dawa/core/utils/apiError.js";
 import { C, space, radius, type } from "../../src/ui/theme.js";
@@ -93,6 +103,12 @@ const ROW_FIELD_LABELS = {
   walk: { ar: "المسافة", he: "מרחק" },
   who: { ar: "من", he: "מי" },
   what: { ar: "الرسالة", he: "הודעה" },
+};
+
+// Ghost-text examples for the emptiest first-step fields (no blank void).
+const SCALAR_PLACEHOLDERS = {
+  groomDisplayName: { ar: "مثال: أحمد", he: "למשל: אחמד" },
+  brideName: { ar: "مثال: سارة", he: "למשל: שרה" },
 };
 
 const ENV_COLORS = ["paper", "wax", "foil", "cardPaper", "cardInk"];
@@ -159,7 +175,8 @@ function Stepper({ label, value, min, max, step, onChange }) {
   );
 }
 
-function Section({ title, children, right }) {
+function Section({ title, children, right, hidden }) {
+  if (hidden) return null;
   return (
     <View style={styles.section}>
       <View style={styles.sectionHead}>
@@ -183,6 +200,26 @@ export default function Design() {
   const [editLang, setEditLang] = useState(he ? "he" : "ar");
   const [busy, setBusy] = useState(false);
   const [uploadBusy, setUploadBusy] = useState(false);
+  // Guided wizard: "wizard" shows one step-card at a time (default); "full" is the
+  // escape hatch showing every section (the original layout). A field only renders
+  // on its step in wizard mode, but the buffered state + autosave live in the
+  // editor hook, so stepping never loses edits.
+  const [view, setView] = useState("wizard");
+  const [stepIdx, setStepIdx] = useState(0);
+  const activeStep = WIZARD_STEP_IDS[stepIdx] || "essentials";
+  const isFull = view === "full";
+  // Does the active step (or full mode) include this step / this field?
+  const inStep = (id) => isFull || activeStep === id;
+  // The flat text/toggle cards span multiple steps; show them when the active step
+  // actually owns a field of that kind (weddingDate is gated to essentials below).
+  const showText = isFull || ["essentials", "venue", "rsvp"].includes(activeStep);
+  const showToggles = isFull || !["style", "review"].includes(activeStep);
+  // Deep-truthy check for a localized ({ar,he}) or plain scalar — for the review card.
+  const filled = (k) => { const v = ed.f[k]; return !!(v && (typeof v === "object" ? (v.ar || v.he) : v)); };
+  const goStep = (idx) => {
+    Keyboard.dismiss(); // blur the focused input so its onBlur autosave fires first
+    setStepIdx(Math.max(0, Math.min(WIZARD_STEP_IDS.length - 1, idx)));
+  };
 
   useEffect(() => {
     if (selectedId && designs.some((d) => d.id === selectedId)) return;
@@ -342,9 +379,30 @@ export default function Design() {
           </Pressable>
         </View>
 
+        {/* ── Guided-wizard chrome: progress + step title + full-editor escape ── */}
+        <View style={styles.wizBar}>
+          <View style={styles.wizBarTop}>
+            <Text style={styles.wizStepLabel}>
+              {isFull
+                ? (he ? "עורך מלא — כל החלקים" : "المحرر الكامل — كل الأقسام")
+                : (he ? `שלב ${stepIdx + 1} מתוך ${WIZARD_STEP_IDS.length}` : `الخطوة ${stepIdx + 1} من ${WIZARD_STEP_IDS.length}`)}
+            </Text>
+            <Pressable style={styles.ghostBtn} onPress={() => setView(isFull ? "wizard" : "full")}>
+              <Text style={styles.ghostBtnText}>{isFull ? (he ? "✨ מצב מודרך" : "✨ الوضع الموجّه") : (he ? "🎛 עורך מלא" : "🎛 المحرر الكامل")}</Text>
+            </Pressable>
+          </View>
+          {!isFull ? (
+            <View style={styles.wizMeta}>
+              <ProgressBar value={(stepIdx + 1) / WIZARD_STEP_IDS.length} />
+              <Text style={styles.wizTitle}>{WIZARD_STEPS[stepIdx]?.icon} {stepTitle(activeStep, he ? "he" : "ar")}</Text>
+              <Text style={styles.wizSub}>{stepSubtitle(activeStep, he ? "he" : "ar")}</Text>
+            </View>
+          ) : null}
+        </View>
+
         <View pointerEvents={editable ? "auto" : "none"} style={!editable && styles.dim}>
           {/* ── Theme ──────────────────────────────────────────── */}
-          <Section title={he ? "ערכת צבעים" : "لوحة الألوان"}>
+          <Section hidden={!inStep("style")} title={he ? "ערכת צבעים" : "لوحة الألوان"}>
             <View style={styles.wrap}>
               {Object.values(DIGITAL_THEMES).map((th) => (
                 <Pressable key={th.key} onPress={() => ed.pick("themeColor", th.key)} style={[styles.themeChip, ed.themeColor === th.key && styles.themeChipOn]}>
@@ -356,7 +414,7 @@ export default function Design() {
           </Section>
 
           {/* ── Font ───────────────────────────────────────────── */}
-          <Section title={he ? "גופן" : "الخط"}>
+          <Section hidden={!inStep("style")} title={he ? "גופן" : "الخط"}>
             <View style={styles.wrap}>
               {Object.values(DIGITAL_FONTS).map((fn) => (
                 <Chip key={fn.key} label={L({ ar: fn.label_ar, he: fn.label_he }, he)} selected={ed.fontFamily === fn.key} onPress={() => ed.pick("fontFamily", fn.key)} />
@@ -365,8 +423,8 @@ export default function Design() {
           </Section>
 
           {/* ── Text fields ────────────────────────────────────── */}
-          <Section title={he ? "טקסטים" : "النصوص"}>
-            {SCALAR_KEYS.map((key) => {
+          <Section hidden={!showText} title={he ? "טקסטים" : "النصوص"}>
+            {SCALAR_KEYS.filter((key) => isFull || stepForScalarKey(key) === activeStep).map((key) => {
               const localized = isLocalizedScalar(key);
               const value = localized ? ed.getLoc(key, editLang) : (typeof ed.f[key] === "string" ? ed.f[key] : "");
               return (
@@ -375,6 +433,7 @@ export default function Design() {
                   label={L(SCALAR_LABELS[key], he)}
                   value={value}
                   plain={PLAIN_SCALARS.has(key)}
+                  placeholder={SCALAR_PLACEHOLDERS[key] ? L(SCALAR_PLACEHOLDERS[key], he) : undefined}
                   onCommit={(text) => {
                     if (localized) {
                       ed.setLoc(key, editLang, text);
@@ -389,6 +448,7 @@ export default function Design() {
                 />
               );
             })}
+            {(isFull || activeStep === "essentials") ? (
             <DatePickerField
               label={he ? "תאריך החתונה" : "تاريخ الزفاف"}
               value={ed.f.weddingDate || null}
@@ -396,11 +456,12 @@ export default function Design() {
               onChange={(ms) => { ed.setField("weddingDate", ms); ed.flush("weddingDate", ms); }}
               placeholder={he ? "בחר תאריך" : "اختر التاريخ"}
             />
+            ) : null}
           </Section>
 
           {/* ── Section toggles ────────────────────────────────── */}
-          <Section title={he ? "חלקים" : "الأقسام"}>
-            {TOGGLE_KEYS.map((key) => (
+          <Section hidden={!showToggles} title={he ? "חלקים" : "الأقسام"}>
+            {TOGGLE_KEYS.filter((key) => isFull || stepForToggleKey(key) === activeStep).map((key) => (
               <View key={key} style={styles.toggleRow}>
                 <Text style={styles.toggleLabel}>{L(TOGGLE_LABELS[key], he)}</Text>
                 <Switch
@@ -414,7 +475,7 @@ export default function Design() {
           </Section>
 
           {/* ── Content arrays ─────────────────────────────────── */}
-          {ARRAY_KEYS.map((key) => (
+          {ARRAY_KEYS.filter((key) => isFull || stepForArrayKey(key) === activeStep).map((key) => (
             <ArrayEditor
               key={key}
               he={he}
@@ -428,13 +489,13 @@ export default function Design() {
           ))}
 
           {/* ── Media ──────────────────────────────────────────── */}
-          <MediaSection he={he} title={he ? "גלריה" : "المعرض"} items={ed.media} busy={uploadBusy}
+          <MediaSection hidden={!inStep("story")} he={he} title={he ? "גלריה" : "المعرض"} items={ed.media} busy={uploadBusy}
             onPick={() => pickAndUpload("gallery")} onCapture={() => captureAndUpload("gallery")} onRemove={(m) => ed.removeMedia(m, "gallery")} />
-          <MediaSection he={he} title={he ? "תמונת נושא" : "صورة الغلاف"} items={ed.heroMedia} busy={uploadBusy}
+          <MediaSection hidden={!inStep("essentials")} he={he} title={he ? "תמונת נושא" : "صورة الغلاف"} items={ed.heroMedia} busy={uploadBusy}
             onPick={() => pickAndUpload("hero")} onCapture={() => captureAndUpload("hero")} onRemove={(m) => ed.removeMedia(m, "hero")} />
 
           {/* ── 3D envelope overrides ──────────────────────────── */}
-          <Section title={he ? "מעטפה תלת-ממד" : "الظرف ثلاثي الأبعاد"}>
+          <Section hidden={!inStep("advanced")} title={he ? "מעטפה תלת-ממד" : "الظرف ثلاثي الأبعاد"}>
             {ENV_COLORS.map((sk) => (
               <HexField key={sk} label={L(ENV_COLOR_LABELS[sk], he)} value={ed.envelope[sk] || ""} onCommit={(v) => ed.setNested("envelope", sk, v)} />
             ))}
@@ -451,14 +512,14 @@ export default function Design() {
           </Section>
 
           {/* ── Background starfield (particles behind the 3D envelope) ── */}
-          <Section title={he ? "כוכבי הרקע (החלל התלת-ממדי)" : "نجوم الخلفية (الفضاء ثلاثي الأبعاد)"}>
+          <Section hidden={!inStep("advanced")} title={he ? "כוכבי הרקע (החלל התלת-ממדי)" : "نجوم الخلفية (الفضاء ثلاثي الأبعاد)"}>
             <HexField label={he ? "צבע הכוכבים" : "لون النجوم"} value={ed.starfield.color || ""} placeholder="#ffffff" onCommit={(v) => ed.setNested("starfield", "color", v)} />
             <Stepper label={he ? "גודל הכוכבים" : "حجم النجوم"} value={ed.starfield.size ?? 1} min={0.4} max={2.5} step={0.1} onChange={(v) => ed.setNested("starfield", "size", v)} />
             <Stepper label={he ? "בהירות הכוכבים" : "وضوح النجوم"} value={ed.starfield.opacity ?? 1} min={0} max={2} step={0.1} onChange={(v) => ed.setNested("starfield", "opacity", v)} />
           </Section>
 
           {/* ── Custom background ──────────────────────────────── */}
-          <Section title={he ? "רקע מותאם" : "خلفية مخصّصة"}>
+          <Section hidden={!inStep("advanced")} title={he ? "רקע מותאם" : "خلفية مخصصة"}>
             <View style={styles.toggleRow}>
               <Text style={styles.toggleLabel}>{he ? "השתמש ברקע שלי" : "استخدم خلفيتي"}</Text>
               <Switch value={ed.background.enabled === true} onValueChange={(v) => ed.setNested("background", "enabled", v)} trackColor={{ true: C.gold, false: "#333" }} thumbColor="#fff" />
@@ -510,13 +571,44 @@ export default function Design() {
             ) : null}
           </Section>
         </View>
+
+        {/* ── Review card (wizard final step) ── */}
+        {inStep("review") ? (
+          <View style={styles.card}>
+            <Text style={styles.wizTitle}>{he ? "מוכנות ההזמנה" : "جاهزية الدعوة"}</Text>
+            {[
+              { ok: filled("brideName") && filled("groomDisplayName"), ar: "أسماء العروسين", he: "שמות החתן והכלה" },
+              { ok: !!ed.f.weddingDate, ar: "تاريخ الزفاف", he: "תאריך החתונה" },
+              { ok: (ed.heroMedia.length + ed.media.length) > 0, ar: "صورة واحدة على الأقل", he: "לפחות תמונה אחת" },
+            ].map((r, i) => (
+              <Text key={i} style={styles.reviewItem}>{r.ok ? "✅" : "⬜"}  {he ? r.he : r.ar}</Text>
+            ))}
+            <Pressable style={[styles.previewBtn, styles.mt]} onPress={() => router.push({ pathname: "/design-preview", params: { id: selectedId, lang } })}>
+              <Text style={styles.previewBtnText}>👁 {he ? "תצוגה מקדימה" : "معاينة الدعوة"}</Text>
+            </Pressable>
+          </View>
+        ) : null}
+
+        {/* ── Wizard Back / Next ── */}
+        {!isFull ? (
+          <View style={styles.wizNav}>
+            <Pressable style={[styles.ghostBtn, stepIdx === 0 && styles.dim]} disabled={stepIdx === 0} onPress={() => goStep(stepIdx - 1)}>
+              <Text style={styles.ghostBtnText}>← {he ? "הקודם" : "السابق"}</Text>
+            </Pressable>
+            {stepIdx < WIZARD_STEP_IDS.length - 1 ? (
+              <Pressable style={styles.goldBtnNav} onPress={() => goStep(stepIdx + 1)}>
+                <Text style={styles.goldBtnText}>{he ? "הבא →" : "التالي →"}</Text>
+              </Pressable>
+            ) : null}
+          </View>
+        ) : null}
       </ScrollView>
     </View>
   );
 }
 
 // A scalar text input that commits on blur (mirrors the web autosave-on-blur).
-function ScalarInput({ label, value, plain, onCommit }) {
+function ScalarInput({ label, value, plain, placeholder, onCommit }) {
   const [v, setV] = useState(value || "");
   useEffect(() => setV(value || ""), [value]);
   return (
@@ -527,6 +619,7 @@ function ScalarInput({ label, value, plain, onCommit }) {
         value={v}
         onChangeText={setV}
         onBlur={() => onCommit(v)}
+        placeholder={placeholder}
         placeholderTextColor={C.dim}
         autoCapitalize="none"
       />
@@ -587,9 +680,10 @@ function ArrCell({ label, value, placeholder, onCommit }) {
   );
 }
 
-function MediaSection({ he, title, items, busy, onPick, onCapture, onRemove }) {
+function MediaSection({ he, title, items, busy, onPick, onCapture, onRemove, hidden }) {
   return (
     <Section
+      hidden={hidden}
       title={title}
       right={
         <View style={styles.mediaBtns}>
@@ -678,4 +772,13 @@ const styles = StyleSheet.create({
   goldBtnText: { color: C.bg, fontSize: type.sm, fontWeight: "800" },
   ghostBtn: { paddingVertical: space[2], paddingHorizontal: space[3], borderRadius: radius.md, borderColor: "rgba(201,168,76,0.4)", borderWidth: 1 },
   ghostBtnText: { color: C.goldLight, fontSize: type.sm, fontWeight: "800" },
+  wizBar: { backgroundColor: "#0f0f15", borderColor: "rgba(201,168,76,0.25)", borderWidth: 1, borderRadius: radius.xl, padding: space[4], gap: space[2] },
+  wizBarTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: space[2] },
+  wizStepLabel: { color: C.goldDim, fontSize: type.xs, fontWeight: "800", flex: 1, textAlign: "right" },
+  wizMeta: { gap: space[1], marginTop: space[1] },
+  wizTitle: { color: C.gold, fontSize: type.lg, fontWeight: "900", textAlign: "right" },
+  wizSub: { color: C.dim, fontSize: type.xs, textAlign: "right" },
+  wizNav: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: space[3], marginTop: space[2] },
+  goldBtnNav: { flex: 1, paddingVertical: space[3], borderRadius: radius.md, backgroundColor: C.gold, alignItems: "center" },
+  reviewItem: { color: C.goldLight, fontSize: type.sm, textAlign: "right", paddingVertical: 2 },
 });

@@ -16,6 +16,7 @@ import { LoginScreen } from "./LoginScreen.jsx";
 import { ForgotPasswordPage } from "./ForgotPasswordPage.jsx";
 import { LogoutPage } from "./LogoutPage.jsx";
 import { PasswordChangeScreen } from "./PasswordChangeScreen.jsx";
+import { OnboardingScreen } from "./OnboardingScreen.jsx";
 
 // Role dashboards are code-split per role: a signed-in user only downloads the
 // bundle for their own role instead of all three. Same lazy() idiom used for
@@ -52,7 +53,7 @@ function AuthLoadingScreen() {
 
 // Picks which view to render — must run inside <PortalProvider>.
 function PortalRouter() {
-  const { authed, authReady, userType, mustChangePassword } = usePortal();
+  const { authed, authReady, userType, mustChangePassword, needsOnboarding } = usePortal();
   // While the auth subscription resolves the session, show a branded
   // splash — avoids a blank screen and a login-flash for active sessions.
   if (!authReady) return <AuthLoadingScreen />;
@@ -81,6 +82,18 @@ function PortalRouter() {
       <Routes>
         <Route path="logout" element={<LogoutPage />} />
         <Route path="*" element={<PasswordChangeScreen />} />
+      </Routes>
+    );
+  }
+
+  // First-sign-in onboarding (couple bride/groom names). Runs AFTER the password
+  // change (which logs out/in and clears mustChangePassword), and blocks the groom
+  // portal until the account carries onboardedAt.
+  if (needsOnboarding) {
+    return (
+      <Routes>
+        <Route path="logout" element={<LogoutPage />} />
+        <Route path="*" element={<OnboardingScreen />} />
       </Routes>
     );
   }

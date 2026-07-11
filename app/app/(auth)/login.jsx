@@ -31,6 +31,7 @@ export default function Login() {
       const u = await login(username.trim(), password);
       if (u.mustChangePassword) router.replace("/change-password");
       else if (u.role !== "groom") router.replace("/not-a-groom");
+      else if (!u.onboardedAt) router.replace("/onboarding");
       else router.replace("/dashboard");
     } catch (e) {
       setError(t("login_failed") || "تعذّر تسجيل الدخول. تحقّق من البيانات.");

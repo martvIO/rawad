@@ -100,6 +100,7 @@ export function usePortalState({ onBack, t, lang, setLang }) {
     currentUid: auth.currentUid, currentUsername: auth.currentUsername,
     canSeeAttendance: auth.canSeeAttendance, canUsePhotographer: auth.canUsePhotographer,
     canUseBoardingPass: auth.canUseBoardingPass, mustChangePassword: auth.mustChangePassword,
+    needsOnboarding: auth.needsOnboarding, markOnboarded: auth.markOnboarded,
     driverServingGroom: driver.driverServingGroomUsername,
     setDriverServingGroom: driver.setDriverServingGroom,
     loginUser: auth.loginUser, setLoginUser: auth.setLoginUser,

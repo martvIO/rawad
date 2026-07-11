@@ -56,8 +56,26 @@ export async function signIn(username, password) {
     displayName: data.displayName ?? null,
     phoneE164: data.phoneE164 ?? null,
     mustChangePassword: data.mustChangePassword === true,
+    onboardedAt: data.onboardedAt ?? null,
+    brideName: data.brideName ?? null,
+    groomName: data.groomName ?? null,
+    weddingDate: data.weddingDate ?? null,
     claims: { role: data.role, username: data.username },
   };
+}
+
+/**
+ * First-sign-in onboarding — persist the couple's bride/groom names (+ optional
+ * wedding date) to the account so the digital-invitation editor pre-seeds the
+ * first design. Setting the server-side `onboardedAt` clears the onboarding gate.
+ *
+ * @param {{ brideName: string, groomName: string, weddingDate?: number|null }} input
+ * @returns {Promise<{ ok: boolean, onboardedAt: number }>}
+ */
+export async function submitOnboarding({ brideName, groomName, weddingDate = null }) {
+  const body = { brideName, groomName };
+  if (typeof weddingDate === "number" && Number.isFinite(weddingDate)) body.weddingDate = weddingDate;
+  return api.post("/auth/onboarding", body);
 }
 
 /**
@@ -153,6 +171,10 @@ export function subscribeAuth(cb) {
         canUsePhotographer: value.canUsePhotographer !== false,
         canUseBoardingPass: value.canUseBoardingPass === true,
         mustChangePassword: value.mustChangePassword === true,
+        onboardedAt: value.onboardedAt ?? null,
+        brideName: value.brideName ?? null,
+        groomName: value.groomName ?? null,
+        weddingDate: value.weddingDate ?? null,
         claims: value.claims ?? {},
       });
     },
