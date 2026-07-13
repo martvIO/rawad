@@ -325,3 +325,6 @@ Touched: Digital-Invitations
 
 ## [2026-07-09 18:20] session | Rename to "دعوة فرحنا" + readable envelope cue
 Touched: Digital-Invitations
+
+## [2026-07-09 19:05] session | "دعوة فرحنا" in manual-invite guest forms
+Touched: Digital-Invitations

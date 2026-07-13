@@ -528,6 +528,12 @@ transliteration). Applied SELECTIVELY (owner's list), NOT a global rename — mo
 - **Landing copyright**: `© {year} دعوة فرحنا · {footer_tagline}`.
 - **Invitation footer** (`InviteFooterDock.jsx`): "فرحنا" under the "دعوة" mark, smaller + `theme.accent`.
 - **Invitation credit** (`DigitalInvitationView.jsx`): `صُنعت بواسطة دعوة فرحنا — اصنع دعوتك ←` (+HE).
+- **Manual-invite guest forms** (i18n `conf_form_welcome_title` + `conf_form_welcome_body`, AR+HE):
+  "شركة دعوة" → "شركة دعوة فرحنا" / "חברת דעוה" → "חברת דעוה שמחתנו". Both guest-detail forms use these —
+  the per-guest invite link (`/invite/:token`, body only) and the public confirm form
+  (`/confirm/:groomUsername`, title + body). `invite_title` ("تأكيد بيانات الدعوة") left alone — there
+  "الدعوة" means *the invitation*, not the company. Verified live on `/confirm/groom` (a generic test
+  groom; the 3 prod grooms are `sally`/`groom`/`rani`).
 Left as-is (not in the owner's list): the baked `BRAND_FULL_SVG` hero emblem, the WhatsApp booking text,
 the "دعوة زفاف" sample-card label.
 

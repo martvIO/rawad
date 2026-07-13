@@ -422,8 +422,8 @@ export const ar = {
   admin_conf_no_address: "بدون عنوان",
   admin_conf_for_groom: "للعريس:",
   // Guest confirmation form
-  conf_form_welcome_title: "شركة دعوة ترحب بكم",
-  conf_form_welcome_body: "نحن شركة دعوة — متخصصون في توصيل مكاتيب الأعراس بطريقة احترافية وراقية. تم تسجيلكم كأحد المدعوين الكرام، يُرجى تأكيد بياناتكم لتسهيل توصيل المكتوب إليكم.",
+  conf_form_welcome_title: "شركة دعوة فرحنا ترحب بكم",
+  conf_form_welcome_body: "نحن شركة دعوة فرحنا — متخصصون في توصيل مكاتيب الأعراس بطريقة احترافية وراقية. تم تسجيلكم كأحد المدعوين الكرام، يُرجى تأكيد بياناتكم لتسهيل توصيل المكتوب إليكم.",
   conf_form_full_name: "الاسم الكامل",
   conf_form_phone: "رقم الهاتف",
   conf_form_city: "البلدة",
