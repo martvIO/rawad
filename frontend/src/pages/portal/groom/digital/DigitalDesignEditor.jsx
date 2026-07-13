@@ -1341,6 +1341,7 @@ export function DesignEditorBody({ groomUid, designId, adminDemoMode = false, on
           <EnvColorRow testid="design-star-color" label={tt(lang, "لون النجوم", "צבע הכוכבים")} value={starOverrides.color} defaultHex="#ffffff" presets={["#ffffff", "#ffe9b0", "#bcd4ff", "#e8b4b8"]} disabled={!editable} onPick={(hex) => setStarField("color", hex)} onReset={() => setStarField("color", null)} />
           <RangeRow testid="design-star-size" label={tt(lang, "حجم النجوم", "גודל הכוכבים")} min={0.4} max={2.5} step={0.1} value={starOverrides.size ?? 1} disabled={!editable} onInput={(v) => bufferStarField("size", v)} onCommit={(v) => commitStarField("size", v)} />
           <RangeRow testid="design-star-opacity" label={tt(lang, "وضوح النجوم", "בהירות הכוכבים")} min={0} max={2} step={0.1} value={starOverrides.opacity ?? 1} disabled={!editable} onInput={(v) => bufferStarField("opacity", v)} onCommit={(v) => commitStarField("opacity", v)} />
+          <RangeRow testid="design-star-speed" label={tt(lang, "سرعة دخول النجوم", "מהירות כניסת הכוכבים")} min={0.4} max={2} step={0.1} value={starOverrides.speed ?? 1} disabled={!editable} onInput={(v) => bufferStarField("speed", v)} onCommit={(v) => commitStarField("speed", v)} />
 
           {/* Live example of the background stars — reacts instantly to the colour/
               size/clarity controls above so the groom/admin sees the result before
@@ -1789,10 +1790,11 @@ function StarfieldPreview({ themeColor, starfield, lang }) {
           tier={2}
           starfield={starfield}
           elevated={false}
+          demoScroll
         />
       </Suspense>
       <div style={{ position: "absolute", bottom: 8, insetInlineStart: 0, insetInlineEnd: 0, textAlign: "center", zIndex: 2, pointerEvents: "none", fontSize: 10, letterSpacing: 2, textTransform: "uppercase", color: "rgba(255,255,255,.7)", textShadow: "0 1px 4px rgba(0,0,0,.6)" }}>
-        {tt(lang, "مثال على النجوم", "דוגמת כוכבים")}
+        {tt(lang, "مثال على دخول النجوم", "דוגמת כניסת הכוכבים")}
       </div>
     </div>
   );

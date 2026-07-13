@@ -195,7 +195,7 @@ export function DigitalYourPhotos({ lang, setLang }) {
           <div className="gold-card" style={{ textAlign: "center", padding: 32 }}>
             <div style={{ fontSize: 56, marginBottom: 14 }}>🔒</div>
             <div style={{ fontSize: 16, fontWeight: 800, color: C.gold, marginBottom: 8 }}>
-              {tt(lang, "الصور لم تُنشر بعد من قِبل العريس", "התמונות עוד לא פורסמו על-ידי החתן")}
+              {tt(lang, "الصور لم تُنشر بعد من قِبل صاحب/ة الفرح", "התמונות עוד לא פורסמו על-ידי בעלי השמחה")}
             </div>
             <div style={{ fontSize: 12, color: C.dim, lineHeight: 1.7 }}>
               {tt(lang, "عُد لاحقاً بعد نشر الصور لتتمكن من البحث عن صورك",

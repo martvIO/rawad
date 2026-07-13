@@ -546,3 +546,33 @@ cue sits ABOVE the guest name; it was a fixed 13px faint accent-gold with `lette
 Playwright, dev): landing hero/nav/footer/copyright, invitation footer wordmark+suffix (`فرحنا` in
 `rgb(196,164,88)`) + credit text, and the cue readable above the name on both phone (16px) and desktop
 (26px). Deploy: `hosting,functions:digitalInvitePreview`. See [[Visual-Design-System]].
+
+## Star entrance: mobile fix + speed control + demo, & صورك copy (2026-07-09)
+Three owner items on the scroll-driven background starfield.
+
+**Bug — the scroll "entrance" streamed on desktop but not on phone.** The fly-in moves the 3D camera from
+the page scroll position, but `useScrollDriver` updated the scroll ref on `scroll` EVENTS, which mobile
+browsers throttle/suppress during a momentum flick — so the camera sat frozen mid-scroll on phones. Fix:
+`useScrollDriver` now samples `window.scrollY` every animation frame (rAF) instead of on events (the
+scrollable HEIGHT is still measured only on scroll/resize/orientation, the layout-affecting reads). Same
+computed value, sampled continuously → streams on mobile exactly like desktop. Affects every invitation's
+scroll motion; desktop unchanged.
+
+**Feature — per-design star ENTRANCE SPEED + live demo (groom + admin).** New `starfield.speed` multiplier
+(1 = baseline): backend `sanitizeStarfield` clamps it (`STARFIELD_SPEED_MIN/MAX` 0.2–3, `constants.ts`);
+`themeToUniforms` passes `starSpeed`; the engine holds it in a live JS var `camScrollSpeed` (mutated by
+`setTheme`, so dragging the slider re-scales the fly-in instantly) and uses it in the scroll camera:
+`tz = max(-60, 60 - scroll*108*camScrollSpeed)`. The **floor (-60)** stops a fast speed overshooting the
+170-deep slab (z 40→-130) and emptying the field; at speed 1 the floor is never hit, so the baseline is
+byte-unchanged. Editor: a "سرعة دخول النجوم" `RangeRow` (0.4–2, default 1, `design-star-speed`) in the
+star `<Section>` (shared `DesignEditorBody` → groom + admin). Live example: `CelestialCanvas` gained a
+`demoScroll` prop; the `StarfieldPreview` sets it, and the engine auto-ramps a 0→1→0 triangle sweep
+(`demoT`) so the groom SEES the entrance at the chosen speed (the preview has no page scroll of its own).
+**Verified** (dev harness): three demoScroll panels at speed 0.5/1/2 sit at visibly different camera depths
+and animate; mobile viewport renders the field.
+
+**Copy — صورك empty state:** `DigitalYourPhotos.jsx` "الصور لم تُنشر بعد من قِبل العريس" → "…من قِبل
+صاحب/ة الفرح" (gender-inclusive); HE "על-ידי החתן" → "על-ידי בעלי השמחה".
+
+Deploy: `hosting,functions:api,functions:digitalInvitePreview` (api because the persisted `speed` field is
+new). See [[Visual-Design-System]], [[Architecture-Decisions]].

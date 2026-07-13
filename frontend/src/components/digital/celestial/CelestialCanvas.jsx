@@ -13,7 +13,7 @@ import { useTiltParallax } from "../../../hooks/useTiltParallax.js";
 // the engine — which force-loses the GL context to free it immediately — never
 // poisons a reused canvas. React StrictMode's mount→unmount→remount, and any
 // real remount, each get a brand-new canvas.
-export default function CelestialCanvas({ theme, mode = "public", fixed = true, tier = 2, onFpsDowngrade, envelope = null, starfield = null, onReady, elevated = false, fading = false }) {
+export default function CelestialCanvas({ theme, mode = "public", fixed = true, tier = 2, onFpsDowngrade, envelope = null, starfield = null, onReady, elevated = false, fading = false, demoScroll = false }) {
   const containerRef = useRef(null);
   const worldRef = useRef(null);
   const scrollRef = useRef(0);
@@ -58,6 +58,7 @@ export default function CelestialCanvas({ theme, mode = "public", fixed = true, 
         interactive,
         inputRefs: { scrollRef, pointerRef, tiltRef },
         envelope: envelopeRef.current,
+        demoScroll,
         onFpsDowngrade: () => fpsCbRef.current && fpsCbRef.current(),
       });
     } catch (err) {

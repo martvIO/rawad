@@ -58,6 +58,9 @@ export function themeToUniforms(theme, starfield) {
     glow: sfColor || (isLight ? accent : glow),
     starSize: sf && typeof sf.size === "number" ? sf.size : 1,
     starOpacity: sf && typeof sf.opacity === "number" ? sf.opacity : 1,
+    // Scroll-driven entrance-speed multiplier (JS camera-travel scale, not a
+    // shader uniform). 1 = baseline; the engine reads it in the camera loop.
+    starSpeed: sf && typeof sf.speed === "number" ? sf.speed : 1,
     accent,
     deep,
     mono: hexToRgb(mono[1] || mono[0] || theme?.accent),

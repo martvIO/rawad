@@ -328,3 +328,6 @@ Touched: Digital-Invitations
 
 ## [2026-07-09 19:05] session | "دعوة فرحنا" in manual-invite guest forms
 Touched: Digital-Invitations
+
+## [2026-07-09 21:30] session | Star entrance: mobile fix + speed control + demo
+Touched: Digital-Invitations

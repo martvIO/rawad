@@ -58,6 +58,7 @@ export function createCelestialWorld(canvas, opts = {}) {
     interactive = true, // public guest page: scroll + parallax; preview: ambient drift only
     onFpsDowngrade,
     envelope = null, // { colors, monogram } → enables the 3D intro envelope
+    demoScroll = false, // editor preview: auto-ramp the scroll to demo entrance speed
   } = opts;
 
   // Mutable so rebuildEnvelope() can swap in a fresh design (e.g. the demo page
@@ -139,6 +140,10 @@ export function createCelestialWorld(canvas, opts = {}) {
     tiltRef: { current: [0, 0] },
   };
   let cam = { x: 0, y: 0, z: 60 };
+  // Per-design scroll-entrance speed multiplier (1 = baseline). Mutated live by
+  // setTheme so dragging the editor's speed slider re-scales the fly-in at once.
+  let camScrollSpeed = typeof startUniforms.starSpeed === "number" ? startUniforms.starSpeed : 1;
+  let demoT = 0; // auto-ramp clock for the editor "entrance speed" preview
   let paused = false;
   let disposed = false;
   let raf = 0;
@@ -188,6 +193,7 @@ export function createCelestialWorld(canvas, opts = {}) {
     material.uniforms.uIsLight.value = u.isLight ? 1 : 0;
     if (typeof u.starSize === "number") material.uniforms.uStarSize.value = u.starSize;
     if (typeof u.starOpacity === "number") material.uniforms.uStarOpacity.value = u.starOpacity;
+    if (typeof u.starSpeed === "number") camScrollSpeed = u.starSpeed;
     material.blending = u.isLight ? THREE.NormalBlending : THREE.AdditiveBlending;
     material.needsUpdate = true;
     if (u.bg) bgColor.setRGB(...u.bg);
@@ -281,12 +287,23 @@ export function createCelestialWorld(canvas, opts = {}) {
     let tx, ty, tz, lx, ly, lz, fov, clearA, posEase;
 
     if (mode === "scroll") {
-      // Normal scene: scroll flies the camera forward through the star slab;
-      // ambient drift + parallax keep it alive. A longer travel (108, was 72)
-      // makes the field visibly stream in as the guest scrolls down — the
-      // "stars entering the screen artistically" motion the owner asked for.
-      // The slab is 170 deep (z 40 → -130), so the camera never runs out of stars.
-      tz = interactive ? 60 - input.scrollRef.current * 108 : 56 + Math.sin(t * 0.1) * 4;
+      // Scroll flies the camera forward through the star slab so the field streams
+      // in as the guest scrolls down — scaled live by the per-design entrance SPEED
+      // (camScrollSpeed, 1 = baseline). The target z is FLOORED so a fast speed
+      // can't overshoot the slab (z 40 → -130) and empty the field; at speed 1 the
+      // floor is never reached, so the baseline look is byte-for-byte unchanged.
+      // The editor preview has no page scroll, so `demoScroll` auto-ramps a 0→1→0
+      // sweep to DEMONSTRATE the chosen speed to the groom.
+      let s = input.scrollRef.current;
+      if (demoScroll) {
+        demoT += dt;
+        const CYCLE = 3.4; // seconds per in-and-out sweep
+        const phase = (demoT % CYCLE) / CYCLE;
+        s = phase < 0.5 ? phase * 2 : (1 - phase) * 2; // triangle 0→1→0
+      }
+      tz = (interactive || demoScroll)
+        ? Math.max(-60, 60 - s * 108 * camScrollSpeed)
+        : 56 + Math.sin(t * 0.1) * 4;
       tx = driftX + px; ty = driftY + py;
       lx = cam.x * 0.25; ly = cam.y * 0.25; lz = cam.z - 45;
       fov = SCENE_FOV; clearA = 0; posEase = 0.06;
