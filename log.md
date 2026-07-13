@@ -322,3 +322,6 @@ Touched: Digital-Invitations
 
 ## [2026-07-09 16:40] session | Envelope no-flash + visible scrolling starfield
 Touched: Digital-Invitations
+
+## [2026-07-09 18:20] session | Rename to "دعوة فرحنا" + readable envelope cue
+Touched: Digital-Invitations

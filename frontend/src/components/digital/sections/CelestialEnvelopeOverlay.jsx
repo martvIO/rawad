@@ -44,16 +44,16 @@ export function CelestialEnvelopeOverlay({ phase, guestName, theme, font, lang, 
         >
           <div
             style={{
-              color: theme.accent,
-              fontSize: 13,
-              letterSpacing: 3,
-              // letter-spacing adds trailing space after the last glyph, which
-              // textAlign:center counts as content — indent the inline-start by
-              // the same amount so the visible text sits on true center.
-              textIndent: 3,
-              textTransform: "uppercase",
-              fontStyle: "italic",
-              marginBottom: 18,
+              // Clear, readable "tap to open" cue ABOVE the guest's name, a bit
+              // smaller than the name (name is clamp(24,5vw,40)) and responsive so
+              // it reads on the phone AND the computer (was a fixed tiny 13px).
+              // No letter-spacing / uppercase / italic — those are Latin-oriented
+              // and hurt Arabic legibility (letter-spacing breaks the connected
+              // script); theme.text guarantees contrast on every theme.
+              color: theme.text,
+              fontSize: "clamp(16px,3.6vw,26px)",
+              fontWeight: 700,
+              marginBottom: 16,
               animation: "dawa-inv-cue-c 2.6s ease-in-out infinite",
             }}
           >

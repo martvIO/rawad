@@ -517,3 +517,26 @@ stalled. **Fix (owner picked direct-to-cloud, 2GB cap):** the browser now upload
   authenticated groom UI flow itself is auth-gated (emulator needs Java 11+) so not browser-tested end
   to end; the fallback + the verified mechanism de-risk it. Deploy:
   `hosting,functions:api,functions:digitalInvitePreview`. See [[Face Matching]], [[Architecture-Decisions]].
+
+## Company rename → "دعوة فرحنا" + readable envelope cue (2026-07-09)
+Owner rebranded the company from "دعوة" to **"دعوة فرحنا"** (name-collision with other "دعوة"
+businesses). AR suffix = **فرحنا**; HE = the translation **שמחתנו** (owner picked translation over a
+transliteration). Applied SELECTIVELY (owner's list), NOT a global rename — most "دعوة" strings stay:
+- **Landing hero** (`LandingPage.jsx`): "فرحنا" under the gold "دعوة" headline, smaller + cream `#f5e6b8`.
+- **Landing top-nav**: brand now `دعوة فرحنا` / `דעוה שמחתנו` (was hardcoded "دعوة"; made lang-aware).
+- **Landing footer wordmark**: "فرحنا" stacked under "دعوة" (muted cream) — added for consistency.
+- **Landing copyright**: `© {year} دعوة فرحنا · {footer_tagline}`.
+- **Invitation footer** (`InviteFooterDock.jsx`): "فرحنا" under the "دعوة" mark, smaller + `theme.accent`.
+- **Invitation credit** (`DigitalInvitationView.jsx`): `صُنعت بواسطة دعوة فرحنا — اصنع دعوتك ←` (+HE).
+Left as-is (not in the owner's list): the baked `BRAND_FULL_SVG` hero emblem, the WhatsApp booking text,
+the "دعوة زفاف" sample-card label.
+
+**Envelope tap-cue readability** (`CelestialEnvelopeOverlay.jsx`): the sealed مكتوب's "اضغط لفتح الدعوة"
+cue sits ABOVE the guest name; it was a fixed 13px faint accent-gold with `letter-spacing:3` +
+`uppercase` + `italic` — tiny on desktop and letter-spacing BREAKS connected Arabic. Now: `theme.text`
+(guaranteed contrast), responsive `clamp(16px,3.6vw,26px)` (a bit smaller than the name's
+`clamp(24,5vw,40)`, readable on phone AND computer), no letter-spacing/uppercase/italic. Pulse keyframe
+`dawa-inv-cue-c` trough raised `.55 → .7` so it never dims below readable. **Verified** (headless
+Playwright, dev): landing hero/nav/footer/copyright, invitation footer wordmark+suffix (`فرحنا` in
+`rgb(196,164,88)`) + credit text, and the cue readable above the name on both phone (16px) and desktop
+(26px). Deploy: `hosting,functions:digitalInvitePreview`. See [[Visual-Design-System]].

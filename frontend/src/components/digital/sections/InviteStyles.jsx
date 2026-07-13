@@ -286,7 +286,7 @@ function ViewStyles({ theme, fixed }) {
     @keyframes dawa-inv-cue { 0%,100% { opacity: .55; transform: translate(-50%,0); } 50% { opacity: 1; transform: translate(-50%,6px); } }
     /* Same pulse for elements that are NOT left:50% anchored (the -50% variant
        above would drag a full-width block half a viewport off center). */
-    @keyframes dawa-inv-cue-c { 0%,100% { opacity: .55; transform: translateY(0); } 50% { opacity: 1; transform: translateY(6px); } }
+    @keyframes dawa-inv-cue-c { 0%,100% { opacity: .7; transform: translateY(0); } 50% { opacity: 1; transform: translateY(6px); } }
     @keyframes dawa-inv-route { to { stroke-dashoffset: 0; } }
     @keyframes dawa-inv-flip { 0% { transform: translateY(0); } 50% { transform: translateY(-14px); opacity: .4; filter: blur(2px); } 100% { transform: translateY(0); } }
     @keyframes dawa-inv-seal { 0% { transform: scale(0) rotate(-90deg); } 60% { transform: scale(1.15) rotate(8deg); } 100% { transform: scale(1) rotate(0); } }

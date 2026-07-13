@@ -14,6 +14,11 @@ function InviteFooter({ theme, font, lang }) {
       >
         {lang === "he" ? "דעוה" : "دعوة"}
       </div>
+      {/* Company-name suffix under the wordmark — smaller + accent colour so it
+          reads as the second word of the brand ("دعوة فرحنا" / "דעוה שמחתנו"). */}
+      <div style={{ marginTop: -6, marginBottom: 12, fontSize: 18, fontWeight: 700, color: theme.accent, fontFamily: font.family }}>
+        {lang === "he" ? "שמחתנו" : "فرحنا"}
+      </div>
       <div className="dawa-inv-foot-tag" style={{ color: theme.accent, fontFamily: font.family }}>
         {lang === "he" ? "— הזמנה דיגיטלית · נעשה באהבה —" : "— بطاقة دعوة رقمية · صُنعت بحبّ —"}
       </div>

@@ -72,7 +72,7 @@ function TopNav({ t, lang, setLang, onEnterPortal, onContact, scrolled }) {
           flexShrink: 0,
         }}>
           <BrandLogo size={34} />
-          <span>دعوة</span>
+          <span>{lang === "he" ? "דעוה שמחתנו" : "دعوة فرحنا"}</span>
         </a>
 
         <nav className="dawa-topnav-links" style={{
@@ -361,6 +361,16 @@ function HeroSection({ t, lang, onEnterPortal, onContact, openSample, scrollY })
           animation: "dawa-hero-rise 1.1s .2s cubic-bezier(.2,.7,.2,1) both",
           textShadow: "0 0 80px rgba(201,168,76,.35)",
         }}>{lang === "he" ? "דעוה" : "دعوة"}</h1>
+
+        {/* Company name suffix — "فرحنا" under "دعوة", smaller + a distinct cream
+            tone so it reads as the second word of the brand, not part of the gold
+            wordmark. Pulled up to sit as a lockup under the headline. */}
+        <div style={{
+          fontSize: "clamp(26px,5.5vw,54px)", fontWeight: 700,
+          fontFamily: "'Amiri','Frank Ruhl Libre',serif",
+          color: "#f5e6b8", marginTop: -18, marginBottom: 34, lineHeight: 1.1,
+          animation: "dawa-hero-rise 1.1s .28s cubic-bezier(.2,.7,.2,1) both",
+        }}>{lang === "he" ? "שמחתנו" : "فرحنا"}</div>
 
         <p style={{
           fontSize: "clamp(20px,3vw,30px)", color: "#ffffff",
@@ -1232,11 +1242,17 @@ function FooterSection({ t, lang, onEnterPortal, contact }) {
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
               <BrandLogo size={36} />
-              <span style={{
-                fontFamily: "'Amiri','Frank Ruhl Libre',serif", fontSize: 26, fontWeight: 900,
-                background: "linear-gradient(135deg,#fff3c0,#f0c84c,#c9a84c)",
-                WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
-              }}>{lang === "he" ? "דעוה" : "دعوة"}</span>
+              <div style={{ display: "flex", flexDirection: "column", lineHeight: 1.05 }}>
+                <span style={{
+                  fontFamily: "'Amiri','Frank Ruhl Libre',serif", fontSize: 26, fontWeight: 900,
+                  background: "linear-gradient(135deg,#fff3c0,#f0c84c,#c9a84c)",
+                  WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+                }}>{lang === "he" ? "דעוה" : "دعوة"}</span>
+                <span style={{
+                  fontFamily: "'Amiri','Frank Ruhl Libre',serif", fontSize: 15, fontWeight: 700,
+                  color: "#d8c9a6",
+                }}>{lang === "he" ? "שמחתנו" : "فرحنا"}</span>
+              </div>
             </div>
             <p style={{ color: "#d8c9a6", fontSize: 13, lineHeight: 1.85, maxWidth: "32ch", marginBottom: 20 }}>
               {t("footer_tagline")}
@@ -1303,7 +1319,7 @@ function FooterSection({ t, lang, onEnterPortal, contact }) {
           flexWrap: "wrap", gap: 16,
         }}>
           <div style={{ color: "#7a6a4a", fontSize: 12 }}>
-            © {new Date().getFullYear()} {lang === "he" ? "דעוה" : "دعوة"} · {t("footer_tagline")}
+            © {new Date().getFullYear()} {lang === "he" ? "דעוה שמחתנו" : "دعوة فرحنا"} · {t("footer_tagline")}
           </div>
           <button onClick={onEnterPortal} style={{
             background: "transparent", border: "1px solid rgba(201,168,76,.30)",

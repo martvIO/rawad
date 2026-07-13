@@ -322,7 +322,7 @@ export function DigitalInvitationView({
         <div style={{ textAlign: "center", padding: "16px 16px 72px" }}>
           <a href="/?ref=invite" target="_blank" rel="noopener noreferrer"
              style={{ color: theme.accent, textDecoration: "none", opacity: 0.7, fontSize: 12, fontWeight: 700 }}>
-            {lang === "he" ? "נוצר עם דעוה — צרו את ההזמנה שלכם ←" : "صُنعت بواسطة دعوة — اصنع دعوتك ←"}
+            {lang === "he" ? "נוצר עם דעוה שמחתנו — צרו את ההזמנה שלכם ←" : "صُنعت بواسطة دعوة فرحنا — اصنع دعوتك ←"}
           </a>
         </div>
       )}
