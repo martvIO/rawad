@@ -331,3 +331,6 @@ Touched: Digital-Invitations
 
 ## [2026-07-09 21:30] session | Star entrance: mobile fix + speed control + demo
 Touched: Digital-Invitations
+
+## [2026-07-14 13:58] session | Grilled reel→template prompt for Claude Design
+Touched: Digital-Invitations, Tasks-Backlog

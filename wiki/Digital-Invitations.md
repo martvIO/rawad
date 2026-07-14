@@ -576,3 +576,30 @@ and animate; mobile viewport renders the field.
 
 Deploy: `hosting,functions:api,functions:digitalInvitePreview` (api because the persisted `speed` field is
 new). See [[Visual-Design-System]], [[Architecture-Decisions]].
+
+## DECIDED, not built: reel-derived templates + the reel→template prompt (2026-07-14)
+Grilled (8 questions). Owner wants invitation designs seen in **Instagram reels** fully implemented as
+**templates** for the digital invitation. Immediate deliverable shipped: a reusable prompt for **Claude
+Design** (the tool the 3D envelope originally came from) — `docs/REEL-TO-TEMPLATE-PROMPT.md`. Decisions:
+- **Audience/input:** the prompt is pasted into Claude Design per reel; the reel arrives via a
+  **connector**, with an ordered-screenshots fallback baked into the prompt (Claude models read stills,
+  not video — the prompt instructs the model to STOP if it can't actually retrieve frames).
+- **Output per reel:** a single **self-contained HTML mockup** (CONTENT + TOKENS config objects, Google
+  Fonts only, code-drawn ornament) **+ a companion spec** (shot list, tokens, typography, motion
+  inventory, section map, port notes) — same import pipeline that worked for the envelope.
+- **Structure:** the **reel's structure leads**, but ALL functional blocks are woven in (owner selected
+  all four groups): hero essentials, RSVP (headcount + required phone), countdown + venue/map,
+  guestbook + gift + dock; story/gallery/details where the flow allows.
+- **Envelope:** the reel's intro **replaces** the 3D envelope in reel templates (`envelopeEnabled:
+  false`) — but the **sealed guest-name + tap-to-open ritual is preserved**, restyled per reel
+  (personalization + browser-gesture gating).
+- **Fidelity:** owner chose **pixel-perfect clone** (risk of copying published designers' work into a
+  commercial product was flagged and accepted). Physical limits: artwork is redrawn in code; couple
+  photos → placeholder slots; audio never included (mood described in spec).
+- **Palette:** delivered **as `digitalThemes`-shaped tokens** (template's native theme), so the existing
+  theme machinery (background, starfield, nav, contrast pairs) keeps working.
+- **Constraints hard-coded in the prompt:** RTL, bilingual AR/HE with toggle, mobile-first 390×844, no
+  Arabic letter-spacing, Western digits, Arabic/Hebrew-capable Google Fonts only, reduced-motion floor.
+The **port into the app** (template registry, editor picker, how a template snapshot mints) is a separate
+project needing its own design + go-ahead — see TASK-TPL-1 in [[Tasks Backlog]]. See
+[[Visual-Design-System]], [[Architecture-Decisions]].
