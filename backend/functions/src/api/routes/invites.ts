@@ -547,6 +547,7 @@ invitesRouter.post(
         weddingDate: designData.weddingDate ?? null,
         themeColor: designData.themeColor ?? "gold",
         fontFamily: designData.fontFamily ?? "amiri",
+        templateId: designData.templateId ?? "classic",
         media: Array.isArray(designData.media) ? designData.media : [],
         heroMedia: Array.isArray(designData.heroMedia) ? designData.heroMedia : [],
         designVersion: designData.designVersion ?? 1,

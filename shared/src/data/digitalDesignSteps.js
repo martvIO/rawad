@@ -81,7 +81,7 @@ export const WIZARD_STEPS = [
     scalars: [],
     arrays: [],
     toggles: [],
-    extras: ["theme", "font"],
+    extras: ["template", "theme", "font"],
     nested: [],
   },
   {

@@ -2,7 +2,7 @@
 // design data. Used in AdminDesigns to preview a pending design before
 // approving / rejecting.
 import { useEffect } from "react";
-import { DigitalInvitationView } from "./DigitalInvitationView.jsx";
+import { TemplateRenderer } from "./templates/TemplateRenderer.jsx";
 
 export function DigitalInvitationPreviewModal({ open, design, demoGuestName, lang, onClose }) {
   useEffect(() => {
@@ -67,7 +67,7 @@ export function DigitalInvitationPreviewModal({ open, design, demoGuestName, lan
         >
           ✕
         </button>
-        <DigitalInvitationView
+        <TemplateRenderer
           design={design}
           guestName={demoGuestName}
           lang={lang}

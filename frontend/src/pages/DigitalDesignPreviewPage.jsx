@@ -8,7 +8,7 @@ import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { subscribeDesign } from "../services/digitalInvitation.js";
 import { loadStoredTokens, getStoredUid } from "../utils/tokenManager.js";
-import { DigitalInvitationView } from "../components/digital/DigitalInvitationView.jsx";
+import { TemplateRenderer } from "../components/digital/templates/TemplateRenderer.jsx";
 import { C } from "../styles/theme.js";
 
 export function DigitalDesignPreviewPage({ lang: appLang, setLang }) {
@@ -56,7 +56,7 @@ export function DigitalDesignPreviewPage({ lang: appLang, setLang }) {
   }
 
   return (
-    <DigitalInvitationView
+    <TemplateRenderer
       design={design}
       lang={lang}
       setLang={setLang}

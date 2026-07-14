@@ -7,7 +7,7 @@ import { useParams, Routes, Route, useSearchParams, useNavigate } from "react-ro
 import { subscribeInviteToken, submitDigitalWish, getApprovedWishes } from "../services/invites.js";
 import { getDigitalInvitationPublic, submitDigitalGuestInvite, pingDigitalInviteOpened, getDemoDesignPublic } from "../services/digitalInvitation.js";
 import { logErr } from "../utils/logger.js";
-import { DigitalInvitationView } from "../components/digital/DigitalInvitationView.jsx";
+import { TemplateRenderer } from "../components/digital/templates/TemplateRenderer.jsx";
 import { EventUnavailableNotice } from "../components/EventUnavailableNotice.jsx";
 import { C } from "../styles/theme.js";
 import { Icon } from "../components/icons/Icon.jsx";
@@ -269,7 +269,7 @@ function DigitalLandingMain({ t, lang, setLang }) {
   if (!doc) return <LoadingScreen lang={lang} />;
 
   return (
-    <DigitalInvitationView
+    <TemplateRenderer
       design={doc}
       guestName={tokenRec.guestName || ""}
       guestPhone={tokenRec.guestPhone || ""}

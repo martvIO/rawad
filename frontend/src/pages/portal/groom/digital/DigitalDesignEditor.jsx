@@ -25,7 +25,7 @@ import { C } from "../../../../styles/theme.js";
 import { DIGITAL_THEMES, DIGITAL_FONTS, DIGITAL_THEME_KEYS, DIGITAL_FONT_KEYS, getDigitalTheme, getDigitalFont } from "../../../../styles/digitalThemes.js";
 import { resolveEnvelopePalette } from "../../../../utils/themeToEnvelopePalette.js";
 import { resolveBackground } from "../../../../utils/themeToBackground.js";
-import { DigitalInvitationView } from "../../../../components/digital/DigitalInvitationView.jsx";
+import { TemplateRenderer } from "../../../../components/digital/templates/TemplateRenderer.jsx";
 import { Ambience } from "../../../../components/digital/sections/InviteAmbience.jsx";
 import { ViewStyles } from "../../../../components/digital/sections/InviteStyles.jsx";
 
@@ -33,12 +33,12 @@ import { ViewStyles } from "../../../../components/digital/sections/InviteStyles
 // when the design editor's envelope section mounts).
 const CelestialCanvas = lazy(() => import("../../../../components/digital/celestial/CelestialCanvas.jsx"));
 
-// Opening-envelope STYLE options (the "شكل فتح المكتوب" picker). One style today;
-// to offer more, add an entry here + its look in the 3D engine. `key` persists as
-// `envelope.style` (validated as a slug backend-side, so new keys need no redeploy).
-const ENVELOPE_STYLES = [
-  { key: "classic", icon: "✉️", label_ar: "المكتوب العادي", label_he: "המעטפה הרגילה" },
-];
+import {
+  TEMPLATES,
+  DIGITAL_TEMPLATE_KEYS,
+  DEFAULT_TEMPLATE_ID,
+  ENVELOPE_STYLES,
+} from "@dawa/core/data/digitalTemplates.js";
 import {
   DEFAULT_EYEBROW,
   DEFAULT_BLESSING,
@@ -361,6 +361,7 @@ export function DesignEditorBody({ groomUid, designId, adminDemoMode = false, on
         apply("starfield", next.starfield && typeof next.starfield === "object" ? next.starfield : {});
         apply("themeColor", next.themeColor || "gold");
         apply("fontFamily", next.fontFamily || "amiri");
+        apply("templateId", next.templateId || DEFAULT_TEMPLATE_ID);
         return merged;
       });
     });
@@ -371,6 +372,7 @@ export function DesignEditorBody({ groomUid, designId, adminDemoMode = false, on
   // instantly (optimistic), before the background save round-trips.
   const themeColor = f.themeColor || doc?.themeColor || "gold";
   const fontFamily = f.fontFamily || doc?.fontFamily || "amiri";
+  const templateId = f.templateId || doc?.templateId || DEFAULT_TEMPLATE_ID;
   // 3D-envelope overrides (one buffered nested object, like mediaCaptions) and the
   // theme-derived defaults shown in the swatches when an override is unset.
   const envOverrides = f.envelope && typeof f.envelope === "object" ? f.envelope : {};
@@ -396,10 +398,11 @@ export function DesignEditorBody({ groomUid, designId, adminDemoMode = false, on
       weddingDate: inputToEpoch(f.weddingDate),
       themeColor,
       fontFamily,
+      templateId,
       media,
       heroMedia,
     }),
-    [doc, f, themeColor, fontFamily, media, heroMedia],
+    [doc, f, themeColor, fontFamily, templateId, media, heroMedia],
   );
 
   // ── Persistence ────────────────────────────────────────────────────────────
@@ -442,6 +445,7 @@ export function DesignEditorBody({ groomUid, designId, adminDemoMode = false, on
       if (key === "starfield") return { ...prev, starfield: cur.starfield || {} };
       if (key === "themeColor") return { ...prev, themeColor: cur.themeColor || "gold" };
       if (key === "fontFamily") return { ...prev, fontFamily: cur.fontFamily || "amiri" };
+      if (key === "templateId") return { ...prev, templateId: cur.templateId || DEFAULT_TEMPLATE_ID };
       return { ...prev, [key]: cur[key] || "" };
     });
     dirty.current.delete(key);
@@ -485,6 +489,39 @@ export function DesignEditorBody({ groomUid, designId, adminDemoMode = false, on
     if (!editable || fontFamily === key) return;
     setField("fontFamily", key);
     flush("fontFamily", key);
+  };
+
+  // Switching template resets PRESENTATION defaults (theme/font/envelope style/
+  // envelope on-off) to the new template's recommended pairing — it never
+  // touches guest-facing content (names/date/venue/story/details/etc.), which
+  // both templates keep rendering from the same design doc. A confirm dialog
+  // is shown because even though content survives, the visual result changes
+  // completely and the groom may have spent real effort tuning the old
+  // template's theme/font/envelope colors.
+  const onPickTemplate = (id) => {
+    if (!editable || templateId === id) return;
+    const tpl = TEMPLATES[id] || TEMPLATES[DEFAULT_TEMPLATE_ID];
+    const label = tt(lang, tpl.label_ar, tpl.label_he);
+    const confirmed = window.confirm(tt(
+      lang,
+      `سيؤدي التبديل إلى قالب "${label}" إلى إعادة ضبط اللون والخط وشكل المظروف على القيم الافتراضية لهذا القالب. نصوصكم وصوركم وإعدادات تأكيد الحضور ستبقى كما هي. متابعة؟`,
+      `מעבר לתבנית "${label}" יאפס את הצבע, הגופן וסגנון המעטפה לברירת המחדל של התבנית. הטקסטים, התמונות והגדרות אישור ההגעה יישארו כפי שהם. להמשיך?`,
+    ));
+    if (!confirmed) return;
+    const patch = {
+      templateId: id,
+      themeColor: tpl.defaults.themeColor,
+      fontFamily: tpl.defaults.fontFamily,
+      envelopeEnabled: tpl.defaults.envelopeEnabled,
+      envelope: { ...envOverrides, style: tpl.defaults.envelopeStyle },
+    };
+    const keys = Object.keys(patch);
+    keys.forEach((k) => dirty.current.add(k));
+    setF((prev) => ({ ...prev, ...patch }));
+    persist(patch).then((ok) => {
+      if (ok) keys.forEach((k) => dirty.current.delete(k));
+      else keys.forEach((k) => revert(k));
+    });
   };
 
   // ── Envelope (3D) overrides ──────────────────────────────────────────────
@@ -1439,6 +1476,25 @@ export function DesignEditorBody({ groomUid, designId, adminDemoMode = false, on
           <BackgroundPreview themeColor={themeColor} fontFamily={fontFamily} overrides={bgOverrides} lang={lang} />
         </Section>
 
+        {/* Template — the highest-level appearance choice, so it renders before
+            theme/font. Picking a template pre-selects its recommended theme/
+            font/envelope style (onPickTemplate), but never locks them — the
+            pickers below stay fully interactive regardless of active template. */}
+        <Section step="style" title={tt(lang, "اختر قالب الدعوة", "בחר תבנית להזמנה")}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 10 }}>
+            {DIGITAL_TEMPLATE_KEYS.map((id) => {
+              const tpl = TEMPLATES[id];
+              const active = templateId === id;
+              return (
+                <button key={id} data-testid={`design-template-${id}`} onClick={() => onPickTemplate(id)} disabled={!editable}
+                  style={{ padding: "14px 10px", borderRadius: 12, border: `2px solid ${active ? C.gold : "rgba(255,255,255,.08)"}`, background: active ? "rgba(201,168,76,.10)" : "rgba(255,255,255,.02)", cursor: editable ? "pointer" : "not-allowed", opacity: editable ? 1 : 0.55, fontFamily: "inherit", textAlign: "center" }}>
+                  <div style={{ fontSize: 12, fontWeight: 800, color: active ? C.gold : C.goldLight }}>{tt(lang, tpl.label_ar, tpl.label_he)}</div>
+                </button>
+              );
+            })}
+          </div>
+        </Section>
+
         {/* Theme */}
         <Section step="style" title={tt(lang, "لون التصميم", "צבע העיצוב")}>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(110px, 1fr))", gap: 10 }}>
@@ -1504,7 +1560,7 @@ export function DesignEditorBody({ groomUid, designId, adminDemoMode = false, on
             {tt(lang, "معاينة مباشرة", "תצוגה מקדימה חיה")}
           </div>
           <div data-testid="design-preview" style={{ borderRadius: 16, overflow: "hidden", border: "1px solid rgba(201,168,76,.22)", maxHeight: 640, overflowY: "auto" }}>
-            <DigitalInvitationView design={previewDesign} guestName={tt(editLang, "اسم الضيف", "שם האורח")} lang={editLang} mode="preview" />
+            <TemplateRenderer design={previewDesign} guestName={tt(editLang, "اسم الضيف", "שם האורח")} lang={editLang} mode="preview" />
           </div>
         </div>
         </StepGroup>
