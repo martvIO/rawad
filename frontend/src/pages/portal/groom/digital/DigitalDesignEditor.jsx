@@ -32,6 +32,13 @@ import { ViewStyles } from "../../../../components/digital/sections/InviteStyles
 // Lazy WebGL host for the dedicated sealed-envelope preview (pulls `three` only
 // when the design editor's envelope section mounts).
 const CelestialCanvas = lazy(() => import("../../../../components/digital/celestial/CelestialCanvas.jsx"));
+
+// Opening-envelope STYLE options (the "شكل فتح المكتوب" picker). One style today;
+// to offer more, add an entry here + its look in the 3D engine. `key` persists as
+// `envelope.style` (validated as a slug backend-side, so new keys need no redeploy).
+const ENVELOPE_STYLES = [
+  { key: "classic", icon: "✉️", label_ar: "المكتوب العادي", label_he: "המעטפה הרגילה" },
+];
 import {
   DEFAULT_EYEBROW,
   DEFAULT_BLESSING,
@@ -1304,6 +1311,32 @@ export function DesignEditorBody({ groomUid, designId, adminDemoMode = false, on
           <div style={{ fontSize: 11, color: C.dim, marginBottom: 12, lineHeight: 1.6 }}>
             {tt(lang, "خصّص ألوان المظروف والنجوم. اترك أي لون فارغاً لاستخدام لون القالب.", "התאם את צבעי המעטפה והכוכבים. השאר צבע ריק כדי להשתמש בצבע הערכה.")}
           </div>
+
+          {/* Opening-envelope STYLE picker. One style today ("المكتوب العادي"); the
+              placeholder card hints that more are coming. The choice persists as
+              envelope.style so future styles slot in with no other rewiring. */}
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ marginBottom: 8, fontSize: 12, color: C.goldDim, fontWeight: 700 }}>
+              {tt(lang, "شكل فتح المكتوب", "סגנון פתיחת המעטפה")}
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))", gap: 10 }}>
+              {ENVELOPE_STYLES.map((s) => {
+                const active = (envOverrides.style || "classic") === s.key;
+                return (
+                  <button key={s.key} data-testid={`design-env-style-${s.key}`} onClick={() => setEnvField("style", s.key)} disabled={!editable}
+                    style={{ padding: "14px 10px", borderRadius: 12, border: `2px solid ${active ? C.gold : "rgba(255,255,255,.08)"}`, background: active ? "rgba(201,168,76,.10)" : "rgba(255,255,255,.02)", cursor: editable ? "pointer" : "not-allowed", opacity: editable ? 1 : 0.55, fontFamily: "inherit", textAlign: "center" }}>
+                    <div style={{ fontSize: 26, marginBottom: 6 }} aria-hidden>{s.icon}</div>
+                    <div style={{ fontSize: 12, fontWeight: 800, color: active ? C.gold : C.goldLight }}>{tt(lang, s.label_ar, s.label_he)}</div>
+                  </button>
+                );
+              })}
+              <div aria-hidden style={{ padding: "14px 10px", borderRadius: 12, border: "2px dashed rgba(255,255,255,.10)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", opacity: 0.6 }}>
+                <div style={{ fontSize: 22, marginBottom: 6 }}>✨</div>
+                <div style={{ fontSize: 11, color: C.dim }}>{tt(lang, "أشكال أخرى قريباً", "סגנונות נוספים בקרוב")}</div>
+              </div>
+            </div>
+          </div>
+
           <EnvColorRow testid="design-env-paper" label={tt(lang, "لون الورق", "צבע הנייר")} value={envOverrides.paper} defaultHex={envDefaults.paper} presets={["#2a211a", "#1a1f2e", "#f9f6f0", "#2a1a1a"]} disabled={!editable} onPick={(hex) => setEnvField("paper", hex)} onReset={() => resetEnvField("paper")} />
           <EnvColorRow testid="design-env-wax" label={tt(lang, "لون الختم (الدائرة)", "צבע החותם (העיגול)")} value={envOverrides.wax} defaultHex={envDefaults.wax} presets={["#f4ece0", "#b3232a", "#1f3b2e", "#caa14e"]} disabled={!editable} onPick={(hex) => setEnvField("wax", hex)} onReset={() => resetEnvField("wax")} />
           <EnvColorRow testid="design-env-foil" label={tt(lang, "لون النجوم والذهب", "צבע הכוכבים והזהב")} value={envOverrides.foil} defaultHex={envDefaults.foil} presets={["#caa14e", "#c0c0c0", "#e8b4b8", "#d4af37"]} disabled={!editable} onPick={(hex) => setEnvField("foil", hex)} onReset={() => resetEnvField("foil")} />

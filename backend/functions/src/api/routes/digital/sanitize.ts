@@ -246,6 +246,7 @@ interface StarfieldSettings {
 }
 
 interface EnvelopeSettings {
+  style?: string;
   paper?: string;
   wax?: string;
   foil?: string;
@@ -608,6 +609,16 @@ function sanitizeEnvelope(v: unknown): Sanitized<EnvelopeSettings> {
   }
   const o = v as Record<string, unknown>;
   const out: EnvelopeSettings = {};
+  // Envelope opening STYLE — a short slug that selects the 3D open animation/look
+  // ("classic" today; the groom picks it in the editor). Validated as a safe slug
+  // rather than a fixed enum, so new styles can ship from the client without a
+  // backend redeploy; unknown/empty → unset (falls back to the classic default).
+  if (o.style !== undefined && o.style !== "") {
+    if (typeof o.style !== "string" || !/^[a-z0-9_-]{1,32}$/.test(o.style)) {
+      return { ok: false, error: "invalid_envelope_style", field: "envelope.style" };
+    }
+    out.style = o.style;
+  }
   for (const key of ENVELOPE_COLOR_KEYS) {
     const raw = o[key];
     if (raw === undefined || raw === "") continue; // unset → fall back to default

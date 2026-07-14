@@ -334,3 +334,6 @@ Touched: Digital-Invitations
 
 ## [2026-07-14 13:58] session | Grilled reel→template prompt for Claude Design
 Touched: Digital-Invitations, Tasks-Backlog
+
+## [2026-07-09 22:40] session | Envelope opening-style picker scaffold
+Touched: Digital-Invitations

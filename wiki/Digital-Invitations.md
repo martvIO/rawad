@@ -603,3 +603,20 @@ Design** (the tool the 3D envelope originally came from) — `docs/REEL-TO-TEMPL
 The **port into the app** (template registry, editor picker, how a template snapshot mints) is a separate
 project needing its own design + go-ahead — see TASK-TPL-1 in [[Tasks Backlog]]. See
 [[Visual-Design-System]], [[Architecture-Decisions]].
+
+## Envelope opening-STYLE picker (scaffold) (2026-07-09)
+Owner wants to offer multiple "شكل فتح المكتوب" (envelope-open) styles later; asked for the PICKER box
+now with the single existing style. Built the full scaffold so future styles slot in cleanly:
+- **Data:** new `envelope.style` slug (default → "classic"). `sanitizeEnvelope` validates it as a safe
+  slug `^[a-z0-9_-]{1,32}$` (NOT a fixed enum) so new style keys can ship from the client with no backend
+  redeploy; unknown/empty → unset → classic. Rides the existing `envelope` object (already a DESIGN_FIELD).
+- **Editor:** a card-grid picker (`ENVELOPE_STYLES`, mirrors the theme/font pickers) at the TOP of the
+  "المظروف ثلاثي الأبعاد" `<Section>` in the shared `DesignEditorBody` → shows at groom + admin. One card
+  today ("المكتوب العادي" / "המעטפה הרגילה", `design-env-style-classic`, ✉️) + a dashed "أشكال أخرى قريباً"
+  placeholder. Wired via `setEnvField("style", key)`; active = `envOverrides.style || "classic"`.
+- **Render:** the engine still draws the one classic envelope — `style` is not yet branched on; adding a
+  style = a new `ENVELOPE_STYLES` entry + its look in the 3D engine keyed on `envelope.style`.
+- **Verified** (dev harness, AR+HE): selected classic card + coming-soon placeholder render correctly.
+Deploy: `hosting,functions:api,functions:digitalInvitePreview` (api for the persisted `style`).
+Related owner Q: a raw opening VIDEO can't be ingested; still frames/screenshots or a description can be
+rebuilt into the 3D envelope. See [[Visual-Design-System]], [[Architecture-Decisions]].
