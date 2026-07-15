@@ -13,14 +13,32 @@
 import { DigitalInvitationView } from "../DigitalInvitationView.jsx";
 import { TEMPLATES, DEFAULT_TEMPLATE_ID } from "@dawa/core/data/digitalTemplates.js";
 
+// `classic` is imported EAGERLY (not lazy): it is the fallback for every
+// unknown/legacy id, so it must be able to render synchronously and must never
+// itself suspend. Bespoke templates are heavier (bespoke sections + a lazy
+// three.js effects scene), so each registers a `lazy()` Component — the
+// <Suspense> boundary in TemplateRenderer.jsx covers the chunk fetch. Create
+// the `lazy()` at MODULE SCOPE (as below), never inside getTemplate(): the
+// editor preview re-renders TemplateRenderer on every keystroke, and a lazy
+// component recreated per render would re-suspend and flash on each edit.
+//
+//   import { lazy } from "react";
+//   const DestinationLoveView = lazy(() => import("./destination-love/index.js"));
+//   import destinationLoveThumb from "../../../assets/templates/destination-love.jpg";
+//   ...
+//   "destination-love": {
+//     ...TEMPLATES["destination-love"],
+//     Component: DestinationLoveView,
+//     thumb: destinationLoveThumb,
+//   },
 export const TEMPLATE_REGISTRY = {
   classic: {
     ...TEMPLATES.classic,
     Component: DigitalInvitationView,
   },
-  // Additional templates register their Component here as they're built —
-  // each entry pairs one shared/digitalTemplates.js metadata row with the
-  // template's own top-level view component.
+  // Additional templates register their lazy Component + thumb here as they're
+  // built — each entry pairs one shared/digitalTemplates.js metadata row with
+  // the template's own top-level view component.
 };
 
 export const TEMPLATE_IDS = Object.keys(TEMPLATE_REGISTRY);

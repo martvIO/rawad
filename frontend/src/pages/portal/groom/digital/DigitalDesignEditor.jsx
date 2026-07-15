@@ -38,6 +38,7 @@ import {
   DIGITAL_TEMPLATE_KEYS,
   DEFAULT_TEMPLATE_ID,
   ENVELOPE_STYLES,
+  getTemplateThemeKeys,
 } from "@dawa/core/data/digitalTemplates.js";
 import {
   DEFAULT_EYEBROW,
@@ -373,6 +374,22 @@ export function DesignEditorBody({ groomUid, designId, adminDemoMode = false, on
   const themeColor = f.themeColor || doc?.themeColor || "gold";
   const fontFamily = f.fontFamily || doc?.fontFamily || "amiri";
   const templateId = f.templateId || doc?.templateId || DEFAULT_TEMPLATE_ID;
+  // A BESPOKE template owns its whole visual (its own opening intro + ambient
+  // effects), so the classic-only controls — the 3D envelope, the background
+  // starfield, and the custom 2D background — are hidden for it (they configure
+  // subsystems a bespoke tree never mounts, so leaving them visible would be
+  // dead controls). Its theme picker is also narrowed to the template's curated
+  // palette list. `classic` has neither flag → everything shows as before.
+  const isBespokeTpl = !!TEMPLATES[templateId]?.bespoke;
+  // Curated palette keys for the active template, or the full global list when
+  // the template opts out (classic). If the design's current themeColor somehow
+  // isn't in the curated list (legacy state, or set before curation), append it
+  // so the active chip stays visible and selectable.
+  const themeKeysForPicker = useMemo(() => {
+    const curated = getTemplateThemeKeys(templateId);
+    if (!curated) return DIGITAL_THEME_KEYS;
+    return curated.includes(themeColor) ? curated : [...curated, themeColor];
+  }, [templateId, themeColor]);
   // 3D-envelope overrides (one buffered nested object, like mediaCaptions) and the
   // theme-derived defaults shown in the swatches when an override is unset.
   const envOverrides = f.envelope && typeof f.envelope === "object" ? f.envelope : {};
@@ -1338,11 +1355,25 @@ export function DesignEditorBody({ groomUid, designId, adminDemoMode = false, on
           <div style={{ fontSize: 11, color: C.dim, marginBottom: 12, lineHeight: 1.6 }}>
             {tt(lang, "كل الأقسام تظهر افتراضياً. أزل العلامة لإخفاء قسم.", "כל החלקים מוצגים כברירת מחדל. הסר סימון כדי להסתיר.")}
           </div>
-          <ToggleRow label={tt(lang, "غلاف الفتح (المظروف)", "מעטפת פתיחה")} checked={tog("envelopeEnabled")} disabled={!editable} testid="design-toggle-envelope" onChange={(c) => toggle("envelopeEnabled", c)} />
-          <ToggleRow label={tt(lang, "عالم ثلاثي الأبعاد غامر (خلفية متحركة)", "עולם תלת-ממדי סוחף (רקע מונפש)")} checked={tog("immersive3d")} disabled={!editable} testid="design-toggle-immersive3d" onChange={(c) => toggle("immersive3d", c)} />
+          {/* Envelope + immersive-3D world are classic-only (a bespoke template
+              brings its own opening intro + ambience), so they're hidden when a
+              bespoke template is active. The floating dock stays — every
+              template respects footerDockEnabled. */}
+          {!isBespokeTpl && (
+            <>
+              <ToggleRow label={tt(lang, "غلاف الفتح (المظروف)", "מעטפת פתיחה")} checked={tog("envelopeEnabled")} disabled={!editable} testid="design-toggle-envelope" onChange={(c) => toggle("envelopeEnabled", c)} />
+              <ToggleRow label={tt(lang, "عالم ثلاثي الأبعاد غامر (خلفية متحركة)", "עולם תלת-ממדי סוחף (רקע מונפש)")} checked={tog("immersive3d")} disabled={!editable} testid="design-toggle-immersive3d" onChange={(c) => toggle("immersive3d", c)} />
+            </>
+          )}
           <ToggleRow label={tt(lang, "شريط الأدوات العائم (مشاركة / تقويم)", "סרגל צף (שיתוף / יומן)")} checked={tog("footerDockEnabled")} disabled={!editable} testid="design-toggle-footer" onChange={(c) => toggle("footerDockEnabled", c)} />
         </Section>
 
+        {/* The 3D envelope, background starfield, and custom 2D background all
+            configure the classic CelestialAmbience subsystem — a bespoke
+            template never mounts it, so these three sections are hidden when a
+            bespoke template is active (they'd be dead controls otherwise). */}
+        {!isBespokeTpl && (
+        <>
         {/* Envelope (3D) customization */}
         <Section step="advanced" title={tt(lang, "المظروف ثلاثي الأبعاد", "מעטפה תלת-ממדית")}>
           <div style={{ fontSize: 11, color: C.dim, marginBottom: 12, lineHeight: 1.6 }}>
@@ -1475,6 +1506,8 @@ export function DesignEditorBody({ groomUid, designId, adminDemoMode = false, on
 
           <BackgroundPreview themeColor={themeColor} fontFamily={fontFamily} overrides={bgOverrides} lang={lang} />
         </Section>
+        </>
+        )}
 
         {/* Template — the highest-level appearance choice, so it renders before
             theme/font. Picking a template pre-selects its recommended theme/
@@ -1497,8 +1530,15 @@ export function DesignEditorBody({ groomUid, designId, adminDemoMode = false, on
 
         {/* Theme */}
         <Section step="style" title={tt(lang, "لون التصميم", "צבע העיצוב")}>
+          {isBespokeTpl && (
+            <div style={{ fontSize: 11, color: C.dim, marginBottom: 12, lineHeight: 1.6 }}>
+              {tt(lang,
+                "ألوان منسّقة خصيصًا لهذا التصميم — كل خيار مصمَّم ومجرَّب ليبقى المظهر متناسقًا.",
+                "צבעים שנבחרו במיוחד לתבנית זו — כל אפשרות עוצבה ונבדקה כדי לשמור על מראה מלוטש.")}
+            </div>
+          )}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(110px, 1fr))", gap: 10 }}>
-            {DIGITAL_THEME_KEYS.map((k) => {
+            {themeKeysForPicker.map((k) => {
               const t = DIGITAL_THEMES[k];
               const active = themeColor === k;
               return (

@@ -620,3 +620,63 @@ now with the single existing style. Built the full scaffold so future styles slo
 Deploy: `hosting,functions:api,functions:digitalInvitePreview` (api for the persisted `style`).
 Related owner Q: a raw opening VIDEO can't be ingested; still frames/screenshots or a description can be
 rebuilt into the 3D envelope. See [[Visual-Design-System]], [[Architecture-Decisions]].
+
+## DECIDED + BUILDING: 4 webgency-inspired bespoke templates (2026-07-15)
+Owner: "go to webgencyinvitations.com, recreate the designs as new templates with cooler visual effects,
+fully customizable like the current digital invite with token; take opening animation + visual effects,
+not their texts/photos." Grilled (7 questions) + `/design-research` test-plan + `/synthesize`. This is the
+real execution of **TASK-TPL-1** — the first bespoke templates through the registry seam built in a667fbc.
+
+**Locked decisions:**
+- **Scope:** the **top 4 flagships** only — `destination-love` (Most Popular), `dolce-vita` (Popular),
+  `sacred-garden` + `blossom-oud` (both NEW). Skipped: Vibrant Vows, Royal Gold, Minimalist, and
+  "Eternal Romance" (`jathuandthanu` — a **real couple's** personalized page, not a generic template).
+- **Fidelity:** **inspired-by reinterpretation** — source mood/palette/motion as reference, freely
+  redesigned; NO texts/photos copied (only opening animation + effects, per the ask).
+- **Architecture:** **fully bespoke component tree per template** — shares only the design-doc data
+  contract, the `DigitalInvitationView` prop contract, and `useRsvpForm`/`useCountdown`/`confettiBurst`
+  (+ `WalletButton`). **Hard rule: no new design-doc fields** (keeps mint/sanitize/PUBLIC_DESIGN_FIELDS/SSR
+  untouched — a template renders only from the existing schema).
+- **Theming:** each ships a native `digitalThemes`-shaped palette + 2–3 curated recolor variants; the
+  editor theme picker is **filtered per template** (new `themes` metadata field); fonts stay free with a
+  native default.
+- **Effects:** **maximum wow, WebGL allowed** — per-template three.js scenes, lazy-loaded, with a 2D CSS
+  fallback + `prefers-reduced-motion` static floor + device-capability tiering (`useDeviceCapability`,
+  `downgradeStore` FPS latch). But **WebGL never blocks the ritual** (sealed layer is pure CSS/DOM; scene
+  prefetches during sealed idle; tap always plays an immediate CSS opening animation).
+- **Opening:** each template's own **sealed-tap intro replaces the 3D envelope** (`envelopeEnabled:false`
+  default); sealed = static guest name + tap cue, nothing animates until tap. Governed by the shared
+  `useIntroPhase` contract (below). Editor hides the 3D envelope / starfield / custom-bg controls for
+  bespoke templates.
+- **Names:** original bilingual AR/HE per template, chosen at build (kebab ids are permanent once minted).
+- **Dirty tree:** the uncommitted **gilded-orchard scaffold** was **stashed** (`git stash`, recoverable —
+  events revival + bg decorations + `gildedOrchard` palette) to restore the clean classic-only baseline.
+
+**Synthesis (affinity + JTBD) → intro-contract safeguards.** The no-auto-open decision collides with the
+[[UX Research Discovery 2026-07-02]] **P2 "Im Khaled" floor** (older WhatsApp-only guest may not know to
+tap) and the audit "loading wall". So `useIntroPhase` bakes in: an **escalating cue** (~8s idle → stronger
+hint), a **skip** control, a **return-visit fast path** (per-token localStorage → instant reveal + replay),
+and a **stuck-screen failsafe** (20s hard-cut to content, distinct from auto-open). The no-auto-open call is
+**reversible pending a Wave 1 usability gate** after template 1 ships (contingency: stronger cue → timed
+auto-open like classic). Editor also gets **legible curation** (copy above the curated chips; switch-confirm
+states content is kept / look resets) for the P1 "invisible changes / irreversibility" anxiety. Full plan in
+`~/.claude/plans/go-to-this-website-snuggly-curry.md`; usability plan in [[Usability Templates Test Plan]].
+
+**Phase 0 BUILT (2026-07-15, plumbing — one commit, classic path unchanged):**
+- `shared/src/data/digitalTemplates.js` — optional `bespoke:true` + curated `themes:[key,…]` metadata
+  fields + `getTemplateThemeKeys(id)` export (returns `null` for classic → full list).
+- `frontend/.../templates/TemplateRenderer.jsx` — `<Suspense>` boundary + `TemplateLoadCover` (public =
+  full-viewport theme-bg + guest name so the wait reads as the sealed state, not a loading wall; preview =
+  themed pulse). `registry.js` documents the module-scope `lazy()` registration pattern (classic stays eager
+  as the fallback).
+- `frontend/.../templates/introContract.js` — **`useIntroPhase({active,token,openMs})`** phase machine
+  (sealed→opening→done) with cue escalation, skip, replay, reduced-motion, failsafe, and the seen-token fast
+  path. This is the uniform sealed-tap contract every bespoke template's `<Intro>` runs on.
+- `DigitalDesignEditor.jsx` — `isBespokeTpl`; theme picker iterates curated keys (`themeKeysForPicker`,
+  appends active-but-uncurated defensively); hides envelope + immersive3d toggles and the 3D-envelope /
+  starfield / custom-bg `<Section>`s for bespoke; curation copy above the chips.
+- Tests: extended `registry.test.js` (bespoke invariants — curated∈themes, themes[0]===default themeColor,
+  envelopeEnabled false); new **`backend/tests/functions/digitalTemplateSync.test.ts`** (mechanizes the
+  backend↔shared `TEMPLATE_IDS`/`THEME_COLORS` mirror — a real gap before); new `useIntroPhase.test.js`.
+  Full unit suite green (frontend 566, backend 522).
+See [[Visual-Design-System]], [[Architecture-Decisions]], [[Tasks Backlog]], [[Usability Templates Test Plan]].

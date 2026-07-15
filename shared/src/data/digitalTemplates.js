@@ -19,6 +19,27 @@
 
 export const DEFAULT_TEMPLATE_ID = "classic";
 
+// Two optional fields distinguish the newer BESPOKE templates from `classic`:
+//
+//   bespoke: true
+//     Marks a template whose component tree is a standalone design (its own
+//     hero, opening intro, ornaments, effects) rather than the shared
+//     section stack. The web editor uses this flag to hide the classic-only
+//     controls (3D envelope, background starfield, custom 2D background) that
+//     a bespoke tree never mounts, and to interpret `showEnvelope` as the
+//     template's own sealed-tap intro instead of the 3D envelope. A bespoke
+//     template ALWAYS defaults `envelopeEnabled:false` (its intro is the
+//     `showEnvelope` prop, not the classic envelope toggle).
+//
+//   themes: [<digitalThemes key>, ...]
+//     An ordered CURATED palette list (native palette first — and
+//     `defaults.themeColor` must equal `themes[0]`). The editor's theme picker
+//     shows only these keys for this template, instead of the full global
+//     list, so a bespoke design is only ever recolored into palettes we
+//     actually designed + tested for it. Keys (not embedded palette objects) —
+//     digitalThemes.js stays the single palette store and the backend
+//     THEME_COLORS enum keeps mirroring its keys. Classic omits `themes`
+//     entirely → the picker falls back to the full list (unchanged behavior).
 export const TEMPLATES = {
   classic: {
     id: "classic",
@@ -33,7 +54,8 @@ export const TEMPLATES = {
     },
   },
   // Additional templates land here one at a time as they're built — each
-  // entry contributes its own `defaults` (themeColor/fontFamily/envelopeEnabled/
+  // bespoke entry adds `bespoke:true` + a curated `themes` list, and its
+  // `defaults` (themeColor === themes[0], fontFamily, envelopeEnabled:false,
   // envelopeStyle), never touching another template's entry.
 };
 
@@ -41,6 +63,15 @@ export const DIGITAL_TEMPLATE_KEYS = Object.keys(TEMPLATES);
 
 export function getDigitalTemplate(id) {
   return TEMPLATES[id] || TEMPLATES[DEFAULT_TEMPLATE_ID];
+}
+
+// The curated palette keys a template's theme picker should offer, or `null`
+// when the template opts out of curation (classic → the caller shows the full
+// global list). Never returns an empty array — a template that declared
+// `themes: []` by mistake also falls back to the full list.
+export function getTemplateThemeKeys(id) {
+  const t = TEMPLATES[id];
+  return Array.isArray(t?.themes) && t.themes.length ? t.themes : null;
 }
 
 // Opening-envelope STYLE options (the "شكل فتح المكتوب" picker) — relocated
