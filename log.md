@@ -340,3 +340,6 @@ Touched: Digital-Invitations
 
 ## [2026-07-15 11:10] session | Bespoke template plumbing + Destination Love template
 Touched: Digital-Invitations, Usability-Templates-Test-Plan, Tasks-Backlog, index
+
+## [2026-07-15 18:45] session | Brand-gold palette alignment for Destination Love
+Touched: Digital-Invitations

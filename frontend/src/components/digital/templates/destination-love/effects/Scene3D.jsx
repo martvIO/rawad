@@ -96,7 +96,7 @@ export default function Scene3D({ t, tier = 2, fixed = true, onDowngrade }) {
     // ── Clouds: soft sprites at varied depth drifting horizontally ──────
     const cloudCount = CLOUDS_BY_TIER[tier] || CLOUDS_BY_TIER[2];
     const clouds = [];
-    const cloudColor = new THREE.Color(t.isLight ? "#ffffff" : (t.secondary || "#9bb7a1"));
+    const cloudColor = new THREE.Color(t.isLight ? "#ffffff" : (t.secondary || "#c9a84c"));
     for (let i = 0; i < cloudCount; i++) {
       const mat = new THREE.SpriteMaterial({ map: tex, color: cloudColor, transparent: true, opacity: (t.isLight ? 0.16 : 0.12) + (i % 3) * 0.02, depthWrite: false });
       const s = new THREE.Sprite(mat);

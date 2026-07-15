@@ -8,22 +8,26 @@ import { getDigitalTheme } from "../../../../styles/digitalThemes.js";
 
 // Per-palette motif colours. `panel` = the cream/ivory boarding-pass card,
 // `panelInk` = text on it, `stamp` = the "invited" ink stamp, `dash` = the
-// dashed flight-path stroke, `secondary`/`sky` = travel accents.
+// dashed flight-path stroke, `secondary` = the plane/solid-accent tone,
+// `onSecondary` = ink that sits on `secondary` fills. Owner rule (2026-07-15):
+// motifs stay inside the WEBSITE's luxury identity — brand-gold family accents,
+// classic-envelope cream paper (#f9f6f0), wax-seal red (#b3232a) for the stamp —
+// the source design never contributes its color identity.
 const MOTIF = {
   voyage: {
-    secondary: "#9bb7a1", sky: "#7ebbfa", ring: "#c9a86a",
-    panel: "#f3ece4", panelSoft: "#e7ddcf", panelInk: "#2a2620", panelInkSoft: "#6b6152",
-    stamp: "#b04a3f", dash: "rgba(201,168,106,.55)", sceneTop: "#241f18", sceneHaze: "#3a2f22",
+    secondary: "#c9a84c", onSecondary: "#2a1c06", sky: "#8fb8e0", ring: "#c9a84c",
+    panel: "#f9f6f0", panelSoft: "#efe6d4", panelInk: "#2a2412", panelInkSoft: "#6e5f33",
+    stamp: "#b3232a", dash: "rgba(201,168,76,.55)", sceneTop: "#0d0c08", sceneHaze: "#1c160a",
   },
   voyageAzure: {
-    secondary: "#9cc0e8", sky: "#8fb8e0", ring: "#9cc0e8",
-    panel: "#eef3fb", panelSoft: "#dbe6f5", panelInk: "#1a2230", panelInkSoft: "#5a6b82",
-    stamp: "#c56a5a", dash: "rgba(156,192,232,.55)", sceneTop: "#161d2b", sceneHaze: "#22304a",
+    secondary: "#8fb8e0", onSecondary: "#101826", sky: "#b8d0f0", ring: "#c9a84c",
+    panel: "#f5f7fb", panelSoft: "#dfe7f2", panelInk: "#1a2230", panelInkSoft: "#5a6b82",
+    stamp: "#b3232a", dash: "rgba(143,184,224,.5)", sceneTop: "#0a0e1a", sceneHaze: "#111a30",
   },
   voyageSand: {
-    secondary: "#c98a5e", sky: "#4a9e97", ring: "#2f6d5f",
-    panel: "#fffdf7", panelSoft: "#f1e8d7", panelInk: "#2a2620", panelInkSoft: "#6b6152",
-    stamp: "#c0492f", dash: "rgba(47,109,95,.5)", sceneTop: "#eadfc8", sceneHaze: "#f2e7d2",
+    secondary: "#c4a458", onSecondary: "#2a1c06", sky: "#ddc488", ring: "#9c8040",
+    panel: "#fffdf7", panelSoft: "#f0e8d2", panelInk: "#332d1a", panelInkSoft: "#6e5f33",
+    stamp: "#b3232a", dash: "rgba(156,128,64,.5)", sceneTop: "#f2ead6", sceneHaze: "#f5eeda",
   },
 };
 
@@ -43,6 +47,10 @@ export function dlTokens(themeColor) {
   return {
     theme,
     ...motif,
+    // Top-level convenience mirror — sections/parts read `t.accent` for labels
+    // and eyebrows (previously undefined, silently falling back to inherited
+    // color; now the real theme accent).
+    accent: theme.accent,
     isLight: isLightBg(theme.bg),
     // Shared geometry so every section lines up.
     maxW: 460,

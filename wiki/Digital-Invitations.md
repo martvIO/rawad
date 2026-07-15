@@ -701,6 +701,20 @@ extended; registry + hero thumbnail wired.
   active, and **all classic 3D controls hidden** (envelope/starfield/custom-bg + toggles), footer
   toggle kept; picker hero thumbnail loads. Frontend 568 + backend 522 unit green; `npm run build`
   splits the template + a 3.7 kB Scene3D chunk off the shared `three` vendor chunk.
+- **Post-ship feedback round 1 (2026-07-15, owner review): brand-palette alignment — SHIPPED.**
+  Owner accepted the functionality but required the template palettes to match **the website's own
+  identity and luxury feeling**, not the source site's pastels. Fixed values-only (no ids/keys/backend):
+  `voyage` re-grounded on brand gold `#c9a84c` on near-black `#07070a` (theme.js C tokens); `voyageAzure`
+  aligned to the in-brand `blue` family (`#070a14`/`#8fb8e0`) with a gold-trimmed medallion; `voyageSand`
+  aligned to the in-brand `ivorygold` luxe family (`#faf5e7`/`#c4a458`). Motifs: plane/solid accents →
+  gold family, stamp → wax-seal red `#b3232a`, boarding-pass panel → classic-envelope cream `#f9f6f0`;
+  `DlButton` → the classic gold-gradient treatment; new `onSecondary` ink token replaced the isLight
+  ternaries; fixed a silent bug where sections read undefined `t.accent` (now a real convenience mirror).
+  Verified all 3 palettes in-browser at 390×844 + regenerated the picker thumbnail. Tests 568+522 green.
+  **⭐ STANDING RULE for all future bespoke templates (incl. templates 2–4):** palettes derive from the
+  brand family — near-black `#07070a` / ivory-gold grounds, `#c9a84c`-family accents, cream paper panels,
+  wax-red accent stamps; the source design contributes layout/motion/ornament language, **never its color
+  identity**.
 - **NEXT — Wave 1 usability gate (owner-run):** per [[Usability Templates Test Plan]], run the
   formative wave (4–5 participants, incl. an older P2 guest on a budget Android) on `destination-love`
   BEFORE building templates 2–4 (`dolce-vita`, `sacred-garden`, `blossom-oud`). It resolves the

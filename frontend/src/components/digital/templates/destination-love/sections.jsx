@@ -75,9 +75,9 @@ export function BoardingPass({ t, lang, fontFamily, namesLine, dateText, timeTex
   return (
     <section className="dl-scroll" style={{ padding: "16px 18px 8px" }}>
       <div style={{ maxWidth: t.maxW, margin: "0 auto", background: t.panel, color: t.panelInk, borderRadius: 18, overflow: "hidden", boxShadow: "0 24px 60px -34px rgba(0,0,0,.6)" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "13px 18px", background: t.secondary, color: t.isLight ? "#fff" : "#20211c" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "13px 18px", background: t.secondary, color: t.onSecondary }}>
           <span style={{ fontWeight: 900, fontSize: 13 }}>{L(lang, "بطاقة صعود", "כרטיס עלייה")}</span>
-          <PaperPlane size={20} color={t.isLight ? "#fff" : "#20211c"} stroke="transparent" />
+          <PaperPlane size={20} color={t.onSecondary} stroke="transparent" />
         </div>
         <div style={{ padding: "16px 18px" }}>
           <div style={{ display: "flex", gap: 14, marginBottom: 14 }}>
@@ -185,7 +185,7 @@ export function RsvpSection({ t, lang, fontFamily, opts, mealOptions, guestPhone
   const f = useRsvpForm({ guestPhone, opts, theme: t.theme, lang, onSubmitRsvp, rsvpDone, disabled });
   const chipStyle = (on) => ({
     padding: "9px 14px", borderRadius: 999, cursor: "pointer", fontSize: 13, fontWeight: 700, fontFamily: "inherit",
-    border: `1px solid ${on ? "transparent" : t.theme.accentLine}`, background: on ? t.secondary : "transparent", color: on ? (t.isLight ? "#fff" : "#20211c") : t.theme.textSoft,
+    border: `1px solid ${on ? "transparent" : t.theme.accentLine}`, background: on ? t.secondary : "transparent", color: on ? t.onSecondary : t.theme.textSoft,
   });
   const inputStyle = { width: "100%", padding: "11px 13px", borderRadius: 12, border: `1px solid ${t.theme.accentLine}`, background: "transparent", color: t.theme.text, fontFamily: "inherit", fontSize: 14 };
 
@@ -195,7 +195,7 @@ export function RsvpSection({ t, lang, fontFamily, opts, mealOptions, guestPhone
       <div style={{ maxWidth: 400, margin: "0 auto", position: "relative", background: t.theme.cardBg, border: `1px solid ${t.theme.cardBorder}`, borderRadius: 18, padding: 20 }}>
         {(alreadyAnswered && !f.showDone) || f.showDone ? (
           <div data-testid="rsvp-success" role="status" aria-live="polite" style={{ textAlign: "center", padding: "10px 0" }}>
-            <div style={{ width: 54, height: 54, borderRadius: "50%", margin: "0 auto 12px", display: "flex", alignItems: "center", justifyContent: "center", background: t.secondary, color: t.isLight ? "#fff" : "#20211c", fontSize: 26 }}>✓</div>
+            <div style={{ width: 54, height: 54, borderRadius: "50%", margin: "0 auto 12px", display: "flex", alignItems: "center", justifyContent: "center", background: t.secondary, color: t.onSecondary, fontSize: 26 }}>✓</div>
             <div style={{ fontWeight: 800, fontSize: 18, color: t.theme.text }}>
               {alreadyAnswered && !f.showDone ? L(lang, "تم تأكيد ردك", "כבר אישרת") : (f.status === "absent" ? L(lang, "نشكر إعلامكم", "תודה שהודעת") : L(lang, "تم حجز مقعدك!", "המקום שוריין!"))}
             </div>

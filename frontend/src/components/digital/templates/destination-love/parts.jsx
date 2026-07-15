@@ -70,7 +70,9 @@ export function SectionTitle({ eyebrow, title, t, fontFamily, id }) {
   );
 }
 
-// Sage/accent pill with the shine sweep.
+// Brand gold-gradient pill with the shine sweep — the same gradient treatment
+// as the classic RSVP submit, so the CTA reads unmistakably as the website's
+// gold identity in every palette.
 export function DlButton({ children, onClick, disabled, t, type = "button", full = false, testid }) {
   return (
     <button
@@ -90,12 +92,12 @@ export function DlButton({ children, onClick, disabled, t, type = "button", full
         border: "none",
         cursor: disabled ? "not-allowed" : "pointer",
         opacity: disabled ? 0.6 : 1,
-        background: t.secondary,
-        color: t.isLight ? "#fff" : "#20211c",
+        background: `linear-gradient(135deg, ${t.theme.gradientStops.join(",")})`,
+        color: t.onSecondary,
         fontWeight: 800,
         fontSize: 15,
         fontFamily: "inherit",
-        boxShadow: `0 10px 26px -12px ${t.secondary}`,
+        boxShadow: `0 10px 26px -12px ${t.theme.accent}`,
       }}
     >
       {children}
