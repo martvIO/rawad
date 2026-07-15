@@ -10,8 +10,13 @@
 // designSnapshot locked in a templateId at mint time) never renders blank,
 // even for a legacy design created before this field existed, or a template
 // later renamed/removed from the registry.
+import { lazy } from "react";
 import { DigitalInvitationView } from "../DigitalInvitationView.jsx";
 import { TEMPLATES, DEFAULT_TEMPLATE_ID } from "@dawa/core/data/digitalTemplates.js";
+import destinationLoveThumb from "../../../assets/templates/destination-love.jpg";
+
+// Bespoke templates: module-scope lazy() (see the note below on why not inline).
+const DestinationLoveView = lazy(() => import("./destination-love/index.js"));
 
 // `classic` is imported EAGERLY (not lazy): it is the fallback for every
 // unknown/legacy id, so it must be able to render synchronously and must never
@@ -36,6 +41,11 @@ export const TEMPLATE_REGISTRY = {
     ...TEMPLATES.classic,
     Component: DigitalInvitationView,
   },
+  "destination-love": {
+    ...TEMPLATES["destination-love"],
+    Component: DestinationLoveView,
+    thumb: destinationLoveThumb,
+  },
   // Additional templates register their lazy Component + thumb here as they're
   // built — each entry pairs one shared/digitalTemplates.js metadata row with
   // the template's own top-level view component.
@@ -45,4 +55,11 @@ export const TEMPLATE_IDS = Object.keys(TEMPLATE_REGISTRY);
 
 export function getTemplate(templateId) {
   return TEMPLATE_REGISTRY[templateId] || TEMPLATE_REGISTRY[DEFAULT_TEMPLATE_ID];
+}
+
+// Bundled preview thumbnail for the editor's template picker (frontend-only —
+// the shared metadata carries a plain slug, since Vite asset imports can't
+// cross into the native bundle). Returns null for templates without one.
+export function getTemplateThumb(templateId) {
+  return TEMPLATE_REGISTRY[templateId]?.thumb || null;
 }

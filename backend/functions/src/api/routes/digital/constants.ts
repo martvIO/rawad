@@ -119,6 +119,8 @@ const THEME_COLORS = new Set([
   // Light luxe palettes
   "champagne", "blush", "sage", "dustyblue", "lavender",
   "pearl", "peach", "mint", "mauve", "ivorygold",
+  // Destination Love (رحلة الحب) native palettes
+  "voyage", "voyageAzure", "voyageSand",
 ]);
 const FONT_FAMILIES = new Set([
   "amiri", "noto", "cairo",
@@ -138,7 +140,7 @@ const FONT_FAMILIES = new Set([
 // frontend/src/components/digital/templates/registry.js TEMPLATE_REGISTRY.
 // New ids are appended here only once their frontend Component + registry
 // entry actually exist — never speculatively ahead of the frontend build.
-const TEMPLATE_IDS = new Set(["classic"]);
+const TEMPLATE_IDS = new Set(["classic", "destination-love"]);
 
 // Fields whose change demotes an approved design back to draft. Operational
 // flags (photographerPublished, guestRanks) are intentionally NOT design fields.

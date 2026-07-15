@@ -53,6 +53,24 @@ export const TEMPLATES = {
       envelopeStyle: "classic",
     },
   },
+  // Destination Love (رحلة الحب / מסע האהבה) — a travel / boarding-pass theme:
+  // a sealed boarding pass that a paper plane flies in to "stamp" open, then a
+  // journey through the wedding as flight legs on a dashed route. Inspired-by
+  // reinterpretation of webgency's "Destination Love"; no source text/photos.
+  "destination-love": {
+    id: "destination-love",
+    label_ar: "رحلة الحب",
+    label_he: "מסע האהבה",
+    thumbnail: "destination-love",
+    bespoke: true,
+    themes: ["voyage", "voyageAzure", "voyageSand"],
+    defaults: {
+      themeColor: "voyage",
+      fontFamily: "aref",
+      envelopeEnabled: false,
+      envelopeStyle: "classic",
+    },
+  },
   // Additional templates land here one at a time as they're built — each
   // bespoke entry adds `bespoke:true` + a curated `themes` list, and its
   // `defaults` (themeColor === themes[0], fontFamily, envelopeEnabled:false,

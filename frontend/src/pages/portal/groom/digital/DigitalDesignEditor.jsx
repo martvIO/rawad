@@ -26,6 +26,7 @@ import { DIGITAL_THEMES, DIGITAL_FONTS, DIGITAL_THEME_KEYS, DIGITAL_FONT_KEYS, g
 import { resolveEnvelopePalette } from "../../../../utils/themeToEnvelopePalette.js";
 import { resolveBackground } from "../../../../utils/themeToBackground.js";
 import { TemplateRenderer } from "../../../../components/digital/templates/TemplateRenderer.jsx";
+import { getTemplateThumb } from "../../../../components/digital/templates/registry.js";
 import { Ambience } from "../../../../components/digital/sections/InviteAmbience.jsx";
 import { ViewStyles } from "../../../../components/digital/sections/InviteStyles.jsx";
 
@@ -1518,10 +1519,16 @@ export function DesignEditorBody({ groomUid, designId, adminDemoMode = false, on
             {DIGITAL_TEMPLATE_KEYS.map((id) => {
               const tpl = TEMPLATES[id];
               const active = templateId === id;
+              const thumb = getTemplateThumb(id);
               return (
                 <button key={id} data-testid={`design-template-${id}`} onClick={() => onPickTemplate(id)} disabled={!editable}
-                  style={{ padding: "14px 10px", borderRadius: 12, border: `2px solid ${active ? C.gold : "rgba(255,255,255,.08)"}`, background: active ? "rgba(201,168,76,.10)" : "rgba(255,255,255,.02)", cursor: editable ? "pointer" : "not-allowed", opacity: editable ? 1 : 0.55, fontFamily: "inherit", textAlign: "center" }}>
-                  <div style={{ fontSize: 12, fontWeight: 800, color: active ? C.gold : C.goldLight }}>{tt(lang, tpl.label_ar, tpl.label_he)}</div>
+                  style={{ padding: thumb ? 0 : "14px 10px", overflow: "hidden", borderRadius: 12, border: `2px solid ${active ? C.gold : "rgba(255,255,255,.08)"}`, background: active ? "rgba(201,168,76,.10)" : "rgba(255,255,255,.02)", cursor: editable ? "pointer" : "not-allowed", opacity: editable ? 1 : 0.55, fontFamily: "inherit", textAlign: "center" }}>
+                  {thumb && (
+                    <div style={{ width: "100%", aspectRatio: "3 / 4", overflow: "hidden", background: "#111" }}>
+                      <img src={thumb} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                    </div>
+                  )}
+                  <div style={{ fontSize: 12, fontWeight: 800, color: active ? C.gold : C.goldLight, padding: thumb ? "8px 6px" : 0 }}>{tt(lang, tpl.label_ar, tpl.label_he)}</div>
                 </button>
               );
             })}
