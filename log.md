@@ -337,3 +337,6 @@ Touched: Digital-Invitations, Tasks-Backlog
 
 ## [2026-07-09 22:40] session | Envelope opening-style picker scaffold
 Touched: Digital-Invitations
+
+## [2026-07-15 11:10] session | Bespoke template plumbing + Destination Love template
+Touched: Digital-Invitations, Usability-Templates-Test-Plan, Tasks-Backlog, index

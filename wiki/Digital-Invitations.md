@@ -679,4 +679,31 @@ states content is kept / look resets) for the P1 "invisible changes / irreversib
   envelopeEnabled false); new **`backend/tests/functions/digitalTemplateSync.test.ts`** (mechanizes the
   backend↔shared `TEMPLATE_IDS`/`THEME_COLORS` mirror — a real gap before); new `useIntroPhase.test.js`.
   Full unit suite green (frontend 566, backend 522).
+
+**Template 1 SHIPPED (2026-07-15): `destination-love` (رحلة الحب / מסע האהבה).** A travel /
+boarding-pass theme — the first bespoke template through the seam. `frontend/src/components/
+digital/templates/destination-love/`: `DestinationLoveView` (data contract identical to
+DigitalInvitationView) + `Intro` (sealed boarding pass → tap → plane fly-in + INVITED stamp →
+reveal, on `useIntroPhase`) + bespoke `sections.jsx` (medallion hero w/ flight arc, boarding-pass
+details card, departure countdown, flight-route timeline, destination/venue, ticket RSVP via the
+shared `useRsvpForm`+confetti, gift, guestbook, footer) + `effects/` (three.js parallax sky —
+drifting clouds/motes + tilt/pointer parallax — lazy, with a 2D CSS floor fallback, device tiering,
+FPS-guard downgrade, reduced-motion floor; **imperative canvas per mount** fixes the StrictMode
+context-loss remount bug) + scoped `Styles.jsx` (CSS vars, no template-literal interpolation) +
+`tokens.js` (per-palette motif colours + `isLight`). 3 native palettes **voyage / voyageAzure /
+voyageSand** (curated list; native font Aref Ruqaa). Backend `TEMPLATE_IDS` + `THEME_COLORS`
+extended; registry + hero thumbnail wired.
+- **Verified E2E in the emulator** (create→PATCH `templateId`→submit→approve→mint→open): sealed
+  boarding pass w/ real guest name from `designSnapshot` → tap → open → all 9 sections; RSVP
+  attending→prefilled phone→submit→success+confetti; AR↔HE RTL; voyage (dark) + voyageSand (light)
+  palettes; **live WebGL scene on the public page** (canvas + GL context, 0 console errors after
+  the remount fix); editor shows the **curated 3-chip theme picker + curation copy**, native font
+  active, and **all classic 3D controls hidden** (envelope/starfield/custom-bg + toggles), footer
+  toggle kept; picker hero thumbnail loads. Frontend 568 + backend 522 unit green; `npm run build`
+  splits the template + a 3.7 kB Scene3D chunk off the shared `three` vendor chunk.
+- **NEXT — Wave 1 usability gate (owner-run):** per [[Usability Templates Test Plan]], run the
+  formative wave (4–5 participants, incl. an older P2 guest on a budget Android) on `destination-love`
+  BEFORE building templates 2–4 (`dolce-vita`, `sacred-garden`, `blossom-oud`). It resolves the
+  no-auto-open sealed-screen decision + the default effects tier; findings feed back into
+  `useIntroPhase` so the remaining 3 inherit the tuned contract.
 See [[Visual-Design-System]], [[Architecture-Decisions]], [[Tasks Backlog]], [[Usability Templates Test Plan]].
