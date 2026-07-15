@@ -1,7 +1,30 @@
 
 // Shared building blocks for the digital-invitation sections — the gold-ink
-// constant, section header, floral flourish, and the public top-bar buttons.
+// constant, section header, floral flourish, confetti burst, and the public
+// top-bar buttons.
 const ON_GOLD = "#2a0f00"; // dark ink for text sitting on the gold gradient
+
+// ── RSVP confetti burst ───────────────────────────────────────────────────────
+// Hoisted out of the classic template's InviteRsvp.jsx so every template's
+// RSVP visual (old and new) triggers the identical, already-parameterized
+// burst — pass the theme's own gradient/accent/mono colors as `palette`.
+function confettiBurst(palette) {
+  const root = document.createElement("div");
+  root.className = "dawa-inv-confetti";
+  document.body.appendChild(root);
+  for (let i = 0; i < 80; i++) {
+    const sp = document.createElement("span");
+    const angle = Math.random() * Math.PI * 2;
+    const dist = 220 + Math.random() * 280;
+    sp.style.background = palette[i % palette.length];
+    sp.style.setProperty("--x", `${Math.cos(angle) * dist}px`);
+    sp.style.setProperty("--y", `${Math.sin(angle) * dist - 100}px`);
+    sp.style.setProperty("--r", `${Math.random() * 720 - 360}deg`);
+    sp.style.animationDelay = Math.random() * 0.2 + "s";
+    root.appendChild(sp);
+  }
+  setTimeout(() => root.remove(), 1800);
+}
 
 // ── Shared section header ────────────────────────────────────────────────────
 function SectionHead({ eyebrow, title, sub, theme, font }) {
@@ -120,4 +143,4 @@ function LangToggle({ lang, setLang, theme, font }) {
   );
 }
 
-export { ON_GOLD, SectionHead, FloralFlourish, LangToggle };
+export { ON_GOLD, confettiBurst, SectionHead, FloralFlourish, LangToggle };

@@ -1,23 +1,8 @@
 import { useEffect,useState } from "react";
 import { SectionHead } from "../inviteShared.jsx";
+import { useCountdown } from "../../../hooks/useCountdown.js";
 
 // ── Countdown ────────────────────────────────────────────────────────────────────
-function useCountdown(target) {
-  const [now, setNow] = useState(Date.now());
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(id);
-  }, []);
-  const diff = Math.max(0, target - now);
-  return {
-    d: Math.floor(diff / 86400000),
-    h: Math.floor((diff % 86400000) / 3600000),
-    m: Math.floor((diff % 3600000) / 60000),
-    s: Math.floor((diff % 60000) / 1000),
-    reached: target - now <= 0,
-  };
-}
-
 function CountdownCell({ value, label, theme, font }) {
   const [last, setLast] = useState(value);
   const [flip, setFlip] = useState(false);
