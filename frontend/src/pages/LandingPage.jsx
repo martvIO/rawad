@@ -2,7 +2,7 @@
 // No top nav: the page reads as a pure editorial composition.
 // Language toggle floats as a discreet chip top-right.
 // Portal CTA is woven through hero / showcase / pricing / CTA / footer.
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { BrandLogo } from "../components/BrandLogo.jsx";
 import { Icon } from "../components/icons/Icon.jsx";
@@ -13,16 +13,53 @@ import { C } from "../styles/theme.js";
 import { fetchPublicSettings } from "../services/publicSettings.js";
 import { resolveContact, buildWhatsAppUrl, mailtoUrl } from "../utils/contact.js";
 
-// ── Scroll position hook ────────────────────────────────────────────────────
-function useScrollPos() {
-  const [y, setY] = useState(0);
+// ── Scroll hooks ────────────────────────────────────────────────────────────
+// The hero's parallax/fade used to come from a `scrollY` state updated on EVERY
+// (unthrottled) scroll event, which re-reconciled this whole ~1400-line tree
+// per tick. Motion now runs off a ref inside requestAnimationFrame — React never
+// re-renders while you scroll — and only the nav's 60px threshold stays state,
+// since crossing it is a genuine visual state change (and React bails out when
+// the boolean is unchanged).
+function useScrolledPast(threshold) {
+  const [passed, setPassed] = useState(false);
   useEffect(() => {
-    const onScroll = () => setY(window.scrollY);
+    const onScroll = () => setPassed(window.scrollY > threshold);
     window.addEventListener("scroll", onScroll, { passive: true });
     onScroll();
     return () => window.removeEventListener("scroll", onScroll);
+  }, [threshold]);
+  return passed;
+}
+
+// Drives the hero's parallax + fade directly, rAF-throttled, with no renders.
+// Returns two refs: the content block (parallax + fade) and the scroll cue,
+// which only fades (at 0.85x) and keeps its own centring transform.
+function useHeroParallax() {
+  const contentRef = useRef(null);
+  const cueRef = useRef(null);
+  useEffect(() => {
+    let raf = 0;
+    const apply = () => {
+      raf = 0;
+      const y = window.scrollY;
+      // Identical math to the previous state-driven version:
+      // parallax = min(y*0.25, 80) applied as translateY(-parallax*0.4);
+      // opacity = max(0, 1 - y/600); the cue fades at opacity*0.85.
+      const opacity = Math.max(0, 1 - y / 600);
+      const content = contentRef.current;
+      if (content) {
+        content.style.transform = `translateY(${-Math.min(y * 0.25, 80) * 0.4}px)`;
+        content.style.opacity = String(opacity);
+      }
+      const cue = cueRef.current;
+      if (cue) cue.style.opacity = String(opacity * 0.85);
+    };
+    const onScroll = () => { if (!raf) raf = requestAnimationFrame(apply); };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    apply();
+    return () => { window.removeEventListener("scroll", onScroll); if (raf) cancelAnimationFrame(raf); };
   }, []);
-  return y;
+  return [contentRef, cueRef];
 }
 
 // IntersectionObserver-driven reveal cascade.
@@ -234,7 +271,7 @@ const PageStyles = () => (
 );
 
 export function LandingPage({ onEnterPortal, t, lang, setLang }) {
-  const scrollY = useScrollPos();
+  const scrolled = useScrolledPast(60);
   useReveal([lang]);
 
   // Contact channels (admin-managed via /settings/public, with config fallback).
@@ -280,9 +317,9 @@ export function LandingPage({ onEnterPortal, t, lang, setLang }) {
   return (
     <div style={{ background: C.bg, color: "#fff3c0", overflowX: "hidden", position: "relative" }}>
       <PageStyles />
-      <TopNav t={t} lang={lang} setLang={setLang} onEnterPortal={onEnterPortal} onContact={onContact} scrolled={scrollY > 60} />
+      <TopNav t={t} lang={lang} setLang={setLang} onEnterPortal={onEnterPortal} onContact={onContact} scrolled={scrolled} />
 
-      <HeroSection t={t} lang={lang} onEnterPortal={onEnterPortal} onContact={onContact} openSample={openSample} scrollY={scrollY} />
+      <HeroSection t={t} lang={lang} onEnterPortal={onEnterPortal} onContact={onContact} openSample={openSample} />
       <SocialProofSection t={t} />
       <Divider />
       <AboutSection      t={t} lang={lang} />
@@ -313,9 +350,10 @@ function Divider() {
 }
 
 // ── HERO ────────────────────────────────────────────────────────────────────
-function HeroSection({ t, lang, onEnterPortal, onContact, openSample, scrollY }) {
-  const parallax = Math.min(scrollY * 0.25, 80);
-  const opacity  = Math.max(0, 1 - scrollY / 600);
+function HeroSection({ t, lang, onEnterPortal, onContact, openSample }) {
+  // Parallax + fade are written straight to the node inside rAF (see
+  // useHeroParallax) — scrolling no longer re-renders this tree.
+  const [heroRef, cueRef] = useHeroParallax();
   const trustChips = t("trust_chips") || [];
   const heroTextLink = {
     background: "transparent", border: "none", color: "#c9a84c",
@@ -338,7 +376,7 @@ function HeroSection({ t, lang, onEnterPortal, onContact, openSample, scrollY })
           "radial-gradient(ellipse 70% 55% at 50% 30%, rgba(201,168,76,.14) 0%, transparent 60%)," +
           "radial-gradient(ellipse 60% 50% at 50% 90%, rgba(201,168,76,.06) 0%, transparent 70%)",
       }} />
-      <div style={{ position: "relative", transform: `translateY(${-parallax * 0.4}px)`, opacity }}>
+      <div ref={heroRef} style={{ position: "relative", willChange: "transform, opacity" }}>
         <div style={{
           fontSize: 11, color: "#f0c84c", fontWeight: 800,
           letterSpacing: 4, textTransform: "uppercase",
@@ -435,10 +473,9 @@ function HeroSection({ t, lang, onEnterPortal, onContact, openSample, scrollY })
         </div>
       </div>
 
-      <div style={{
+      <div ref={cueRef} style={{
         position: "absolute", bottom: 32, left: "50%", transform: "translateX(-50%)",
         display: "flex", flexDirection: "column", alignItems: "center", gap: 10,
-        opacity: opacity * 0.85,
         animation: "dawa-hero-shimmer 2.4s ease-in-out infinite",
       }}>
         <span style={{
@@ -905,7 +942,7 @@ function ShowcaseSection({ t, openSample }) {
                     borderRadius: 8, padding: "7px 0", textAlign: "center",
                   }}>
                     <div style={{ fontFamily: "'Amiri','Frank Ruhl Libre',serif", color: "#f0c84c", fontSize: 15, fontWeight: 900, lineHeight: 1 }}>{c.v}</div>
-                    <div style={{ fontSize: 7.5, color: "#7a6a4a", marginTop: 3, letterSpacing: .5 }}>{c.l}</div>
+                    <div style={{ fontSize: 7.5, color: C.dim, marginTop: 3, letterSpacing: .5 }}>{c.l}</div>
                   </div>
                 ))}
               </div>
@@ -1349,7 +1386,7 @@ function FooterSection({ t, lang, onEnterPortal, contact }) {
           display: "flex", justifyContent: "space-between", alignItems: "center",
           flexWrap: "wrap", gap: 16,
         }}>
-          <div style={{ color: "#7a6a4a", fontSize: 12 }}>
+          <div style={{ color: C.dim, fontSize: 12 }}>
             © {new Date().getFullYear()} {lang === "he" ? "דעוה שמחתנו" : "دعوة فرحنا"} · {t("footer_tagline")}
           </div>
           <button onClick={onEnterPortal} style={{
