@@ -147,6 +147,25 @@ export const TEMPLATES = {
     },
   },
 
+  // Lumen (ضياء / זוהר) — the quiet one: greige paper, wide serif capitals, acres
+  // of space, one gold seal. Inspired-by reinterpretation of webgency's template3
+  // ("Light design"); no source text/photos. Deliberately effect-free — a 3D scene
+  // would contradict the whole point of it.
+  lumen: {
+    id: "lumen",
+    label_ar: "ضياء",
+    label_he: "זוהר",
+    thumbnail: "lumen",
+    bespoke: true,
+    themes: ["lumen", "lumenNoir", "lumenSnow"],
+    defaults: {
+      themeColor: "lumen",
+      fontFamily: "noto",
+      envelopeEnabled: false,
+      envelopeStyle: "classic",
+    },
+  },
+
   // Additional templates land here one at a time as they're built — each
   // bespoke entry adds `bespoke:true` + a curated `themes` list, and its
   // `defaults` (themeColor === themes[0], fontFamily, envelopeEnabled:false,

@@ -21,6 +21,7 @@ const DolceVitaView = lazy(() => import("./dolce-vita/index.js"));
 const SacredGardenView = lazy(() => import("./sacred-garden/index.js"));
 const BlossomOudView = lazy(() => import("./blossom-oud/index.js"));
 const GildedOrchardView = lazy(() => import("./gilded-orchard/index.js"));
+const LumenView = lazy(() => import("./lumen/index.js"));
 
 // `classic` is imported EAGERLY (not lazy): it is the fallback for every
 // unknown/legacy id, so it must be able to render synchronously and must never
@@ -69,6 +70,11 @@ export const TEMPLATE_REGISTRY = {
     ...TEMPLATES["gilded-orchard"],
     Component: GildedOrchardView,
     thumb: BUNDLED_THUMBS["gilded-orchard"],
+  },
+  lumen: {
+    ...TEMPLATES.lumen,
+    Component: LumenView,
+    thumb: BUNDLED_THUMBS.lumen,
   },
   // Additional templates register their lazy Component + thumb here as they're
   // built — each entry pairs one shared/digitalTemplates.js metadata row with
