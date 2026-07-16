@@ -185,10 +185,25 @@ export function CelestialAmbience({
     }
   }, [covering, phase, onOpened]);
 
+  // The baked card used to hardcode Amiri/Frank Ruhl, so a groom who picked any
+  // other font saw the card's names in one face and the hero's names in another
+  // a second later. Split the design's stack (stack[0] = Arabic family,
+  // stack[1] = its Hebrew pair — see digitalThemes FONTS) and hand plain strings
+  // to the canvas, so JSON.stringify(envelope) stays stable and the envKey in
+  // CelestialCanvas doesn't churn. celestialEngine already refreshCard()s on
+  // document.fonts.ready, so the face repaints once it lands.
+  const famStack = String(font?.family || "")
+    .split(",")
+    .map((s) => s.trim().replace(/^['"]|['"]$/g, ""))
+    .filter(Boolean);
   const envelopeProp = {
     colors: resolveEnvelopePalette(theme, envelopeOverrides),
     monogram,
-    content: { namesAr, namesHe, blessing, welcome, eyebrow, date: dateText },
+    content: {
+      namesAr, namesHe, blessing, welcome, eyebrow, date: dateText,
+      arFamily: famStack[0] || "Amiri",
+      heFamily: famStack[1] || "Frank Ruhl Libre",
+    },
   };
 
   // ── Custom background mode ───────────────────────────────────────────────────

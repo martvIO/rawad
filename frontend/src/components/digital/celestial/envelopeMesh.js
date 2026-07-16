@@ -617,20 +617,28 @@ function paintCard(cardMaps, pal, text) {
   });
 
   // ── typography (colour map only; baked as matte ink) ──
+  // The families come from the design's chosen font (threaded in as
+  // content.arFamily / content.heFamily by CelestialAmbience) so the names
+  // emerging on the card match the hero one second later. Falls back to the
+  // previous hardcoded pair when absent. Quoted so multi-word families
+  // ("Frank Ruhl Libre", "Noto Naskh Arabic") parse in the canvas font shorthand.
+  const q = (f, fallback) => `"${String(f || fallback).replace(/"/g, "")}"`;
+  const ar = q(text.arFamily, "Amiri");
+  const he = q(text.heFamily, "Frank Ruhl Libre");
   colC.textAlign = "center"; colC.direction = "rtl";
-  colC.fillStyle = foil; colC.font = '600 34px Amiri,"Scheherazade New",serif';
+  colC.fillStyle = foil; colC.font = `600 34px ${ar},"Scheherazade New",serif`;
   colC.fillText(text.blessing || "", W / 2, H * 0.165);
   ornRule(colC, W / 2, H * 0.205, 150, foil);
-  colC.fillStyle = "rgba(150,110,60,0.9)"; colC.font = '500 19px Cairo,sans-serif';
+  colC.fillStyle = "rgba(150,110,60,0.9)"; colC.font = `500 19px ${ar},Cairo,sans-serif`;
   colC.fillText(text.eyebrow || "", W / 2, H * 0.265);
-  colC.fillStyle = ink; colC.font = '700 92px Amiri,serif';
+  colC.fillStyle = ink; colC.font = `700 92px ${ar},serif`;
   colC.fillText(text.namesAr || "", W / 2, H * 0.44);
-  colC.fillStyle = "#7a5430"; colC.font = '700 40px "Frank Ruhl Libre",serif';
+  colC.fillStyle = "#7a5430"; colC.font = `700 40px ${he},serif`;
   colC.fillText(text.namesHe || "", W / 2, H * 0.525);
   ornRule(colC, W / 2, H * 0.575, 210, foil);
-  colC.fillStyle = "#6a4e30"; colC.font = '400 24px Cairo,"Frank Ruhl Libre",sans-serif';
+  colC.fillStyle = "#6a4e30"; colC.font = `400 24px ${ar},${he},sans-serif`;
   wrapText(colC, text.welcome || "", W / 2, H * 0.66, W * 0.66, 34);
-  colC.fillStyle = foil; colC.font = '600 23px Cairo,sans-serif';
+  colC.fillStyle = foil; colC.font = `600 23px ${ar},Cairo,sans-serif`;
   colC.fillText(text.date || "", W / 2, H * 0.85);
 }
 
