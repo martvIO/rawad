@@ -40,8 +40,8 @@ function ViewStyles({ theme, fixed }) {
      * renders as an unreadable solid BLOCK on a few legacy in-app engines that
      * report support but mis-render it (old Samsung Internet, pre-autoupdate
      * Android WebView) — exactly where some guests open the WhatsApp link. So
-     * the gradient is GATED: DigitalInvitationView stamps `.dawa-inv-clip-ok`
-     * on the root only when the engine is confirmed to render clip-text
+     * the gradient is GATED: DigitalInvitationView stamps a dawa-inv-clip-ok
+     * class on the root only when the engine is confirmed to render clip-text
      * correctly (see supportsGradientText()). When that class is present this
      * flatten rule does NOT match and the inline gradient shows through; when
      * absent (unsupported / known-bad engine / uncertain) we fall back to the
