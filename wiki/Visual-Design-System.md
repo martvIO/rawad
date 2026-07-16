@@ -58,5 +58,15 @@ correct RTL order, `dir=rtl` preserved. Shipped across commits `d7b085b`,
 - Extract `Card`/`Modal`/`Stack`/`Field` primitives; landing scroll-reveal
   parity; standardize Suspense fallbacks + expand skeletons; design-token docs.
 
+## Standing rule — bespoke-template palettes (owner, 2026-07-15)
+
+From the post-ship review of the first bespoke invitation template (TASK-TPL-2, `destination-love`):
+**every bespoke template's palettes derive from the brand family** — near-black `#07070a` or
+ivory-gold luxe grounds, `#c9a84c`-family (theme.js `C.gold`) accents, classic-envelope cream
+`#f9f6f0` paper panels, wax-seal red `#b3232a` accent stamps; curated variants come from the
+in-brand `digitalThemes` families (`blue`, `ivorygold`). An external source design contributes
+layout / motion / ornament language, **never its color identity**. Full record + the shipped
+`voyage`/`voyageAzure`/`voyageSand` retune in [[Digital Invitations]].
+
 Related: [[Inline Styling Convention]] · [[Digital Invitations]] ·
 [[CRO and IA Audit 2026-06-20]] · [[Tasks Backlog]]

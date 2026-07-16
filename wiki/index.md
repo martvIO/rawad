@@ -26,7 +26,7 @@ _(ideas, frameworks, patterns, principles — pages that describe a concept)_
 - [[Polling and Realtime]] — REST polling (15–30s) for most data; SSE for live driver GPS
 - [[Security Model]] — three enforced server-side layers + non-authoritative UI guard; + 2026-07-01 monitoring/blocking/validation layer
 - [[Password Encryption]] — client RSA-OAEP-encrypts password fields as `enc:v1:` envelopes (defense-in-depth on top of HTTPS); backend middleware decrypts ahead of /auth + /users; LIVE in prod with plaintext rejection enforced, verified E2E 2026-07-03
-- [[Digital Invitations]] — the Firestore-backed WhatsApp-link invite flow; guest phone fields reuse the shared PhoneInput (Arabic-digit safe), groom add-guest imports contacts from .vcf/.csv files
+- [[Digital Invitations]] — the Firestore-backed WhatsApp-link invite flow (guest RSVP, design editor, approval workflow, token snapshots); now a multi-TEMPLATE system: classic + bespoke templates behind the TemplateRenderer registry seam, sealed-tap intro contract (`useIntroPhase`), curated per-template palettes on the brand gold identity — first bespoke template `destination-love` (رحلة الحب) shipped 2026-07-15
 - [[Face Matching]] — AWS Rekognition engine: guest "your photos" (camera-only Face Liveness → matches → ZIP) + OTP-gated "People" gallery; auto-send photos on publish; Cognito pool wired (us-east-1); consent + 30-day auto-purge
 - [[Optimistic UI Pattern]] — recurring bug class from the polling architecture, and its fix convention
 - [[Inline Styling Convention]] — 100% inline styles + `theme.js` tokens, no CSS framework
