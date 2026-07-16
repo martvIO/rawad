@@ -56,9 +56,9 @@ function ViewStyles({ theme, fixed }) {
 
     /* Section shell */
     .dawa-inv .dawa-inv-section { position: relative; padding: var(--inv-sec-pad) 24px; max-width: 1080px; margin: 0 auto; z-index: 6; }
-    .dawa-inv .dawa-inv-eyebrow { font-size: 11.5px; letter-spacing: 4px; text-transform: uppercase; font-style: italic; display: inline-flex; align-items: center; gap: 14px; margin-bottom: 16px; }
+    .dawa-inv .dawa-inv-eyebrow { font-size: 11.5px; letter-spacing: 4px; text-transform: uppercase; display: inline-flex; align-items: center; gap: 14px; margin-bottom: 16px; }
     .dawa-inv .dawa-inv-title { font-weight: 900; font-size: clamp(30px,5vw,48px); line-height: 1.35; margin-bottom: 16px; padding-block: 6px; }
-    .dawa-inv .dawa-inv-sub { font-style: italic; font-size: 14px; max-width: 540px; margin: 0 auto; line-height: 1.85; }
+    .dawa-inv .dawa-inv-sub { font-size: 14px; max-width: 540px; margin: 0 auto; line-height: 1.85; }
     .dawa-inv .dawa-inv-secflourish { margin-bottom: 14px; opacity: .9; }
     .dawa-inv .dawa-inv-secrule { display: flex; align-items: center; justify-content: center; gap: 9px; width: 132px; margin: 4px auto 16px; }
     .dawa-inv .dawa-inv-secrule > span { height: 1px; flex: 1; }
@@ -76,7 +76,7 @@ function ViewStyles({ theme, fixed }) {
     .dawa-inv .dawa-inv-corner-bl { bottom: -1px; inset-inline-start: -1px; border-bottom-width: 2px; border-inline-start-width: 2px; border-end-start-radius: 16px; }
     .dawa-inv .dawa-inv-corner-br { bottom: -1px; inset-inline-end: -1px; border-bottom-width: 2px; border-inline-end-width: 2px; border-end-end-radius: 16px; }
     @keyframes dawa-inv-frame { from { opacity: 0; transform: scale(1.03); } to { opacity: .4; transform: none; } }
-    .dawa-inv .dawa-inv-hero-eyebrow { position: relative; font-size: 13px; letter-spacing: 4px; text-transform: uppercase; font-style: italic; margin-bottom: 24px; display: inline-flex; align-items: center; gap: 14px; animation: dawa-inv-rise .9s ease both; }
+    .dawa-inv .dawa-inv-hero-eyebrow { position: relative; font-size: 13px; letter-spacing: 4px; text-transform: uppercase; margin-bottom: 24px; display: inline-flex; align-items: center; gap: 14px; animation: dawa-inv-rise .9s ease both; }
     .dawa-inv .dawa-inv-monogram { width: 170px; height: 170px; margin: 0 auto 28px; position: relative; display: flex; align-items: center; justify-content: center; animation: dawa-inv-rise 1.1s .15s cubic-bezier(.17,.67,.35,1.4) both; }
     .dawa-inv .dawa-inv-monogram svg { width: 100%; height: 100%; position: absolute; inset: 0; }
     .dawa-inv .dawa-inv-crown { animation: dawa-inv-rise 1s .35s cubic-bezier(.2,.7,.2,1) both; }
@@ -84,15 +84,15 @@ function ViewStyles({ theme, fixed }) {
     @keyframes dawa-inv-twinkle { 0%,100% { opacity: 1; } 50% { opacity: .5; } }
     .dawa-inv .dawa-inv-monogram-letters { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 56px; line-height: 1.4; padding-block: 8px; }
     .dawa-inv .dawa-inv-couple { font-weight: 900; font-size: clamp(48px,9vw,96px); line-height: 1.25; margin: 8px 0; padding-block: 8px; text-shadow: 0 0 80px ${theme.accentMuted}; animation: dawa-inv-rise 1.1s .3s cubic-bezier(.2,.7,.2,1) both; }
-    .dawa-inv .dawa-inv-amp { display: block; font-style: italic; font-size: clamp(28px,6vw,52px); margin: 6px 0; opacity: .8; padding-block: 4px; animation: dawa-inv-rise 1.1s .4s ease both; }
+    .dawa-inv .dawa-inv-amp { display: block; font-size: clamp(28px,6vw,52px); margin: 6px 0; opacity: .8; padding-block: 4px; animation: dawa-inv-rise 1.1s .4s ease both; }
     .dawa-inv .dawa-inv-dateline { display: inline-flex; align-items: center; gap: 16px; margin-top: 28px; padding: 12px 28px; border-radius: 999px; backdrop-filter: blur(20px); font-size: 16px; letter-spacing: .5px; animation: dawa-inv-rise 1.1s .5s ease both; flex-wrap: wrap; justify-content: center; box-shadow: 0 12px 36px -14px ${theme.accentMuted}, inset 0 0 0 1px ${theme.accentLine}; }
     .dawa-inv .dawa-inv-dot { width: 4px; height: 4px; border-radius: 50%; }
-    .dawa-inv .dawa-inv-greet { margin-top: 26px; font-style: italic; font-size: clamp(19px,3.4vw,28px); letter-spacing: 1px; line-height: 1.5; animation: dawa-inv-rise 1.1s .6s ease both; }
+    .dawa-inv .dawa-inv-greet { margin-top: 26px; font-size: clamp(19px,3.4vw,28px); letter-spacing: 1px; line-height: 1.5; animation: dawa-inv-rise 1.1s .6s ease both; }
     .dawa-inv .dawa-inv-greet strong { display: block; margin-top: 12px; font-style: normal; font-weight: 900; font-size: clamp(34px,7.5vw,52px); line-height: 1.2; letter-spacing: .5px; padding-block: 4px; text-shadow: 0 0 60px ${theme.accentMuted}; }
     .dawa-inv .dawa-inv-hero-media { margin-top: 30px; width: 100%; max-width: 440px; display: grid; gap: 14px; animation: dawa-inv-rise 1.1s .7s ease both; }
     .dawa-inv .dawa-inv-hero-media-item { border: 1px solid; border-radius: 16px; overflow: hidden; background: ${theme.cardBg}; }
     .dawa-inv .dawa-inv-hero-media-item img, .dawa-inv .dawa-inv-hero-media-item video { width: 100%; display: block; max-height: 56vh; object-fit: cover; }
-    .dawa-inv .dawa-inv-cue { position: absolute; bottom: 28px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 10px; font-size: 11px; font-style: italic; letter-spacing: 3px; text-transform: uppercase; opacity: .7; animation: dawa-inv-cue 2.4s ease-in-out infinite; }
+    .dawa-inv .dawa-inv-cue { position: absolute; bottom: 28px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 10px; font-size: 11px; letter-spacing: 3px; text-transform: uppercase; opacity: .7; animation: dawa-inv-cue 2.4s ease-in-out infinite; }
     .dawa-inv .dawa-inv-cue-line { width: 1px; height: 34px; }
     /* Entrance gate: the hero cascade above fires on MOUNT, while the opaque
      * envelope canvas still covers the page — finished long before the guest
@@ -124,7 +124,7 @@ function ViewStyles({ theme, fixed }) {
     .dawa-inv .dawa-inv-story.is-left .dawa-inv-story-node { left: -60px; }
     .dawa-inv .dawa-inv-story.is-right .dawa-inv-story-node { right: -60px; }
     .dawa-inv .dawa-inv-story-icon { font-size: 22px; margin-bottom: 12px; opacity: .9; }
-    .dawa-inv .dawa-inv-story-when { font-style: italic; font-size: 10.5px; letter-spacing: 3px; text-transform: uppercase; margin-bottom: 10px; opacity: .85; }
+    .dawa-inv .dawa-inv-story-when { font-size: 10.5px; letter-spacing: 3px; text-transform: uppercase; margin-bottom: 10px; opacity: .85; }
     .dawa-inv .dawa-inv-story-title { font-weight: 700; font-size: 25px; margin-bottom: 12px; line-height: 1.45; padding-block: 3px; }
     .dawa-inv .dawa-inv-story-body { font-size: 14px; line-height: 1.95; max-width: 40ch; }
     @media (max-width: 700px) {
@@ -144,7 +144,7 @@ function ViewStyles({ theme, fixed }) {
      * hide + hover-reveal is gated to fine-hover pointers. Unknown-support
      * browsers fall back to SHOWING the caption. A 2-line clamp keeps a long
      * caption from swallowing a portrait image; the scrim is softened for touch. */
-    .dawa-inv .dawa-inv-gallery-cap { position: absolute; bottom: 0; left: 0; right: 0; padding: 14px; font-style: italic; font-size: 12.5px; color: #fbf6e8; background: linear-gradient(180deg, transparent, rgba(7,7,10,.62)); opacity: 1; transform: none; transition: opacity .35s, transform .45s; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .dawa-inv .dawa-inv-gallery-cap { position: absolute; bottom: 0; left: 0; right: 0; padding: 14px; font-size: 12.5px; color: #fbf6e8; background: linear-gradient(180deg, transparent, rgba(7,7,10,.62)); opacity: 1; transform: none; transition: opacity .35s, transform .45s; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
     @media (hover: hover) and (pointer: fine) {
       .dawa-inv .dawa-inv-gallery-cap { opacity: 0; transform: translateY(6px); background: linear-gradient(180deg, transparent, rgba(7,7,10,.82)); }
       .dawa-inv .dawa-inv-gallery-item:hover .dawa-inv-gallery-cap { opacity: 1; transform: none; }
@@ -189,13 +189,13 @@ function ViewStyles({ theme, fixed }) {
     .dawa-inv .dawa-inv-cd-cell + .dawa-inv-cd-cell { border-inline-start: 1px solid var(--line); }
     .dawa-inv .dawa-inv-cd-num { font-weight: 900; font-size: clamp(40px,8vw,72px); line-height: 1.35; font-variant-numeric: tabular-nums; margin-bottom: 10px; display: inline-block; padding-block: 6px; }
     .dawa-inv .dawa-inv-cd-num.is-flip { animation: dawa-inv-flip .65s cubic-bezier(.2,.95,.25,1.1); }
-    .dawa-inv .dawa-inv-cd-lbl { font-style: italic; font-size: 11px; letter-spacing: 3px; text-transform: uppercase; opacity: .9; }
+    .dawa-inv .dawa-inv-cd-lbl { font-size: 11px; letter-spacing: 3px; text-transform: uppercase; opacity: .9; }
     .dawa-inv .dawa-inv-cd-date { text-align: center; margin-top: 22px; font-size: clamp(15px,2.8vw,20px); font-weight: 700; letter-spacing: .5px; }
 
     /* RSVP + guestbook cards */
     .dawa-inv .dawa-inv-rsvp { max-width: 580px; margin: 0 auto; }
     .dawa-inv .dawa-inv-field { margin-bottom: 22px; }
-    .dawa-inv .dawa-inv-field label { display: block; font-style: italic; font-size: 11px; letter-spacing: 2.8px; text-transform: uppercase; margin-bottom: 12px; opacity: .9; }
+    .dawa-inv .dawa-inv-field label { display: block; font-size: 11px; letter-spacing: 2.8px; text-transform: uppercase; margin-bottom: 12px; opacity: .9; }
     .dawa-inv .dawa-inv-toggle { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; border-bottom: 1px solid; padding-bottom: 16px; }
     .dawa-inv .dawa-inv-toggle-btn { border: 1px solid; background: transparent; cursor: pointer; padding: 12px 14px; border-radius: 999px; font-weight: 700; font-size: 14px; transition: all .35s cubic-bezier(.2,.95,.25,1.1); }
     .dawa-inv .dawa-inv-input { width: 100%; padding: 12px 0; background: transparent; border: none; border-bottom: 1px solid; border-radius: 0; font-size: 16px; outline: none; transition: border-color .25s; }
@@ -222,14 +222,14 @@ function ViewStyles({ theme, fixed }) {
     .dawa-inv .dawa-inv-wish:first-child { padding-top: 0; }
     .dawa-inv .dawa-inv-wish:last-child { border-bottom: none; }
     .dawa-inv .dawa-inv-wish:hover { transform: translateX(-2px); }
-    .dawa-inv .dawa-inv-wish-who { font-style: italic; font-size: 11px; letter-spacing: 2.8px; text-transform: uppercase; margin-bottom: 10px; opacity: .85; }
+    .dawa-inv .dawa-inv-wish-who { font-size: 11px; letter-spacing: 2.8px; text-transform: uppercase; margin-bottom: 10px; opacity: .85; }
     .dawa-inv .dawa-inv-wish-what { font-size: 16px; line-height: 1.8; }
 
     /* Footer */
     .dawa-inv .dawa-inv-foot { padding: var(--inv-sec-pad) 24px var(--inv-foot-bottom); text-align: center; position: relative; z-index: 6; }
     .dawa-inv .dawa-inv-foot-flourish { margin-bottom: 16px; opacity: .92; }
     .dawa-inv .dawa-inv-foot-mark { font-weight: 900; font-size: 38px; margin-bottom: 12px; padding-block: 6px; }
-    .dawa-inv .dawa-inv-foot-tag { font-size: 11px; letter-spacing: 3px; text-transform: uppercase; font-style: italic; opacity: .85; }
+    .dawa-inv .dawa-inv-foot-tag { font-size: 11px; letter-spacing: 3px; text-transform: uppercase; opacity: .85; }
 
     /* Brand logo crown + floral flourish */
     .dawa-inv .dawa-inv-hero-logo { margin-bottom: 10px; animation: dawa-inv-rise .8s ease both, dawa-inv-float 6s ease-in-out 1.4s infinite; }

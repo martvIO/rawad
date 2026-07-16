@@ -48,7 +48,7 @@ function GallerySection({ items, theme, font, lang }) {
             style={{
               position: "absolute", bottom: 24, left: 0, right: 0,
               textAlign: "center", padding: "0 32px",
-              color: "#fbf6e8", fontFamily: font.family, fontStyle: "italic",
+              color: "#fbf6e8", fontFamily: font.family,
               fontSize: 13, textShadow: "0 2px 12px rgba(0,0,0,.6)",
             }}
           >
