@@ -4,7 +4,7 @@
 //   /portal/*               → Authenticated portal (login + role views)
 // A back-compat effect rewrites legacy `?form=GROOM` query strings to the
 // new `/confirm/GROOM` path so old WhatsApp links still work.
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, lazy, Suspense } from "react";
 import { Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom";
 import { makeT } from "./i18n/index.js";
 import { GlobalStyle } from "./styles/GlobalStyle.jsx";
@@ -19,6 +19,12 @@ import { DigitalDesignPreviewPage } from "./pages/DigitalDesignPreviewPage.jsx";
 import { PeopleGallery } from "./pages/PeopleGallery.jsx";
 import { PayPage } from "./pages/PayPage.jsx";
 import { Portal } from "./pages/portal/Portal.jsx";
+
+// Public template gallery — lazy so its cards + thumbnails stay out of the
+// landing/main chunk (only prospects who ask for it pay the download).
+const TemplateGalleryPage = lazy(() =>
+  import("./pages/TemplateGalleryPage.jsx").then((m) => ({ default: m.TemplateGalleryPage })),
+);
 
 export default function App() {
   // Language (raw-string localStorage; preserves existing values).
@@ -62,6 +68,11 @@ export default function App() {
       <main id="main-content" tabIndex={-1}>
         <Routes>
           <Route path="/" element={<LandingPage onEnterPortal={() => navigate("/portal")} {...langProps} />} />
+          <Route path="/templates" element={
+            <Suspense fallback={<div style={{ minHeight: "100vh", background: "#07070a" }} />}>
+              <TemplateGalleryPage {...langProps} />
+            </Suspense>
+          } />
           <Route path="/terms" element={<TermsPage {...langProps} />} />
           <Route path="/help" element={<HelpPage {...langProps} />} />
           <Route path="/confirm/:groomUsername" element={<ConfirmationForm {...langProps} />} />

@@ -679,6 +679,17 @@ export const ar = {
   hero_cta_book: "← احجزوا عبر واتساب",
   hero_login_link: "عميل حالي؟ تسجيل الدخول",
   hero_sample_link: "← شاهد نموذجاً حيًّا للدعوة",
+  // ── Template gallery ───────────────────────────────────────────────
+  templates_strip_eyebrow: "قوالب التصميم",
+  templates_strip_title: "اختر أسلوب دعوتك",
+  templates_strip_body: "كل قالب تجربة كاملة — افتحه وجرّبه بنفسك.",
+  templates_view_all: "استعرض جميع القوالب ←",
+  templates_try_live: "جرّب حيًّا ↗",
+  templates_copy_link: "انسخ الرابط",
+  templates_copied: "تم نسخ الرابط ✓",
+  templates_gallery_title: "قوالب الدعوات",
+  templates_gallery_subtitle: "استعرض كل قالب بتجربته الحيّة، ثم اختر الأنسب لفرحك.",
+  templates_back_home: "← الصفحة الرئيسية",
   social_proof_eyebrow: "آراء عملائنا",
   social_proof_title: "عرسان وثقوا بدعوة",
   // ⤵ شهادات حقيقية فقط (اسم العميل ومدينته، بعد إذنه). اتركها [] لإخفاء القسم بالكامل.

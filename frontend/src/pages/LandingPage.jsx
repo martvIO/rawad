@@ -6,6 +6,9 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { BrandLogo } from "../components/BrandLogo.jsx";
 import { Icon } from "../components/icons/Icon.jsx";
+import { TemplateCard } from "../components/TemplateCard.jsx";
+import { DIGITAL_TEMPLATE_KEYS } from "@dawa/core/data/digitalTemplates.js";
+import { getTemplateThumb } from "../components/digital/templates/thumbs.js";
 import { C } from "../styles/theme.js";
 import { fetchPublicSettings } from "../services/publicSettings.js";
 import { resolveContact, buildWhatsAppUrl, mailtoUrl } from "../utils/contact.js";
@@ -290,6 +293,7 @@ export function LandingPage({ onEnterPortal, t, lang, setLang }) {
       <ServicesSection   t={t} onEnterPortal={onEnterPortal} />
       <ProcessSection    t={t} />
       <ShowcaseSection   t={t} openSample={openSample} />
+      <TemplateStripSection t={t} lang={lang} />
       <PricingSection    t={t} onContact={onContact} />
       <FaqSection        t={t} />
       <CtaSection        t={t} onEnterPortal={onEnterPortal} onContact={onContact} />
@@ -799,6 +803,32 @@ function ProcessSection({ t }) {
 }
 
 // ── SHOWCASE — phone mockup with mini dashboard preview ────────────────────
+// Template strip — a compact, horizontally scrollable row of every template,
+// each opening its own live demo, with a link through to the full /templates
+// gallery. Deliberately placed AFTER ShowcaseSection: the showcase narrates what
+// an invitation IS, and this then answers "in which style?". Data-driven from the
+// shared TEMPLATES metadata, so new templates surface here automatically.
+function TemplateStripSection({ t, lang }) {
+  const navigate = useNavigate();
+  return (
+    <section style={{ padding: "40px 24px 100px", maxWidth: 1100, margin: "0 auto" }}>
+      <SectionHead eyebrow={t("templates_strip_eyebrow")} title={t("templates_strip_title")} sub={t("templates_strip_body")} />
+      <div className="dawa-reveal" style={{ display: "flex", gap: 16, overflowX: "auto", paddingBottom: 12, scrollSnapType: "x mandatory" }}>
+        {DIGITAL_TEMPLATE_KEYS.map((id) => (
+          <div key={id} style={{ scrollSnapAlign: "start", flex: "0 0 auto" }}>
+            <TemplateCard id={id} t={t} lang={lang} thumb={getTemplateThumb(id)} compact />
+          </div>
+        ))}
+      </div>
+      <div className="dawa-reveal" style={{ textAlign: "center", marginTop: 28 }}>
+        <button onClick={() => navigate("/templates")} className="gold-btn" style={{ fontFamily: "inherit", cursor: "pointer" }}>
+          {t("templates_view_all")}
+        </button>
+      </div>
+    </section>
+  );
+}
+
 function ShowcaseSection({ t, openSample }) {
   const bullets = t("showcase_bullets") || [];
   return (

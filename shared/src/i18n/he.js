@@ -669,6 +669,17 @@ export const he = {
   hero_cta_book: "← הזמנה בוואטסאפ",
   hero_login_link: "כבר לקוח? התחברות",
   hero_sample_link: "← צפו בדוגמה חיה של ההזמנה",
+  // ── Template gallery ───────────────────────────────────────────────
+  templates_strip_eyebrow: "תבניות עיצוב",
+  templates_strip_title: "בחרו את סגנון ההזמנה",
+  templates_strip_body: "כל תבנית היא חוויה שלמה — פתחו ונסו בעצמכם.",
+  templates_view_all: "לכל התבניות ←",
+  templates_try_live: "נסו חי ↗",
+  templates_copy_link: "העתק קישור",
+  templates_copied: "הקישור הועתק ✓",
+  templates_gallery_title: "תבניות הזמנה",
+  templates_gallery_subtitle: "צפו בכל תבנית בתצוגה חיה, ואז בחרו את המתאימה לשמחה שלכם.",
+  templates_back_home: "← לדף הבית",
   social_proof_eyebrow: "המלצות לקוחות",
   social_proof_title: "חתנים שסמכו על דעוה",
   // ⤵ המלצות אמיתיות בלבד (שם ועיר הלקוח, באישורו). השאירו [] כדי להסתיר את הקטע לגמרי.
