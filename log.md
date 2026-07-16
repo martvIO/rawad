@@ -352,3 +352,6 @@ Touched: Template-Demo-Surfaces, Guest-Experience-Metrics, Digital-Invitations, 
 
 ## [2026-07-16 11:15] session | Numeric web-quality audit → Reports/ (Lighthouse+probes)
 Touched: Web-Quality-Report-2026-07-16, index
+
+## [2026-07-16 14:45] session | Arabic joins+clipping skill built and run app-wide
+Touched: Arabic-Typography, Visual-Design-System, index

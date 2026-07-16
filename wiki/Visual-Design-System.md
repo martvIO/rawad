@@ -68,5 +68,5 @@ in-brand `digitalThemes` families (`blue`, `ivorygold`). An external source desi
 layout / motion / ornament language, **never its color identity**. Full record + the shipped
 `voyage`/`voyageAzure`/`voyageSand` retune in [[Digital Invitations]].
 
-Related: [[Inline Styling Convention]] · [[Digital Invitations]] ·
+Related: [[Inline Styling Convention]] · [[Digital Invitations]] · [[Arabic Typography]] ·
 [[CRO and IA Audit 2026-06-20]] · [[Tasks Backlog]]
