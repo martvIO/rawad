@@ -24,7 +24,8 @@ import { AuthRequest, requireAuth, requireAdmin } from "../middleware/auth";
 import { uidRateLimit } from "../middleware/rateLimit";
 import { HOUR_MS } from "../../constants/time";
 import { COLL_ROOT, COLL_GUESTS, COLL_DESIGNS } from "./digital/constants";
-import { buildAnalytics, normalizeWindow } from "../analytics/aggregate";
+import { buildAnalytics, normalizeWindow, windowSpanMs } from "../analytics/aggregate";
+import { dayKey } from "../analytics/metricsRollup";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -128,8 +129,12 @@ adminRouter.get(
 
       const db = getDatabase();
       const fs = getFirestore();
+      // metricsDaily is queried by a bounded day RANGE (not scanned): the
+      // rollups exist precisely so this endpoint never has to read raw per-load
+      // events, which grow without bound. Single-field range → auto-indexed.
+      const sinceDay = dayKey(now - windowSpanMs(window));
       const [
-        usersSnap, guestsSnap, confSnap, tokensSnap, assignSnap, designsSnap, digitalGuestsSnap,
+        usersSnap, guestsSnap, confSnap, tokensSnap, assignSnap, designsSnap, digitalGuestsSnap, metricsSnap,
       ] = await Promise.all([
         db.ref("users").get(),
         db.ref("guestsByGroom").get(),
@@ -138,6 +143,7 @@ adminRouter.get(
         db.ref("driverAssignments").get(),
         fs.collectionGroup(COLL_DESIGNS).get(),
         fs.collectionGroup(COLL_GUESTS).get(),
+        fs.collection("metricsDaily").where("day", ">=", sinceDay).get(),
       ]);
 
       const users = Object.entries(usersSnap.val() ?? {}).map(
@@ -167,11 +173,15 @@ adminRouter.get(
       }));
       const digitalGuests = digitalGuestsSnap.docs.map((d) => ({
         groomUid: d.ref.parent.parent?.id ?? "",
+        // The guest id is what joins a guest to the invite token that carries the
+        // template they were actually sent (token.guestId).
+        id: d.id,
         ...(d.data() as Record<string, unknown>),
       }));
+      const metricsDaily = metricsSnap.docs.map((d) => d.data() as Record<string, unknown>);
 
       const payload = buildAnalytics({
-        users, guests, confirmations, inviteTokens, driverAssignments, designs, digitalGuests, window, now,
+        users, guests, confirmations, inviteTokens, driverAssignments, designs, digitalGuests, metricsDaily, window, now,
       });
       analyticsCache = { at: now, window, payload };
       res.json(payload);

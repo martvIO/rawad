@@ -14,6 +14,13 @@
 //     invites still have only "sent" (inviteLinkSentAt) and "confirmed".
 //   - Stripe only records paymentStatus pending|paid (no "failed") — failedCount
 //     is surfaced as 0 rather than fabricated.
+//   - Load/open TIMINGS come from metricsDaily histogram rollups, so percentiles
+//     are bucket UPPER EDGES ("p90 ≤ 4s"), and a percentile landing in the
+//     open-ended tail returns null rather than an invented number.
+//   - Demo/gallery (prospect) traffic is reported ONLY in demoEngagement; it is
+//     never merged into the guest funnel or a template's guest-facing timings.
+
+import { MS_EDGES, histPercentile, mergeHist } from "./metricsRollup";
 
 type AnyRec = Record<string, unknown>;
 
@@ -40,6 +47,13 @@ const WINDOWS: Record<AnalyticsWindow, { spanMs: number; stepMs: number }> = {
 
 export function normalizeWindow(w: unknown): AnalyticsWindow {
   return w === "90d" || w === "all" ? w : "30d";
+}
+
+/** The trend span for a window — exported so the route can bound its
+ *  metricsDaily query to exactly the range the aggregator will report on
+ *  (rather than duplicating the window table and drifting from it). */
+export function windowSpanMs(w: AnalyticsWindow): number {
+  return WINDOWS[w].spanMs;
 }
 
 // ─── Small coercion helpers ────────────────────────────────────────────────────
@@ -249,6 +263,320 @@ export function composeDesigns(designs: AnyRec[]) {
   };
 }
 
+// ─── Guest-experience engagement (the digital funnel + load timings) ───────────
+//
+// Sources, and the honesty line between them:
+//   • digitalGuests — inviteLinkSentAt / viewedAt / confirmedAt are FIRST-PARTY
+//     stamps written by the mint, the open ping, and the RSVP submit. The funnel
+//     below is therefore counted, not modeled.
+//   • guest.perf   — the FIRST visit's timings (POST /invites/digital/metrics).
+//   • metricsDaily — histogram rollups over EVERY load, used for percentiles.
+// Demo/gallery rollups are deliberately never mixed into the guest sections —
+// prospect traffic must not move a couple's numbers (see composeDemoEngagement).
+
+/** Exact percentile from raw samples (used where we have the values, not buckets). */
+function pctile(values: number[], q: number): number | null {
+  if (!values.length) return null;
+  const s = [...values].sort((a, b) => a - b);
+  const i = Math.min(s.length - 1, Math.max(0, Math.ceil(q * s.length) - 1));
+  return Math.round(s[i]);
+}
+
+function statsOf(values: number[]) {
+  return { p50: pctile(values, 0.5), p90: pctile(values, 0.9), n: values.length };
+}
+
+/**
+ * Which template a digital guest's invitation actually rendered. The token's
+ * mint-time designSnapshot is authoritative (it is what the guest was SENT, even
+ * if the couple has since switched templates); `perf.templateId` is the
+ * fallback for a visit we measured, and pre-template tokens are `classic`, which
+ * is exactly what the renderer falls back to for an unknown id.
+ */
+function templateOfGuest(g: AnyRec, tokenTemplates: Map<string, string>): string {
+  const key = `${String(g.groomUid ?? "")}/${String(g.id ?? "")}`;
+  const fromToken = tokenTemplates.get(key);
+  if (fromToken) return fromToken;
+  const perf = g.perf as AnyRec | undefined;
+  const fromPerf = perf?.templateId;
+  return typeof fromPerf === "string" && fromPerf ? fromPerf : "classic";
+}
+
+/** guestKey → templateId, from the digital invite tokens' design snapshots. */
+export function buildTokenTemplateMap(inviteTokens: AnyRec[]): Map<string, string> {
+  const m = new Map<string, string>();
+  for (const tk of inviteTokens) {
+    if (tk.guestType !== "digital") continue;
+    const groomUid = String(tk.groomUid ?? "");
+    const guestId = String(tk.guestId ?? "");
+    if (!groomUid || !guestId) continue;
+    const snap = tk.designSnapshot as AnyRec | undefined;
+    const tpl = snap?.templateId;
+    m.set(`${groomUid}/${guestId}`, typeof tpl === "string" && tpl ? tpl : "classic");
+  }
+  return m;
+}
+
+const MAX_ROWS = 100;
+
+/**
+ * The digital funnel: sent → opened → submitted, plus the two buckets the owner
+ * explicitly asked to see — guests who opened but never answered, and guests who
+ * never opened at all. Both are derived from existing stamps (no new tracking).
+ */
+export function composeDigitalEngagement(digitalGuests: AnyRec[], inviteTokens: AnyRec[]) {
+  const tokenTemplates = buildTokenTemplateMap(inviteTokens);
+  const funnel = { sent: 0, opened: 0, submitted: 0, attending: 0, absent: 0, openedNoAnswer: 0, neverOpened: 0 };
+  const lags: number[] = [];
+  const taps: number[] = [];
+  const rows: AnyRec[] = [];
+
+  for (const g of digitalGuests) {
+    const sentAt = posTs(g.inviteLinkSentAt);
+    const viewedAt = posTs(g.viewedAt);
+    const confirmedAt = posTs(g.confirmedAt);
+    const status = String(g.status ?? "pending");
+
+    if (sentAt) funnel.sent++;
+    if (viewedAt) funnel.opened++;
+    if (confirmedAt) {
+      funnel.submitted++;
+      if (status === "attending") funnel.attending++;
+      else if (status === "absent") funnel.absent++;
+    }
+    // Opened but never answered — the drop-off the RSVP nudge should target.
+    if (viewedAt && !confirmedAt) funnel.openedNoAnswer++;
+    // Sent but never opened — a reach problem (wrong number, unseen message),
+    // NOT an invitation problem. Only counted for guests we actually sent to.
+    if (sentAt && !viewedAt) funnel.neverOpened++;
+
+    // Send → first-visit lag: how long the WhatsApp link sat before it was opened.
+    if (sentAt && viewedAt && viewedAt >= sentAt) lags.push(viewedAt - sentAt);
+
+    const perf = (g.perf as AnyRec | undefined) ?? undefined;
+    // Only a REAL tap measures the ritual; an auto-open/skip/failsafe would
+    // otherwise flatter the number with delays no guest chose.
+    if (perf?.tapKind === "tap") {
+      const d = posTs(perf.tapDelayMs);
+      if (d !== null) taps.push(d);
+    }
+
+    if (viewedAt || confirmedAt || perf) {
+      rows.push({
+        groomUid: g.groomUid ?? "",
+        guestId: g.id ?? "",
+        templateId: templateOfGuest(g, tokenTemplates),
+        sentAt, viewedAt, confirmedAt,
+        status: confirmedAt ? status : "pending",
+        lagMs: sentAt && viewedAt && viewedAt >= sentAt ? viewedAt - sentAt : null,
+        sealedMs: perf ? (posTs(perf.sealedMs) ?? null) : null,
+        readyMs: perf ? (posTs(perf.readyMs) ?? null) : null,
+        lcpMs: perf ? (posTs(perf.lcpMs) ?? null) : null,
+        tapDelayMs: perf ? (posTs(perf.tapDelayMs) ?? null) : null,
+        tapKind: perf?.tapKind ?? null,
+        locale: g.locale ?? null,
+      });
+    }
+  }
+
+  // Most-recently-active first, capped — the payload is a dashboard, not an export.
+  rows.sort((a, b) => num(b.viewedAt) - num(a.viewedAt));
+  const totalRows = rows.length;
+
+  return {
+    funnel,
+    totalDigitalGuests: digitalGuests.length,
+    openRatePct: funnel.sent > 0 ? Math.round((funnel.opened / funnel.sent) * 100) : 0,
+    // "Completed" = ANY answer (attending or absent) — an explicit "not coming"
+    // is a completed form, and counting only attendees would misread the ask.
+    completionRatePct: funnel.sent > 0 ? Math.round((funnel.submitted / funnel.sent) * 100) : 0,
+    answerRateOfOpenedPct: funnel.opened > 0 ? Math.round((funnel.submitted / funnel.opened) * 100) : 0,
+    sendToOpenLagMs: statsOf(lags),
+    tapDelayMs: statsOf(taps),
+    guestRows: rows.slice(0, MAX_ROWS),
+    guestRowsTruncated: Math.max(0, totalRows - MAX_ROWS),
+  };
+}
+
+/** Sum the guest-surface rollups for one template across the window. */
+function sumRollups(docs: AnyRec[]) {
+  const acc = {
+    loads: 0,
+    hist: {} as Record<string, Record<string, number>>,
+    tapKinds: {} as Record<string, number>,
+    cls: { good: 0, ni: 0, poor: 0 },
+  };
+  for (const d of docs) {
+    acc.loads += num(d.loads);
+    const hist = (d.hist as AnyRec | undefined) ?? {};
+    for (const [metric, buckets] of Object.entries(hist)) {
+      acc.hist[metric] = mergeHist(acc.hist[metric], buckets as Record<string, number>);
+    }
+    const tk = (d.tapKinds as AnyRec | undefined) ?? {};
+    for (const [k, v] of Object.entries(tk)) acc.tapKinds[k] = (acc.tapKinds[k] ?? 0) + num(v);
+    const cls = (d.cls as AnyRec | undefined) ?? {};
+    acc.cls.good += num(cls.good);
+    acc.cls.ni += num(cls.ni);
+    acc.cls.poor += num(cls.poor);
+  }
+  return acc;
+}
+
+/**
+ * Per-template comparison: the funnel from the guest stamps + the load
+ * distribution from the GUEST-surface rollups. This is what answers "is this
+ * template slower, and does it actually get more RSVPs?".
+ */
+export function composeTemplateMetrics(
+  digitalGuests: AnyRec[],
+  inviteTokens: AnyRec[],
+  metricsDaily: AnyRec[],
+) {
+  const tokenTemplates = buildTokenTemplateMap(inviteTokens);
+  const byTpl = new Map<string, { sent: number; opened: number; submitted: number }>();
+  const touch = (id: string) => {
+    if (!byTpl.has(id)) byTpl.set(id, { sent: 0, opened: 0, submitted: 0 });
+    return byTpl.get(id)!;
+  };
+
+  for (const g of digitalGuests) {
+    const tpl = templateOfGuest(g, tokenTemplates);
+    const row = touch(tpl);
+    if (posTs(g.inviteLinkSentAt)) row.sent++;
+    if (posTs(g.viewedAt)) row.opened++;
+    if (posTs(g.confirmedAt)) row.submitted++;
+  }
+
+  // Guest surface only — a prospect clicking through demos must never make a
+  // template look faster or slower than it is for real guests.
+  const guestDocs = metricsDaily.filter((d) => d.surface === "guest");
+  const docsByTpl = new Map<string, AnyRec[]>();
+  for (const d of guestDocs) {
+    const id = String(d.templateId ?? "classic");
+    if (!docsByTpl.has(id)) docsByTpl.set(id, []);
+    docsByTpl.get(id)!.push(d);
+    touch(id);
+  }
+
+  const rows = [...byTpl.entries()].map(([templateId, f]) => {
+    const agg = sumRollups(docsByTpl.get(templateId) ?? []);
+    const taps = num(agg.tapKinds.tap);
+    const autos = num(agg.tapKinds.auto);
+    const opens = taps + autos + num(agg.tapKinds.skip) + num(agg.tapKinds.failsafe) + num(agg.tapKinds.seen);
+    const clsTotal = agg.cls.good + agg.cls.ni + agg.cls.poor;
+    return {
+      templateId,
+      sent: f.sent,
+      opened: f.opened,
+      submitted: f.submitted,
+      openRatePct: f.sent > 0 ? Math.round((f.opened / f.sent) * 100) : 0,
+      completionRatePct: f.sent > 0 ? Math.round((f.submitted / f.sent) * 100) : 0,
+      loads: agg.loads,
+      sealedP50: histPercentile(agg.hist.sealed, MS_EDGES, 0.5),
+      sealedP90: histPercentile(agg.hist.sealed, MS_EDGES, 0.9),
+      readyP50: histPercentile(agg.hist.ready, MS_EDGES, 0.5),
+      readyP90: histPercentile(agg.hist.ready, MS_EDGES, 0.9),
+      lcpP75: histPercentile(agg.hist.lcp, MS_EDGES, 0.75),
+      inpP75: histPercentile(agg.hist.inp, MS_EDGES, 0.75),
+      tapDelayP50: histPercentile(agg.hist.tap, MS_EDGES, 0.5),
+      // What share of opens the guest actually chose. A high auto share on the
+      // classic template means the tap cue is not landing.
+      tapKinds: agg.tapKinds,
+      autoOpenPct: opens > 0 ? Math.round((autos / opens) * 100) : null,
+      clsGoodPct: clsTotal > 0 ? Math.round((agg.cls.good / clsTotal) * 100) : null,
+    };
+  });
+
+  rows.sort((a, b) => b.sent - a.sent || b.loads - a.loads);
+  return { rows };
+}
+
+/** Per-wedding engagement — "are THIS couple's guests getting through?". */
+export function composeWeddingEngagement(digitalGuests: AnyRec[], users: AnyRec[]) {
+  const nameOf = new Map<string, string>();
+  for (const u of users) if (typeof u.uid === "string") nameOf.set(u.uid, username(u));
+
+  const byGroom = new Map<string, { sent: number; opened: number; submitted: number; lags: number[]; sealed: number[] }>();
+  for (const g of digitalGuests) {
+    const uid = String(g.groomUid ?? "");
+    if (!uid) continue;
+    if (!byGroom.has(uid)) byGroom.set(uid, { sent: 0, opened: 0, submitted: 0, lags: [], sealed: [] });
+    const row = byGroom.get(uid)!;
+    const sentAt = posTs(g.inviteLinkSentAt);
+    const viewedAt = posTs(g.viewedAt);
+    if (sentAt) row.sent++;
+    if (viewedAt) row.opened++;
+    if (posTs(g.confirmedAt)) row.submitted++;
+    if (sentAt && viewedAt && viewedAt >= sentAt) row.lags.push(viewedAt - sentAt);
+    const sealed = posTs((g.perf as AnyRec | undefined)?.sealedMs);
+    if (sealed !== null) row.sealed.push(sealed);
+  }
+
+  const rows = [...byGroom.entries()].map(([groomUid, r]) => ({
+    groomUid,
+    groomUsername: nameOf.get(groomUid) ?? groomUid.slice(0, 6),
+    sent: r.sent,
+    opened: r.opened,
+    submitted: r.submitted,
+    openRatePct: r.sent > 0 ? Math.round((r.opened / r.sent) * 100) : 0,
+    completionRatePct: r.sent > 0 ? Math.round((r.submitted / r.sent) * 100) : 0,
+    medianLagMs: pctile(r.lags, 0.5),
+    medianSealedMs: pctile(r.sealed, 0.5),
+  }));
+  rows.sort((a, b) => b.sent - a.sent);
+  const total = rows.length;
+  return { rows: rows.slice(0, MAX_ROWS), truncated: Math.max(0, total - MAX_ROWS) };
+}
+
+/**
+ * Prospect traffic (the /templates gallery + the per-template demos), kept in its
+ * own section. This is a MARKETING signal — which template do prospects open? —
+ * and mixing it into the guest funnel would silently inflate a couple's numbers.
+ */
+export function composeDemoEngagement(
+  metricsDaily: AnyRec[],
+  startMs: number,
+  endMs: number,
+  stepMs: number,
+) {
+  const docs = metricsDaily.filter((d) => d.surface === "demo" || d.surface === "gallery");
+  const bySurface = { demo: 0, gallery: 0 };
+  const byTemplate = new Map<string, number>();
+  const stamps: Array<number | null> = [];
+
+  for (const d of docs) {
+    const loads = num(d.loads);
+    const surface = String(d.surface);
+    if (surface === "demo") bySurface.demo += loads;
+    else bySurface.gallery += loads;
+    const tpl = String(d.templateId ?? "classic");
+    if (surface === "demo") byTemplate.set(tpl, (byTemplate.get(tpl) ?? 0) + loads);
+    // Rollups are per-day, so the series is reconstructed by repeating each
+    // day's key `loads` times — exact at day granularity, which is all the
+    // buckets need.
+    const day = String(d.day ?? "");
+    if (/^\d{8}$/.test(day)) {
+      const ms = Date.UTC(+day.slice(0, 4), +day.slice(4, 6) - 1, +day.slice(6, 8));
+      for (let i = 0; i < loads; i++) stamps.push(ms);
+    }
+  }
+
+  const sealedHist = docs.reduce<Record<string, number>>(
+    (acc, d) => mergeHist(acc, ((d.hist as AnyRec | undefined)?.sealed as Record<string, number>) ?? {}),
+    {},
+  );
+
+  return {
+    totalLoads: bySurface.demo + bySurface.gallery,
+    bySurface,
+    byTemplate: [...byTemplate.entries()]
+      .map(([templateId, loads]) => ({ templateId, loads }))
+      .sort((a, b) => b.loads - a.loads),
+    sealedP50: histPercentile(sealedHist, MS_EDGES, 0.5),
+    series: bucketSeries(stamps, startMs, endMs, stepMs),
+  };
+}
+
 export interface TriageItem {
   type: "design_pending" | "payment_pending" | "no_driver" | "low_delivery" | "wedding_soon";
   groomUid: string;
@@ -370,6 +698,11 @@ export interface AnalyticsInput {
   driverAssignments: AnyRec;
   designs: AnyRec[];
   digitalGuests: AnyRec[];
+  /** Windowed guest-experience rollups (metricsDaily). Bounded by the query in
+   *  admin.ts — never a raw per-load scan. Optional: a deployment with no
+   *  timing data yet (or a caller that doesn't need the section) still builds a
+   *  complete payload, with the timing fields reported as null rather than 0. */
+  metricsDaily?: AnyRec[];
   window: unknown;
   now: number;
 }
@@ -390,5 +723,9 @@ export function buildAnalytics(input: AnalyticsInput) {
     designs: composeDesigns(input.designs),
     triage: composeTriage(input.users, input.guests, input.designs, input.driverAssignments, input.now),
     trends: composeTrends(input.users, input.confirmations, input.inviteTokens, startMs, endMs, stepMs),
+    digitalEngagement: composeDigitalEngagement(input.digitalGuests, input.inviteTokens),
+    templateMetrics: composeTemplateMetrics(input.digitalGuests, input.inviteTokens, input.metricsDaily ?? []),
+    weddingEngagement: composeWeddingEngagement(input.digitalGuests, input.users),
+    demoEngagement: composeDemoEngagement(input.metricsDaily ?? [], startMs, endMs, stepMs),
   };
 }

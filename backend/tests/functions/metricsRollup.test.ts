@@ -13,6 +13,7 @@ import {
   mergeHist,
   clampNum,
   buildRollupIncrement,
+  expandIncrements,
 } from "../../functions/src/api/analytics/metricsRollup";
 
 describe("bucketIndex", () => {
@@ -219,5 +220,50 @@ describe("buildRollupIncrement", () => {
 
   it("records a phase even with no timings at all", () => {
     expect(buildRollupIncrement({ surface: "demo", templateId: "classic", phase: "load" })).toEqual({ loads: 1 });
+  });
+});
+
+describe("expandIncrements", () => {
+  const id = (n: number) => n;
+
+  // Guards a bug class that would be invisible until the dashboard read back
+  // empty: Firestore's set() treats "a.b.c" as a LITERAL field name (only
+  // update() reads it as a path), so the rollup must be written nested.
+  it("nests dotted paths instead of leaving literal dotted field names", () => {
+    const out = expandIncrements({ "hist.sealed.b2": 1, "sum.sealed": 900 }, id);
+    expect(out).toEqual({ hist: { sealed: { b2: 1 } }, sum: { sealed: 900 } });
+    expect(out["hist.sealed.b2"]).toBeUndefined();
+  });
+
+  it("keeps top-level counters flat", () => {
+    expect(expandIncrements({ loads: 1 }, id)).toEqual({ loads: 1 });
+  });
+
+  it("merges sibling leaves under one shared parent", () => {
+    expect(expandIncrements({ "hist.sealed.b1": 1, "hist.sealed.b2": 2, "hist.ready.b0": 3 }, id)).toEqual({
+      hist: { sealed: { b1: 1, b2: 2 }, ready: { b0: 3 } },
+    });
+  });
+
+  it("applies the wrapper to every leaf (FieldValue.increment in production)", () => {
+    const out = expandIncrements({ "cls.good": 1 }, (n) => ({ __inc__: n }));
+    expect(out).toEqual({ cls: { good: { __inc__: 1 } } });
+  });
+
+  it("round-trips a real payload into the shape the aggregator reads", () => {
+    const inc = buildRollupIncrement({
+      surface: "guest", templateId: "classic", phase: "load",
+      t: { sealedMs: 900, readyMs: 2500 },
+    });
+    const doc = expandIncrements(inc, id) as any;
+    // The aggregator reads doc.hist.sealed.bN — this is the contract between
+    // the writer and composeTemplateMetrics.
+    expect(doc.hist.sealed.b2).toBe(1);
+    expect(doc.hist.ready.b4).toBe(1);
+    expect(doc.n.sealed).toBe(1);
+  });
+
+  it("returns an empty object for no increments", () => {
+    expect(expandIncrements({}, id)).toEqual({});
   });
 });

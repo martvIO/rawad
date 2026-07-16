@@ -178,7 +178,10 @@ describe("POST /invites/digital/metrics — rollups", () => {
     expect(w.merge).toBe(true);
     expect(w.data.surface).toBe("guest");
     expect(w.data.loads).toEqual({ __inc__: 1 });
-    expect(w.data["hist.sealed.b2"]).toEqual({ __inc__: 1 });
+    // NESTED, not a literal "hist.sealed.b2" field — set() does not interpret
+    // dots as a field path, so the dotted form would read back as nothing.
+    expect(w.data.hist.sealed.b2).toEqual({ __inc__: 1 });
+    expect(w.data["hist.sealed.b2"]).toBeUndefined();
   });
 
   it("keeps demo traffic in a SEPARATE doc from guest traffic", async () => {

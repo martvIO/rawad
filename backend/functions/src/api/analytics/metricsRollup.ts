@@ -93,6 +93,39 @@ export function mergeHist(
   return out;
 }
 
+/**
+ * Expand the dotted increment paths into the NESTED object shape a Firestore
+ * `set(..., {merge:true})` needs.
+ *
+ * This is not cosmetic: `update()` treats "hist.sealed.b2" as a field PATH, but
+ * `set()` treats it as a literal field NAME containing dots. Writing the dotted
+ * map directly with set() would silently produce top-level fields called
+ * "hist.sealed.b2" that the aggregator (reading `doc.hist.sealed.b2`) could never
+ * find — a rollup that looks written but reads back empty forever. We need set()
+ * rather than update() because the day's first report must create the doc.
+ * merge:true deep-merges nested maps, and increment sentinels work inside them.
+ *
+ * @param wrap converts a numeric delta into the value written (FieldValue.increment
+ *             in production; identity in tests).
+ */
+export function expandIncrements(
+  inc: Record<string, number>,
+  wrap: (n: number) => unknown,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [path, by] of Object.entries(inc)) {
+    const parts = path.split(".");
+    let node = out;
+    for (let i = 0; i < parts.length - 1; i++) {
+      const k = parts[i];
+      if (typeof node[k] !== "object" || node[k] === null) node[k] = {};
+      node = node[k] as Record<string, unknown>;
+    }
+    node[parts[parts.length - 1]] = wrap(by);
+  }
+  return out;
+}
+
 /** A clamped, finite number or undefined — never trust a public payload. */
 export function clampNum(v: unknown, min: number, max: number): number | undefined {
   const n = typeof v === "number" ? v : NaN;

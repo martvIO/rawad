@@ -23,7 +23,7 @@ import { getDatabase } from "firebase-admin/database";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { randomBytes } from "crypto";
 import { z } from "zod";
-import { buildRollupIncrement, dayKey, rollupDocId } from "../analytics/metricsRollup";
+import { buildRollupIncrement, expandIncrements, dayKey, rollupDocId } from "../analytics/metricsRollup";
 import { TEMPLATE_IDS } from "./digital/constants";
 import {
   AuthRequest,
@@ -961,16 +961,15 @@ invitesRouter.post(
 
       // 1) Rollup — one atomic merge of FieldValue.increment()s (no transaction:
       //    increments commute, so concurrent guests can't clobber each other).
-      const inc = buildRollupIncrement(body);
       const day = dayKey(now);
       const rollup: Record<string, unknown> = {
         day,
         surface: body.surface,
         templateId: body.templateId,
+        // Nested (not dotted) — set() treats a dotted key as a literal field
+        // name, so the dotted form would never read back. See expandIncrements.
+        ...expandIncrements(buildRollupIncrement(body), (n) => FieldValue.increment(n)),
       };
-      for (const [path, by] of Object.entries(inc)) {
-        rollup[path] = FieldValue.increment(by);
-      }
       await fs
         .doc(`metricsDaily/${rollupDocId(body.surface, body.templateId, day)}`)
         .set(rollup, { merge: true });

@@ -239,3 +239,245 @@ describe("buildAnalytics", () => {
     expect(outAll.trends.stepMs).toBe(7 * DAY);
   });
 });
+
+// ─── Guest-experience engagement (funnel + per-template + per-wedding + demo) ──
+// These pin the two things most likely to be got wrong and never noticed:
+// (1) prospect/demo traffic leaking into a couple's real numbers, and
+// (2) an auto-open or a return visit being counted as a guest "tap".
+import {
+  composeDigitalEngagement,
+  composeTemplateMetrics,
+  composeWeddingEngagement,
+  composeDemoEngagement,
+  buildTokenTemplateMap,
+} from "../../functions/src/api/analytics/aggregate";
+
+const dg = (over = {}) => ({ groomUid: "g1", id: "gu1", ...over });
+const tok = (over = {}) => ({ guestType: "digital", groomUid: "g1", guestId: "gu1", ...over });
+
+describe("buildTokenTemplateMap", () => {
+  it("maps a digital guest to the template its token was MINTED with", () => {
+    const m = buildTokenTemplateMap([tok({ designSnapshot: { templateId: "destination-love" } })]);
+    expect(m.get("g1/gu1")).toBe("destination-love");
+  });
+
+  it("treats a pre-template token as classic (what the renderer falls back to)", () => {
+    expect(buildTokenTemplateMap([tok({ designSnapshot: {} })]).get("g1/gu1")).toBe("classic");
+    expect(buildTokenTemplateMap([tok()]).get("g1/gu1")).toBe("classic");
+  });
+
+  it("ignores physical tokens", () => {
+    expect(buildTokenTemplateMap([tok({ guestType: "physical" })]).size).toBe(0);
+  });
+});
+
+describe("composeDigitalEngagement", () => {
+  it("counts the sent → opened → submitted funnel from first-party stamps", () => {
+    const out = composeDigitalEngagement(
+      [
+        dg({ id: "a", inviteLinkSentAt: 10, viewedAt: 20, confirmedAt: 30, status: "attending" }),
+        dg({ id: "b", inviteLinkSentAt: 10, viewedAt: 20, confirmedAt: 30, status: "absent" }),
+        dg({ id: "c", inviteLinkSentAt: 10, viewedAt: 20 }), // opened, no answer
+        dg({ id: "d", inviteLinkSentAt: 10 }), // never opened
+      ],
+      [],
+    );
+    expect(out.funnel).toMatchObject({
+      sent: 4, opened: 3, submitted: 2, attending: 1, absent: 1, openedNoAnswer: 1, neverOpened: 1,
+    });
+    expect(out.openRatePct).toBe(75); // 3/4
+    expect(out.completionRatePct).toBe(50); // 2/4 — an "absent" IS a completed form
+    expect(out.answerRateOfOpenedPct).toBe(67); // 2/3
+  });
+
+  it("does not count a never-sent guest as neverOpened", () => {
+    // A guest sitting in the list who was never sent a link is not a reach
+    // failure — counting them would make the number look bad for no reason.
+    const out = composeDigitalEngagement([dg({ id: "x" })], []);
+    expect(out.funnel.neverOpened).toBe(0);
+    expect(out.funnel.sent).toBe(0);
+  });
+
+  it("measures send → first-visit lag", () => {
+    const out = composeDigitalEngagement(
+      [
+        dg({ id: "a", inviteLinkSentAt: 1000, viewedAt: 3000 }),
+        dg({ id: "b", inviteLinkSentAt: 1000, viewedAt: 5000 }),
+      ],
+      [],
+    );
+    expect(out.sendToOpenLagMs.n).toBe(2);
+    expect(out.sendToOpenLagMs.p50).toBe(2000);
+  });
+
+  it("ignores a viewedAt that precedes the send (clock skew), rather than a negative lag", () => {
+    const out = composeDigitalEngagement([dg({ inviteLinkSentAt: 5000, viewedAt: 1000 })], []);
+    expect(out.sendToOpenLagMs.n).toBe(0);
+    expect(out.guestRows[0].lagMs).toBeNull();
+  });
+
+  it("counts ONLY a real tap in the tap-delay stat", () => {
+    const out = composeDigitalEngagement(
+      [
+        dg({ id: "a", viewedAt: 1, perf: { tapKind: "tap", tapDelayMs: 3000 } }),
+        dg({ id: "b", viewedAt: 1, perf: { tapKind: "auto", tapDelayMs: 5000 } }),
+        dg({ id: "c", viewedAt: 1, perf: { tapKind: "seen" } }),
+        dg({ id: "d", viewedAt: 1, perf: { tapKind: "failsafe", tapDelayMs: 20000 } }),
+      ],
+      [],
+    );
+    // An auto-open/failsafe delay is not a decision the guest made.
+    expect(out.tapDelayMs.n).toBe(1);
+    expect(out.tapDelayMs.p50).toBe(3000);
+  });
+
+  it("attributes each guest row to the template its token was sent with", () => {
+    const out = composeDigitalEngagement(
+      [dg({ viewedAt: 5 })],
+      [tok({ designSnapshot: { templateId: "destination-love" } })],
+    );
+    expect(out.guestRows[0].templateId).toBe("destination-love");
+  });
+
+  it("caps the drill-down rows and reports how many were dropped", () => {
+    const many = Array.from({ length: 130 }, (_v, i) => dg({ id: `g${i}`, viewedAt: i + 1 }));
+    const out = composeDigitalEngagement(many, []);
+    expect(out.guestRows).toHaveLength(100);
+    expect(out.guestRowsTruncated).toBe(30);
+    // Most recent first.
+    expect(out.guestRows[0].viewedAt).toBe(130);
+  });
+
+  it("is NaN-free on empty data", () => {
+    const out = composeDigitalEngagement([], []);
+    expect(out.openRatePct).toBe(0);
+    expect(out.completionRatePct).toBe(0);
+    expect(out.tapDelayMs.p50).toBeNull();
+    expect(JSON.stringify(out)).not.toContain("NaN");
+  });
+});
+
+describe("composeTemplateMetrics", () => {
+  const rollup = (over = {}) => ({ surface: "guest", templateId: "classic", day: 20260716, loads: 0, ...over });
+
+  it("splits the funnel per template", () => {
+    const out = composeTemplateMetrics(
+      [
+        dg({ id: "a", inviteLinkSentAt: 1, viewedAt: 2, confirmedAt: 3 }),
+        dg({ id: "b", inviteLinkSentAt: 1 }),
+      ],
+      [
+        tok({ guestId: "a", designSnapshot: { templateId: "destination-love" } }),
+        tok({ guestId: "b", designSnapshot: { templateId: "classic" } }),
+      ],
+      [],
+    );
+    const dl = out.rows.find((r) => r.templateId === "destination-love")!;
+    const cl = out.rows.find((r) => r.templateId === "classic")!;
+    expect(dl).toMatchObject({ sent: 1, opened: 1, submitted: 1, openRatePct: 100, completionRatePct: 100 });
+    expect(cl).toMatchObject({ sent: 1, opened: 0, submitted: 0, openRatePct: 0 });
+  });
+
+  it("computes load percentiles from the guest-surface histograms", () => {
+    const out = composeTemplateMetrics([], [], [
+      rollup({ templateId: "classic", loads: 4, hist: { sealed: { b0: 1, b1: 1, b2: 1, b3: 1 } } }),
+    ]);
+    const cl = out.rows.find((r) => r.templateId === "classic")!;
+    expect(cl.loads).toBe(4);
+    expect(cl.sealedP50).toBe(500);
+    expect(cl.sealedP90).toBe(2000);
+  });
+
+  it("EXCLUDES demo traffic from a template's guest-facing timings", () => {
+    const out = composeTemplateMetrics([], [], [
+      rollup({ templateId: "classic", loads: 1, hist: { sealed: { b0: 1 } } }),
+      rollup({ surface: "demo", templateId: "classic", loads: 999, hist: { sealed: { b8: 999 } } }),
+    ]);
+    const cl = out.rows.find((r) => r.templateId === "classic")!;
+    // Only the single guest load counts; the 999 demo loads must not appear.
+    expect(cl.loads).toBe(1);
+    expect(cl.sealedP50).toBe(250);
+  });
+
+  it("reports the auto-open share — how often the guest did NOT tap", () => {
+    const out = composeTemplateMetrics([], [], [
+      rollup({ templateId: "classic", loads: 10, tapKinds: { tap: 3, auto: 7 } }),
+    ]);
+    expect(out.rows[0].autoOpenPct).toBe(70);
+  });
+
+  it("returns null (not 0) for percentiles with no samples", () => {
+    const out = composeTemplateMetrics([], [], [rollup({ templateId: "classic", loads: 0 })]);
+    expect(out.rows[0].sealedP50).toBeNull();
+    expect(out.rows[0].autoOpenPct).toBeNull();
+    expect(out.rows[0].clsGoodPct).toBeNull();
+  });
+
+  it("merges a template's rollups across days", () => {
+    const out = composeTemplateMetrics([], [], [
+      rollup({ templateId: "classic", day: 20260716, loads: 1, hist: { sealed: { b0: 1 } } }),
+      rollup({ templateId: "classic", day: 20260717, loads: 1, hist: { sealed: { b0: 1 } } }),
+    ]);
+    expect(out.rows).toHaveLength(1);
+    expect(out.rows[0].loads).toBe(2);
+  });
+});
+
+describe("composeWeddingEngagement", () => {
+  it("rolls the funnel up per groom with a readable username", () => {
+    const out = composeWeddingEngagement(
+      [
+        { groomUid: "g1", id: "a", inviteLinkSentAt: 1, viewedAt: 2, confirmedAt: 3 },
+        { groomUid: "g1", id: "b", inviteLinkSentAt: 1 },
+        { groomUid: "g2", id: "c", inviteLinkSentAt: 1, viewedAt: 2 },
+      ],
+      [{ uid: "g1", username: "sally" }, { uid: "g2", username: "rani" }],
+    );
+    const g1 = out.rows.find((r) => r.groomUid === "g1")!;
+    expect(g1).toMatchObject({ groomUsername: "sally", sent: 2, opened: 1, submitted: 1, openRatePct: 50 });
+    expect(out.rows.find((r) => r.groomUid === "g2")!.groomUsername).toBe("rani");
+  });
+
+  it("is NaN-free and null-safe with no data", () => {
+    const out = composeWeddingEngagement([], []);
+    expect(out.rows).toEqual([]);
+    expect(JSON.stringify(out)).not.toContain("NaN");
+  });
+});
+
+describe("composeDemoEngagement", () => {
+  const start = Date.UTC(2026, 6, 10);
+  const end = Date.UTC(2026, 6, 20);
+
+  it("counts ONLY prospect surfaces, never guest traffic", () => {
+    const out = composeDemoEngagement(
+      [
+        { surface: "guest", templateId: "classic", day: 20260716, loads: 500 },
+        { surface: "demo", templateId: "destination-love", day: 20260716, loads: 3 },
+        { surface: "gallery", templateId: "all", day: 20260716, loads: 2 },
+      ],
+      start, end, DAY,
+    );
+    expect(out.totalLoads).toBe(5); // the 500 guest loads are excluded
+    expect(out.bySurface).toEqual({ demo: 3, gallery: 2 });
+    expect(out.byTemplate).toEqual([{ templateId: "destination-love", loads: 3 }]);
+  });
+
+  it("builds a daily series from the day keys", () => {
+    const out = composeDemoEngagement(
+      [{ surface: "demo", templateId: "classic", day: 20260716, loads: 2 }],
+      start, end, DAY,
+    );
+    const hit = out.series.find((b) => b.count > 0);
+    expect(hit?.count).toBe(2);
+    expect(out.series.length).toBeGreaterThan(0);
+  });
+
+  it("is empty and NaN-free with no prospect traffic", () => {
+    const out = composeDemoEngagement([], start, end, DAY);
+    expect(out.totalLoads).toBe(0);
+    expect(out.byTemplate).toEqual([]);
+    expect(out.sealedP50).toBeNull();
+    expect(JSON.stringify(out)).not.toContain("NaN");
+  });
+});
