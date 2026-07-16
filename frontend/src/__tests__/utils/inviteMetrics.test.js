@@ -129,6 +129,47 @@ describe("createInviteMetrics", () => {
     expect(finals[0].t).toMatchObject({ lcpMs: 2401, cls: 0.052, inpMs: 180 });
   });
 
+  // The invariant the server's histograms depend on: one visit must contribute
+  // each metric exactly once, or every percentile is silently double-counted.
+  it("sends each metric exactly once across the two phases", async () => {
+    const m = make({ token: "t1", surface: "guest", templateId: "classic" });
+    await vi.dynamicImportSettled();
+    m.handleIntroEvent("sealed");
+    m.handleIntroEvent("open", { kind: "tap" });
+    m.handleIntroEvent("ready");
+    vitalsCbs.lcp({ value: 1200 });
+    vitalsCbs.cls({ value: 0.02 });
+    vitalsCbs.inp({ value: 90 });
+    window.dispatchEvent(new Event("pagehide"));
+
+    const [load, final] = sent();
+    // Load owns the load timings...
+    expect(load.t).toHaveProperty("sealedMs");
+    expect(load.t).toHaveProperty("readyMs");
+    // ...and must not repeat them in the final payload.
+    expect(final.t).not.toHaveProperty("sealedMs");
+    expect(final.t).not.toHaveProperty("readyMs");
+    expect(final.t).not.toHaveProperty("ttfbMs");
+    // Final owns the vitals, which are absent from the load payload.
+    expect(final.t).toMatchObject({ lcpMs: 1200, cls: 0.02, inpMs: 90 });
+    expect(load.t).not.toHaveProperty("lcpMs");
+    // The tap was known at load time → reported there, never again.
+    expect(load.t.tapKind).toBe("tap");
+    expect(final.t).not.toHaveProperty("tapKind");
+  });
+
+  it("reports a tap that happens AFTER load in the final phase, once", async () => {
+    const m = make({ token: "t1", surface: "guest", templateId: "classic" });
+    await vi.dynamicImportSettled();
+    m.handleIntroEvent("sealed");
+    m.handleIntroEvent("ready"); // load sent before the guest taps
+    m.handleIntroEvent("open", { kind: "tap" });
+    window.dispatchEvent(new Event("pagehide"));
+    const [load, final] = sent();
+    expect(load.t).not.toHaveProperty("tapKind");
+    expect(final.t.tapKind).toBe("tap");
+  });
+
   it("still reports a very short visit that hides before ready", () => {
     make({ token: "t1", surface: "guest", templateId: "classic" });
     window.dispatchEvent(new Event("pagehide"));

@@ -113,20 +113,42 @@ export function createInviteMetrics({ token, surface, templateId, lang }) {
     lang: lang || undefined,
   });
 
+  // PHASE FIELD OWNERSHIP: each metric is sent EXACTLY ONCE, in the phase that
+  // owns it — otherwise the server's histograms would count one visit twice.
+  //   load  → sealedMs, readyMs, ttfbMs
+  //   final → lcpMs, cls, inpMs   (these only settle at page-hide)
+  //   tap   → whichever phase first knows it (a guest may tap before or after
+  //           ready), latched by `tapSent` so it is never repeated.
+  // The server enforces the same split defensively; this keeps the wire honest.
+  let tapSent = false;
+  const tapFields = () => {
+    if (tapSent || t.tapKind == null) return {};
+    tapSent = true;
+    const out = { tapKind: t.tapKind };
+    if (t.tapDelayMs != null) out.tapDelayMs = t.tapDelayMs;
+    return out;
+  };
+
   const sendLoad = () => {
     if (loadSent || disposed) return;
     loadSent = true;
     clearTimeout(loadTimer);
-    send({ ...base(), phase: "load", t: { ...t } });
+    const payload = {};
+    if (t.sealedMs != null) payload.sealedMs = t.sealedMs;
+    if (t.readyMs != null) payload.readyMs = t.readyMs;
+    if (t.ttfbMs != null) payload.ttfbMs = t.ttfbMs;
+    send({ ...base(), phase: "load", t: { ...payload, ...tapFields() } });
   };
 
-  // LCP/CLS/INP only settle at page-hide, so they ride the "final" phase along
-  // with any tap that happened after the load phase was already sent.
   const sendFinal = () => {
     if (finalSent || disposed) return;
     finalSent = true;
-    sendLoad(); // guarantee the load phase was sent for a very short visit
-    send({ ...base(), phase: "final", t: { ...t } });
+    sendLoad(); // a very short visit must still report its load phase
+    const payload = {};
+    if (t.lcpMs != null) payload.lcpMs = t.lcpMs;
+    if (t.cls != null) payload.cls = t.cls;
+    if (t.inpMs != null) payload.inpMs = t.inpMs;
+    send({ ...base(), phase: "final", t: { ...payload, ...tapFields() } });
   };
 
   // web-vitals is loaded lazily so it never sits on the invitation's critical

@@ -65,6 +65,12 @@ export const RATE = Object.freeze({
   INVITE_OPEN_PER_TOKEN: perHour(60),
   /** IP backstop for the open ping — generous for a venue sharing one NAT IP. */
   INVITE_OPEN_IP_BACKSTOP: perHour(600),
+  /** Guest-experience timing reports — 2 per visit (load + final), so this
+   *  allows refreshes without letting one token flood the rollups. */
+  INVITE_METRICS_PER_TOKEN: perHour(60),
+  /** IP backstop for timing reports — a venue NATs every guest behind one IP,
+   *  and demo/gallery reports (which carry no token) key off IP alone. */
+  INVITE_METRICS_IP_BACKSTOP: perHour(600),
 
   // ── Template preview covers (public gallery / landing strip / picker) ────
   /** Public read of the template-cover pointer doc (cached 5 min at the edge). */

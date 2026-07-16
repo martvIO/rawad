@@ -20,8 +20,11 @@
 
 import { Router, Request, Response } from "express";
 import { getDatabase } from "firebase-admin/database";
-import { getFirestore } from "firebase-admin/firestore";
+import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { randomBytes } from "crypto";
+import { z } from "zod";
+import { buildRollupIncrement, dayKey, rollupDocId } from "../analytics/metricsRollup";
+import { TEMPLATE_IDS } from "./digital/constants";
 import {
   AuthRequest,
   requireAuth,
@@ -857,6 +860,142 @@ invitesRouter.post(
       res.json({ ok: true });
     } catch (err) {
       // Analytics signal only — degrade silently, never surface to the guest page.
+      res.json({ ok: false, detail: errorMessage(err) });
+    }
+  }
+);
+
+// Body schema for the timing report. Numbers are CLAMPED (not rejected) further
+// down in buildRollupIncrement — a weird clock on some old Android should degrade
+// to a capped sample, not throw away the visit. What IS strictly rejected is
+// anything that could name a document/field or forge identity: the token format,
+// the surface, the template id, and the loadId shape.
+const metricsBodySchema = z.object({
+  token: z.string().regex(TOKEN_HEX_RE).optional(),
+  surface: z.enum(["guest", "demo", "gallery"]),
+  templateId: z.string().max(64),
+  loadId: z.string().regex(/^[a-f0-9]{8,32}$/),
+  phase: z.enum(["load", "final"]),
+  lang: z.enum(["ar", "he"]).optional(),
+  t: z
+    .object({
+      sealedMs: z.number(),
+      readyMs: z.number(),
+      ttfbMs: z.number(),
+      lcpMs: z.number(),
+      inpMs: z.number(),
+      tapDelayMs: z.number(),
+      cls: z.number(),
+      tapKind: z.enum(["tap", "auto", "skip", "failsafe", "seen"]),
+    })
+    .partial()
+    .default({}),
+});
+
+// ─── POST /invites/digital/metrics ─────────────────────────────────────────────
+// PUBLIC: fire-and-forget guest-experience timings from the invitation page (see
+// frontend utils/inviteMetrics.js). Answers "how long did it take to load?" and
+// "how long until they opened it?" — the guest-side blind spot the 2026-07-02
+// owner interview called out.
+//
+// TWO WRITES per report, both cheap and both best-effort:
+//   1. A ROLLUP increment on metricsDaily/{surface}_{template}_{day} — bounded
+//      docs holding histogram buckets, so /admin/analytics can compute p50/p90
+//      from a small windowed query instead of scanning raw per-load events
+//      (which would grow without bound and eventually sink that endpoint).
+//   2. For real guests only, a per-guest `perf` row on the FIRST visit — the
+//      drill-down table, matching viewedAt's first-open semantics.
+//
+// Demo/gallery reports carry surface "demo"/"gallery" and are rolled up under
+// their own doc ids, so prospect traffic can never contaminate guest funnels.
+// No PII: the token is the same credential /digital/opened already accepts.
+invitesRouter.post(
+  "/digital/metrics",
+  tokenRateLimit(
+    "inviteMetrics",
+    RATE.INVITE_METRICS_PER_TOKEN.limit,
+    HOUR_MS,
+    RATE.INVITE_METRICS_IP_BACKSTOP.limit,
+  ),
+  async (req: Request, res: Response) => {
+    const parsed = metricsBodySchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "invalid_body" });
+      return;
+    }
+    const body = parsed.data;
+
+    // Never let a public payload name a Firestore document or field: the
+    // templateId must be one we actually ship. ("all" is the gallery's sentinel
+    // — it is a page listing every template, not a render of one.)
+    const templateOk =
+      TEMPLATE_IDS.has(body.templateId) || (body.surface === "gallery" && body.templateId === "all");
+    if (!templateOk) {
+      res.status(400).json({ error: "invalid_template_id" });
+      return;
+    }
+    if (body.surface === "guest" && !body.token) {
+      res.status(400).json({ error: "missing_token" });
+      return;
+    }
+
+    try {
+      const fs = getFirestore();
+      const now = Date.now();
+
+      // Resolve the guest BEFORE recording, so a bogus token can't write anything.
+      let guestRef: FirebaseFirestore.DocumentReference | null = null;
+      if (body.surface === "guest" && body.token) {
+        const tokenSnap = await getDatabase().ref(`inviteTokens/${body.token}`).get();
+        if (!tokenSnap.exists()) {
+          res.status(404).json({ error: "token_not_found" });
+          return;
+        }
+        const tk = tokenSnap.val() as TokenRecord;
+        if (tk.guestType !== "digital") {
+          res.status(409).json({ error: "wrong_invite_type" });
+          return;
+        }
+        guestRef = fs.doc(`digitalInvitations/${tk.groomUid}/guests/${tk.guestId}`);
+      }
+
+      // 1) Rollup — one atomic merge of FieldValue.increment()s (no transaction:
+      //    increments commute, so concurrent guests can't clobber each other).
+      const inc = buildRollupIncrement(body);
+      const day = dayKey(now);
+      const rollup: Record<string, unknown> = {
+        day,
+        surface: body.surface,
+        templateId: body.templateId,
+      };
+      for (const [path, by] of Object.entries(inc)) {
+        rollup[path] = FieldValue.increment(by);
+      }
+      await fs
+        .doc(`metricsDaily/${rollupDocId(body.surface, body.templateId, day)}`)
+        .set(rollup, { merge: true });
+
+      // 2) Per-guest raw row — FIRST visit only (later visits still feed the
+      //    rollups). The `final` phase merges into the row it started, matched on
+      //    loadId, so a second visit can never overwrite the first visit's stats.
+      if (guestRef) {
+        const snap = await guestRef.get();
+        if (snap.exists) {
+          const perf = snap.data()?.perf as { loadId?: string } | undefined;
+          if (!perf) {
+            await guestRef.set(
+              { perf: { loadId: body.loadId, templateId: body.templateId, at: now, lang: body.lang ?? null, ...body.t } },
+              { merge: true },
+            );
+          } else if (body.phase === "final" && perf.loadId === body.loadId) {
+            await guestRef.set({ perf: { ...perf, ...body.t } }, { merge: true });
+          }
+        }
+      }
+
+      res.json({ ok: true });
+    } catch (err) {
+      // Analytics only — degrade silently, exactly like /digital/opened.
       res.json({ ok: false, detail: errorMessage(err) });
     }
   }

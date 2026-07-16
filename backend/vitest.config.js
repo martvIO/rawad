@@ -1,6 +1,23 @@
 import { fileURLToPath } from "node:url";
-import { dirname } from "node:path";
+import { dirname, resolve } from "node:path";
 import { defineConfig } from "vitest/config";
+
+const here = dirname(fileURLToPath(import.meta.url));
+
+// firebase-admin is a dependency of backend/functions, NOT of this test package,
+// so a bare `firebase-admin/*` specifier resolves from functions/src but NOT from
+// tests/. That asymmetry silently breaks vi.mock(): a mock registered in a test
+// lands under a different module id than the one the route imports, so it never
+// applies and the real SDK runs (typically throwing into a route's catch-all and
+// making I/O assertions pass vacuously). Aliasing both sides to the one physical
+// copy makes the ids match. It points at the same package the source already got,
+// so nothing about how the code runs changes.
+const firebaseAdminAlias = [
+  {
+    find: /^firebase-admin\/(app|auth|database|firestore|storage|messaging)$/,
+    replacement: resolve(here, "functions/node_modules/firebase-admin/lib/$1/index.js"),
+  },
+];
 
 // Backend test projects (frontend unit tests live in frontend/vitest.config.js):
 //   unit        — Cloud Functions pure-logic tests (helpers, rate limits,
@@ -15,6 +32,7 @@ export default defineConfig({
   test: {
     projects: [
       {
+        resolve: { alias: firebaseAdminAlias },
         test: {
           name: "unit",
           // Glob (not an explicit list) so new pure-logic tests under
