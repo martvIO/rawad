@@ -41,6 +41,7 @@ Owner funded **all four clusters** in the interview; sequence by impact. Baselin
 ([[Usability Test Plan 2026-07]]) runs BEFORE these land, re-test after.
 - **TASK-UX-1 (S, highest impact)** — guest first-load: skeleton/hero placeholder + skip-intro path + fix `.dawa-inv-cue` hardcoded `left:50%` → logical properties (`InviteStyles.jsx`)
 - **TASK-UX-2 (M)** — confidence layer: per-guest sent/delivered/read via [[WhatsApp Messaging]] states, last-synced chip, design-review notification, "why admin sends" explainer, filtered-count fixes
+  - *Partly addressed 2026-07-16*: the guest-side half is now measured (open/load/RSVP funnel — [[Guest Experience Metrics]]); the per-guest sent/delivered/read chips + last-synced indicator remain.
 - **TASK-UX-3 (M)** — safe actions: undo-toast guest delete (replace instant swipe-delete), themed bulk-send confirm modal, driver upload progress + retry queue
 - **TASK-UX-4 (M, compounding)** — design-system adoption sweep: hand-rolled modals → `ui/Modal`, 133+ hardcoded colors → tokens, `left/right` → logical properties, ≥44px touch targets
 - **TASK-UX-5 (M, decided feature)** — editable RSVP + change log (see [[Digital Invitations]] "DECIDED, not built")

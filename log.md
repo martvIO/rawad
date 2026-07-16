@@ -346,3 +346,6 @@ Touched: Digital-Invitations
 
 ## [2026-07-15 19:05] session | Wiki-brain consolidation of the template session
 Touched: Architecture-Decisions, Visual-Design-System, Digital-Invitations, Tasks-Backlog, index
+
+## [2026-07-16 10:40] session | Template demo surfaces + guest-experience metrics
+Touched: Template-Demo-Surfaces, Guest-Experience-Metrics, Digital-Invitations, Admin-Analytics, Conversion-KPIs, Tasks-Backlog, index

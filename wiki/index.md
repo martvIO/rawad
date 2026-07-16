@@ -35,11 +35,13 @@ _(ideas, frameworks, patterns, principles — pages that describe a concept)_
 - [[Digit Normalization]] — Western ASCII digits everywhere: `numberingSystem: latn` dates, apiClient input scrubbing, DB migration script
 - [[List Search and Filter]] — reusable SearchBar + FilterChips + `useListFilter` on every portal list (12 lists); substring + phone-aware + hamza-insensitive
 - [[Load-Test Dashboard]] — local-only FastAPI+React control panel for the Locust suite; live SSE metrics, always-on LOADTEST-data cleanup (incl. new admin purge endpoint), archived run history + compare
+- [[Template Demo Surfaces]] — how a template gets SEEN: public /templates gallery + landing strip, per-template demo links (one shared demo content, any template), groom picker live preview, admin-uploadable covers
+- [[Guest Experience Metrics]] — first-party load time / time-to-open / RSVP-completion measurement; bounded metricsDaily histogram rollups; demo traffic quarantined from guest numbers
 
 - [[Payments]] — Lemon Squeezy overlay checkout (admin-minted single-use pay links) + X-Signature-verified order_created webhook for paid groom self-signup
 - [[WhatsApp Messaging]] — WhatsApp Cloud API send + Meta webhook + daily scheduled RSVP reminders; + manual-send fallback (copy/open-WhatsApp modal on failed sends, clickable failed pill, persisted "manual" status); real-number cutover BLOCKED on Meta business verification (141010, 2026-07-06 — unblock task TASK-WA-1)
 - [[Communication Settings]] — admin contact channels + public /settings/public + landing WhatsApp CTAs
-- [[Admin Analytics]] — admin operator command center: server-aggregated GET /admin/analytics + recharts page (composition/revenue/operations/rsvp/designs/triage/trends)
+- [[Admin Analytics]] — admin operator command center: server-aggregated GET /admin/analytics + recharts page (composition/revenue/operations/rsvp/designs/triage/trends + the 2026-07-16 guest-experience sections: digital funnel / template / wedding / demo engagement)
 - [[Conversion KPIs]] — North Star (paid weddings/month) + funnel KPIs + weekly cadence; flags the untracked top-of-funnel (WhatsApp-click) gap
 - [[Mobile App]] — groom-only Android+iOS **Expo SDK 56** app (`app/` + shared `@dawa/core`); Phases 0–3b built; **publish-prep 2026-07-05**: drift fixes (datetime, native photographer upload, design parity), permission hardening, brand icon/splash, emulator+prod QA before Play/App Store submission
 

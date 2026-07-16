@@ -14,7 +14,7 @@ that, if it goes up sustainably, means the business is winning.
 |---|---|---|---|
 | WhatsApp leads / week | Clicks on a "book" CTA that open WhatsApp | **not measured** | needs the top-of-funnel counter (see below) |
 | Lead → paid % | Paid weddings ÷ WhatsApp leads | not computable | unlocked once leads are counted |
-| RSVP completion % | Confirmed ÷ invites sent | partly in [[Admin Analytics]] | invite-*open* still untracked |
+| RSVP completion % | Confirmed ÷ invites sent | [[Admin Analytics]] + [[Guest Experience Metrics]] | ✅ closed 2026-07-16 — full sent→opened→submitted funnel, incl. opened-but-never-answered and never-opened |
 | Delivery-proof % | Deliveries with a proof photo ÷ total | in [[Admin Analytics]] | ok |
 | ARPU / revenue (₪) | From Stripe paymentStatus | in [[Admin Analytics]] / [[Payments]] | ok |
 

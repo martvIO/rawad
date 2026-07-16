@@ -721,3 +721,30 @@ extended; registry + hero thumbnail wired.
   no-auto-open sealed-screen decision + the default effects tier; findings feed back into
   `useIntroPhase` so the remaining 3 inherit the tuned contract.
 See [[Visual-Design-System]], [[Architecture-Decisions]], [[Tasks Backlog]], [[Usability Templates Test Plan]].
+
+## Template demo surfaces + guest-experience metrics (2026-07-16)
+Two features shipped together, both driven by owner Q&A (3 rounds, no assumptions):
+
+**Seeing a template** — the bespoke system could render templates but had no way to
+show them. Now: a public `/templates` gallery + a landing strip, **per-template
+demo links** (`?demo=1&template=<id>` — one shared admin-published demo content
+rendered by any template), a "معاينة حيّة" preview button on the groom's picker, and
+**admin-uploadable preview covers** (pointer doc `appConfig/templateAssets`,
+deliberately NOT a design field, so the bespoke no-new-fields rule holds). Full
+design + `?template=` semantics: [[Template Demo Surfaces]].
+
+**Measuring the guest** — load time (sealed-visible + fully-ready + web-vitals),
+time-to-open (send→first-visit lag AND on-page tap delay, with `tapKind`
+separating a real tap from classic's 5s auto-open), and RSVP completion (any
+answer) with opened-but-never-answered / never-opened buckets. Instrumented at the
+**shared `useIntroPhase` contract** (new optional `onEvent`), so every bespoke
+template reports identically and none can forget to; classic hooks
+`CelestialAmbience`. Never blocks the ritual. Full design: [[Guest Experience Metrics]].
+
+**Contract note for future templates:** a bespoke template gets the sealed/open
+signals for free from `useIntroPhase`; it only needs to thread an `onReady` from its
+effects layer (see `destination-love/effects/SceneHost.jsx`) so "fully loaded" is
+reported. Two ordering traps are already handled centrally — `ready` can arrive
+before `sealed`, and child effects run before the page wires the recorder.
+
+See [[Template Demo Surfaces]], [[Guest Experience Metrics]], [[Admin Analytics]].

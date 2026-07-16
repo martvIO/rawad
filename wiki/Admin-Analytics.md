@@ -51,9 +51,11 @@ Each item deep-links to the relevant admin tab: `design_pending`→designs,
 The page deliberately does **not** fabricate metrics the data model can't support:
 - **No delivery time-series** — `guest.deliveredAt` is a localized **HH:MM string**
   (`usePortalState.js`), not a timestamp. Delivery is a current-state count only.
-- **No invite-"open" rate** — only "sent" (`inviteLinkSentAt`) and "confirmed/submitted"
-  (`confirmedAt`/`token.usedAt`) are tracked. Open-tracking would be a separate build on the
-  public hot path. See [[Polling and Realtime]] / [[Product Audit 2026-06-13]].
+- ~~**No invite-"open" rate**~~ — **RESOLVED.** Opens are first-party tracked
+  (`viewedAt`, stamped by `/invites/digital/opened`); the aggregator has returned
+  `digitalOpened`/`digitalOpenRatePct` since 2026-06-19, and the page finally
+  *renders* them as of 2026-07-16. Full load/open/RSVP funnel:
+  [[Guest Experience Metrics]].
 - **No payment "failed" state** — Stripe only records `pending|paid` ([[Payments]]), so
   `failedCount` is surfaced as 0, never invented.
 - Expected headcount comes from `/confirmations` only (it already mirrors digital submits as
@@ -89,5 +91,8 @@ https://dawa-aa793.web.app/portal/admin/analytics — the tab sits first in the 
 
 ## Follow-ups
 
-- Optional future: instrument invite-open tracking to complete the RSVP funnel (sent →
-  opened → confirmed) — touches the public `/d/:groomUsername/:token` hot path.
+- ~~Instrument invite-open tracking to complete the RSVP funnel~~ — **DONE**
+  (open ping + full load/open/RSVP funnel, [[Guest Experience Metrics]], 2026-07-16).
+- The endpoint now also reads `metricsDaily` with a bounded `day >= …` range query
+  (never a raw event scan — that is why the rollups exist) and attaches the digital
+  guest doc `id` so a guest can be joined to the template their token was minted with.
