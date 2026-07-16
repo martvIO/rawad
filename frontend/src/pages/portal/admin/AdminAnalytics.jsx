@@ -18,6 +18,9 @@ import {
   LineChart, Line,
 } from "recharts";
 import { usePortal } from "../../../context/PortalContext.jsx";
+import {
+  DigitalFunnel, LoadPerformance, TemplateMetrics, WeddingEngagement, DemoEngagement,
+} from "./AdminEngagementSections.jsx";
 import { C } from "../../../styles/theme.js";
 import { Icon } from "../../../components/icons/Icon.jsx";
 import { Num } from "../../../components/Num.jsx";
@@ -176,9 +179,17 @@ export function AdminAnalytics() {
           <Revenue data={data.revenue} lang={lang} />
           <Operations data={data.operations} lang={lang} />
           <Rsvp data={data.rsvp} lang={lang} />
+          {/* Guest-experience: the funnel + how the invitation actually performs
+              on a guest's phone. Prospect/demo traffic is reported separately at
+              the bottom so it can never be read as a couple's numbers. */}
+          <DigitalFunnel data={data.digitalEngagement} lang={lang} />
+          <LoadPerformance data={data.templateMetrics} lang={lang} />
+          <TemplateMetrics data={data.templateMetrics} lang={lang} />
+          <WeddingEngagement data={data.weddingEngagement} lang={lang} />
           <Designs data={data.designs} lang={lang} />
           <Triage data={data.triage} lang={lang} />
           <Trends data={data.trends} lang={lang} windowKey={windowKey} onWindow={onWindow} />
+          <DemoEngagement data={data.demoEngagement} lang={lang} />
 
           <div style={{ textAlign: "center", fontSize: 10, color: C.dim, marginTop: 8 }}>
             {tt(lang, "آخر تحديث", "עודכן")}: <Num dir="auto">{fmtClock(data.generatedAt, lang)}</Num>
