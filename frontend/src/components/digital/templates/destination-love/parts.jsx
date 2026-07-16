@@ -51,6 +51,7 @@ export function SectionTitle({ eyebrow, title, t, fontFamily, id }) {
         </div>
       )}
       <h2
+        className="dl-grad"
         style={{
           margin: 0,
           fontFamily: font.family,

@@ -11,6 +11,7 @@ import { useEffect,useMemo,useRef,useState } from "react";
 import { getDigitalTheme, getDigitalFont } from "../../styles/digitalThemes.js";
 import { DEFAULT_EYEBROW, DEFAULT_MEAL_OPTIONS, DEFAULT_BLESSING, DEFAULT_WELCOME } from "../../data/digitalInviteDefaults.js";
 import { localize, localizeItems, localizeList } from "../../utils/localize.js";
+import { supportsGradientText } from "../../utils/gradientText.js";
 import { ensureDigitalFonts } from "../../utils/digitalFonts.js";
 import { LangToggle } from "./inviteShared.jsx";
 import { Hero } from "./sections/InviteHero.jsx";
@@ -48,24 +49,6 @@ function formatWeddingDateTime(epoch, lang) {
     numberingSystem: "latn", timeZone: WEDDING_TZ,
   });
   return `${datePart} · ${timePart}`;
-}
-
-// Whether this engine renders `background-clip:text` (the gold "foil" gradient on
-// names / titles / countdown) correctly. A few legacy in-app engines report
-// support but paint the clipped text as a solid block — the browsers some guests
-// open the WhatsApp link in — so we enable the gradient only when supported AND
-// the engine isn't a known-bad legacy one, and fall back to the flat solid color
-// otherwise (the `.dawa-inv:not(.dawa-inv-clip-ok) .dawa-inv-grad` rule in
-// InviteStyles). Conservative by design: anything uncertain gets the safe flat path.
-function supportsGradientText() {
-  if (typeof window === "undefined" || typeof CSS === "undefined" || !CSS.supports) return false;
-  if (!(CSS.supports("-webkit-background-clip", "text") || CSS.supports("background-clip", "text"))) return false;
-  const ua = navigator.userAgent || "";
-  const sam = ua.match(/SamsungBrowser\/(\d+)/); // old Samsung Internet mis-renders clip-text
-  if (sam && Number(sam[1]) < 12) return false;
-  const andr = ua.match(/Android (\d+)/); // legacy Android WebView (pre Chromium auto-update)
-  if (andr && Number(andr[1]) <= 6) return false;
-  return true;
 }
 
 export function DigitalInvitationView({

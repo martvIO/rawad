@@ -78,6 +78,12 @@ const DL_CSS = `
 .tpl-dl .dl-rule i:last-child { transform: scaleX(-1); }
 .tpl-dl .dl-rule b { width: 5px; height: 5px; border-radius: 50%; background: var(--dl-accent); }
 
+/* Gold gradient section titles use background-clip:text. A few legacy in-app
+   engines report support but paint the clipped text as a solid block, so unless
+   the root is stamped .tpl-dl-clip-ok (supportsGradientText passed) we flatten
+   .dl-grad to a solid readable color. */
+.tpl-dl:not(.tpl-dl-clip-ok) .dl-grad { background: none !important; -webkit-text-fill-color: var(--dl-title-solid) !important; color: var(--dl-title-solid) !important; }
+
 /* Respect reduced motion: kill looping motion, keep everything readable. */
 @media (prefers-reduced-motion: reduce) {
   .tpl-dl .dl-reveal, .tpl-dl.is-opened .dl-reveal { opacity: 1 !important; transform: none !important; animation: none !important; }

@@ -7,6 +7,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { getDigitalFont } from "../../../../styles/digitalThemes.js";
 import { localize, localizeItems, localizeList } from "../../../../utils/localize.js";
 import { ensureDigitalFonts } from "../../../../utils/digitalFonts.js";
+import { supportsGradientText } from "../../../../utils/gradientText.js";
 import { DEFAULT_EYEBROW, DEFAULT_MEAL_OPTIONS } from "../../../../data/digitalInviteDefaults.js";
 import { LangToggle } from "../../inviteShared.jsx";
 import { FloatingDock } from "../../sections/InviteFooterDock.jsx";
@@ -53,6 +54,10 @@ export function DestinationLoveView({
   const t = useMemo(() => dlTokens(design?.themeColor), [design?.themeColor]);
   const font = getDigitalFont(design?.fontFamily);
   const rootRef = useRef(null);
+  // Gate the gold gradient section titles on engines that render background-clip:text
+  // correctly — legacy in-app WebViews paint clipped text as a solid block, so they
+  // fall back to the solid --dl-title-solid color (see Styles.jsx / parts.jsx .dl-grad).
+  const [clipTextOk] = useState(supportsGradientText);
 
   useEffect(() => { ensureDigitalFonts(); }, []);
 
@@ -137,7 +142,7 @@ export function DestinationLoveView({
   return (
     <div
       ref={rootRef}
-      className={"tpl-dl" + (opened ? " is-opened" : "")}
+      className={"tpl-dl" + (clipTextOk ? " tpl-dl-clip-ok" : "") + (opened ? " is-opened" : "")}
       lang={lang}
       dir="rtl"
       style={{
@@ -151,6 +156,7 @@ export function DestinationLoveView({
         "--dl-accent-line": t.theme.accentLine,
         "--dl-dash": t.dash,
         "--dl-card-border": t.theme.cardBorder,
+        "--dl-title-solid": t.theme.text,
       }}
     >
       <DlStyles />
