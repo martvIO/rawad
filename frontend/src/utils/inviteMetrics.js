@@ -38,6 +38,13 @@ const PATH = "/invites/digital/metrics";
 // If a page never signals "ready" (e.g. an effect throws, a template forgets to
 // wire onReady), still report what we have rather than losing the visit.
 const LOAD_SEND_TIMEOUT_MS = 15000;
+// "ready" is the signal that the load phase can be reported — but it does NOT
+// reliably arrive after "sealed". The two come from sibling subtrees (the
+// ambient scene vs the intro), so their mount effects fire in tree order, and in
+// practice "ready" lands a few ms FIRST. Sending synchronously on "ready" would
+// therefore ship every load report with sealedMs missing. Let the signals settle
+// first; a page-hide still flushes immediately, so nothing is lost.
+const LOAD_SETTLE_MS = 250;
 
 const now = () => {
   try {
@@ -103,6 +110,7 @@ export function createInviteMetrics({ token, surface, templateId, lang }) {
   let loadSent = false;
   let finalSent = false;
   let loadTimer = null;
+  let settleTimer = null;
   let disposed = false;
 
   const base = () => ({
@@ -133,6 +141,7 @@ export function createInviteMetrics({ token, surface, templateId, lang }) {
     if (loadSent || disposed) return;
     loadSent = true;
     clearTimeout(loadTimer);
+    clearTimeout(settleTimer);
     const payload = {};
     if (t.sealedMs != null) payload.sealedMs = t.sealedMs;
     if (t.readyMs != null) payload.readyMs = t.readyMs;
@@ -179,28 +188,36 @@ export function createInviteMetrics({ token, surface, templateId, lang }) {
    *   "sealed" — the sealed screen (guest name + tap cue) is visible
    *   "ready"  — everything is loaded, incl. the lazy 3D scene
    *   "open"   — the intro started opening; opts.kind = tap|auto|skip|failsafe|seen
+   *
+   * `opts.at` optionally supplies the performance.now() reading from WHEN the
+   * event actually happened. React runs child effects before parent effects, so
+   * a template can emit "sealed" before this recorder exists; the page buffers
+   * those events and replays them with their original timestamp. Without `at`
+   * the replay would time-stamp the sealed screen at the replay moment, which is
+   * exactly the metric we are trying to measure.
    */
   const handleIntroEvent = (event, opts = {}) => {
     try {
       if (disposed) return;
+      const at = typeof opts.at === "number" ? opts.at : now();
       if (event === "sealed") {
         if (sealedAt == null) {
-          sealedAt = now();
-          t.sealedMs = Math.round(sealedAt);
+          sealedAt = at;
+          t.sealedMs = Math.round(at);
         }
         return;
       }
       if (event === "ready") {
-        if (t.readyMs == null) t.readyMs = Math.round(now());
-        // Ready is the natural moment to report the load phase.
-        sendLoad();
+        if (t.readyMs == null) t.readyMs = Math.round(at);
+        // Report shortly AFTER ready rather than on it — see LOAD_SETTLE_MS.
+        if (settleTimer == null) settleTimer = setTimeout(sendLoad, LOAD_SETTLE_MS);
         return;
       }
       if (event === "open") {
         if (t.tapKind == null) {
           t.tapKind = opts.kind || "tap";
           // Delay is only meaningful relative to a visible sealed screen.
-          if (sealedAt != null) t.tapDelayMs = Math.max(0, Math.round(now() - sealedAt));
+          if (sealedAt != null) t.tapDelayMs = Math.max(0, Math.round(at - sealedAt));
         }
       }
     } catch {
@@ -224,6 +241,7 @@ export function createInviteMetrics({ token, surface, templateId, lang }) {
     }
     disposed = true;
     clearTimeout(loadTimer);
+    clearTimeout(settleTimer);
     try {
       document.removeEventListener("visibilitychange", onHide);
       window.removeEventListener("pagehide", onPageHide);

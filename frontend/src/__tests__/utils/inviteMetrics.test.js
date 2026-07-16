@@ -43,10 +43,33 @@ describe("createInviteMetrics", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
+  // Regression (found in a real browser): "ready" and "sealed" come from sibling
+  // subtrees and fire in TREE order, so "ready" reliably lands a few ms BEFORE
+  // "sealed". Sending synchronously on "ready" shipped every load report with
+  // sealedMs missing — silently losing one of the two headline load metrics.
+  it("still captures sealedMs when 'sealed' arrives AFTER 'ready'", () => {
+    const m = make({ token: "t1", surface: "guest", templateId: "classic" });
+    m.handleIntroEvent("ready", { at: 365 });
+    expect(fetch).not.toHaveBeenCalled(); // must not send synchronously
+    m.handleIntroEvent("sealed", { at: 376 }); // the real-world ordering
+    vi.advanceTimersByTime(250);
+    expect(sent()[0].t).toMatchObject({ readyMs: 365, sealedMs: 376 });
+  });
+
+  it("flushes the settling load phase immediately if the visit ends first", () => {
+    const m = make({ token: "t1", surface: "guest", templateId: "classic" });
+    m.handleIntroEvent("ready", { at: 100 });
+    m.handleIntroEvent("sealed", { at: 110 });
+    window.dispatchEvent(new Event("pagehide")); // before the settle timer fires
+    expect(phases()).toEqual(["load", "final"]);
+    expect(sent()[0].t.sealedMs).toBe(110);
+  });
+
   it("sends the load phase once ready, with the identifying fields", () => {
     const m = make({ token: "t1", surface: "guest", templateId: "classic", lang: "ar" });
     m.handleIntroEvent("sealed");
     m.handleIntroEvent("ready");
+    vi.advanceTimersByTime(250);
     expect(fetch).toHaveBeenCalledTimes(1);
     const [url, init] = fetch.mock.calls[0];
     expect(url).toContain("/invites/digital/metrics");
@@ -63,6 +86,7 @@ describe("createInviteMetrics", () => {
     m.handleIntroEvent("ready");
     m.handleIntroEvent("ready");
     m.handleIntroEvent("ready");
+    vi.advanceTimersByTime(250);
     expect(phases().filter((p) => p === "load")).toHaveLength(1);
   });
 
@@ -81,6 +105,7 @@ describe("createInviteMetrics", () => {
     nowSpy.mockReturnValue(4500); // tapped at 4500ms
     m.handleIntroEvent("open", { kind: "tap" });
     m.handleIntroEvent("ready");
+    vi.advanceTimersByTime(250);
     const body = sent()[0];
     expect(body.t.tapDelayMs).toBe(3500); // 4500 - 1000, NOT 4500
     expect(body.t.tapKind).toBe("tap");
@@ -92,6 +117,7 @@ describe("createInviteMetrics", () => {
     m.handleIntroEvent("sealed");
     m.handleIntroEvent("open", { kind: "auto" });
     m.handleIntroEvent("ready");
+    vi.advanceTimersByTime(250);
     expect(sent()[0].t.tapKind).toBe("auto");
   });
 
@@ -101,6 +127,7 @@ describe("createInviteMetrics", () => {
     m.handleIntroEvent("open", { kind: "tap" });
     m.handleIntroEvent("open", { kind: "auto" });
     m.handleIntroEvent("ready");
+    vi.advanceTimersByTime(250);
     expect(sent()[0].t.tapKind).toBe("tap");
   });
 
@@ -108,6 +135,7 @@ describe("createInviteMetrics", () => {
     const m = make({ token: "t1", surface: "guest", templateId: "classic" });
     m.handleIntroEvent("open", { kind: "seen" }); // return visit — revealed instantly
     m.handleIntroEvent("ready");
+    vi.advanceTimersByTime(250);
     const body = sent()[0];
     expect(body.t.tapKind).toBe("seen");
     expect(body.t.tapDelayMs).toBeUndefined();
@@ -119,6 +147,7 @@ describe("createInviteMetrics", () => {
     // below would not be registered yet and this test would pass vacuously.
     await vi.dynamicImportSettled();
     m.handleIntroEvent("ready");
+    vi.advanceTimersByTime(250);
     vitalsCbs.lcp({ value: 2400.7 });
     vitalsCbs.cls({ value: 0.0523 });
     vitalsCbs.inp({ value: 180 });
@@ -137,6 +166,7 @@ describe("createInviteMetrics", () => {
     m.handleIntroEvent("sealed");
     m.handleIntroEvent("open", { kind: "tap" });
     m.handleIntroEvent("ready");
+    vi.advanceTimersByTime(250);
     vitalsCbs.lcp({ value: 1200 });
     vitalsCbs.cls({ value: 0.02 });
     vitalsCbs.inp({ value: 90 });
@@ -163,6 +193,7 @@ describe("createInviteMetrics", () => {
     await vi.dynamicImportSettled();
     m.handleIntroEvent("sealed");
     m.handleIntroEvent("ready"); // load sent before the guest taps
+    vi.advanceTimersByTime(250);
     m.handleIntroEvent("open", { kind: "tap" });
     window.dispatchEvent(new Event("pagehide"));
     const [load, final] = sent();
@@ -177,9 +208,42 @@ describe("createInviteMetrics", () => {
     expect(phases()).toEqual(["load", "final"]);
   });
 
+  // Regression: React runs child effects before parent effects, so a template
+  // emits "sealed" before the page can wire the recorder. The page buffers those
+  // events with their ORIGINAL timestamp and replays them. If the recorder
+  // ignored `at`, the replay would stamp the sealed screen at replay time and
+  // sealedMs would be wrong (or, before the buffer existed, missing entirely).
+  it("honours a replayed event's original timestamp instead of the replay time", () => {
+    const nowSpy = vi.spyOn(performance, "now");
+    nowSpy.mockReturnValue(5000); // the recorder is created late…
+    const m = make({ token: "t1", surface: "guest", templateId: "classic" });
+    // …replaying a "sealed" that really happened at 400ms.
+    m.handleIntroEvent("sealed", { at: 400 });
+    m.handleIntroEvent("open", { kind: "tap", at: 2400 });
+    m.handleIntroEvent("ready", { at: 800 });
+    vi.advanceTimersByTime(250);
+    const body = sent()[0];
+    expect(body.t.sealedMs).toBe(400); // not 5000
+    expect(body.t.readyMs).toBe(800);
+    expect(body.t.tapDelayMs).toBe(2000); // 2400 − 400
+    nowSpy.mockRestore();
+  });
+
+  it("falls back to the current time when no timestamp is supplied", () => {
+    const nowSpy = vi.spyOn(performance, "now");
+    nowSpy.mockReturnValue(1234);
+    const m = make({ token: "t1", surface: "guest", templateId: "classic" });
+    m.handleIntroEvent("sealed");
+    m.handleIntroEvent("ready");
+    vi.advanceTimersByTime(250);
+    expect(sent()[0].t.sealedMs).toBe(1234);
+    nowSpy.mockRestore();
+  });
+
   it("tags demo traffic with its own surface so it can be kept out of guest stats", () => {
     const m = make({ token: "demo-abc", surface: "demo", templateId: "destination-love" });
     m.handleIntroEvent("ready");
+    vi.advanceTimersByTime(250);
     expect(sent()[0]).toMatchObject({ surface: "demo", templateId: "destination-love" });
   });
 
@@ -187,12 +251,13 @@ describe("createInviteMetrics", () => {
     vi.stubGlobal("fetch", vi.fn(() => { throw new Error("network down"); }));
     vi.stubGlobal("navigator", { sendBeacon: vi.fn(() => { throw new Error("nope"); }) });
     const m = make({ token: "t1", surface: "guest", templateId: "classic" });
-    expect(() => m.handleIntroEvent("ready")).not.toThrow();
+    expect(() => { m.handleIntroEvent("ready"); vi.advanceTimersByTime(250); }).not.toThrow();
   });
 
   it("stops reporting after dispose", () => {
     const m = make({ token: "t1", surface: "guest", templateId: "classic" });
     m.handleIntroEvent("ready");
+    vi.advanceTimersByTime(250);
     const before = fetch.mock.calls.length;
     m.dispose();
     window.dispatchEvent(new Event("pagehide"));

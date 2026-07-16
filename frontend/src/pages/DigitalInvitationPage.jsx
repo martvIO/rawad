@@ -188,7 +188,16 @@ function DigitalLandingMain({ t, lang, setLang }) {
   // a template demo report under "demo" — the backend keeps those buckets apart
   // so demo traffic can never inflate the real-guest funnel.
   const metricsRef = useRef(null);
-  const introEventRef = useRef(() => {});
+  // React runs CHILD effects before parent effects, so the template reports its
+  // sealed screen before this effect can create the recorder. Buffer anything
+  // emitted pre-wiring — stamped with the time it actually happened — and replay
+  // it once the recorder exists. Without the buffer, sealedMs (one of the two
+  // load metrics we're here to measure) is silently dropped on every visit;
+  // without the timestamp, it would be recorded as however late the replay ran.
+  const pendingRef = useRef([]);
+  const introEventRef = useRef((event, opts) => {
+    pendingRef.current.push([event, { ...(opts || {}), at: performance.now() }]);
+  });
   useEffect(() => {
     if (!doc) return undefined;
     const m = createInviteMetrics({
@@ -199,10 +208,14 @@ function DigitalLandingMain({ t, lang, setLang }) {
     });
     metricsRef.current = m;
     introEventRef.current = m.handleIntroEvent;
+    for (const [event, opts] of pendingRef.current) m.handleIntroEvent(event, opts);
+    pendingRef.current = [];
     return () => {
       m.dispose();
       metricsRef.current = null;
-      introEventRef.current = () => {};
+      introEventRef.current = (event, opts) => {
+        pendingRef.current.push([event, { ...(opts || {}), at: performance.now() }]);
+      };
     };
     // Only re-create for a genuinely different visit (never on a lang toggle —
     // that would restart the clock mid-visit and double-count the load).
