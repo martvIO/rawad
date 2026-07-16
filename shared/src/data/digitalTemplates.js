@@ -71,6 +71,25 @@ export const TEMPLATES = {
       envelopeStyle: "classic",
     },
   },
+  // Dolce Vita (الحياة الحلوة / החיים המתוקים) — Italian-riviera stationery: a
+  // wax-sealed ivory letter that opens, a scratch-to-reveal wedding date, and a
+  // schedule told as a seaside day. Inspired-by reinterpretation of webgency's
+  // "Dolce Vita"; no source text/photos. Accent = the in-brand blue family.
+  "dolce-vita": {
+    id: "dolce-vita",
+    label_ar: "الحياة الحلوة",
+    label_he: "החיים המתוקים",
+    thumbnail: "dolce-vita",
+    bespoke: true,
+    themes: ["dolceVita", "dolceVitaNotte", "dolceVitaLimone"],
+    defaults: {
+      themeColor: "dolceVita",
+      fontFamily: "messiri",
+      envelopeEnabled: false,
+      envelopeStyle: "classic",
+    },
+  },
+
   // Additional templates land here one at a time as they're built — each
   // bespoke entry adds `bespoke:true` + a curated `themes` list, and its
   // `defaults` (themeColor === themes[0], fontFamily, envelopeEnabled:false,

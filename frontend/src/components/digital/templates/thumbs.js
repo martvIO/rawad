@@ -8,9 +8,11 @@
 // runtime via the useTemplateAssets resolver — this file is the last rung of the
 // uploaded → bundled → label-only chain.
 import destinationLoveThumb from "../../../assets/templates/destination-love.jpg";
+import dolceVitaThumb from "../../../assets/templates/dolce-vita.jpg";
 
 export const BUNDLED_THUMBS = {
   "destination-love": destinationLoveThumb,
+  "dolce-vita": dolceVitaThumb,
   // classic has no bundled thumbnail (picker/gallery render a label-only card).
 };
 
