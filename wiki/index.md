@@ -36,7 +36,7 @@ _(ideas, frameworks, patterns, principles — pages that describe a concept)_
 - [[Digit Normalization]] — Western ASCII digits everywhere: `numberingSystem: latn` dates, apiClient input scrubbing, DB migration script
 - [[List Search and Filter]] — reusable SearchBar + FilterChips + `useListFilter` on every portal list (12 lists); substring + phone-aware + hamza-insensitive
 - [[Load-Test Dashboard]] — local-only FastAPI+React control panel for the Locust suite; live SSE metrics, always-on LOADTEST-data cleanup (incl. new admin purge endpoint), archived run history + compare
-- [[Template Demo Surfaces]] — how a template gets SEEN: public /templates gallery + landing strip, per-template demo links (one shared demo content, any template), groom picker live preview, admin-uploadable covers
+- [[Template Demo Surfaces]] — how a template gets SEEN (catalogue widening to 9 templates + multi-day events, 2026-07-16): public /templates gallery + landing strip, per-template demo links (one shared demo content, any template), groom picker live preview, admin-uploadable covers
 - [[Guest Experience Metrics]] — first-party load time / time-to-open / RSVP-completion measurement; bounded metricsDaily histogram rollups; demo traffic quarantined from guest numbers
 
 - [[Payments]] — Lemon Squeezy overlay checkout (admin-minted single-use pay links) + X-Signature-verified order_created webhook for paid groom self-signup

@@ -87,6 +87,14 @@ gating and unknown-id rejection confirmed live. The `templateAssets` 404 in dev
 (prod API lacks the endpoint until deploy) correctly falls back to bundled art —
 the designed chain.
 
+## Catalogue widening (2026-07-16)
+Grilled: the catalogue goes **4 → 9 templates** (all 8 webgency designs minus the real-couple page,
+plus `gilded-orchard`, plus `classic`). Nothing on THIS page needs changing to support that — the
+gallery, landing strip, picker and per-template demo links are all data-driven from `TEMPLATES`, so
+each new template appears on every surface the moment it is registered. Each will want a bundled cover
+in `templates/thumbs.js` (else it renders the themed ornament), overridable live via the admin uploader.
+Decisions + build order: [[Digital Invitations]] and [[Tasks Backlog]] TASK-TPL-2.
+
 ## Related
 [[Digital Invitations]] · [[Guest Experience Metrics]] · [[Visual Design System]] ·
 [[Usability Templates Test Plan]] · [[Tasks Backlog]]

@@ -33,7 +33,20 @@ Prioritized work for [[Dawa]] (full list in `TASKS.md`).
 
 ## Templates (2026-07-14 — from the reel-templates grilling in [[Digital Invitations]], needs its own go-ahead)
 - **TASK-TPL-1** — design + build the **reel-template port pipeline**: take a Claude Design HTML mockup + spec (produced via `docs/REEL-TO-TEMPLATE-PROMPT.md`) and land it as a selectable template — template registry, groom editor picker, native-theme token registration, per-template `envelopeEnabled:false` default, sealed-tap intro component, and how a template interacts with the design approval state machine + mint-time `designSnapshot`. Blocked on: owner producing the first mockup+spec from a reel.
-- **TASK-TPL-2 (IN PROGRESS 2026-07-15)** — build the **4 webgency-inspired bespoke templates** (`destination-love` → `dolce-vita` → `sacred-garden` → `blossom-oud`). **Phase 0 plumbing DONE** + **Template 1 `destination-love` SHIPPED** (built + E2E-verified in the emulator: sealed→tap→open, RSVP+confetti, AR/HE, curated palettes, live WebGL scene, editor curated-themes + hidden 3D controls; frontend 568 + backend 522 green) + **owner feedback round 1 DONE** (palettes re-grounded on the brand gold identity — standing rule in [[Visual Design System]]). **BLOCKED on the owner-run Wave 1 usability gate** ([[Usability Templates Test Plan]]) before building `dolce-vita`/`sacred-garden`/`blossom-oud` — it resolves the no-auto-open sealed-screen decision + default effects tier, which the remaining 3 inherit via `useIntroPhase`. See [[Digital Invitations]] "DECIDED + BUILDING". Plan: `~/.claude/plans/go-to-this-website-snuggly-curry.md`.
+- **TASK-TPL-2 (IN PROGRESS — scope widened 4 → 9 on 2026-07-16)** — build the **full template
+  catalogue**. `classic` + `destination-love` are LIVE. **7 to build**, reviewed one at a time:
+  `dolce-vita` → `sacred-garden` → `blossom-oud` → `template2` → `template3` → `template5` →
+  `gilded-orchard`. Preceded by **Phase 0: multi-day `events` everywhere**.
+  - **Scope reversal (owner, 2026-07-16):** the earlier "top-4 flagships only" decision is superseded —
+    ALL 8 webgency designs are in (the 3 previously skipped = `template2`/`template3`/`template5`,
+    marketing names Vibrant Vows / Royal Gold / Minimalist, confirmed at scout), plus the revived
+    `gilded-orchard`. **Still excluded: "Eternal Romance" (`jathuandthanu`)** — a real couple's
+    personalized page, not a generic template.
+  - **Wave 1 usability gate DOWNGRADED to non-blocking** (owner, 2026-07-16): build now, gate later.
+    Rationale: the sealed-tap behaviour lives in ONE shared file (`useIntroPhase`), so a Wave 1 finding
+    changes it once and all 9 templates inherit it — that is exactly what the seam was built for. The
+    gate itself ([[Usability Templates Test Plan]]) is still worth running; it just no longer blocks.
+  - Plan: `~/.claude/plans/search-and-think-and-delegated-allen.md`. See [[Digital Invitations]].
 - **Parked:** the **gilded-orchard scaffold** is stashed (`git stash` on main, 2026-07-15) — events-schedule revival + bg decorations (string lights / vine borders / fountain) + `gildedOrchard` palette. Recover if it becomes a 5th template; cherry-pick the `events` schema if a webgency template needs a multi-day schedule.
 
 ## UX opportunity backlog (2026-07-02 — from [[UX Research Discovery 2026-07-02]], each item needs its own go-ahead)

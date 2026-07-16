@@ -748,3 +748,35 @@ reported. Two ordering traps are already handled centrally — `ready` can arriv
 before `sealed`, and child effects run before the page wires the recorder.
 
 See [[Template Demo Surfaces]], [[Guest Experience Metrics]], [[Admin Analytics]].
+
+## DECIDED: full template catalogue (9) + multi-day events (2026-07-16)
+Grilled (6 questions). Owner: *"all the templates should be included as a templates for the user to
+check, all of them, and the old one should also be included."* Scope widened **4 → 9**; the top-4-only
+decision of 2026-07-15 is superseded. See [[Tasks Backlog]] TASK-TPL-2 and the plan
+`~/.claude/plans/search-and-think-and-delegated-allen.md`.
+
+| # | Decision |
+|---|---|
+| 1 | **9 selectable**: `classic` (the old one) + `destination-love` (both LIVE) + 7 to build — `dolce-vita`, `sacred-garden`, `blossom-oud`, `template2`, `template3`, `template5`, `gilded-orchard`. **"Eternal Romance" (`jathuandthanu`) stays excluded** — a real couple's personalized page. |
+| 2 | **Wave 1 gate → non-blocking.** Build now, gate later: the sealed-tap contract is ONE shared file (`useIntroPhase`), so a finding changes it once and all 9 inherit. |
+| 3 | **Multi-day `events` on ALL templates** — editor exposure + a schedule render in every template, not template-locked. |
+| 4 | **Palette: brand GROUNDS constant** (near-black `#07070a` / ivory-gold + gold trim), **one in-brand accent per template**. Refines the 2026-07-15 standing rule *for a 9-template catalogue*: strict gold everywhere would make the gallery read as one design nine times; distinctness now comes from layout/motion/ornament **plus** an accent. Consistent with the shipped `voyageAzure` (in-brand blue). |
+| 5 | **Review every template before the next** (7 cycles). |
+| 6 | **Events-everywhere lands first**, as its own reviewable phase. |
+
+**`events` is a REVIVAL, not a new field — the no-new-design-doc-fields rule holds.** It is already in
+`DESIGN_FIELDS` (`constants.ts:169`), has a full `EventItem` sanitize branch (`sanitize.ts:153,374`),
+an `eventsEnabled` toggle (`:203`, defaulting **true** in `workflow.routes.ts:60`), and rides
+`PUBLIC_DESIGN_FIELDS` → `designSnapshot`. **Nothing in the frontend has ever read it** (verified: every
+`events` hit is `pointer-events` CSS). It predates the luxury-editorial redesign and simply lost its UI.
+So mint / sanitize / SSR stay untouched. Shape:
+`EventItem = { icon, title, time, venue, address, mapUrl }` (title/time/venue/address localized).
+Render gate is the standard `on(design?.eventsEnabled) && events.length > 0`, so empty arrays auto-hide
+and **every existing design and already-minted token is visually unchanged**.
+
+**Stash hazard:** the 2026-07-15 `gilded-orchard` stash now conflicts with the metrics/gallery work on
+`constants.ts` + `DigitalDesignEditor.jsx`. **Never `git stash pop`** — read it (`git stash show -p`),
+re-apply the events hunks by hand (Phase 0), lift the `gildedOrchard` palette when that template is
+built, then drop it.
+
+See [[Template Demo Surfaces]], [[Guest Experience Metrics]], [[Usability Templates Test Plan]].
