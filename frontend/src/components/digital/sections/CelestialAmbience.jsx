@@ -44,6 +44,7 @@ export function CelestialAmbience({
   showEnvelope = false, guestName = "", monogram = "",
   namesAr = "", namesHe = "", eyebrow = "", blessing = "", welcome = "", dateText = "",
   envelopeOverrides = null, background = null, starfield = null, onOpened = null,
+  onIntroEvent = null,
 }) {
   const cap = useDeviceCapability();
   const [downgraded, setDowngraded] = useState(celDowngraded);
@@ -111,9 +112,26 @@ export function CelestialAmbience({
     setDowngraded(true);
   };
 
-  const onOpen = () => {
+  // Optional instrumentation (utils/inviteMetrics.js) — latched + wrapped so it
+  // can never double-count or throw into the reveal. See the metrics notes below.
+  const introEventRef = useRef(onIntroEvent);
+  introEventRef.current = onIntroEvent;
+  const emittedRef = useRef({ sealed: false, ready: false, open: false });
+  const emitIntro = (event, opts) => {
+    try {
+      if (emittedRef.current[event]) return;
+      emittedRef.current[event] = true;
+      introEventRef.current?.(event, opts);
+    } catch { /* metrics must never break the envelope */ }
+  };
+
+  // `source` distinguishes a REAL guest tap from the auto-open timer below.
+  // The overlay wires onClick={onOpen}, so it calls this with a MouseEvent —
+  // anything that isn't the literal "auto" sentinel is therefore a tap.
+  const onOpen = (source) => {
     const w = worldRef.current;
     if (!w || phase !== "sealed") return;
+    emitIntro("open", { kind: source === "auto" ? "auto" : "tap" });
     setPhase("opening");
     w.openEnvelope({
       onReveal: () => { setPhase("revealing"); haptic(18); }, // co-timed to the visible seal break
@@ -126,10 +144,28 @@ export function CelestialAmbience({
   // firing a no-op anyway.
   useEffect(() => {
     if (!envActive || !worldReady || phase !== "sealed") return undefined;
-    const id = setTimeout(onOpen, TIMING.ENVELOPE_AUTO_OPEN_MS);
+    const id = setTimeout(() => onOpen("auto"), TIMING.ENVELOPE_AUTO_OPEN_MS);
     return () => clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [envActive, worldReady, phase]);
+
+  // ── Load-timing signals ────────────────────────────────────────────────────
+  // "sealed" = the guest can see the sealed مكتوب (its DOM overlay paints before
+  // WebGL, so this is the honest first-meaningful-paint of the ritual).
+  // "ready"  = everything incl. the lazy three.js world is up (worldReady).
+  // When no envelope runs at all (reduced motion / no WebGL / envelope off), the
+  // content IS the first paint, so both fire together on mount — otherwise those
+  // visits would silently vanish from the load stats.
+  useEffect(() => {
+    if (envActive) {
+      emitIntro("sealed");
+      if (worldReady) emitIntro("ready");
+      return;
+    }
+    emitIntro("sealed");
+    emitIntro("ready");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [envActive, worldReady]);
 
   // Tell the parent the intro is out of the content's way, exactly once: the
   // envelope just opened (phase "done" — its fade-out is starting, so the

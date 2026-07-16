@@ -31,7 +31,7 @@ function softTexture() {
 const MOTES_BY_TIER = { 1: 260, 2: 520, 3: 900 };
 const CLOUDS_BY_TIER = { 1: 5, 2: 8, 3: 12 };
 
-export default function Scene3D({ t, tier = 2, fixed = true, onDowngrade }) {
+export default function Scene3D({ t, tier = 2, fixed = true, onDowngrade, onReady }) {
   const hostRef = useRef(null);
 
   useEffect(() => {
@@ -54,8 +54,14 @@ export default function Scene3D({ t, tier = 2, fixed = true, onDowngrade }) {
     } catch {
       canvas.remove();
       onDowngrade?.();
+      // The 3D scene will never arrive — the 2D floor IS the finished state, so
+      // report ready here or this visit's load time would never be recorded.
+      onReady?.();
       return undefined;
     }
+    // The heavy chunk is down and the GL context is live: this visit is fully
+    // loaded (the metric the owner asked for as "fully ready incl. 3D").
+    onReady?.();
     let W = host.clientWidth || window.innerWidth;
     let H = host.clientHeight || window.innerHeight;
     const dprCap = tier >= 3 ? 2 : tier === 2 ? 1.5 : 1;

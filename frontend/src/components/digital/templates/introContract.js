@@ -64,7 +64,41 @@ function prefersReducedMotion() {
   }
 }
 
-export function useIntroPhase({ active = false, token = "", openMs = DEFAULT_OPEN_ANIM_MS } = {}) {
+// `onEvent(event, opts)` is an OPTIONAL instrumentation callback (see
+// utils/inviteMetrics.js). It is wired here, in the shared contract, rather than
+// in each template — so every bespoke template (present and future) reports the
+// same "sealed / opening / how did it open" signals for free, and no template
+// can silently forget to. Events:
+//   ("sealed")                     the sealed screen is on screen
+//   ("open", {kind:"tap"})         a real guest tap
+//   ("open", {kind:"skip"})        the guest used the skip control
+//   ("open", {kind:"failsafe"})    the stuck-screen rescue fired
+//   ("open", {kind:"seen"})        return visit — revealed instantly, no tap
+// Every call is wrapped so a throwing callback can never break the ritual.
+export function useIntroPhase({ active = false, token = "", openMs = DEFAULT_OPEN_ANIM_MS, onEvent = null } = {}) {
+  // Keep the latest callback in a ref so callers can pass an inline function
+  // without re-creating open()/skip() (which would churn the template's handlers).
+  const onEventRef = useRef(onEvent);
+  onEventRef.current = onEvent;
+  const emit = useCallback((event, opts) => {
+    try {
+      // Always hand the listener an options object, so a consumer can read
+      // opts.kind without guarding for undefined.
+      onEventRef.current?.(event, opts || {});
+    } catch {
+      /* instrumentation must never break the intro */
+    }
+  }, []);
+  // An invitation opens exactly once per mount, so the open signal is latched:
+  // this keeps the phase machine's functional-updater race guard intact while
+  // making the emit idempotent (React may double-invoke an updater in
+  // StrictMode, and a double-counted "tap" would corrupt the tap-delay stats).
+  const openEmitted = useRef(false);
+  const emitOpenOnce = useCallback((kind) => {
+    if (openEmitted.current) return;
+    openEmitted.current = true;
+    emit("open", { kind });
+  }, [emit]);
   // Resolve the starting phase ONCE (lazy init): inactive previews and
   // already-seen tokens skip straight to revealed; a fresh active visit seals.
   const [phase, setPhase] = useState(() => {
@@ -76,6 +110,18 @@ export function useIntroPhase({ active = false, token = "", openMs = DEFAULT_OPE
   const openTimer = useRef(null);
 
   const revealed = phase === "done";
+
+  // Report the initial state ONCE per mount: either the sealed screen is up, or
+  // this is a return visit that revealed instantly (no tap will ever come).
+  const startReported = useRef(false);
+  useEffect(() => {
+    if (startReported.current || !active) return;
+    startReported.current = true;
+    if (phase === "sealed") emit("sealed");
+    else emitOpenOnce("seen");
+    // Intentionally mount-only: `phase` is read for the INITIAL state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active, emit, emitOpenOnce]);
 
   // Escalate the tap cue after an idle beat on the sealed screen.
   useEffect(() => {
@@ -89,28 +135,35 @@ export function useIntroPhase({ active = false, token = "", openMs = DEFAULT_OPE
   // hard-cuts to "done" (no opening animation) only as a stuck-screen rescue.
   useEffect(() => {
     if (!active || phase === "done") return undefined;
-    const id = setTimeout(() => setPhase("done"), FAILSAFE_MS);
+    const id = setTimeout(() => {
+      emitOpenOnce("failsafe");
+      setPhase("done");
+    }, FAILSAFE_MS);
     return () => clearTimeout(id);
-  }, [active, phase]);
+  }, [active, phase, emitOpenOnce]);
 
   useEffect(() => () => clearTimeout(openTimer.current), []);
 
   const open = useCallback(() => {
     setPhase((p) => {
       if (p !== "sealed") return p;
+      // Only on a real sealed→open transition (latched, so a double-tap or a
+      // StrictMode updater replay can't inflate the tap count).
+      emitOpenOnce("tap");
       markSeen(token);
       if (prefersReducedMotion()) return "done";
       clearTimeout(openTimer.current);
       openTimer.current = setTimeout(() => setPhase("done"), Math.max(0, openMs));
       return "opening";
     });
-  }, [token, openMs]);
+  }, [token, openMs, emitOpenOnce]);
 
   const skip = useCallback(() => {
     clearTimeout(openTimer.current);
+    emitOpenOnce("skip");
     markSeen(token);
     setPhase("done");
-  }, [token]);
+  }, [token, emitOpenOnce]);
 
   const replay = useCallback(() => {
     clearTimeout(openTimer.current);

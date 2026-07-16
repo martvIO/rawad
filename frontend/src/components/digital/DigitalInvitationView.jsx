@@ -69,6 +69,7 @@ export function DigitalInvitationView({
   rsvpDone = false,
   boardingPassEnabled = false,
   token = "",
+  onIntroEvent = null,
 }) {
   const theme = getDigitalTheme(design?.themeColor);
   const font = getDigitalFont(design?.fontFamily);
@@ -264,6 +265,7 @@ export function DigitalInvitationView({
         background={design?.background && typeof design.background === "object" ? design.background : null}
         starfield={design?.starfield && typeof design.starfield === "object" ? design.starfield : null}
         onOpened={() => setInviteRevealed(true)}
+        onIntroEvent={onIntroEvent}
       />
 
       <Hero

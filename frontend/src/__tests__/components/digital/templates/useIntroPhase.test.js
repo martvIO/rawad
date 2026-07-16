@@ -82,3 +82,66 @@ describe("useIntroPhase", () => {
     expect(result.current.phase).toBe("done");
   });
 });
+
+// ── Instrumentation seam (onEvent) ────────────────────────────────────────────
+// Wired in the CONTRACT rather than per-template, so every bespoke template
+// reports the same signals. These pin the guarantees the metrics depend on:
+// exactly-once open reporting, and an honest `kind` for each way an invitation
+// can open (a skip or a failsafe must never be counted as a guest tap).
+describe("useIntroPhase — onEvent instrumentation", () => {
+  it("reports the sealed screen on mount", () => {
+    const onEvent = vi.fn();
+    renderHook(() => useIntroPhase({ active: true, token: "e1", onEvent }));
+    expect(onEvent).toHaveBeenCalledWith("sealed", {});
+  });
+
+  it("reports a real tap once, and only on a true sealed→open transition", () => {
+    const onEvent = vi.fn();
+    const { result } = renderHook(() => useIntroPhase({ active: true, token: "e2", onEvent }));
+    act(() => result.current.open());
+    act(() => result.current.open()); // double-tap must not double-count
+    const opens = onEvent.mock.calls.filter(([e]) => e === "open");
+    expect(opens).toEqual([["open", { kind: "tap" }]]);
+  });
+
+  it("reports a skip as a skip, never as a tap", () => {
+    const onEvent = vi.fn();
+    const { result } = renderHook(() => useIntroPhase({ active: true, token: "e3", onEvent }));
+    act(() => result.current.skip());
+    expect(onEvent.mock.calls.filter(([e]) => e === "open")).toEqual([["open", { kind: "skip" }]]);
+  });
+
+  it("reports the stuck-screen failsafe as a failsafe, never as a tap", () => {
+    const onEvent = vi.fn();
+    renderHook(() => useIntroPhase({ active: true, token: "e4", onEvent }));
+    act(() => vi.advanceTimersByTime(20000));
+    expect(onEvent.mock.calls.filter(([e]) => e === "open")).toEqual([["open", { kind: "failsafe" }]]);
+  });
+
+  it("reports a return visit as 'seen' (revealed instantly, no tap to measure)", () => {
+    globalThis.localStorage.setItem(SEEN_KEY("e5"), "1");
+    const onEvent = vi.fn();
+    renderHook(() => useIntroPhase({ active: true, token: "e5", onEvent }));
+    expect(onEvent).toHaveBeenCalledWith("open", { kind: "seen" });
+    expect(onEvent).not.toHaveBeenCalledWith("sealed", {});
+  });
+
+  it("stays silent for an inactive preview (the editor never seals)", () => {
+    const onEvent = vi.fn();
+    renderHook(() => useIntroPhase({ active: false, token: "e6", onEvent }));
+    expect(onEvent).not.toHaveBeenCalled();
+  });
+
+  it("a throwing onEvent can never break the ritual", () => {
+    const onEvent = vi.fn(() => { throw new Error("metrics exploded"); });
+    const { result } = renderHook(() => useIntroPhase({ active: true, token: "e7", onEvent }));
+    expect(() => act(() => result.current.open())).not.toThrow();
+    expect(result.current.phase).toBe("opening");
+  });
+
+  it("works with no onEvent supplied (instrumentation is optional)", () => {
+    const { result } = renderHook(() => useIntroPhase({ active: true, token: "e8" }));
+    expect(() => act(() => result.current.open())).not.toThrow();
+    expect(result.current.phase).toBe("opening");
+  });
+});

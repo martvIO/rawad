@@ -6,9 +6,10 @@
 // this component only renders. recharts is LTR-only, so every chart sits in a
 // `dir="ltr"` wrapper while the surrounding RTL chrome stays Arabic/Hebrew.
 //
-// HONESTY: no invite-"open" rate (not tracked), no delivery time-series
-// (deliveredAt is a HH:MM string), no fabricated "failed" payments — see the
-// backend aggregator's header for why.
+// HONESTY: no delivery time-series (deliveredAt is a HH:MM string), no
+// fabricated "failed" payments — see the backend aggregator's header for why.
+// Invite OPENS are first-party tracked (the /invites/digital/opened ping stamps
+// viewedAt), so the open rate here is real, not modeled.
 import { useEffect, useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -330,6 +331,11 @@ function Rsvp({ data, lang }) {
         <Kpi label={tt(lang, "أكّدوا", "אישרו")} value={enNum(data.confirmedGuests)} color={PAL.green} />
         <Kpi label={tt(lang, "نسبة الرد", "אחוז מענה")} value={enNum(data.rsvpRatePct)} suffix="%" color={C.goldLight} />
         <Kpi label={tt(lang, "الحضور المتوقّع", "צפי נוכחים")} value={enNum(data.expectedHeadcount)} color={PAL.gold} />
+      </KpiGrid>
+      {/* First-party open KPIs — computed server-side from the viewedAt ping. */}
+      <KpiGrid cols={2}>
+        <Kpi label={tt(lang, "فتحوا الدعوة الرقمية", "פתחו את ההזמנה הדיגיטלית")} value={enNum(data.digitalOpened)} color={PAL.blue} />
+        <Kpi label={tt(lang, "نسبة الفتح الرقمي", "אחוז פתיחה דיגיטלי")} value={enNum(data.digitalOpenRatePct)} suffix="%" color={C.goldLight} />
       </KpiGrid>
       <ChartCard>
         <ProgressBar

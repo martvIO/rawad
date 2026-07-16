@@ -3,7 +3,7 @@
 // the SAME design-doc fields (no new schema). It owns the sealed-tap intro
 // (useIntroPhase), the entrance/scroll reveal, the ambient effects, and reuses
 // the shared LangToggle / FloatingDock / WalletButton / behaviour hooks.
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getDigitalFont } from "../../../../styles/digitalThemes.js";
 import { localize, localizeItems, localizeList } from "../../../../utils/localize.js";
 import { ensureDigitalFonts } from "../../../../utils/digitalFonts.js";
@@ -49,6 +49,7 @@ export function DestinationLoveView({
   rsvpDone = false,
   boardingPassEnabled = false,
   token = "",
+  onIntroEvent = null,
 }) {
   const isPublic = mode === "public";
   const t = useMemo(() => dlTokens(design?.themeColor), [design?.themeColor]);
@@ -62,7 +63,14 @@ export function DestinationLoveView({
   useEffect(() => { ensureDigitalFonts(); }, []);
 
   // Sealed-tap intro (active only on the public page; previews reveal at once).
-  const intro = useIntroPhase({ active: showEnvelope, token, openMs: 2400 });
+  // onEvent feeds the shared intro contract's sealed/open signals to the page's
+  // metrics recorder — wired once here, so every bespoke template reports alike.
+  const intro = useIntroPhase({ active: showEnvelope, token, openMs: 2400, onEvent: onIntroEvent });
+  // "ready" = the ambient scene finished loading (or was skipped) — the second
+  // half of the load metric. Stable identity so SceneHost's effect can't loop.
+  const onSceneReady = useCallback(() => {
+    try { onIntroEvent?.("ready"); } catch { /* never break the invitation */ }
+  }, [onIntroEvent]);
   const opened = intro.phase !== "sealed"; // content rises as the intro fades
 
   // ── Field extraction (identical semantics to DigitalInvitationView) ──────
@@ -163,7 +171,7 @@ export function DestinationLoveView({
 
       {/* Ambient sky (2D floor + optional lazy three.js parallax). Rendered via a
           nested import to keep the three chunk out of this base module. */}
-      <AmbientLayer t={t} fixed={isPublic} />
+      <AmbientLayer t={t} fixed={isPublic} onReady={onSceneReady} />
 
       {isPublic && typeof setLang === "function" && (
         <LangToggle lang={lang} setLang={setLang} theme={t.theme} font={font} />
@@ -238,10 +246,10 @@ export function DestinationLoveView({
 // The ambient effects wrapper. SceneHost renders the 2D floor always and layers
 // the lazy three.js parallax on top on capable devices (only when `fixed`, i.e.
 // the real guest page — the editor preview stays on the light 2D floor).
-function AmbientLayer({ t, fixed }) {
+function AmbientLayer({ t, fixed, onReady }) {
   return (
     <div style={{ position: fixed ? "fixed" : "absolute", inset: 0, zIndex: 0 }} aria-hidden="true">
-      <SceneHost t={t} fixed={fixed} />
+      <SceneHost t={t} fixed={fixed} onReady={onReady} />
     </div>
   );
 }

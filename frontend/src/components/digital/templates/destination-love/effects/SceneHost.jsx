@@ -7,14 +7,14 @@
 // The 2D floor is also the Suspense placeholder, so nothing flashes while the
 // three chunk downloads. A runtime FPS downgrade latches for the session
 // (celDowngraded) so we don't re-attempt the 3D on the next mount.
-import { lazy, Suspense, useState, useCallback } from "react";
+import { lazy, Suspense, useState, useCallback, useEffect } from "react";
 import { Ambience2D } from "./Ambience2D.jsx";
 import { useDeviceCapability } from "../../../../../hooks/useDeviceCapability.js";
 import { celDowngraded, markCelDowngraded } from "../../../celestial/downgradeStore.js";
 
 const Scene3D = lazy(() => import("./Scene3D.jsx"));
 
-export function SceneHost({ t, fixed = true }) {
+export function SceneHost({ t, fixed = true, onReady }) {
   const cap = useDeviceCapability();
   const [downgraded, setDowngraded] = useState(celDowngraded);
 
@@ -27,12 +27,19 @@ export function SceneHost({ t, fixed = true }) {
   // editor/admin preview stays on the light 2D floor (no tall-canvas cost).
   const use3d = fixed && cap.tier > 0 && cap.webgl && !downgraded;
 
+  // When no 3D is attempted, the 2D floor is the finished state — report ready
+  // now, otherwise these (lower-tier, most-vulnerable) visits would be missing
+  // from the load stats entirely. Scene3D reports for itself when it does run.
+  useEffect(() => {
+    if (!use3d) onReady?.();
+  }, [use3d, onReady]);
+
   return (
     <>
       <Ambience2D t={t} fixed={fixed} />
       {use3d && (
         <Suspense fallback={null}>
-          <Scene3D t={t} tier={cap.tier} fixed={fixed} onDowngrade={onDowngrade} />
+          <Scene3D t={t} tier={cap.tier} fixed={fixed} onDowngrade={onDowngrade} onReady={onReady} />
         </Suspense>
       )}
     </>

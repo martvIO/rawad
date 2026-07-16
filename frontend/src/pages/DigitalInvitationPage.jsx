@@ -2,7 +2,7 @@
 // (preferring the embedded designSnapshot when present), and delegates
 // rendering to <DigitalInvitationView/>. RSVP submission lives here so the
 // view stays presentational.
-import { useEffect, useState, useRef, lazy, Suspense } from "react";
+import { useCallback, useEffect, useState, useRef, lazy, Suspense } from "react";
 import { useParams, Routes, Route, useSearchParams, useNavigate } from "react-router-dom";
 import { subscribeInviteToken, submitDigitalWish, getApprovedWishes } from "../services/invites.js";
 import { getDigitalInvitationPublic, submitDigitalGuestInvite, pingDigitalInviteOpened, getDemoDesignPublic } from "../services/digitalInvitation.js";
@@ -13,6 +13,8 @@ import { C } from "../styles/theme.js";
 import { Icon } from "../components/icons/Icon.jsx";
 import { SAMPLE_STORY, SAMPLE_DETAILS, SAMPLE_HOTELS, SAMPLE_WISHES, DEFAULT_MEAL_OPTIONS } from "../data/digitalInviteDefaults.js";
 import { applyDemoOverrides } from "../utils/demoOverrides.js";
+import { createInviteMetrics } from "../utils/inviteMetrics.js";
+import { DEFAULT_TEMPLATE_ID } from "@dawa/core/data/digitalTemplates.js";
 
 const DEMO_MEDIA = [
   { url: "https://images.unsplash.com/photo-1519741497674-611481863552?w=1200&q=80", kind: "image", storagePath: "demo/1" },
@@ -180,6 +182,39 @@ function DigitalLandingMain({ t, lang, setLang }) {
     }
   }, [token, isDemo, tokenRec, lang]);
 
+  // Guest-experience timing recorder. Created once the design resolves (so the
+  // templateId is final and the event is attributed to the template the guest
+  // actually saw). Real guests report under surface "guest"; prospects browsing
+  // a template demo report under "demo" — the backend keeps those buckets apart
+  // so demo traffic can never inflate the real-guest funnel.
+  const metricsRef = useRef(null);
+  const introEventRef = useRef(() => {});
+  useEffect(() => {
+    if (!doc) return undefined;
+    const m = createInviteMetrics({
+      token: isDemo ? demoTokenRef.current : token,
+      surface: isDemo ? "demo" : "guest",
+      templateId: doc.templateId || DEFAULT_TEMPLATE_ID,
+      lang,
+    });
+    metricsRef.current = m;
+    introEventRef.current = m.handleIntroEvent;
+    return () => {
+      m.dispose();
+      metricsRef.current = null;
+      introEventRef.current = () => {};
+    };
+    // Only re-create for a genuinely different visit (never on a lang toggle —
+    // that would restart the clock mid-visit and double-count the load).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [!!doc, doc?.templateId, isDemo, token]);
+
+  // Stable identity: the templates receive one callback that never changes, so
+  // wiring metrics can't churn their memoized handlers or re-run their effects.
+  const onIntroEvent = useCallback((event, opts) => {
+    introEventRef.current?.(event, opts);
+  }, []);
+
   // The groom's APPROVED guestbook wishes (live — shows the same approved
   // messages on every guest's invitation, whatever design they received).
   useEffect(() => {
@@ -280,6 +315,7 @@ function DigitalLandingMain({ t, lang, setLang }) {
       rsvpDone={done}
       boardingPassEnabled={!!tokenRec.boardingPassEnabled}
       token={isDemo ? demoTokenRef.current : token}
+      onIntroEvent={onIntroEvent}
     />
   );
 }
