@@ -90,6 +90,25 @@ export const TEMPLATES = {
     },
   },
 
+  // The Sacred Garden (حديقة الفرح / גן השמחה) — a walled garden: an embossed
+  // floral envelope closed with a monogrammed wax seal, torn-paper section edges,
+  // drifting petals and botanical garlands. Inspired-by reinterpretation of
+  // webgency's "The Sacred Garden"; no source text/photos. Accent = in-brand green.
+  "sacred-garden": {
+    id: "sacred-garden",
+    label_ar: "حديقة الفرح",
+    label_he: "גן השמחה",
+    thumbnail: "sacred-garden",
+    bespoke: true,
+    themes: ["sacredGarden", "sacredGardenNight", "sacredGardenRose"],
+    defaults: {
+      themeColor: "sacredGarden",
+      fontFamily: "reem",
+      envelopeEnabled: false,
+      envelopeStyle: "classic",
+    },
+  },
+
   // Additional templates land here one at a time as they're built — each
   // bespoke entry adds `bespoke:true` + a curated `themes` list, and its
   // `defaults` (themeColor === themes[0], fontFamily, envelopeEnabled:false,
