@@ -6,7 +6,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getDigitalFont } from "../../../../styles/digitalThemes.js";
 import { localize, localizeItems, localizeList } from "../../../../utils/localize.js";
-import { ensureDigitalFonts } from "../../../../utils/digitalFonts.js";
+import { ensureDigitalFontFamily } from "../../../../utils/digitalFonts.js";
 import { supportsGradientText } from "../../../../utils/gradientText.js";
 import { DEFAULT_EYEBROW, DEFAULT_MEAL_OPTIONS } from "../../../../data/digitalInviteDefaults.js";
 import { LangToggle } from "../../inviteShared.jsx";
@@ -61,7 +61,7 @@ export function DestinationLoveView({
   // fall back to the solid --dl-title-solid color (see Styles.jsx / parts.jsx .dl-grad).
   const [clipTextOk] = useState(supportsGradientText);
 
-  useEffect(() => { ensureDigitalFonts(); }, []);
+  useEffect(() => { ensureDigitalFontFamily(font.family); }, [font.family]);
 
   // Sealed-tap intro (active only on the public page; previews reveal at once).
   // onEvent feeds the shared intro contract's sealed/open signals to the page's

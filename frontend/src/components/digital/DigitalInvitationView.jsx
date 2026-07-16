@@ -12,7 +12,7 @@ import { getDigitalTheme, getDigitalFont } from "../../styles/digitalThemes.js";
 import { DEFAULT_EYEBROW, DEFAULT_MEAL_OPTIONS, DEFAULT_BLESSING, DEFAULT_WELCOME } from "../../data/digitalInviteDefaults.js";
 import { localize, localizeItems, localizeList } from "../../utils/localize.js";
 import { supportsGradientText } from "../../utils/gradientText.js";
-import { ensureDigitalFonts } from "../../utils/digitalFonts.js";
+import { ensureDigitalFontFamily } from "../../utils/digitalFonts.js";
 import { LangToggle } from "./inviteShared.jsx";
 import { Icon } from "./InviteIcon.jsx";
 import { Hero } from "./sections/InviteHero.jsx";
@@ -93,9 +93,10 @@ export function DigitalInvitationView({
     return () => clearTimeout(id);
   }, [inviteRevealed]);
 
-  // Load the extended Arabic+Hebrew wedding fonts only when an invitation
-  // actually renders (lazy — other pages don't pay for them).
-  useEffect(() => { ensureDigitalFonts(); }, []);
+  // Load ONLY the families this design's font needs (an invitation renders one
+  // font — the guest shouldn't wait on the editor's whole picker set, and the
+  // names shouldn't reflow when the real face lands).
+  useEffect(() => { ensureDigitalFontFamily(font.family); }, [font.family]);
 
   // ── Field extraction with sensible fallbacks ────────────────────────────
   // Every groom-authored text field may be a plain string (legacy / single-

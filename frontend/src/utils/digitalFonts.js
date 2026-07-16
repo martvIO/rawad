@@ -31,9 +31,78 @@ const FONT_HREF =
   "&family=Suez+One" +
   "&display=swap";
 
+// ── Targeted, per-design loading ────────────────────────────────────────────
+// An invitation renders exactly ONE font, but the guest used to wait on the
+// whole ~17-family picker set above (a much bigger CSS + font payload on 4G),
+// and the couple's names reflowed when the real face finally landed. The
+// invitation views therefore ask for just the families their design needs.
+//
+// Already loaded globally by index.html — never re-request these.
+const GLOBAL_FAMILIES = new Set(["Cairo", "Amiri", "Noto Naskh Arabic", "Heebo", "Frank Ruhl Libre"]);
+
+// family name → its Google Fonts spec (same weights the full set requests).
+const FAMILY_SPEC = {
+  "Aref Ruqaa": "Aref+Ruqaa:wght@400;700",
+  "El Messiri": "El+Messiri:wght@400;500;700",
+  "Reem Kufi": "Reem+Kufi:wght@400;600;700",
+  Tajawal: "Tajawal:wght@400;500;700",
+  "Markazi Text": "Markazi+Text:wght@400;600;700",
+  "Scheherazade New": "Scheherazade+New:wght@400;700",
+  Changa: "Changa:wght@400;600;700",
+  Lalezar: "Lalezar",
+  Lemonada: "Lemonada:wght@400;600;700",
+  "Noto Serif Hebrew": "Noto+Serif+Hebrew:wght@400;500;700",
+  "David Libre": "David+Libre:wght@400;500;700",
+  Assistant: "Assistant:wght@400;600;700",
+  Rubik: "Rubik:wght@400;500;700",
+  "Secular One": "Secular+One",
+  "Suez One": "Suez+One",
+};
+
+function familiesFor(family) {
+  return String(family || "")
+    .split(",")
+    .map((s) => s.trim().replace(/^['"]|['"]$/g, ""))
+    .filter(Boolean);
+}
+
+/**
+ * Inject ONLY the families this design's font stack needs. Pass the resolved
+ * `font.family` stack (from getDigitalFont). Idempotent per stack; a no-op when
+ * every family is already global, or when the full picker set is already in.
+ */
+export function ensureDigitalFontFamily(family) {
+  if (typeof document === "undefined") return;
+  if (document.querySelector("link[data-dawa-fonts]")) return; // full set already loaded
+  const specs = familiesFor(family)
+    .filter((f) => !GLOBAL_FAMILIES.has(f))
+    .map((f) => FAMILY_SPEC[f])
+    .filter(Boolean);
+  if (!specs.length) return; // nothing to fetch — already available globally
+  const key = specs.join("|");
+  if (document.querySelector(`link[data-dawa-font="${CSS.escape(key)}"]`)) return;
+
+  const preconnectCss = document.createElement("link");
+  preconnectCss.rel = "preconnect";
+  preconnectCss.href = "https://fonts.googleapis.com";
+
+  const preconnectFiles = document.createElement("link");
+  preconnectFiles.rel = "preconnect";
+  preconnectFiles.href = "https://fonts.gstatic.com";
+  preconnectFiles.crossOrigin = "anonymous";
+
+  const link = document.createElement("link");
+  link.rel = "stylesheet";
+  link.href = `https://fonts.googleapis.com/css2?family=${specs.join("&family=")}&display=swap`;
+  link.setAttribute("data-dawa-font", key);
+
+  document.head.append(preconnectCss, preconnectFiles, link);
+}
+
 /**
  * Inject the extended wedding fonts once. Idempotent and SSR-safe — repeated
  * calls and a second mount are no-ops because the <link> carries a marker attr.
+ * Used by the design EDITOR, whose font picker previews every family.
  */
 export function ensureDigitalFonts() {
   if (typeof document === "undefined") return;
