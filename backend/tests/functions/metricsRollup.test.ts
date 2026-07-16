@@ -74,9 +74,26 @@ describe("histPercentile", () => {
     expect(histPercentile(hist, MS_EDGES, 0.9)).toBe(2000); // 36th sample → b3
   });
 
-  it("returns null in the open-ended tail instead of inventing a number", () => {
-    // Everything landed past the last edge: we know it was >30s, not how much.
-    expect(histPercentile({ b8: 5 }, MS_EDGES, 0.5)).toBeNull();
+  // null must mean "no samples" and NOTHING else. A caller comparing templates
+  // ("which is slowest?") skips nulls, so if the open-ended tail also returned
+  // null the SLOWEST possible result would vanish from the comparison and a fast
+  // template would be reported as the worst.
+  it("reports the last edge as a lower bound in the open-ended tail, not null", () => {
+    // Everything landed past 30s: we know it was AT LEAST 30s, not how much more.
+    expect(histPercentile({ b8: 5 }, MS_EDGES, 0.5)).toBe(30000);
+  });
+
+  it("reserves null exclusively for 'no samples'", () => {
+    expect(histPercentile({}, MS_EDGES, 0.9)).toBeNull();
+    expect(histPercentile({ b0: 0, b8: 0 }, MS_EDGES, 0.9)).toBeNull();
+    // Any sample at all → a number, never null.
+    expect(histPercentile({ b8: 1 }, MS_EDGES, 0.9)).toBe(30000);
+  });
+
+  it("ranks a tail percentile as worse than a fast one (the comparison that broke)", () => {
+    const fast = histPercentile({ b0: 10 }, MS_EDGES, 0.9);
+    const slow = histPercentile({ b8: 10 }, MS_EDGES, 0.9);
+    expect(slow).toBeGreaterThan(fast);
   });
 
   it("handles a single sample", () => {

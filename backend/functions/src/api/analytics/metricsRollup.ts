@@ -56,9 +56,16 @@ export function rollupDocId(surface: string, templateId: string, day: number): s
 /**
  * Estimate a percentile from histogram counts. Buckets are ranges, so the result
  * is the UPPER EDGE of the bucket the percentile falls in — i.e. "p90 ≤ 4000ms",
- * deliberately conservative rather than falsely precise. The open-ended final
- * bucket returns null (we only know it exceeded the last edge, and inventing a
- * number there would be the kind of fabricated metric the aggregator forbids).
+ * deliberately conservative rather than falsely precise.
+ *
+ * `null` means ONE thing only: no samples. It must NOT also mean "landed in the
+ * open-ended tail" — a caller comparing percentiles (e.g. "which template is
+ * worst?") skips nulls, so conflating the two would make the SLOWEST possible
+ * result (>30s, the village-4G loading wall this exists to detect) vanish from
+ * the comparison and report a fast template as the worst. The tail therefore
+ * returns the last edge, which is that bucket's LOWER bound: read it as "≥30s".
+ * That is a real measurement, not an invented one — we genuinely know it was at
+ * least this slow; we just can't say by how much.
  */
 export function histPercentile(
   hist: Record<string, number> | undefined,
@@ -78,9 +85,10 @@ export function histPercentile(
   let seen = 0;
   for (let i = 0; i < counts.length; i++) {
     seen += counts[i];
-    if (seen >= target) return i < edges.length ? edges[i] : null;
+    // i === edges.length is the overflow bucket → report its lower bound.
+    if (seen >= target) return i < edges.length ? edges[i] : edges[edges.length - 1];
   }
-  return null;
+  return edges[edges.length - 1];
 }
 
 /** Sum two histogram maps (used to merge a template's days into one view). */

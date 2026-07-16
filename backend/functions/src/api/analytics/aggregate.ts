@@ -15,8 +15,10 @@
 //   - Stripe only records paymentStatus pending|paid (no "failed") — failedCount
 //     is surfaced as 0 rather than fabricated.
 //   - Load/open TIMINGS come from metricsDaily histogram rollups, so percentiles
-//     are bucket UPPER EDGES ("p90 ≤ 4s"), and a percentile landing in the
-//     open-ended tail returns null rather than an invented number.
+//     are bucket UPPER EDGES ("p90 ≤ 4s"). A percentile landing in the open-ended
+//     tail reports the LAST edge as a lower bound ("≥30s") — null means "no
+//     samples" and nothing else, so a caller comparing templates can't silently
+//     skip the slowest one.
 //   - Demo/gallery (prospect) traffic is reported ONLY in demoEngagement; it is
 //     never merged into the guest funnel or a template's guest-facing timings.
 
@@ -90,6 +92,29 @@ function username(u: AnyRec): string {
 // ─── Time-series bucketing ──────────────────────────────────────────────────────
 
 export interface Bucket { t: number; count: number; }
+
+/**
+ * Bucket ALREADY-COUNTED (timestamp, count) pairs — the rollup equivalent of
+ * bucketSeries. Rollups store one row per day with a `loads` total, so expanding
+ * them back into one entry per load would rebuild the very unbounded per-event
+ * list the rollups exist to avoid (365 days × N loads/day, materialized inside
+ * the analytics request). This adds the counts straight into the buckets instead.
+ */
+export function bucketCounts(
+  entries: Array<{ t: number; count: number }>,
+  startMs: number,
+  endMs: number,
+  stepMs: number,
+): Bucket[] {
+  const n = Math.max(1, Math.ceil((endMs - startMs) / stepMs));
+  const buckets: Bucket[] = Array.from({ length: n }, (_v, i) => ({ t: startMs + i * stepMs, count: 0 }));
+  for (const e of entries) {
+    if (!Number.isFinite(e.t) || e.t < startMs || e.t > endMs) continue;
+    const idx = Math.min(n - 1, Math.floor((e.t - startMs) / stepMs));
+    buckets[idx].count += Number.isFinite(e.count) ? e.count : 0;
+  }
+  return buckets;
+}
 
 /**
  * Bucket a list of epoch-ms timestamps into fixed-width buckets spanning
@@ -542,7 +567,7 @@ export function composeDemoEngagement(
   const docs = metricsDaily.filter((d) => d.surface === "demo" || d.surface === "gallery");
   const bySurface = { demo: 0, gallery: 0 };
   const byTemplate = new Map<string, number>();
-  const stamps: Array<number | null> = [];
+  const dayCounts: Array<{ t: number; count: number }> = [];
 
   for (const d of docs) {
     const loads = num(d.loads);
@@ -551,13 +576,14 @@ export function composeDemoEngagement(
     else bySurface.gallery += loads;
     const tpl = String(d.templateId ?? "classic");
     if (surface === "demo") byTemplate.set(tpl, (byTemplate.get(tpl) ?? 0) + loads);
-    // Rollups are per-day, so the series is reconstructed by repeating each
-    // day's key `loads` times — exact at day granularity, which is all the
-    // buckets need.
+    // One entry PER ROLLUP DOC (not per load) — the counts go into the buckets
+    // as weights. Exact at day granularity, which is all the series needs.
     const day = String(d.day ?? "");
     if (/^\d{8}$/.test(day)) {
-      const ms = Date.UTC(+day.slice(0, 4), +day.slice(4, 6) - 1, +day.slice(6, 8));
-      for (let i = 0; i < loads; i++) stamps.push(ms);
+      dayCounts.push({
+        t: Date.UTC(+day.slice(0, 4), +day.slice(4, 6) - 1, +day.slice(6, 8)),
+        count: loads,
+      });
     }
   }
 
@@ -573,7 +599,7 @@ export function composeDemoEngagement(
       .map(([templateId, loads]) => ({ templateId, loads }))
       .sort((a, b) => b.loads - a.loads),
     sealedP50: histPercentile(sealedHist, MS_EDGES, 0.5),
-    series: bucketSeries(stamps, startMs, endMs, stepMs),
+    series: bucketCounts(dayCounts, startMs, endMs, stepMs),
   };
 }
 

@@ -247,6 +247,33 @@ describe("createInviteMetrics", () => {
     expect(sent()[0]).toMatchObject({ surface: "demo", templateId: "destination-love" });
   });
 
+  // Regression: the demo page's synthetic token ("demo-0ae918a0") is NOT a
+  // 32-hex invite token, so the endpoint's zod check rejected the entire report
+  // with a 400 — every demo/gallery metric was silently lost. The recorder now
+  // strips it, so no call site can reintroduce the failure.
+  it("never sends a token on a non-guest surface (the server would 400 the report)", () => {
+    const TOKEN_HEX_RE = /^[a-f0-9]{32}$/; // mirrors backend constants/tokens.ts
+    for (const surface of ["demo", "gallery"]) {
+      fetch.mockClear();
+      const m = make({ token: "demo-0ae918a0", surface, templateId: "classic" });
+      m.handleIntroEvent("ready");
+      vi.advanceTimersByTime(250);
+      const body = sent()[0];
+      expect(body.surface).toBe(surface);
+      expect(body.token).toBeUndefined();
+      // Whatever is sent must satisfy the server's token contract.
+      expect(body.token === undefined || TOKEN_HEX_RE.test(body.token)).toBe(true);
+    }
+  });
+
+  it("still sends a real 32-hex token on the guest surface", () => {
+    const real = "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6";
+    const m = make({ token: real, surface: "guest", templateId: "classic" });
+    m.handleIntroEvent("ready");
+    vi.advanceTimersByTime(250);
+    expect(sent()[0].token).toBe(real);
+  });
+
   it("never throws when the transport fails", () => {
     vi.stubGlobal("fetch", vi.fn(() => { throw new Error("network down"); }));
     vi.stubGlobal("navigator", { sendBeacon: vi.fn(() => { throw new Error("nope"); }) });

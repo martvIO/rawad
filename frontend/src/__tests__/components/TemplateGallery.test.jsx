@@ -7,6 +7,19 @@ import { TemplateCard } from "../../components/TemplateCard.jsx";
 import { makeT } from "../../i18n/index.js";
 import { DIGITAL_TEMPLATE_KEYS } from "@dawa/core/data/digitalTemplates.js";
 
+// The gallery reports its own visit; capture what it sends.
+const created = [];
+vi.mock("../../utils/inviteMetrics.js", () => ({
+  createInviteMetrics: (opts) => {
+    const rec = { opts, events: [], disposed: false };
+    created.push(rec);
+    return {
+      handleIntroEvent: (e) => rec.events.push(e),
+      dispose: () => { rec.disposed = true; },
+    };
+  },
+}));
+
 const t = makeT("ar");
 
 const renderGallery = (lang = "ar") =>
@@ -24,6 +37,22 @@ describe("TemplateGalleryPage", () => {
     }
     // No stray cards beyond the registry.
     expect(screen.getAllByTestId(/^template-card-/)).toHaveLength(DIGITAL_TEMPLATE_KEYS.length);
+  });
+
+  // Regression: the "gallery" surface had backend support, an allowlist branch
+  // and its own admin KPI — but nothing ever sent it, so the admin read a
+  // measured-looking 0 forever (a fabricated metric).
+  it("reports its own visit under the gallery surface", () => {
+    created.length = 0;
+    const { unmount } = renderGallery();
+    expect(created).toHaveLength(1);
+    expect(created[0].opts).toMatchObject({ surface: "gallery", templateId: "all" });
+    // No sealed intro here — the page is ready as soon as it mounts.
+    expect(created[0].events).toContain("ready");
+    // A non-guest surface must not carry a token.
+    expect(created[0].opts.token).toBeUndefined();
+    unmount();
+    expect(created[0].disposed).toBe(true);
   });
 
   it("shows the localized template label (AR vs HE)", () => {

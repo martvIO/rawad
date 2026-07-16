@@ -406,6 +406,15 @@ describe("composeTemplateMetrics", () => {
     expect(out.rows[0].autoOpenPct).toBe(70);
   });
 
+  it("keeps a >30s template comparable instead of dropping it to null", () => {
+    // The village-4G loading wall this feature exists to detect. If the tail read
+    // as null, "which template is worst?" would skip it entirely.
+    const out = composeTemplateMetrics([], [], [
+      rollup({ templateId: "classic", loads: 5, hist: { sealed: { b8: 5 } } }),
+    ]);
+    expect(out.rows[0].sealedP90).toBe(30000);
+  });
+
   it("returns null (not 0) for percentiles with no samples", () => {
     const out = composeTemplateMetrics([], [], [rollup({ templateId: "classic", loads: 0 })]);
     expect(out.rows[0].sealedP50).toBeNull();
@@ -471,6 +480,32 @@ describe("composeDemoEngagement", () => {
     const hit = out.series.find((b) => b.count > 0);
     expect(hit?.count).toBe(2);
     expect(out.series.length).toBeGreaterThan(0);
+  });
+
+  it("sums multiple rollups landing on the same day bucket", () => {
+    const out = composeDemoEngagement(
+      [
+        { surface: "demo", templateId: "classic", day: 20260716, loads: 2 },
+        { surface: "demo", templateId: "destination-love", day: 20260716, loads: 3 },
+        { surface: "gallery", templateId: "all", day: 20260716, loads: 1 },
+      ],
+      start, end, DAY,
+    );
+    expect(out.series.find((b) => b.count > 0)?.count).toBe(6);
+  });
+
+  // The series must cost O(rollup docs), not O(total loads) — expanding a day's
+  // `loads` back into one entry each rebuilds the unbounded per-event list the
+  // rollups exist to avoid, inside the analytics request.
+  it("handles a huge daily load count without materializing per-load entries", () => {
+    const t0 = Date.now();
+    const out = composeDemoEngagement(
+      [{ surface: "demo", templateId: "classic", day: 20260716, loads: 50_000_000 }],
+      start, end, DAY,
+    );
+    expect(out.totalLoads).toBe(50_000_000);
+    expect(out.series.find((b) => b.count > 0)?.count).toBe(50_000_000);
+    expect(Date.now() - t0).toBeLessThan(500);
   });
 
   it("is empty and NaN-free with no prospect traffic", () => {

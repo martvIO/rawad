@@ -192,6 +192,22 @@ describe("POST /invites/digital/metrics — rollups", () => {
     expect(guestWrites()).toHaveLength(0);
   });
 
+  // The client-side counterpart of this contract lives in inviteMetrics.js
+  // (`token` is stripped for non-guest surfaces). This pins the server half: a
+  // demo page's synthetic id is NOT an invite token and is rejected outright —
+  // which is exactly how every demo metric was being silently lost.
+  it("rejects a demo-style synthetic token (it is not a 32-hex invite token)", async () => {
+    const r = await post({ token: "demo-0ae918a0", surface: "demo", templateId: "classic", loadId: "aaaa1111", phase: "load", t: {} });
+    expect(r.status).toBe(400);
+    expect(STATE.written).toHaveLength(0);
+  });
+
+  it("accepts a demo report with NO token (what the client actually sends)", async () => {
+    const r = await post({ surface: "demo", templateId: "classic", loadId: "aaaa1111", phase: "load", t: { sealedMs: 900 } });
+    expect(r.status).toBe(200);
+    expect(rollups()).toHaveLength(1);
+  });
+
   it("accepts the gallery's 'all' sentinel, which is not a real template", async () => {
     const r = await post({ surface: "gallery", templateId: "all", loadId: "aaaa1111", phase: "load", t: {} });
     expect(r.status).toBe(200);

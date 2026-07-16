@@ -114,7 +114,13 @@ export function createInviteMetrics({ token, surface, templateId, lang }) {
   let disposed = false;
 
   const base = () => ({
-    token: token || undefined,
+    // ONLY a real guest visit carries a token, and only a real 32-hex invite
+    // token passes the endpoint's format check. Demo pages hold a synthetic
+    // per-mount id (an intro-replay cache-buster, not a credential) — sending it
+    // would fail validation and the server would reject the WHOLE report, losing
+    // every demo metric. Enforced here, not at the call site, so no future
+    // surface can reintroduce it.
+    token: surface === "guest" ? token || undefined : undefined,
     surface,
     templateId,
     loadId,

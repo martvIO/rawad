@@ -7,16 +7,31 @@
 // template makes it appear here automatically. The page is lazy-routed, and
 // imports thumbnails from templates/thumbs.js (NOT the registry) so it never
 // pulls the eager classic invitation view into this chunk.
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { DIGITAL_TEMPLATE_KEYS } from "@dawa/core/data/digitalTemplates.js";
 import { useTemplateAssets } from "../hooks/useTemplateAssets.js";
 import { TemplateCard } from "../components/TemplateCard.jsx";
 import { BrandLogo } from "../components/BrandLogo.jsx";
+import { createInviteMetrics } from "../utils/inviteMetrics.js";
 import { C } from "../styles/theme.js";
 
 export function TemplateGalleryPage({ t, lang, setLang }) {
   const navigate = useNavigate();
   const { resolveThumb } = useTemplateAssets();
+
+  // Report this visit under the "gallery" surface. Without this the admin's
+  // gallery KPI would render a measured-looking 0 forever — a fabricated metric,
+  // which is exactly what the aggregator's honesty rules forbid. The page lists
+  // every template rather than rendering one, so it reports the "all" sentinel;
+  // it has no sealed intro, so it is ready as soon as it mounts.
+  useEffect(() => {
+    const m = createInviteMetrics({ surface: "gallery", templateId: "all", lang });
+    m.handleIntroEvent("ready");
+    return () => m.dispose();
+    // Once per visit — a language toggle is not a new visit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div style={{ background: C.bg, color: "#fff3c0", minHeight: "100vh" }}>

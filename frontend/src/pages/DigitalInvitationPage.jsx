@@ -201,7 +201,12 @@ function DigitalLandingMain({ t, lang, setLang }) {
   useEffect(() => {
     if (!doc) return undefined;
     const m = createInviteMetrics({
-      token: isDemo ? demoTokenRef.current : token,
+      // Demo visits send NO token. The synthetic demo token is a client-side
+      // intro-replay cache-buster, not a credential — it is not 32-hex, so the
+      // endpoint's token format check would reject the whole report (400) and
+      // every demo metric would be silently lost. The route ignores tokens for
+      // non-guest surfaces anyway.
+      token: isDemo ? undefined : token,
       surface: isDemo ? "demo" : "guest",
       templateId: doc.templateId || DEFAULT_TEMPLATE_ID,
       lang,
