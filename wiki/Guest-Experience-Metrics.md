@@ -102,6 +102,29 @@ auto-open@5513` → `tapKind:"auto"`, `tapDelayMs:5133`; destination-love
 `sealed@631 ready@619 tap@1322` → `tapKind:"tap"`, `tapDelayMs:691`. No metric
 appears in both phases.
 
+## Four more bugs found by adversarial review (after the browser pass)
+1. **Every demo metric was rejected with 400 — the demo feature recorded nothing.**
+   The demo page's synthetic token (`demo-0ae918a0`) is an intro-replay
+   cache-buster, not a credential, and fails the endpoint's `TOKEN_HEX_RE`
+   (32-hex) check → the *whole* report was rejected. The browser pass missed it
+   because the endpoint isn't deployed yet, so the 400 was indistinguishable from
+   the expected 404. **Rule: only the `guest` surface ever sends a token** —
+   enforced inside the recorder (`base()`), not at the call site, so no future
+   surface can reintroduce it. Pinned on both sides (client omits; server rejects).
+2. **The `gallery` surface had no sender.** Backend support, allowlist branch and
+   an admin KPI all existed, but nothing reported it → the admin read a
+   measured-looking **0**, i.e. a fabricated metric. `TemplateGalleryPage` now
+   reports its visit (`surface:"gallery"`, `templateId:"all"`).
+3. **The load headline inverted on the worst case.** `histPercentile` returned
+   `null` for BOTH "no samples" and "slower than 30s", and the UI's
+   worst-across-templates skips nulls — so the >30s loading wall vanished and a
+   *fast* template was reported as worst. **`null` now means "no samples" and
+   nothing else**; the open-ended tail reports the last edge as a lower bound
+   (≥30s) — measured, not invented.
+4. **`composeDemoEngagement` re-expanded rollups per load** (one array entry per
+   load), rebuilding the unbounded per-event list the rollups exist to avoid,
+   inside the analytics request. Now buckets day counts as weights (`bucketCounts`).
+
 Also fixed: the rollup was written with **dotted keys**, but Firestore's `set()`
 treats those as literal field names (only `update()` reads them as paths) — every
 histogram would have read back empty forever. `expandIncrements` now writes the
