@@ -7,7 +7,7 @@
 //   - Optional free-text note for the couple.
 //   - Submission writes to Firestore digitalGuests via the Cloud Function.
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { Navigate, useParams } from "react-router-dom";
 import { BrandLogo } from "../components/BrandLogo.jsx";
 import { LangSwitcher } from "../components/LangSwitcher.jsx";
 import { subscribeInviteToken } from "../services/invites.js";
@@ -77,6 +77,17 @@ export function DigitalInviteForm({ t, lang, setLang }) {
         </h1>
       </CenteredMessage>
     );
+  }
+  // ── One coherent guest surface ────────────────────────────────────────────
+  // This legacy route predates the themed invitation: it renders an unthemed
+  // form (portal palette, raw emoji, none of the design's theme/font/ambience),
+  // which reads badly next to the invitation it belongs to. The themed page at
+  // /d/:groomUsername/:token renders the couple's actual template with a
+  // theme-aware in-page RSVP (companions/meal/song), so send guests there —
+  // already-distributed /invite/digital links keep working via this redirect.
+  // Legacy tokens without a groomUsername fall through to the form below.
+  if (tokenRec.groomUsername) {
+    return <Navigate replace to={`/d/${encodeURIComponent(tokenRec.groomUsername)}/${encodeURIComponent(token)}`} />;
   }
   if (tokenRec.eventStatus && tokenRec.eventStatus !== "active" && !done) {
     return <EventUnavailableNotice state={tokenRec.eventStatus} t={t} lang={lang} />;
