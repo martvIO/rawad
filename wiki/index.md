@@ -73,6 +73,7 @@ _(synthesized answers to questions you've asked, filed back as pages)_
 - [[Usability Templates Test Plan]] — two-wave usability test for the 4 bespoke webgency-inspired templates; Wave 1 (formative) gates templates 2–4 on the no-auto-open sealed screen; Wave 2 comparative dignity/preference
 - [[Research Synthesis 2026-07]] — affinity diagram (4 themes) + JTBD map over the discovery corpus; headline: "Dawa's moat is proof — and its UX debt is also proof"; all four actors' jobs converge on visible proof, making the confidence layer identity-work, not polish
 - [[Comprehensive-Test-Harness]] — multi-layer automated test + feedback harness (`npm run test:full`): API route tests (closes TASK-006), 7 cross-role journeys, auto-crawler, visual regression, i18n/a11y sweeps → one consolidated report + deduped auto-filed issues; emulator-full + read-only prod smoke; flag-aware (physical track gated off); fixed the emulator seed namespace mismatch
+- [[Web Quality Report 2026-07-16]] — first numeric Lighthouse/CWV audit of prod (27 runs + live probes + header matrix → `Reports/`): mobile LCP fails everywhere (3.6–6.2s, fonts are the lever), stale-chunk immutable-cache poisoning, 7.7MB orphaned models, 6s invite cold start; 0 Critical / 5 High / 7 Medium / 10 Low
 ---
 
 *This index is maintained by Claude via `/wiki-brain`. Do not edit by hand unless you know what you're doing.*

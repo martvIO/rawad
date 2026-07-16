@@ -349,3 +349,6 @@ Touched: Architecture-Decisions, Visual-Design-System, Digital-Invitations, Task
 
 ## [2026-07-16 10:40] session | Template demo surfaces + guest-experience metrics
 Touched: Template-Demo-Surfaces, Guest-Experience-Metrics, Digital-Invitations, Admin-Analytics, Conversion-KPIs, Tasks-Backlog, index
+
+## [2026-07-16 11:15] session | Numeric web-quality audit → Reports/ (Lighthouse+probes)
+Touched: Web-Quality-Report-2026-07-16, index
