@@ -78,8 +78,10 @@ prospect browsing must never move a couple's numbers. Enforced in
 `composeTemplateMetrics` (guest-surface filter) and pinned by tests.
 
 ## Honesty constraints (do not "fix" these into friendlier numbers)
-- Percentiles come from histograms → they are bucket **upper edges** ("p90 ≤ 4s"),
-  and a percentile landing in the open-ended tail returns **null**, rendered "—".
+- Percentiles come from histograms → they are bucket **upper edges** ("p90 ≤ 4s").
+  A percentile landing in the open-ended tail reports the **last edge as a lower
+  bound** (read: "≥30s"); **`null` means "no samples" and nothing else**, rendered
+  "—". Do not conflate the two — see review finding 3 below for what breaks.
 - The load headline shows the **worst** p90 across templates, not an average.
 - Rollup days are **UTC** (Cloud Functions run UTC; keys must agree between
   concurrent writers) → daily charts shift 2–3h vs Israel local.
