@@ -355,3 +355,6 @@ Touched: Web-Quality-Report-2026-07-16, index
 
 ## [2026-07-16 14:45] session | Arabic joins+clipping skill built and run app-wide
 Touched: Arabic-Typography, Visual-Design-System, index
+
+## [2026-07-16 15:20] session | Template catalogue 4→9 grilled + multi-day events shipped
+Touched: Digital-Invitations, Tasks-Backlog, Template-Demo-Surfaces, index

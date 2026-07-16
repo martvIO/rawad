@@ -779,4 +779,23 @@ and **every existing design and already-minted token is visually unchanged**.
 re-apply the events hunks by hand (Phase 0), lift the `gildedOrchard` palette when that template is
 built, then drop it.
 
+### Phase 0 SHIPPED (2026-07-16) — multi-day schedule on every template
+- **Shared schema**: `events` → `ARRAY_KEYS`, `eventsEnabled` → `TOGGLE_KEYS`.
+- **Editor**: a "جدول الاحتفال (عدة أيام)" `<Section>` (step `venue`, testid
+  `design-events`, toggle `design-toggle-events`) — icon/title/time/venue/address/mapUrl
+  per row, max 6, on every template.
+- **Render**: `sections/InviteEvents.jsx` (classic — a timeline with a rail + connector,
+  styles in `InviteStyles.jsx`, `#inv-events`, nav entry `الجدول` w/ the calendar icon) and
+  `destination-love`'s `ItinerarySection` (`#dl-itinerary` — the same data as numbered
+  boarding-pass legs). Map link prefers the couple's `mapUrl`, else a venue+address maps search.
+- **Additive by construction**: gate is `on(eventsEnabled) && items.length > 0`, so existing
+  designs + already-minted snapshots are untouched. Verified live on both templates.
+- **Bug caught in the parked scaffold before adopting it**: it listed `icon`/`mapUrl` in the
+  shared `ARRAY_ROW_FIELDS`, but the NATIVE editor writes every key listed there as a localized
+  `{ar,he}` object while the server clamps those two via `clampField` (plain). Only the four
+  localized cells are listed now (matching `storyTimeline`, whose plain `icon` is omitted for the
+  same reason); `backend/tests/functions/digitalEventsSanitize.test.ts` pins the contract — that
+  branch had zero coverage despite years in the schema.
+- **Templates 1–7 each render `events` natively** from here on — never retrofitted.
+
 See [[Template Demo Surfaces]], [[Guest Experience Metrics]], [[Usability Templates Test Plan]].
