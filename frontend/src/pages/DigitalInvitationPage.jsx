@@ -12,6 +12,7 @@ import { EventUnavailableNotice } from "../components/EventUnavailableNotice.jsx
 import { C } from "../styles/theme.js";
 import { Icon } from "../components/icons/Icon.jsx";
 import { SAMPLE_STORY, SAMPLE_DETAILS, SAMPLE_HOTELS, SAMPLE_WISHES, DEFAULT_MEAL_OPTIONS } from "../data/digitalInviteDefaults.js";
+import { applyDemoOverrides } from "../utils/demoOverrides.js";
 
 const DEMO_MEDIA = [
   { url: "https://images.unsplash.com/photo-1519741497674-611481863552?w=1200&q=80", kind: "image", storagePath: "demo/1" },
@@ -64,21 +65,6 @@ function buildDemoFallbackDoc() {
     hotels: mergeLang(SAMPLE_HOTELS.ar, SAMPLE_HOTELS.he, ["name", "walk"]),
     wishes: mergeLang(SAMPLE_WISHES.ar, SAMPLE_WISHES.he, ["who", "what"]),
     mealOptions: DEFAULT_MEAL_OPTIONS.ar.map((a, i) => ({ ar: a, he: DEFAULT_MEAL_OPTIONS.he[i] || a })),
-  };
-}
-
-// Layer the personalized demo-link query overrides (?theme/?font/?date) on top
-// of a base design (the published snapshot OR the built-in fallback). ?name is
-// applied separately to the guest name (tokenRec).
-function applyDemoOverrides(base, search) {
-  const theme = search.get("theme");
-  const font = search.get("font");
-  const date = search.get("date");
-  return {
-    ...base,
-    themeColor: theme || base.themeColor,
-    fontFamily: font || base.fontFamily,
-    weddingDate: date ? new Date(date).getTime() : base.weddingDate,
   };
 }
 
@@ -152,6 +138,15 @@ function DigitalLandingMain({ t, lang, setLang }) {
   const [done, setDone] = useState(false);
   const [approvedWishes, setApprovedWishes] = useState([]);
   const pingedRef = useRef(false);
+  // In demo mode every route share the placeholder token "demo", so the intro
+  // contract's per-token "already seen → skip" fast path would suppress the
+  // sealed reveal for a prospect browsing several template demos. Give each demo
+  // MOUNT a unique synthetic token so the ritual always replays. (Per-template
+  // demos open in new tabs, so a fresh mount per link is guaranteed.)
+  const demoTokenRef = useRef(null);
+  if (isDemo && !demoTokenRef.current) {
+    demoTokenRef.current = `demo-${Math.random().toString(16).slice(2, 10)}`;
+  }
 
   // Demo: fetch the design ONCE (admin-published if it exists, else the built-in
   // fallback), then set it so the envelope builds a single time — no swap, no
@@ -284,7 +279,7 @@ function DigitalLandingMain({ t, lang, setLang }) {
       alreadyAnswered={!!tokenRec.usedAt && !done}
       rsvpDone={done}
       boardingPassEnabled={!!tokenRec.boardingPassEnabled}
-      token={token}
+      token={isDemo ? demoTokenRef.current : token}
     />
   );
 }

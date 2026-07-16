@@ -13,7 +13,7 @@
 import { lazy } from "react";
 import { DigitalInvitationView } from "../DigitalInvitationView.jsx";
 import { TEMPLATES, DEFAULT_TEMPLATE_ID } from "@dawa/core/data/digitalTemplates.js";
-import destinationLoveThumb from "../../../assets/templates/destination-love.jpg";
+import { BUNDLED_THUMBS } from "./thumbs.js";
 
 // Bespoke templates: module-scope lazy() (see the note below on why not inline).
 const DestinationLoveView = lazy(() => import("./destination-love/index.js"));
@@ -29,12 +29,12 @@ const DestinationLoveView = lazy(() => import("./destination-love/index.js"));
 //
 //   import { lazy } from "react";
 //   const DestinationLoveView = lazy(() => import("./destination-love/index.js"));
-//   import destinationLoveThumb from "../../../assets/templates/destination-love.jpg";
+//   // register the bundled thumbnail in ./thumbs.js (BUNDLED_THUMBS), not here
 //   ...
 //   "destination-love": {
 //     ...TEMPLATES["destination-love"],
 //     Component: DestinationLoveView,
-//     thumb: destinationLoveThumb,
+//     thumb: BUNDLED_THUMBS["destination-love"],
 //   },
 export const TEMPLATE_REGISTRY = {
   classic: {
@@ -44,7 +44,7 @@ export const TEMPLATE_REGISTRY = {
   "destination-love": {
     ...TEMPLATES["destination-love"],
     Component: DestinationLoveView,
-    thumb: destinationLoveThumb,
+    thumb: BUNDLED_THUMBS["destination-love"],
   },
   // Additional templates register their lazy Component + thumb here as they're
   // built — each entry pairs one shared/digitalTemplates.js metadata row with
