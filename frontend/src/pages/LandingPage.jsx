@@ -8,7 +8,7 @@ import { BrandLogo } from "../components/BrandLogo.jsx";
 import { Icon } from "../components/icons/Icon.jsx";
 import { TemplateCard } from "../components/TemplateCard.jsx";
 import { DIGITAL_TEMPLATE_KEYS } from "@dawa/core/data/digitalTemplates.js";
-import { getTemplateThumb } from "../components/digital/templates/thumbs.js";
+import { useTemplateAssets } from "../hooks/useTemplateAssets.js";
 import { C } from "../styles/theme.js";
 import { fetchPublicSettings } from "../services/publicSettings.js";
 import { resolveContact, buildWhatsAppUrl, mailtoUrl } from "../utils/contact.js";
@@ -810,13 +810,14 @@ function ProcessSection({ t }) {
 // shared TEMPLATES metadata, so new templates surface here automatically.
 function TemplateStripSection({ t, lang }) {
   const navigate = useNavigate();
+  const { resolveThumb } = useTemplateAssets();
   return (
     <section style={{ padding: "40px 24px 100px", maxWidth: 1100, margin: "0 auto" }}>
       <SectionHead eyebrow={t("templates_strip_eyebrow")} title={t("templates_strip_title")} sub={t("templates_strip_body")} />
       <div className="dawa-reveal" style={{ display: "flex", gap: 16, overflowX: "auto", paddingBottom: 12, scrollSnapType: "x mandatory" }}>
         {DIGITAL_TEMPLATE_KEYS.map((id) => (
           <div key={id} style={{ scrollSnapAlign: "start", flex: "0 0 auto" }}>
-            <TemplateCard id={id} t={t} lang={lang} thumb={getTemplateThumb(id)} compact />
+            <TemplateCard id={id} t={t} lang={lang} thumb={resolveThumb(id)} compact />
           </div>
         ))}
       </div>

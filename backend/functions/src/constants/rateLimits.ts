@@ -66,6 +66,12 @@ export const RATE = Object.freeze({
   /** IP backstop for the open ping — generous for a venue sharing one NAT IP. */
   INVITE_OPEN_IP_BACKSTOP: perHour(600),
 
+  // ── Template preview covers (public gallery / landing strip / picker) ────
+  /** Public read of the template-cover pointer doc (cached 5 min at the edge). */
+  TEMPLATE_ASSETS_READ_PER_IP: perHour(240),
+  /** Admin uploads/removals of a template cover — a rare, deliberate action. */
+  TEMPLATE_ASSET_WRITE_PER_ADMIN: perHour(60),
+
   // ── Admin Security page ──────────────────────────────────────────────────
   /** Reads on the admin Security page (events / summary / blocks; polled). */
   SECURITY_READ_PER_ADMIN: perHour(600),

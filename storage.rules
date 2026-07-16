@@ -59,6 +59,23 @@ service firebase.storage {
     }
 
 
+    // Template preview covers — the art on the public /templates gallery, the
+    // landing strip, and the groom's template picker.
+    //   path: /templateAssets/{templateId}/cover_{ts}.{ext}
+    // PUBLIC READ: prospects browse the gallery unauthenticated. Uploads go
+    // through the admin-gated API (Admin SDK, which bypasses these rules); this
+    // gate hardens any DIRECT client write to admins only. Images only, and
+    // REJECT SVG — public-read bucket, so active markup would be a JS/phishing
+    // host on the Google Storage domain (mirrors digitalMedia above).
+    match /templateAssets/{templateId}/{allPaths=**} {
+      allow read: if true;
+      allow write: if request.auth != null
+                   && request.auth.token.role == 'admin'
+                   && request.resource.size < 10 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*')
+                   && !request.resource.contentType.matches('image/svg.*');
+    }
+
     // Design mockups — admin/designer uploads, groom can read.
     match /designMockups/{groomUid}/{reqId}/{file} {
       allow read: if request.auth != null

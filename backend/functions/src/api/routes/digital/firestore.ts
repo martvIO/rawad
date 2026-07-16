@@ -6,7 +6,7 @@ import {
 } from "firebase-admin/firestore";
 import { getDatabase } from "firebase-admin/database";
 import { AuthRequest } from "../../middleware/auth";
-import { COLL_ROOT,COLL_GUESTS,COLL_PHOTOG,COLL_DESIGNS,SCHEMA_VERSION,PARENT_ONLY_KEYS,DEMO_UID,DEMO_DESIGN_ID,DEMO_CONFIG_DOC } from "./constants";
+import { COLL_ROOT,COLL_GUESTS,COLL_PHOTOG,COLL_DESIGNS,SCHEMA_VERSION,PARENT_ONLY_KEYS,DEMO_UID,DEMO_DESIGN_ID,DEMO_CONFIG_DOC,TEMPLATE_ASSETS_DOC } from "./constants";
 import { projectMediaDoc } from "./project";
 
 // ─── Firestore + Storage helpers ──────────────────────────────────────────────
@@ -40,6 +40,12 @@ function demoDesignDoc(): DocumentReference {
 }
 function demoConfigDoc(): DocumentReference {
   return fs().doc(DEMO_CONFIG_DOC);
+}
+
+// The admin-uploaded template preview covers: one pointer doc mapping
+// templateId → { url, storagePath, updatedAt }. Bounded by the template count.
+function templateAssetsDoc(): DocumentReference {
+  return fs().doc(TEMPLATE_ASSETS_DOC);
 }
 
 
@@ -134,4 +140,4 @@ function photographerCol(uid: string): CollectionReference {
   return fs().collection(`${COLL_ROOT}/${uid}/${COLL_PHOTOG}`);
 }
 
-export { fs, parentDoc, mediaDoc, designsCol, designDoc, demoDesignDoc, demoConfigDoc, ensureMigrated, resolveDefaultDesignId, resolveDesignId, guestsCol, wishesCol, photographerCol };
+export { fs, parentDoc, mediaDoc, designsCol, designDoc, demoDesignDoc, demoConfigDoc, templateAssetsDoc, ensureMigrated, resolveDefaultDesignId, resolveDesignId, guestsCol, wishesCol, photographerCol };

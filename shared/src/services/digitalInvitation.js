@@ -418,6 +418,33 @@ export async function getDemoDesignPublic() {
   }
 }
 
+// ── Template preview covers ────────────────────────────────────────────────
+// The art shown on the public gallery, the landing strip, and the groom's
+// template picker. One pointer doc maps templateId → {url, storagePath,
+// updatedAt}; the frontend resolves uploaded → bundled → label-only.
+
+/** Public: the template-cover map ({} when none uploaded). Never throws. */
+export async function getTemplateAssetsPublic() {
+  try {
+    const r = await api.get("/digital/templates/assets", { skipAuth: true });
+    return r?.assets || {};
+  } catch {
+    return {};
+  }
+}
+
+/** Admin: upload/replace one template's preview cover (image, ≤10 MB). */
+export async function uploadTemplateAsset(templateId, file, opts) {
+  const fd = new FormData();
+  fd.append("file", file);
+  return api.upload(`/digital/templates/${encodeURIComponent(templateId)}/asset`, fd, opts);
+}
+
+/** Admin: remove a template's cover (reverts to the bundled art). */
+export async function deleteTemplateAsset(templateId) {
+  return api.delete(`/digital/templates/${encodeURIComponent(templateId)}/asset`);
+}
+
 /**
  * Fire-and-forget "guest opened this digital invite" ping. Stamps a first-party
  * viewedAt (for the open-rate KPI) + the language they opened in (for localized

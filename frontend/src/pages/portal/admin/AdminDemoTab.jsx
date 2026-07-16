@@ -8,6 +8,7 @@ import { localizeApiError } from "../../../utils/apiError.js";
 import { logErr } from "../../../utils/logger.js";
 import { C } from "../../../styles/theme.js";
 import { DesignEditorBody } from "../../portal/groom/digital/DigitalDesignEditor.jsx";
+import { TemplateAssetsSection } from "./TemplateAssetsSection.jsx";
 import {
   ensureDemoDesign,
   publishDemoDesign,
@@ -72,6 +73,8 @@ export function AdminDemoTab() {
           🔗 {tt(lang, "فتح صفحة العرض المباشرة", "פתח את דף ההדגמה החי")}
         </button>
       </div>
+
+      <TemplateAssetsSection lang={lang} showToast={showToast} />
 
       {ready ? (
         <DesignEditorBody

@@ -9,13 +9,14 @@
 // pulls the eager classic invitation view into this chunk.
 import { useNavigate } from "react-router-dom";
 import { DIGITAL_TEMPLATE_KEYS } from "@dawa/core/data/digitalTemplates.js";
-import { getTemplateThumb } from "../components/digital/templates/thumbs.js";
+import { useTemplateAssets } from "../hooks/useTemplateAssets.js";
 import { TemplateCard } from "../components/TemplateCard.jsx";
 import { BrandLogo } from "../components/BrandLogo.jsx";
 import { C } from "../styles/theme.js";
 
 export function TemplateGalleryPage({ t, lang, setLang }) {
   const navigate = useNavigate();
+  const { resolveThumb } = useTemplateAssets();
 
   return (
     <div style={{ background: C.bg, color: "#fff3c0", minHeight: "100vh" }}>
@@ -63,7 +64,7 @@ export function TemplateGalleryPage({ t, lang, setLang }) {
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 20 }}>
           {DIGITAL_TEMPLATE_KEYS.map((id) => (
-            <TemplateCard key={id} id={id} t={t} lang={lang} thumb={getTemplateThumb(id)} />
+            <TemplateCard key={id} id={id} t={t} lang={lang} thumb={resolveThumb(id)} />
           ))}
         </div>
       </section>

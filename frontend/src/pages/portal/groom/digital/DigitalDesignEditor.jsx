@@ -26,7 +26,7 @@ import { DIGITAL_THEMES, DIGITAL_FONTS, DIGITAL_THEME_KEYS, DIGITAL_FONT_KEYS, g
 import { resolveEnvelopePalette } from "../../../../utils/themeToEnvelopePalette.js";
 import { resolveBackground } from "../../../../utils/themeToBackground.js";
 import { TemplateRenderer } from "../../../../components/digital/templates/TemplateRenderer.jsx";
-import { getTemplateThumb } from "../../../../components/digital/templates/registry.js";
+import { useTemplateAssets } from "../../../../hooks/useTemplateAssets.js";
 import { demoPreviewUrl } from "../../../../utils/templateDemo.js";
 import { Ambience } from "../../../../components/digital/sections/InviteAmbience.jsx";
 import { ViewStyles } from "../../../../components/digital/sections/InviteStyles.jsx";
@@ -376,6 +376,8 @@ export function DesignEditorBody({ groomUid, designId, adminDemoMode = false, on
   const themeColor = f.themeColor || doc?.themeColor || "gold";
   const fontFamily = f.fontFamily || doc?.fontFamily || "amiri";
   const templateId = f.templateId || doc?.templateId || DEFAULT_TEMPLATE_ID;
+  // Picker covers: the admin-uploaded art when present, else the bundled asset.
+  const { resolveThumb } = useTemplateAssets();
   // A BESPOKE template owns its whole visual (its own opening intro + ambient
   // effects), so the classic-only controls — the 3D envelope, the background
   // starfield, and the custom 2D background — are hidden for it (they configure
@@ -1520,7 +1522,7 @@ export function DesignEditorBody({ groomUid, designId, adminDemoMode = false, on
             {DIGITAL_TEMPLATE_KEYS.map((id) => {
               const tpl = TEMPLATES[id];
               const active = templateId === id;
-              const thumb = getTemplateThumb(id);
+              const thumb = resolveThumb(id);
               const pick = () => { if (editable) onPickTemplate(id); };
               // The card is a role="button" DIV (not a <button>) so it can host a
               // nested "live preview" <button> — nested buttons are invalid HTML.
