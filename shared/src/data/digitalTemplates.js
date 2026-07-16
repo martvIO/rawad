@@ -109,6 +109,25 @@ export const TEMPLATES = {
     },
   },
 
+  // Blossom & Oud (زهر وعود / פריחה ועוד) — Arabian floral: content framed by a
+  // mihrab arch, an arabesque-embossed envelope with a gold seal, blush + gold.
+  // Inspired-by reinterpretation of webgency's "Blossom & Oud"; no source
+  // text/photos. Accent = the in-brand rose family.
+  "blossom-oud": {
+    id: "blossom-oud",
+    label_ar: "زهر وعود",
+    label_he: "פריחה ועוד",
+    thumbnail: "blossom-oud",
+    bespoke: true,
+    themes: ["blossomOud", "blossomOudNight", "blossomOudGold"],
+    defaults: {
+      themeColor: "blossomOud",
+      fontFamily: "scheherazade",
+      envelopeEnabled: false,
+      envelopeStyle: "classic",
+    },
+  },
+
   // Additional templates land here one at a time as they're built — each
   // bespoke entry adds `bespoke:true` + a curated `themes` list, and its
   // `defaults` (themeColor === themes[0], fontFamily, envelopeEnabled:false,
