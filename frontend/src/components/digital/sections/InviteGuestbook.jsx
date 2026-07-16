@@ -81,7 +81,7 @@ function GuestbookSection({ wishes, approvedWishes = [], onSubmitWish, theme, fo
           <div className="dawa-inv-wishes" key={page} style={{ animation: "dawa-inv-rise .6s ease both" }}>
             {shown.map((w, i) => (
               <div key={i} className="dawa-inv-wish" style={{ borderColor: theme.accentLine }}>
-                <div className="dawa-inv-wish-who" style={{ color: theme.accent, fontFamily: font.family }}>— {w.who}</div>
+                <div className="dawa-inv-wish-who" style={{ color: theme.textSoft, fontFamily: font.family }}>— {w.who}</div>
                 <div className="dawa-inv-wish-what" style={{ color: theme.text, fontFamily: font.family }}>{w.what}</div>
               </div>
             ))}

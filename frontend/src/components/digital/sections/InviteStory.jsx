@@ -16,7 +16,7 @@ function StorySection({ items, theme, font, lang }) {
           <div key={i} className={`dawa-inv-story dawa-inv-reveal ${i % 2 === 0 ? "is-right" : "is-left"}`}>
             <span className="dawa-inv-story-node" style={{ background: theme.accent, boxShadow: `0 0 0 4px ${theme.bg}, 0 0 0 5px ${theme.accentLine}` }} />
             {s.icon && <div className="dawa-inv-story-icon" style={{ color: theme.accent }}>{s.icon}</div>}
-            {s.when && <div className="dawa-inv-story-when" style={{ color: theme.accent, fontFamily: font.family }}>{s.when}</div>}
+            {s.when && <div className="dawa-inv-story-when" style={{ color: theme.textSoft, fontFamily: font.family }}>{s.when}</div>}
             {s.title && <h3 className="dawa-inv-story-title" style={{ color: theme.text, fontFamily: font.family }}>{s.title}</h3>}
             {s.body && <p className="dawa-inv-story-body" style={{ color: theme.textSoft }}>{s.body}</p>}
           </div>

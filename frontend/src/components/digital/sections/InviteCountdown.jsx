@@ -32,7 +32,7 @@ function CountdownCell({ value, label, theme, font, animateFlip = true }) {
       >
         {String(value).padStart(2, "0")}
       </div>
-      <div className="dawa-inv-cd-lbl" style={{ color: theme.accent, fontFamily: font.family }}>{label}</div>
+      <div className="dawa-inv-cd-lbl" style={{ color: theme.textSoft, fontFamily: font.family }}>{label}</div>
     </div>
   );
 }

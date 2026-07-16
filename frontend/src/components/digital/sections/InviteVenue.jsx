@@ -70,7 +70,7 @@ function VenueRow({ icon, label, children, theme, font }) {
     <div className="dawa-inv-venue-row dawa-inv-reveal" style={{ borderColor: theme.accentLine }}>
       <span className="dawa-inv-venue-ic" style={{ color: theme.accent }}>{icon}</span>
       <div style={{ flex: 1 }}>
-        <div className="dawa-inv-venue-label" style={{ color: theme.accent }}>{label}</div>
+        <div className="dawa-inv-venue-label" style={{ color: theme.textSoft }}>{label}</div>
         <div className="dawa-inv-venue-val" style={{ color: theme.text, fontFamily: font.family }}>{children}</div>
       </div>
     </div>
