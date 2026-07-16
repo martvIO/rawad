@@ -1,22 +1,27 @@
-import { useEffect,useState } from "react";
+import { useEffect,useRef,useState } from "react";
 import { SectionHead } from "../inviteShared.jsx";
 import { useCountdown } from "../../../hooks/useCountdown.js";
 
 // ── Countdown ────────────────────────────────────────────────────────────────────
-function CountdownCell({ value, label, theme, font }) {
-  const [last, setLast] = useState(value);
+// The seconds cell passes animateFlip={false}: a once-a-second blur-wiggle reads
+// as fidgety ambient motion, not choreography. The digit still updates live (no
+// shift — .dawa-inv-cd-num is tabular-nums); only genuine minute/hour/day
+// rollovers animate, so the timer feels composed. The flip is cleared on
+// animationend so the full .65s keyframe always plays (was cut at 500ms).
+function CountdownCell({ value, label, theme, font, animateFlip = true }) {
   const [flip, setFlip] = useState(false);
+  const prev = useRef(value);
   useEffect(() => {
-    if (value !== last) {
-      setFlip(true);
-      const id = setTimeout(() => { setFlip(false); setLast(value); }, 500);
-      return () => clearTimeout(id);
+    if (prev.current !== value) {
+      prev.current = value;
+      if (animateFlip) setFlip(true);
     }
-  }, [value, last]);
+  }, [value, animateFlip]);
   return (
     <div className="dawa-inv-cd-cell" style={{ "--line": theme.accentLine }}>
       <div
         className={`dawa-inv-cd-num dawa-inv-grad${flip ? " is-flip" : ""}`}
+        onAnimationEnd={() => setFlip(false)}
         style={{
           fontFamily: font.family,
           background: `linear-gradient(135deg,${theme.gradientStops.join(",")})`,
@@ -53,7 +58,7 @@ function CountdownSection({ weddingDate, dateText = "", theme, font, lang }) {
           <CountdownCell value={d} label={lang === "he" ? "ימים" : "يوم"} theme={theme} font={font} />
           <CountdownCell value={h} label={lang === "he" ? "שעות" : "ساعة"} theme={theme} font={font} />
           <CountdownCell value={m} label={lang === "he" ? "דקות" : "دقيقة"} theme={theme} font={font} />
-          <CountdownCell value={s} label={lang === "he" ? "שניות" : "ثانية"} theme={theme} font={font} />
+          <CountdownCell value={s} label={lang === "he" ? "שניות" : "ثانية"} theme={theme} font={font} animateFlip={false} />
         </div>
       )}
       {/* The wedding date — anchored right under the timer it counts down to. */}

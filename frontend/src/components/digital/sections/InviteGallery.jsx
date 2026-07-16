@@ -41,6 +41,20 @@ function GallerySection({ items, theme, font, lang }) {
         {open && (open.kind === "video"
           ? <video src={open.url} controls autoPlay style={{ maxWidth: "90%", maxHeight: "86vh", borderRadius: 12 }} />
           : <img src={open.url} alt={open.cap || ""} />)}
+        {open && open.cap && (
+          // Caption in the lightbox — the primary touch path, where the grid
+          // hover-caption never fires. Symmetric inset keeps it RTL-safe.
+          <div
+            style={{
+              position: "absolute", bottom: 24, left: 0, right: 0,
+              textAlign: "center", padding: "0 32px",
+              color: "#fbf6e8", fontFamily: font.family, fontStyle: "italic",
+              fontSize: 13, textShadow: "0 2px 12px rgba(0,0,0,.6)",
+            }}
+          >
+            {open.cap}
+          </div>
+        )}
       </div>
     </section>
   );

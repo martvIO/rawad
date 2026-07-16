@@ -5,6 +5,7 @@ import { useDeviceCapability } from "../../../hooks/useDeviceCapability.js";
 import { celDowngraded, markCelDowngraded } from "../celestial/downgradeStore.js";
 import { resolveEnvelopePalette } from "../../../utils/themeToEnvelopePalette.js";
 import { resolveBackground } from "../../../utils/themeToBackground.js";
+import { haptic } from "../../../utils/haptics.js";
 import { TIMING } from "../../../config/index.js";
 
 // Single owner of the invitation's backdrop AND intro envelope. It decides,
@@ -115,7 +116,7 @@ export function CelestialAmbience({
     if (!w || phase !== "sealed") return;
     setPhase("opening");
     w.openEnvelope({
-      onReveal: () => setPhase("revealing"),
+      onReveal: () => { setPhase("revealing"); haptic(18); }, // co-timed to the visible seal break
       onComplete: () => { setOpened(true); setPhase("done"); },
     });
   };

@@ -35,15 +35,20 @@ function ViewStyles({ theme, fixed }) {
     .dawa-inv .dawa-inv-reveal { opacity: 0; transform: translateY(40px); transition: opacity .9s cubic-bezier(.2,.7,.2,1), transform .9s cubic-bezier(.2,.7,.2,1); }
     .dawa-inv .dawa-inv-reveal.is-in { opacity: 1; transform: none; }
 
-    /* Headings / names: SOLID high-contrast color, not background-clip:text.
-     * The clip trick (gradient bg + transparent fill) renders as an unreadable
-     * solid BLOCK on several mobile / in-app browsers (Samsung Internet, older
-     * Android WebView, some iOS in-app views) that report support but mis-render
-     * it — and those are exactly where guests open the WhatsApp invite link.
-     * theme.text equals the gradient's brightest stop on every dark theme, so
-     * this is visually near-identical yet always readable. !important overrides
-     * the per-element inline gradient styles (background + transparent fill). */
-    .dawa-inv .dawa-inv-grad {
+    /* Headings / names — the metallic gold "foil" sweep.
+     * The clip trick (gradient bg + transparent fill, set inline per element)
+     * renders as an unreadable solid BLOCK on a few legacy in-app engines that
+     * report support but mis-render it (old Samsung Internet, pre-autoupdate
+     * Android WebView) — exactly where some guests open the WhatsApp link. So
+     * the gradient is GATED: DigitalInvitationView stamps `.dawa-inv-clip-ok`
+     * on the root only when the engine is confirmed to render clip-text
+     * correctly (see supportsGradientText()). When that class is present this
+     * flatten rule does NOT match and the inline gradient shows through; when
+     * absent (unsupported / known-bad engine / uncertain) we fall back to the
+     * SOLID color below. theme.text equals the gradient's brightest stop on
+     * every dark theme, so the fallback stays near-identical and always
+     * readable. !important beats the per-element inline gradient styles. */
+    .dawa-inv:not(.dawa-inv-clip-ok) .dawa-inv-grad {
       background: none !important;
       -webkit-text-fill-color: ${theme.text} !important;
       color: ${theme.text} !important;
@@ -134,8 +139,16 @@ function ViewStyles({ theme, fixed }) {
     .dawa-inv .dawa-inv-gallery-item:hover { transform: translateY(-4px); }
     .dawa-inv .dawa-inv-gallery-item img, .dawa-inv .dawa-inv-gallery-item video { width: 100%; display: block; border-radius: 12px; transition: transform 1s cubic-bezier(.2,.7,.2,1); }
     .dawa-inv .dawa-inv-gallery-item:hover img { transform: scale(1.04); }
-    .dawa-inv .dawa-inv-gallery-cap { position: absolute; bottom: 0; left: 0; right: 0; padding: 14px; font-style: italic; font-size: 12.5px; color: #fbf6e8; background: linear-gradient(180deg, transparent, rgba(7,7,10,.82)); opacity: 0; transform: translateY(6px); transition: opacity .35s, transform .45s; }
-    .dawa-inv .dawa-inv-gallery-item:hover .dawa-inv-gallery-cap { opacity: 1; transform: none; }
+    /* Captions are VISIBLE BY DEFAULT so touch guests (no hover — most wedding
+     * guests open from WhatsApp) always see the couple's authored copy; the
+     * hide + hover-reveal is gated to fine-hover pointers. Unknown-support
+     * browsers fall back to SHOWING the caption. A 2-line clamp keeps a long
+     * caption from swallowing a portrait image; the scrim is softened for touch. */
+    .dawa-inv .dawa-inv-gallery-cap { position: absolute; bottom: 0; left: 0; right: 0; padding: 14px; font-style: italic; font-size: 12.5px; color: #fbf6e8; background: linear-gradient(180deg, transparent, rgba(7,7,10,.62)); opacity: 1; transform: none; transition: opacity .35s, transform .45s; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    @media (hover: hover) and (pointer: fine) {
+      .dawa-inv .dawa-inv-gallery-cap { opacity: 0; transform: translateY(6px); background: linear-gradient(180deg, transparent, rgba(7,7,10,.82)); }
+      .dawa-inv .dawa-inv-gallery-item:hover .dawa-inv-gallery-cap { opacity: 1; transform: none; }
+    }
     .dawa-inv .dawa-inv-lightbox { position: fixed; inset: 0; z-index: 999; background: rgba(7,7,10,.92); backdrop-filter: blur(20px); display: flex; align-items: center; justify-content: center; padding: 32px; opacity: 0; pointer-events: none; transition: opacity .5s; }
     .dawa-inv .dawa-inv-lightbox.is-open { opacity: 1; pointer-events: all; }
     .dawa-inv .dawa-inv-lightbox img { max-width: 90%; max-height: 86vh; border-radius: 12px; }

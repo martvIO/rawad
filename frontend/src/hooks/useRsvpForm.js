@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { confettiBurst } from "../components/digital/inviteShared.jsx";
+import { haptic } from "../utils/haptics.js";
 import { localizeApiError } from "../utils/apiError.js";
 import { isCompletePhone } from "../components/PhoneInput.jsx";
 
@@ -55,6 +56,7 @@ export function useRsvpForm({ guestPhone, opts, theme, lang, onSubmitRsvp, rsvpD
           theme.gradientStops[0], theme.gradientStops[1], theme.gradientStops[2],
           theme.accent, theme.monoStops[0], theme.monoStops[1],
         ]);
+        haptic(10); // light tap confirming the RSVP landed (attending only, like the confetti)
         const newH = Array.from({ length: 8 }, (_, i) => ({
           id: Date.now() + i,
           left: 40 + Math.random() * 20,
