@@ -3,10 +3,13 @@
 // schema), and reuse the shared behaviour hooks (useRsvpForm, useCountdown,
 // confettiBurst) so RSVP/countdown behave identically everywhere. Colour comes
 // from the CSS vars on `.tpl-dl` + the motif tokens in `t`.
+import { useRef, useState } from "react";
 import { PaperPlane, SectionTitle, DlButton, FlightPath, Ticker } from "./parts.jsx";
 import { PhoneInput } from "../../../PhoneInput.jsx";
+import { Icon } from "../../InviteIcon.jsx";
 import { useRsvpForm } from "../../../../hooks/useRsvpForm.js";
 import { useCountdown } from "../../../../hooks/useCountdown.js";
+import { haptic } from "../../../../utils/haptics.js";
 
 const L = (lang, ar, he) => (lang === "he" ? he : ar);
 
@@ -162,7 +165,7 @@ export function VenueSection({ t, lang, fontFamily, venue, venueCity, venueAddre
         {accessNote && <div style={{ fontSize: 13, marginTop: 6, opacity: 0.9 }}>{accessNote}</div>}
         <div style={{ marginTop: 18 }}>
           <a href={mapUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
-            <DlButton t={t}>🧭 {L(lang, "افتح الخريطة", "פתח מפה")}</DlButton>
+            <DlButton t={t}><Icon name="venue" size={16} /> {L(lang, "افتح الخريطة", "פתח מפה")}</DlButton>
           </a>
         </div>
         {hotels && hotels.length > 0 && (
@@ -268,15 +271,64 @@ export function RsvpSection({ t, lang, fontFamily, opts, mealOptions, guestPhone
 
 // ── Gift ───────────────────────────────────────────────────────────────────
 export function GiftSection({ t, lang, fontFamily, giftNote, giftIban }) {
+  const ibanRef = useRef(null);
+  const [copied, setCopied] = useState(false);
+  // Show the IBAN grouped in 4s; copy the spaces-stripped form (what banking
+  // apps expect). The stored value is never mutated.
+  const ibanRaw = (giftIban || "").replace(/\s+/g, "");
+  const ibanGrouped = ibanRaw.replace(/(.{4})/g, "$1 ").trim();
+
+  function selectIban() {
+    const el = ibanRef.current;
+    if (!el || typeof window === "undefined" || !window.getSelection) return;
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+
+  async function copyIban() {
+    // navigator.clipboard is secure-context-only and absent in some in-app
+    // WebViews — on failure select the (still selectable) IBAN instead of
+    // faking success.
+    if (navigator.clipboard?.writeText) {
+      try {
+        await navigator.clipboard.writeText(ibanRaw);
+        setCopied(true);
+        haptic(8);
+        setTimeout(() => setCopied(false), 2000);
+        return;
+      } catch { /* fall through to manual select */ }
+    }
+    selectIban();
+  }
+
   return (
     <section className="dl-scroll" id="dl-gift" style={{ padding: "34px 20px" }}>
       <SectionTitle eyebrow={L(lang, "هدية", "מתנה")} title={L(lang, "هدية العروسين", "מתנה לזוג")} t={t} fontFamily={fontFamily} />
       <div style={{ maxWidth: t.maxW, margin: "0 auto", textAlign: "center", background: t.theme.cardBg, border: `1px solid ${t.theme.cardBorder}`, borderRadius: 16, padding: 20 }}>
         {giftNote && <p style={{ color: t.theme.textSoft, lineHeight: 1.7, margin: "0 0 12px" }}>{giftNote}</p>}
         {giftIban && (
-          <div style={{ fontFamily: "monospace", direction: "ltr", background: t.theme.chipBg, border: `1px solid ${t.theme.chipBorder}`, borderRadius: 10, padding: "10px 12px", color: t.theme.text, fontSize: 14, wordBreak: "break-all" }}>
-            {giftIban}
-          </div>
+          <>
+            <div
+              ref={ibanRef}
+              style={{ fontFamily: "monospace", direction: "ltr", background: t.theme.chipBg, border: `1px solid ${t.theme.chipBorder}`, borderRadius: 10, padding: "10px 12px", color: t.theme.text, fontSize: 14, fontVariantNumeric: "tabular-nums", wordBreak: "break-word" }}
+            >
+              {ibanGrouped}
+            </div>
+            <button
+              type="button"
+              onClick={copyIban}
+              style={{ display: "inline-flex", alignItems: "center", gap: 8, marginTop: 12, padding: "9px 20px", borderRadius: 999, cursor: "pointer", fontSize: 13, fontWeight: 800, fontFamily: "inherit", border: `1px solid ${t.theme.accent}`, background: copied ? t.theme.accent : "transparent", color: copied ? t.onSecondary : t.theme.accent, transition: "background .3s, color .3s" }}
+            >
+              <Icon name={copied ? "check" : "copy"} size={15} />
+              {copied ? L(lang, "تم النسخ", "הועתק") : L(lang, "نسخ", "העתק")}
+            </button>
+            <span role="status" aria-live="polite" style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0 0 0 0)", whiteSpace: "nowrap" }}>
+              {copied ? L(lang, "تم النسخ", "הועתק") : ""}
+            </span>
+          </>
         )}
       </div>
     </section>

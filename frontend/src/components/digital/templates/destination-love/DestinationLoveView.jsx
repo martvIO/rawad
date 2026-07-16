@@ -10,6 +10,7 @@ import { ensureDigitalFonts } from "../../../../utils/digitalFonts.js";
 import { supportsGradientText } from "../../../../utils/gradientText.js";
 import { DEFAULT_EYEBROW, DEFAULT_MEAL_OPTIONS } from "../../../../data/digitalInviteDefaults.js";
 import { LangToggle } from "../../inviteShared.jsx";
+import { Icon } from "../../InviteIcon.jsx";
 import { FloatingDock } from "../../sections/InviteFooterDock.jsx";
 import { WalletButton } from "../../WalletButton.jsx";
 import { useIntroPhase } from "../introContract.js";
@@ -224,7 +225,7 @@ export function DestinationLoveView({
           className="dl-float"
           style={{ position: "fixed", bottom: 20, insetInlineStart: 16, zIndex: 90, padding: "10px 16px", borderRadius: 999, border: `1px solid ${t.theme.chipBorder}`, background: t.theme.chipBg, backdropFilter: "blur(16px)", color: t.theme.accent, fontWeight: 800, fontSize: 13, fontFamily: "inherit", cursor: "pointer" }}
         >
-          📸 {lang === "he" ? "התמונות שלך" : "صورك"}
+          <Icon name="camera" size={16} /> {lang === "he" ? "התמונות שלך" : "صورك"}
         </button>
       )}
 

@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { SectionHead } from "../inviteShared.jsx";
+import { Icon } from "../InviteIcon.jsx";
 import { haptic } from "../../../utils/haptics.js";
 
 // Small gift-box ornament drawn in the theme accent — a piece of the
@@ -12,23 +13,6 @@ function GiftOrnament({ color }) {
       <path d="M4.6 11.8h14.8v8.4H4.6z" />
       <path d="M12 8.4V20.2" />
       <path d="M12 8.4C10.6 8.4 8.2 8 8.2 6.1c0-1.3 1.1-1.9 1.9-1.9 1.6 0 1.9 2.6 1.9 4.2ZM12 8.4c1.4 0 3.8-.4 3.8-2.3 0-1.3-1.1-1.9-1.9-1.9-1.6 0-1.9 2.6-1.9 4.2Z" />
-    </svg>
-  );
-}
-
-// Copy / done glyphs — inline SVG (currentColor), not emoji, to match the
-// bespoke-icon direction and render identically across platforms.
-function CopyIcon({ done }) {
-  return done ? (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-         strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M20 6 9 17l-5-5" />
-    </svg>
-  ) : (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-         strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <rect x="9" y="9" width="11" height="11" rx="2" />
-      <path d="M5 15V5a2 2 0 0 1 2-2h8" />
     </svg>
   );
 }
@@ -142,7 +126,7 @@ function GiftSection({ giftNote, giftIban, theme, font, lang }) {
                 transition: "background .3s, color .3s, transform .2s cubic-bezier(.2,.95,.25,1.1)",
               }}
             >
-              <CopyIcon done={copied} />
+              <Icon name={copied ? "check" : "copy"} size={15} />
               {copyLabel}
             </button>
             {/* Screen-reader confirmation without stealing focus. */}

@@ -82,6 +82,13 @@ const GLYPHS = {
       <path d="M8.6 7l1.5-2.6h3.8L15.4 7" />
     </>
   ),
+  copy: (
+    <>
+      <rect x="9" y="9" width="11.2" height="11.2" rx="2" />
+      <path d="M5 15V5.4A2.4 2.4 0 0 1 7.4 3H15" />
+    </>
+  ),
+  check: <path d="M20 6.4L9 17.4l-5-5" />,
 };
 
 export function Icon({ name, size = 18, style }) {
