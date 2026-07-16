@@ -139,6 +139,8 @@ const THEME_COLORS = new Set([
   "sacredGarden", "sacredGardenNight", "sacredGardenRose",
   // Blossom & Oud (blossom-oud)
   "blossomOud", "blossomOudNight", "blossomOudGold",
+  // Gilded Orchard (gilded-orchard)
+  "gildedOrchard", "gildedOrchardDusk", "gildedOrchardDawn",
 ]);
 const FONT_FAMILIES = new Set([
   "amiri", "noto", "cairo",
@@ -158,7 +160,7 @@ const FONT_FAMILIES = new Set([
 // frontend/src/components/digital/templates/registry.js TEMPLATE_REGISTRY.
 // New ids are appended here only once their frontend Component + registry
 // entry actually exist — never speculatively ahead of the frontend build.
-const TEMPLATE_IDS = new Set(["classic", "destination-love", "dolce-vita", "sacred-garden", "blossom-oud"]);
+const TEMPLATE_IDS = new Set(["classic", "destination-love", "dolce-vita", "sacred-garden", "blossom-oud", "gilded-orchard"]);
 
 // Fields whose change demotes an approved design back to draft. Operational
 // flags (photographerPublished, guestRanks) are intentionally NOT design fields.

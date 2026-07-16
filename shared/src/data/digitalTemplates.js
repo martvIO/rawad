@@ -128,6 +128,25 @@ export const TEMPLATES = {
     },
   },
 
+  // Gilded Orchard (بستان ذهبي / בוסתן מוזהב) — an orchard at night: strung
+  // lights overhead, a lit fountain, vine borders, gold on midnight navy.
+  // Inspired-by reinterpretation of webgency's template2 (the design the
+  // 2026-07-15 scaffold was started for); no source text/photos.
+  "gilded-orchard": {
+    id: "gilded-orchard",
+    label_ar: "بستان ذهبي",
+    label_he: "בוסתן מוזהב",
+    thumbnail: "gilded-orchard",
+    bespoke: true,
+    themes: ["gildedOrchard", "gildedOrchardDusk", "gildedOrchardDawn"],
+    defaults: {
+      themeColor: "gildedOrchard",
+      fontFamily: "markazi",
+      envelopeEnabled: false,
+      envelopeStyle: "classic",
+    },
+  },
+
   // Additional templates land here one at a time as they're built — each
   // bespoke entry adds `bespoke:true` + a curated `themes` list, and its
   // `defaults` (themeColor === themes[0], fontFamily, envelopeEnabled:false,

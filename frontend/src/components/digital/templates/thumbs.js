@@ -11,12 +11,14 @@ import destinationLoveThumb from "../../../assets/templates/destination-love.jpg
 import dolceVitaThumb from "../../../assets/templates/dolce-vita.jpg";
 import sacredGardenThumb from "../../../assets/templates/sacred-garden.jpg";
 import blossomOudThumb from "../../../assets/templates/blossom-oud.jpg";
+import gildedOrchardThumb from "../../../assets/templates/gilded-orchard.jpg";
 
 export const BUNDLED_THUMBS = {
   "destination-love": destinationLoveThumb,
   "dolce-vita": dolceVitaThumb,
   "sacred-garden": sacredGardenThumb,
   "blossom-oud": blossomOudThumb,
+  "gilded-orchard": gildedOrchardThumb,
   // classic has no bundled thumbnail (picker/gallery render a label-only card).
 };
 

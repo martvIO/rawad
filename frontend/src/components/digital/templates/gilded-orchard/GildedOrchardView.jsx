@@ -1,7 +1,13 @@
-// Blossom & Oud — top-level view. Same prop contract as DigitalInvitationView (so
+// Gilded Orchard — top-level view. Same prop contract as DigitalInvitationView (so
 // TemplateRenderer forwards to it unchanged) and the same design-doc fields (no
-// new schema). It owns the arabesque-envelope intro (via the shared useIntroPhase
-// contract) and the mihrab arch that frames the hero.
+// new schema). It owns the orchard-at-night intro (via the shared useIntroPhase
+// contract), the strung lights, the lit fountain and the vine-edged page.
+//
+// NOTE: the 2026-07-15 scaffold made the lights/fountain/vines groom-configurable
+// by adding flat keys to the `background` design object. That is deliberately NOT
+// done here: they are INTRINSIC to this template, exactly as every other bespoke
+// template owns its ornaments — which keeps the "no new design-doc fields" rule
+// intact (no sanitize/mint/snapshot change) and the editor free of dead controls.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getDigitalFont } from "../../../../styles/digitalThemes.js";
 import { localize, localizeItems, localizeList } from "../../../../utils/localize.js";
@@ -10,8 +16,9 @@ import { supportsGradientText } from "../../../../utils/gradientText.js";
 import { DEFAULT_EYEBROW, DEFAULT_BLESSING, DEFAULT_MEAL_OPTIONS } from "../../../../data/digitalInviteDefaults.js";
 import { LangToggle } from "../../inviteShared.jsx";
 import { useIntroPhase } from "../introContract.js";
-import { boTokens } from "./tokens.js";
-import { BoStyles } from "./Styles.jsx";
+import { goTokens } from "./tokens.js";
+import { GoStyles } from "./Styles.jsx";
+import { VineEdge } from "./parts.jsx";
 import { Intro } from "./Intro.jsx";
 import {
   Hero, CountdownSection, StorySection, ScheduleSection, VenueSection,
@@ -37,7 +44,7 @@ function prefersReducedMotion() {
   }
 }
 
-export function BlossomOudView({
+export function GildedOrchardView({
   design,
   guestName,
   guestPhone = "",
@@ -56,7 +63,7 @@ export function BlossomOudView({
   onIntroEvent = null,
 }) {
   const isPublic = mode === "public";
-  const t = useMemo(() => boTokens(design?.themeColor), [design?.themeColor]);
+  const t = useMemo(() => goTokens(design?.themeColor), [design?.themeColor]);
   const font = getDigitalFont(design?.fontFamily);
   const rootRef = useRef(null);
   const [clipTextOk] = useState(supportsGradientText);
@@ -67,8 +74,8 @@ export function BlossomOudView({
   const intro = useIntroPhase({ active: showEnvelope, token, openMs: 2000, onEvent: onIntroEvent });
   const opened = intro.phase !== "sealed";
 
-  // No lazy 3D scene here (the arch + arabesque are CSS/SVG), so the page is ready
-  // at mount. Report it or every blossom-oud visit would miss its load metric.
+  // No lazy 3D scene (the orchard is CSS/SVG), so the page is ready at mount.
+  // Report it or every gilded-orchard visit would miss its load metric.
   const readyRef = useRef(false);
   useEffect(() => {
     if (readyRef.current) return;
@@ -92,13 +99,6 @@ export function BlossomOudView({
   const giftNote = localize(design?.giftNote, lang);
   const weddingDate = design?.weddingDate || null;
 
-  const monogram = useMemo(() => {
-    const explicit = localize(design?.monogram, lang).trim();
-    if (explicit) return explicit;
-    const g = groomName.trim().charAt(0);
-    const b = brideName.trim().charAt(0);
-    return [g, b].filter(Boolean).join("&") || "♥";
-  }, [design?.monogram, lang, groomName, brideName]);
 
   const storyItems = localizeItems(design?.storyTimeline, ["when", "title", "body"], lang);
   const hotels = localizeItems(design?.hotels, ["name", "walk"], lang);
@@ -129,7 +129,7 @@ export function BlossomOudView({
   useEffect(() => {
     const root = rootRef.current;
     if (!root) return undefined;
-    const els = Array.from(root.querySelectorAll(".bo-scroll"));
+    const els = Array.from(root.querySelectorAll(".go-scroll"));
     if (!isPublic || !opened || reduced || typeof IntersectionObserver === "undefined") {
       if (!isPublic || opened || reduced) els.forEach((el) => el.classList.add("is-in"));
       return undefined;
@@ -147,31 +147,39 @@ export function BlossomOudView({
   return (
     <div
       ref={rootRef}
-      className={"tpl-bo" + (opened ? " is-opened" : "")}
+      className={"tpl-go" + (opened ? " is-opened" : "")}
       lang={lang}
       dir="rtl"
       style={{ fontFamily: font.family }}
     >
-      <BoStyles t={t} />
-      <div className="bo-haze" aria-hidden="true" />
+      <GoStyles t={t} />
+      <div className="go-night" aria-hidden="true" />
+      {/* Vines climbing both edges — only on the real page; the editor preview
+          pane is too narrow to carry them without crowding the content. */}
+      {isPublic && (
+        <>
+          <div className="go-vine-l" aria-hidden="true"><VineEdge t={t} w={72} h={200} opacity={0.85} /></div>
+          <div className="go-vine-r" aria-hidden="true"><VineEdge t={t} w={72} h={200} flip opacity={0.85} /></div>
+        </>
+      )}
 
       {showEnvelope && !intro.revealed && (
         <Intro
           t={t}
           lang={lang}
           guestName={guestName}
-          monogram={monogram}
           phase={intro.phase}
           cueEscalated={intro.cueEscalated}
           onOpen={intro.open}
           onSkip={intro.skip}
+          reduced={reduced}
         />
       )}
 
-      <div className="bo-content">
+      <div className="go-content">
         {setLang && <LangToggle lang={lang} setLang={setLang} theme={t.theme} font={font} />}
 
-        <Hero {...sp} guestName={guestName} namesLine={namesLine} eyebrow={eyebrow} blessing={blessing} venueLine={venueLine} />
+        <Hero {...sp} guestName={guestName} namesLine={namesLine} eyebrow={eyebrow} blessing={blessing} venueLine={venueLine} reduced={reduced} />
         {showCountdown && <CountdownSection {...sp} weddingDate={weddingDate} dateText={dateText} />}
         {showStory && <StorySection {...sp} items={storyItems} />}
         {showEvents && <ScheduleSection {...sp} items={eventItems} />}
