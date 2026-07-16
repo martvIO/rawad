@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { SectionHead } from "../inviteShared.jsx";
+import { haptic } from "../../../utils/haptics.js";
 
 // Small gift-box ornament drawn in the theme accent — a piece of the
 // invitation's own SVG language, replacing the previous bare IBAN line.
@@ -60,7 +61,7 @@ function GiftSection({ giftNote, giftIban, theme, font, lang }) {
       try {
         await navigator.clipboard.writeText(ibanRaw);
         setCopied(true);
-        if (typeof navigator.vibrate === "function") navigator.vibrate(8);
+        haptic(8); // shared helper: feature-detected + respects reduced-motion
         setTimeout(() => setCopied(false), 2000);
         return;
       } catch { /* fall through to manual select */ }

@@ -164,17 +164,24 @@ function ViewStyles({ theme, fixed }) {
     .dawa-inv .dawa-inv-detail-title { font-weight: 700; font-size: 22px; margin-bottom: 12px; line-height: 1.45; padding-block: 3px; }
     .dawa-inv .dawa-inv-detail-body { font-size: 14px; line-height: 1.95; max-width: 36ch; }
 
-    /* Venue */
-    .dawa-inv .dawa-inv-venue { display: grid; grid-template-columns: 1.2fr 1fr; gap: 24px; align-items: stretch; }
-    .dawa-inv .dawa-inv-venue-map { position: relative; border: 1px solid; border-radius: 14px; overflow: hidden; min-height: 360px; background: ${theme.cardBg}; }
-    .dawa-inv .dawa-inv-route { stroke-dashoffset: 200; animation: dawa-inv-route 4s linear infinite; }
+    /* Venue — a single centered column: destination card → details → real CTAs.
+       (The old 1.2fr/1fr grid existed to host a decorative fake map; that map is
+       gone, so the column now carries the address hierarchy itself.) */
+    .dawa-inv .dawa-inv-venue { max-width: 620px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+    .dawa-inv .dawa-inv-venue-card { text-align: center; padding: 28px 24px; border: 1px solid; border-radius: 16px; box-shadow: 0 16px 44px -22px ${theme.accentMuted}, inset 0 1px 0 rgba(255,255,255,.05); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+    .dawa-inv .dawa-inv-venue-name { font-weight: 900; font-size: clamp(24px,4.5vw,34px); line-height: 1.3; padding-block: 4px; }
+    .dawa-inv .dawa-inv-venue-city { font-size: 12px; letter-spacing: 3px; text-transform: uppercase; margin-top: 8px; }
+    .dawa-inv .dawa-inv-venue-addr { font-size: 15px; line-height: 1.7; margin-top: 12px; }
     .dawa-inv .dawa-inv-venue-info { display: flex; flex-direction: column; }
     .dawa-inv .dawa-inv-venue-row { display: flex; align-items: flex-start; gap: 18px; padding: 20px 0; border-bottom: 1px solid; transition: transform .35s; }
     .dawa-inv .dawa-inv-venue-row:hover { transform: translateX(-3px); }
     .dawa-inv .dawa-inv-venue-ic { width: 30px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 22px; opacity: .9; }
     .dawa-inv .dawa-inv-venue-label { font-size: 10px; letter-spacing: 2.8px; text-transform: uppercase; font-weight: 700; margin-bottom: 6px; opacity: .85; }
     .dawa-inv .dawa-inv-venue-val { font-size: 16px; line-height: 1.55; }
-    @media (max-width: 760px) { .dawa-inv .dawa-inv-venue { grid-template-columns: 1fr; } }
+    .dawa-inv .dawa-inv-venue-cta { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .dawa-inv .dawa-inv-venue-btn { display: block; text-align: center; padding: 13px 16px; border: 1px solid; border-radius: 999px; text-decoration: none; font-size: 14px; font-weight: 700; transition: transform .25s cubic-bezier(.2,.95,.25,1.1); }
+    .dawa-inv .dawa-inv-venue-btn:hover { transform: translateY(-2px); }
+    @media (max-width: 420px) { .dawa-inv .dawa-inv-venue-cta { grid-template-columns: 1fr; } }
 
     /* Countdown */
     .dawa-inv .dawa-inv-countdown { display: grid; grid-template-columns: repeat(4,1fr); max-width: 760px; margin: 0 auto; border-block: 1px solid; padding: 26px 0; }
@@ -284,7 +291,6 @@ function ViewStyles({ theme, fixed }) {
     .dawa-inv .dawa-inv-detail:hover { border-color: ${theme.accentLine}; box-shadow: 0 18px 48px -16px ${theme.accentMuted}, inset 0 1px 0 rgba(255,255,255,.08); }
 
     /* Deeper, glowier framing on the showpiece surfaces. */
-    .dawa-inv .dawa-inv-venue-map { box-shadow: 0 20px 56px -24px ${theme.accentMuted}; }
     .dawa-inv .dawa-inv-countdown { box-shadow: 0 0 52px -22px ${theme.accentMuted}; }
     .dawa-inv .dawa-inv-dateline { box-shadow: 0 14px 40px -16px ${theme.accentMuted}, inset 0 0 0 1px ${theme.accentLine}; }
     .dawa-inv .dawa-inv-hero-frame { box-shadow: 0 0 60px -10px ${theme.accentMuted}, inset 0 0 90px -44px ${theme.accentMuted}; }
@@ -300,7 +306,6 @@ function ViewStyles({ theme, fixed }) {
     /* Same pulse for elements that are NOT left:50% anchored (the -50% variant
        above would drag a full-width block half a viewport off center). */
     @keyframes dawa-inv-cue-c { 0%,100% { opacity: .7; transform: translateY(0); } 50% { opacity: 1; transform: translateY(6px); } }
-    @keyframes dawa-inv-route { to { stroke-dashoffset: 0; } }
     @keyframes dawa-inv-flip { 0% { transform: translateY(0); } 50% { transform: translateY(-14px); opacity: .4; filter: blur(2px); } 100% { transform: translateY(0); } }
     @keyframes dawa-inv-seal { 0% { transform: scale(0) rotate(-90deg); } 60% { transform: scale(1.15) rotate(8deg); } 100% { transform: scale(1) rotate(0); } }
     @keyframes dawa-inv-dockpulse { 0% { opacity: .9; transform: scale(.95); } 100% { opacity: 0; transform: scale(1.4); } }
