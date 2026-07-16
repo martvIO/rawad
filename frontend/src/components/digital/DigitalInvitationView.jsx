@@ -19,6 +19,7 @@ import { Hero } from "./sections/InviteHero.jsx";
 import { StorySection } from "./sections/InviteStory.jsx";
 import { GallerySection } from "./sections/InviteGallery.jsx";
 import { DetailsSection } from "./sections/InviteDetails.jsx";
+import { EventsSection } from "./sections/InviteEvents.jsx";
 import { VenueSection } from "./sections/InviteVenue.jsx";
 import { CountdownSection } from "./sections/InviteCountdown.jsx";
 import { RSVPSection } from "./sections/InviteRsvp.jsx";
@@ -137,6 +138,9 @@ export function DigitalInvitationView({
 
   const storyItems = localizeItems(design?.storyTimeline, ["when", "title", "body"], lang);
   const detailItems = localizeItems(design?.details, ["meta", "title", "body"], lang);
+  // events: only title/time/venue/address are localized; icon + mapUrl are plain
+  // strings and pass through untouched (same shape the server validates).
+  const eventItems = localizeItems(design?.events, ["title", "time", "venue", "address"], lang);
   const hotels = localizeItems(design?.hotels, ["name", "walk"], lang);
   const wishes = localizeItems(design?.wishes, ["who", "what"], lang);
   const mealOptions = Array.isArray(design?.mealOptions) && design.mealOptions.length
@@ -149,6 +153,9 @@ export function DigitalInvitationView({
   const showStory = on(design?.storyEnabled) && storyItems.length > 0;
   const showGallery = on(design?.galleryEnabled) && media.length > 0;
   const showDetails = on(design?.detailsEnabled) && detailItems.length > 0;
+  // Multi-day schedule: additive and OFF-by-absence — every existing design and
+  // already-minted token has no events[], so nothing changes for them.
+  const showEvents = on(design?.eventsEnabled) && eventItems.length > 0;
   const showVenue = on(design?.venueEnabled) && (venue || venueAddress || hotels.length > 0);
   const showCountdown = on(design?.countdownEnabled) && !!weddingDate;
   const showGuestbook = on(design?.guestbookEnabled);
@@ -192,13 +199,14 @@ export function DigitalInvitationView({
       { id: "inv-story", label: L("القصة", "הסיפור"), icon: <Icon name="story" />, show: showStory },
       { id: "inv-gallery", label: L("الصور", "התמונות"), icon: <Icon name="gallery" />, show: showGallery },
       { id: "inv-details", label: L("التفاصيل", "הפרטים"), icon: <Icon name="details" />, show: showDetails },
+      { id: "inv-events", label: L("الجدول", "הלוח"), icon: <Icon name="calendar" />, show: showEvents },
       { id: "inv-venue", label: L("المكان", "המקום"), icon: <Icon name="venue" />, show: showVenue },
       { id: "inv-countdown", label: L("العدّ التنازلي", "ספירה לאחור"), icon: <Icon name="countdown" />, show: showCountdown },
       { id: "rsvp", label: L("تأكيد الحضور", "אישור הגעה"), icon: <Icon name="rsvp" />, show: true },
       { id: "inv-gift", label: L("هدية", "מתנה"), icon: <Icon name="gift" />, show: showGift },
       { id: "inv-guestbook", label: L("التهاني", "ברכות"), icon: <Icon name="guestbook" />, show: showGuestbook },
     ].filter((it) => it.show);
-  }, [lang, showStory, showGallery, showDetails, showVenue, showCountdown, showGift, showGuestbook]);
+  }, [lang, showStory, showGallery, showDetails, showEvents, showVenue, showCountdown, showGift, showGuestbook]);
 
   // Scroll-reveal: animate `.dawa-inv-reveal` blocks in as they enter view on
   // the public page. In preview (or without IntersectionObserver) reveal them
@@ -286,6 +294,7 @@ export function DigitalInvitationView({
       {showStory && <StorySection items={storyItems} theme={theme} font={font} lang={lang} />}
       {showGallery && <GallerySection items={media} theme={theme} font={font} lang={lang} />}
       {showDetails && <DetailsSection items={detailItems} theme={theme} font={font} lang={lang} />}
+      {showEvents && <EventsSection items={eventItems} theme={theme} font={font} lang={lang} />}
       {showVenue && (
         <VenueSection
           venue={venue}

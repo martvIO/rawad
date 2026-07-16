@@ -19,7 +19,7 @@ import { DlStyles } from "./Styles.jsx";
 import { Intro } from "./Intro.jsx";
 import { SceneHost } from "./effects/SceneHost.jsx";
 import {
-  Hero, BoardingPass, CountdownSection, TimelineSection, VenueSection,
+  Hero, BoardingPass, CountdownSection, TimelineSection, ItinerarySection, VenueSection,
   RsvpSection, GiftSection, GuestbookSection, FooterCredit,
 } from "./sections.jsx";
 
@@ -97,6 +97,8 @@ export function DestinationLoveView({
   }, [design?.monogram, lang, groomName, brideName]);
 
   const storyItems = localizeItems(design?.storyTimeline, ["when", "title", "body"], lang);
+  // Multi-day schedule — only the four localized cells; icon + mapUrl are plain.
+  const eventItems = localizeItems(design?.events, ["title", "time", "venue", "address"], lang);
   const hotels = localizeItems(design?.hotels, ["name", "walk"], lang);
   const wishes = localizeItems(design?.wishes, ["who", "what"], lang);
   const mealOptions = Array.isArray(design?.mealOptions) && design.mealOptions.length
@@ -117,6 +119,7 @@ export function DestinationLoveView({
   // Section flags (default ON; arrays auto-hide when empty).
   const on = (v) => v !== false;
   const showStory = on(design?.storyEnabled) && storyItems.length > 0;
+  const showEvents = on(design?.eventsEnabled) && eventItems.length > 0;
   const showVenue = on(design?.venueEnabled) && (venue || venueAddress || hotels.length > 0);
   const showCountdown = on(design?.countdownEnabled) && !!weddingDate;
   const showGuestbook = on(design?.guestbookEnabled);
@@ -186,6 +189,7 @@ export function DestinationLoveView({
 
         {showCountdown && <CountdownSection {...sectionProps} weddingDate={weddingDate} />}
         {showStory && <TimelineSection {...sectionProps} items={storyItems} />}
+        {showEvents && <ItinerarySection {...sectionProps} items={eventItems} />}
         {showVenue && <VenueSection {...sectionProps} venue={venue} venueCity={venueCity} venueAddress={venueAddress} accessNote={accessNote} hotels={hotels} />}
 
         <RsvpSection {...sectionProps} opts={rsvpOpts} mealOptions={mealOptions} guestPhone={guestPhone} onSubmitRsvp={onSubmitRsvp} disabled={!isPublic} alreadyAnswered={alreadyAnswered} rsvpDone={rsvpDone} />

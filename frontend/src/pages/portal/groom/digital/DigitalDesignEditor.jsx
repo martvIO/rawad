@@ -1261,6 +1261,48 @@ export function DesignEditorBody({ groomUid, designId, adminDemoMode = false, on
           </FormField>
         </Section>
 
+        {/* Multi-day schedule (events[] / eventsEnabled) — a revival, not a new
+            field: the backend has validated this schema since before the
+            luxury-editorial redesign (DESIGN_FIELDS + sanitize's EventItem
+            branch), it had simply lost its editor UI. Available on EVERY
+            template (owner decision 2026-07-16) — a henna night + wedding day is
+            a normal Arab/Israeli wedding shape, not a per-template flourish.
+            Sits by the venue step: it IS the where/when, spread over days. */}
+        <Section
+          step="venue"
+          title={tt(lang, "جدول الاحتفال (عدة أيام)", "לוח האירוע (מספר ימים)")}
+          toggle={{ enabled: tog("eventsEnabled"), onChange: (c) => toggle("eventsEnabled", c), disabled: !editable, testid: "design-toggle-events" }}
+        >
+          <div style={{ fontSize: 11, color: C.dim, marginBottom: 12, lineHeight: 1.6 }}>
+            {tt(
+              lang,
+              "لأكثر من يوم احتفال — حنّة، زفاف، استقبال — كل واحد بموعده ومكانه ورابط خريطته. اتركه فارغاً ولن يظهر في الدعوة.",
+              "ליותר מיום חגיגה אחד — חינה, חתונה, קבלת פנים — כל אחד עם מועד, מקום וקישור מפה. השאירו ריק ולא יופיע בהזמנה.",
+            )}
+          </div>
+          <ArrayEditor
+            testid="design-events"
+            editLang={editLang}
+            items={arr("events")}
+            disabled={!editable || !tog("eventsEnabled")}
+            onChange={(next) => setArray("events", next)}
+            onCommit={(next) => commitArray("events", next)}
+            max={6}
+            addLabel={tt(lang, "➕ إضافة يوم/محطة", "➕ הוסף יום/תחנה")}
+            removeLabel={tt(lang, "حذف", "מחק")}
+            schema={[
+              // icon + mapUrl are PLAIN strings server-side (clampField); the
+              // other four go through clampLocalized — keep these flags in sync.
+              { key: "icon", placeholder: "🎉", width: 56, maxLength: 8 },
+              { key: "title", placeholder: tt(lang, "العنوان (حفلة الحنّة)", "כותרת (מסיבת חינה)"), maxLength: 60, localized: true },
+              { key: "time", placeholder: tt(lang, "التوقيت (19:00)", "שעה (19:00)"), width: 120, maxLength: 40, localized: true },
+              { key: "venue", placeholder: tt(lang, "المكان", "מקום"), maxLength: 120, localized: true },
+              { key: "address", placeholder: tt(lang, "العنوان الكامل", "כתובת מלאה"), maxLength: 200, localized: true },
+              { key: "mapUrl", placeholder: "https://maps.google.com/…", maxLength: 600 },
+            ]}
+          />
+        </Section>
+
         {/* Countdown */}
         <Section
           step="venue"

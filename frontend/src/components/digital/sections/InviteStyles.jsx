@@ -170,6 +170,22 @@ function ViewStyles({ theme, fixed }) {
     .dawa-inv .dawa-inv-detail-title { font-weight: 700; font-size: 22px; margin-bottom: 12px; line-height: 1.45; padding-block: 3px; }
     .dawa-inv .dawa-inv-detail-body { font-size: 14px; line-height: 1.95; max-width: 36ch; }
 
+    /* Multi-day schedule (events) — a vertical timeline. The rail uses logical
+       properties so the dot/line sit on the correct side under RTL. */
+    .dawa-inv .dawa-inv-events { list-style: none; margin: 0; padding: 0; display: grid; gap: 26px; max-width: 640px; margin-inline: auto; }
+    .dawa-inv .dawa-inv-event { display: grid; grid-template-columns: 22px 1fr; gap: 14px; align-items: start; }
+    .dawa-inv .dawa-inv-event-rail { position: relative; display: flex; flex-direction: column; align-items: center; height: 100%; padding-top: 6px; }
+    .dawa-inv .dawa-inv-event-dot { width: 10px; height: 10px; border-radius: 50%; flex: 0 0 auto; }
+    .dawa-inv .dawa-inv-event-line { width: 1px; flex: 1 1 auto; margin-top: 8px; min-height: 28px; }
+    .dawa-inv .dawa-inv-event-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .dawa-inv .dawa-inv-event-icon { font-size: 20px; line-height: 1; }
+    .dawa-inv .dawa-inv-event-title { font-weight: 700; font-size: 20px; margin: 0; line-height: 1.45; padding-block: 2px; }
+    .dawa-inv .dawa-inv-event-time { font-size: 12.5px; letter-spacing: 2.4px; text-transform: uppercase; font-weight: 700; margin-top: 6px; }
+    .dawa-inv .dawa-inv-event-venue { font-size: 15px; font-weight: 600; margin-top: 8px; }
+    .dawa-inv .dawa-inv-event-addr { font-size: 13px; line-height: 1.8; margin-top: 4px; }
+    .dawa-inv .dawa-inv-event-map { display: inline-block; margin-top: 10px; font-size: 11.5px; font-weight: 700; text-decoration: none; padding: 5px 12px; border-radius: 999px; border: 1px solid; transition: transform .3s; }
+    .dawa-inv .dawa-inv-event-map:hover { transform: translateY(-2px); }
+
     /* Venue — a single centered column: destination card → details → real CTAs.
        (The old 1.2fr/1fr grid existed to host a decorative fake map; that map is
        gone, so the column now carries the address hierarchy itself.) */
@@ -343,6 +359,7 @@ function ViewStyles({ theme, fixed }) {
     .dawa-inv[lang="ar"] .dawa-inv-cue,
     .dawa-inv[lang="ar"] .dawa-inv-story-when,
     .dawa-inv[lang="ar"] .dawa-inv-detail-meta,
+    .dawa-inv[lang="ar"] .dawa-inv-event-time,
     .dawa-inv[lang="ar"] .dawa-inv-venue-city,
     .dawa-inv[lang="ar"] .dawa-inv-venue-label,
     .dawa-inv[lang="ar"] .dawa-inv-field label,

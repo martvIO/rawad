@@ -153,6 +153,75 @@ export function TimelineSection({ t, lang, fontFamily, items }) {
   );
 }
 
+// ── Itinerary: the multi-day schedule (events[]) ───────────────────────────
+// The same field the classic template renders as a plain timeline, told in this
+// template's language: a multi-LEG journey, one boarding stub per day (henna
+// night, wedding, reception). Renders only when the couple filled it in.
+// icon + mapUrl are plain strings; title/time/venue/address arrive localized.
+export function ItinerarySection({ t, lang, fontFamily, items }) {
+  return (
+    <section className="dl-scroll" id="dl-itinerary" style={{ padding: "34px 20px" }}>
+      <SectionTitle
+        eyebrow={L(lang, "خط سير الرحلة", "מסלול הטיסה")}
+        title={L(lang, "محطات فرحنا", "תחנות השמחה")}
+        t={t}
+        fontFamily={fontFamily}
+      />
+      <div style={{ maxWidth: 420, margin: "0 auto", display: "grid", gap: 14 }}>
+        {items.map((e, i) => {
+          const query = [e.venue, e.address].filter(Boolean).join(" ");
+          const href = e.mapUrl || (query ? `https://maps.google.com/?q=${encodeURIComponent(query)}` : "");
+          return (
+            <div
+              key={i}
+              style={{
+                position: "relative", background: t.panel, color: t.panelInk,
+                border: `1px solid ${t.ring}`, borderRadius: 14, padding: "14px 16px",
+                display: "grid", gridTemplateColumns: "auto 1fr", gap: 12, alignItems: "start",
+              }}
+            >
+              {/* Leg number, like a boarding stub's sequence. */}
+              <span
+                aria-hidden="true"
+                style={{
+                  width: 30, height: 30, borderRadius: "50%", background: t.secondary, color: t.onSecondary,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: 12, fontWeight: 900, flex: "0 0 auto",
+                }}
+              >
+                {e.icon ? <span style={{ fontSize: 14 }}>{e.icon}</span> : <bdi dir="ltr">{i + 1}</bdi>}
+              </span>
+              <div style={{ minWidth: 0 }}>
+                {e.title && <div style={{ fontWeight: 800, fontSize: 15, lineHeight: 1.4 }}>{e.title}</div>}
+                {e.time && (
+                  <div className="dl-track" style={{ fontSize: 10, fontWeight: 800, color: t.panelInkSoft, marginTop: 3, textTransform: "uppercase" }}>
+                    <bdi dir="ltr">{e.time}</bdi>
+                  </div>
+                )}
+                {e.venue && <div style={{ fontSize: 13, fontWeight: 700, marginTop: 6 }}>{e.venue}</div>}
+                {e.address && <div style={{ fontSize: 12, opacity: 0.75, marginTop: 2, lineHeight: 1.6 }}>{e.address}</div>}
+                {href && (
+                  <a
+                    href={href}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{
+                      display: "inline-block", marginTop: 9, fontSize: 11, fontWeight: 800,
+                      color: t.panelInkSoft, textDecoration: "none", borderBottom: `1px solid ${t.panelSoft}`,
+                    }}
+                  >
+                    {L(lang, "افتح في الخريطة ↗", "פתח במפה ↗")}
+                  </a>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 // ── Venue: "The Destination" ───────────────────────────────────────────────
 export function VenueSection({ t, lang, fontFamily, venue, venueCity, venueAddress, accessNote, hotels }) {
   const query = encodeURIComponent([venue, venueCity, venueAddress].filter(Boolean).join(", "));

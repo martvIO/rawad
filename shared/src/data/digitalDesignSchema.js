@@ -21,15 +21,25 @@ export const PLAIN_SCALARS = new Set(["giftIban", "musicUrl"]);
 export const isLocalizedScalar = (key) => SCALAR_KEYS.includes(key) && !PLAIN_SCALARS.has(key);
 
 // Repeatable content sections (each an array of localized rows).
-export const ARRAY_KEYS = ["storyTimeline", "details", "hotels", "wishes", "mealOptions"];
+// `events` (the multi-day schedule: henna night + wedding day, each with its own
+// venue and map link) predates the luxury-editorial redesign and is fully
+// validated server-side (DESIGN_FIELDS + sanitize.ts's EventItem branch) — it had
+// simply lost its editor UI. Revived 2026-07-16 rather than inventing a new field
+// for "two dates, two venues", so no design-doc schema change was needed.
+export const ARRAY_KEYS = ["storyTimeline", "details", "hotels", "wishes", "mealOptions", "events"];
 
-// Per-array row shape: the sub-fields each row carries. mealOptions is a bare
-// localized string per row (no sub-fields).
+// Per-array row shape: the LOCALIZED sub-fields each row carries — the native
+// editor writes every listed key as an { ar, he } object, so a plain-string
+// sub-field must NOT be listed here (storyTimeline's `icon` is omitted for the
+// same reason). `events` therefore lists only its four localized cells: the
+// server takes icon/mapUrl through clampField (plain), and title/time/venue/
+// address through clampLocalized. mealOptions is a bare localized string per row.
 export const ARRAY_ROW_FIELDS = {
   storyTimeline: ["when", "title", "body"],
   details: ["meta", "title", "body"],
   hotels: ["name", "walk"],
   wishes: ["who", "what"],
+  events: ["title", "time", "venue", "address"], // icon + mapUrl are plain strings
   mealOptions: [], // each row is itself a localized { ar, he } value
 };
 
@@ -39,7 +49,7 @@ export const TOGGLE_KEYS = [
   "countdownEnabled", "guestbookEnabled", "giftEnabled", "musicEnabled",
   "footerDockEnabled", "envelopeEnabled", "heroMediaEnabled",
   "rsvpCompanionsEnabled", "rsvpMealEnabled", "rsvpSongEnabled",
-  "immersive3d",
+  "immersive3d", "eventsEnabled",
 ];
 
 // Design approval-workflow status metadata (labels + accent colour).

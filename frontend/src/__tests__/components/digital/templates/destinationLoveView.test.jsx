@@ -44,3 +44,64 @@ describe("DestinationLoveView (smoke)", () => {
     expect(screen.getAllByText(/כרים/).length).toBeGreaterThan(0);
   });
 });
+
+// ── Multi-day schedule (events[]) ─────────────────────────────────────────────
+// The same field classic renders as a timeline, told in this template's travel
+// language (numbered legs). The load-bearing guarantee is the AUTO-HIDE: every
+// existing design and already-minted token has no events[], so nothing about
+// them may change.
+describe("DestinationLoveView — itinerary (events)", () => {
+  const withEvents = (events, over = {}) => ({ ...design, events, ...over });
+
+  it("renders nothing when the couple has no schedule (existing designs unchanged)", () => {
+    render(<DestinationLoveView design={design} guestName="أحمد" lang="ar" mode="preview" />);
+    expect(screen.queryByText("محطات فرحنا")).toBeNull();
+  });
+
+  it("renders nothing for an empty events array", () => {
+    render(<DestinationLoveView design={withEvents([])} guestName="أحمد" lang="ar" mode="preview" />);
+    expect(screen.queryByText("محطات فرحنا")).toBeNull();
+  });
+
+  it("renders the schedule once the couple fills it in", () => {
+    render(
+      <DestinationLoveView
+        design={withEvents([
+          { icon: "🌿", title: { ar: "حفلة الحنّة" }, time: { ar: "19:00" }, venue: { ar: "بيت العائلة" } },
+          { icon: "💍", title: { ar: "الزفاف" }, time: { ar: "20:00" }, venue: { ar: "قاعة الأندلس" } },
+        ])}
+        guestName="أحمد"
+        lang="ar"
+        mode="preview"
+      />,
+    );
+    expect(screen.getByText("محطات فرحنا")).toBeTruthy();
+    expect(screen.getByText("حفلة الحنّة")).toBeTruthy();
+    expect(screen.getByText("الزفاف")).toBeTruthy();
+  });
+
+  it("stays hidden when the couple switched the section off", () => {
+    render(
+      <DestinationLoveView
+        design={withEvents([{ title: { ar: "الزفاف" } }], { eventsEnabled: false })}
+        guestName="أحمد"
+        lang="ar"
+        mode="preview"
+      />,
+    );
+    expect(screen.queryByText("محطات فرحنا")).toBeNull();
+  });
+
+  it("localizes the schedule to Hebrew", () => {
+    render(
+      <DestinationLoveView
+        design={withEvents([{ title: { ar: "الزفاف", he: "החתונה" }, venue: { ar: "قاعة", he: "אולם" } }])}
+        guestName="דני"
+        lang="he"
+        mode="preview"
+      />,
+    );
+    expect(screen.getByText("תחנות השמחה")).toBeTruthy();
+    expect(screen.getByText("החתונה")).toBeTruthy();
+  });
+});
