@@ -24,7 +24,7 @@ function GallerySection({ items, theme, font, lang }) {
             {m.kind === "video" ? (
               <video src={m.url} muted loop playsInline />
             ) : (
-              <img src={m.url} alt={m.cap || ""} loading="lazy" />
+              <img src={m.url} alt={m.cap || ""} loading="lazy" decoding="async" />
             )}
             {m.cap && (
               <div className="dawa-inv-gallery-cap" style={{ fontFamily: font.family }}>

@@ -92,6 +92,11 @@ function ViewStyles({ theme, fixed }) {
     .dawa-inv .dawa-inv-hero-media { margin-top: 30px; width: 100%; max-width: 440px; display: grid; gap: 14px; animation: dawa-inv-rise 1.1s .7s ease both; }
     .dawa-inv .dawa-inv-hero-media-item { border: 1px solid; border-radius: 16px; overflow: hidden; background: ${theme.cardBg}; }
     .dawa-inv .dawa-inv-hero-media-item img, .dawa-inv .dawa-inv-hero-media-item video { width: 100%; display: block; max-height: 56vh; object-fit: cover; }
+    /* Ken Burns — a slow eased drift on the hero photo so the fold breathes
+       instead of sitting dead-still behind the starfield. Held until the intro
+       clears (.is-opened) and killed entirely by the reduced-motion block. */
+    .dawa-inv.is-opened .dawa-inv-kenburns { animation: dawa-inv-kenburns 26s cubic-bezier(.4,0,.2,1) infinite alternate both; transform-origin: 50% 50%; will-change: transform; }
+    @keyframes dawa-inv-kenburns { from { transform: scale(1) translate3d(0,0,0); } to { transform: scale(1.08) translate3d(0,-1.6%,0); } }
     .dawa-inv .dawa-inv-cue { position: absolute; bottom: 28px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 10px; font-size: 11px; letter-spacing: 3px; text-transform: uppercase; opacity: .7; animation: dawa-inv-cue 2.4s ease-in-out infinite; }
     .dawa-inv .dawa-inv-cue-line { width: 1px; height: 34px; }
     /* Entrance gate: the hero cascade above fires on MOUNT, while the opaque

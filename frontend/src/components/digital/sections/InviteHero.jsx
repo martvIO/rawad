@@ -160,7 +160,17 @@ function Hero({ guestName, groomName, brideName, monogram, eyebrow, dateText, ve
               {m.kind === "video" ? (
                 <video src={m.url} autoPlay muted loop playsInline />
               ) : (
-                <img src={m.url} alt="" loading="lazy" />
+                // The first hero image is the LCP element — fetch it eagerly at
+                // high priority so the couple's photo paints fast on 4G; the
+                // rest stay lazy. Ken Burns gives it a slow cinematic drift.
+                <img
+                  className="dawa-inv-kenburns"
+                  src={m.url}
+                  alt=""
+                  decoding="async"
+                  loading={i === 0 ? "eager" : "lazy"}
+                  fetchPriority={i === 0 ? "high" : undefined}
+                />
               )}
             </div>
           ))}
