@@ -44,7 +44,7 @@ export function WalletButton({ token, lang, theme, font }) {
     fontFamily: font.family,
     fontSize: 15,
     fontWeight: 800,
-    letterSpacing: 0.3,
+    letterSpacing: he ? 0.3 : 0,
     border: `1px solid ${theme.accent}`,
   };
   const primary = { ...base, background: theme.accent, color: ON_GOLD, boxShadow: `0 8px 24px ${theme.accentMuted}` };

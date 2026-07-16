@@ -5,6 +5,7 @@
 import { lazy, Suspense, createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { usePortal } from "../../../../context/PortalContext.jsx";
 import { localizeApiError } from "../../../../utils/apiError.js";
+import { track } from "../../../../utils/arabicType.js";
 import {
   subscribeDesigns,
   createDesign,
@@ -216,7 +217,7 @@ function DesignSwitcher({ designs, selectedId, lang, busy, onSelect, onCreate, o
   return (
     <div className="gold-card" style={{ padding: 14, marginBottom: 16 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, gap: 8, flexWrap: "wrap" }}>
-        <div style={{ fontSize: 13, color: C.goldLight, fontWeight: 800, letterSpacing: 1 }}>
+        <div style={{ fontSize: 13, color: C.goldLight, fontWeight: 800, letterSpacing: lang === "he" ? 1 : 0 }}>
           {tt(lang, "تصاميمك", "העיצובים שלך")} <span style={{ color: C.dim, fontWeight: 600 }}>({designs.length})</span>
         </div>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
@@ -1618,7 +1619,7 @@ export function DesignEditorBody({ groomUid, designId, adminDemoMode = false, on
 
         {/* Live preview */}
         <div style={{ marginTop: 12 }}>
-          <div style={{ fontSize: 12, color: C.goldDim, marginBottom: 8, fontWeight: 800, letterSpacing: 2, textTransform: "uppercase" }}>
+          <div style={{ fontSize: 12, color: C.goldDim, marginBottom: 8, fontWeight: 800, letterSpacing: lang === "he" ? 2 : 0, textTransform: "uppercase" }}>
             {tt(lang, "معاينة مباشرة", "תצוגה מקדימה חיה")}
           </div>
           <div data-testid="design-preview" style={{ borderRadius: 16, overflow: "hidden", border: "1px solid rgba(201,168,76,.22)", maxHeight: 640, overflowY: "auto" }}>
@@ -1802,7 +1803,7 @@ function Section({ title, children, toggle, step }) {
   return (
     <div className="gold-card" style={{ padding: 18, opacity: dimmed ? 0.6 : 1 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, gap: 10 }}>
-        <div style={{ fontSize: 13, color: C.goldLight, fontWeight: 800, letterSpacing: 1 }}>{title}</div>
+        <div style={{ fontSize: 13, color: C.goldLight, fontWeight: 800, letterSpacing: track(title, 1) }}>{title}</div>
         {toggle && (
           <label data-testid={toggle.testid} style={{ display: "inline-flex", alignItems: "center", gap: 6, cursor: toggle.disabled ? "not-allowed" : "pointer", fontSize: 11, color: C.dim, fontWeight: 700 }}>
             <input type="checkbox" checked={toggle.enabled} disabled={toggle.disabled} onChange={(e) => toggle.onChange(e.target.checked)} style={{ width: 16, height: 16, accentColor: C.gold, cursor: toggle.disabled ? "not-allowed" : "pointer" }} />
@@ -1944,7 +1945,7 @@ function StarfieldPreview({ themeColor, starfield, lang }) {
           demoScroll
         />
       </Suspense>
-      <div style={{ position: "absolute", bottom: 8, insetInlineStart: 0, insetInlineEnd: 0, textAlign: "center", zIndex: 2, pointerEvents: "none", fontSize: 10, letterSpacing: 2, textTransform: "uppercase", color: "rgba(255,255,255,.7)", textShadow: "0 1px 4px rgba(0,0,0,.6)" }}>
+      <div style={{ position: "absolute", bottom: 8, insetInlineStart: 0, insetInlineEnd: 0, textAlign: "center", zIndex: 2, pointerEvents: "none", fontSize: 10, letterSpacing: lang === "he" ? 2 : 0, textTransform: "uppercase", color: "rgba(255,255,255,.7)", textShadow: "0 1px 4px rgba(0,0,0,.6)" }}>
         {tt(lang, "مثال على دخول النجوم", "דוגמת כניסת הכוכבים")}
       </div>
     </div>
@@ -1968,7 +1969,7 @@ function BackgroundPreview({ themeColor, fontFamily, overrides, lang }) {
       <ViewStyles theme={theme} font={font} fixed={false} />
       <Ambience theme={theme} fixed={false} background={bg} />
       <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", zIndex: 6, pointerEvents: "none", padding: 16 }}>
-        <div style={{ fontSize: 11, letterSpacing: 3, textTransform: "uppercase", opacity: 0.75 }}>{tt(lang, "معاينة الخلفية", "תצוגת רקע")}</div>
+        <div style={{ fontSize: 11, letterSpacing: lang === "he" ? 3 : 0, textTransform: "uppercase", opacity: 0.75 }}>{tt(lang, "معاينة الخلفية", "תצוגת רקע")}</div>
         <div style={{ fontSize: 26, fontWeight: 900, marginTop: 6, fontFamily: font.family }}>{tt(lang, "دعوة", "הזמנה")}</div>
       </div>
     </div>

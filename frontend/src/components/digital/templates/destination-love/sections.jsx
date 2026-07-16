@@ -10,6 +10,7 @@ import { Icon } from "../../InviteIcon.jsx";
 import { useRsvpForm } from "../../../../hooks/useRsvpForm.js";
 import { useCountdown } from "../../../../hooks/useCountdown.js";
 import { haptic } from "../../../../utils/haptics.js";
+import { hasArabic } from "../../../../utils/arabicType.js";
 
 const L = (lang, ar, he) => (lang === "he" ? he : ar);
 
@@ -39,8 +40,8 @@ export function Hero({ t, lang, fontFamily, guestName, namesLine, monogram, eyeb
             color: t.panelInk,
           }}
         >
-          <div style={{ fontWeight: 900, letterSpacing: ".08em", color: t.ring, fontSize: 15 }}>{monogram}</div>
-          <div className="dl-track" style={{ fontSize: 10, fontWeight: 800, textTransform: "uppercase", color: t.panelInkSoft, marginTop: 6 }}>
+          <div style={{ fontWeight: 900, letterSpacing: hasArabic(monogram) ? 0 : ".08em", color: t.ring, fontSize: 15 }}>{monogram}</div>
+          <div className={lang === "he" && !hasArabic(eyebrow) ? "dl-track" : undefined} style={{ fontSize: 10, fontWeight: 800, textTransform: "uppercase", color: t.panelInkSoft, marginTop: 6 }}>
             {eyebrow || L(lang, "أنتم مدعوون", "אתם מוזמנים")}
           </div>
           <div style={{ fontFamily: "inherit", fontWeight: 900, fontSize: "clamp(22px,6.4vw,30px)", lineHeight: 1.15, margin: "6px 0", color: t.panelInk }}>

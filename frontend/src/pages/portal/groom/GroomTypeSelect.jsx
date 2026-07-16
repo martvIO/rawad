@@ -63,7 +63,7 @@ export function GroomTypeSelect() {
             >
               <span style={{
                 position: "absolute", top: 12, insetInlineEnd: 12,
-                fontSize: 10, fontWeight: 800, letterSpacing: ".5px",
+                fontSize: 10, fontWeight: 800, letterSpacing: lang === "he" ? ".5px" : 0,
                 padding: "3px 8px", borderRadius: 8,
                 background: "rgba(201,168,76,.16)", color: C.gold,
               }}>{lang === "he" ? "בטא" : "تجريبي"}</span>

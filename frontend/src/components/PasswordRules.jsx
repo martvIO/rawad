@@ -17,7 +17,7 @@ export function PasswordRules({ password, t, compact = false }) {
     }}>
       <div style={{
         fontSize: 11, color: C.goldDim, fontWeight: 700,
-        marginBottom: 8, letterSpacing: .5,
+        marginBottom: 8,
       }}>
         {t("pwd_rules_title")}
       </div>

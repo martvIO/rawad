@@ -130,7 +130,7 @@ function LangToggle({ lang, setLang, theme, font }) {
             padding: "7px 14px",
             fontSize: 12,
             fontWeight: 800,
-            letterSpacing: 0.5,
+            // No tracking: the عربي label is joined Arabic — spacing severs it.
             fontFamily: font.family,
             background: lang === code ? theme.accent : "transparent",
             color: lang === code ? ON_GOLD : theme.accent,

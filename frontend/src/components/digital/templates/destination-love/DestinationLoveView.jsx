@@ -231,7 +231,7 @@ export function DestinationLoveView({
 
       {/* Preview badge (editor / admin). */}
       {mode === "preview" && (
-        <div style={{ position: "absolute", top: 14, insetInlineEnd: 14, zIndex: 60, padding: "6px 12px", borderRadius: 999, background: t.theme.chipBg, border: `1px solid ${t.theme.chipBorder}`, color: t.theme.accent, fontSize: 11, fontWeight: 800, letterSpacing: 2, textTransform: "uppercase" }}>
+        <div style={{ position: "absolute", top: 14, insetInlineEnd: 14, zIndex: 60, padding: "6px 12px", borderRadius: 999, background: t.theme.chipBg, border: `1px solid ${t.theme.chipBorder}`, color: t.theme.accent, fontSize: 11, fontWeight: 800, letterSpacing: lang === "he" ? 2 : 0, textTransform: "uppercase" }}>
           {lang === "he" ? "תצוגה" : "معاينة"}
         </div>
       )}

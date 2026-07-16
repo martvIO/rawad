@@ -378,7 +378,7 @@ export function DigitalInvitationView({
             color: theme.accent,
             fontSize: 11,
             fontWeight: 800,
-            letterSpacing: 2,
+            letterSpacing: lang === "he" ? 2 : 0,
             textTransform: "uppercase",
             zIndex: 60,
             fontFamily: font.family,

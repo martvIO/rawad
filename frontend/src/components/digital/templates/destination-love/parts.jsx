@@ -2,6 +2,7 @@
 // paper-plane, the dashed flight path, the section title, the shine button, and
 // the boarding-pass ticker read identically everywhere.
 import { getDigitalFont } from "../../../../styles/digitalThemes.js";
+import { hasArabic } from "../../../../utils/arabicType.js";
 
 // A little paper/origami plane, tinted. `tail` draws a short dashed contrail.
 export function PaperPlane({ size = 24, color = "#c9a86a", stroke = "rgba(0,0,0,.15)" }) {
@@ -46,7 +47,7 @@ export function SectionTitle({ eyebrow, title, t, fontFamily, id }) {
   return (
     <div style={{ textAlign: "center", marginBottom: 20 }} id={id}>
       {eyebrow && (
-        <div className="dl-track" style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", color: t.accent, marginBottom: 8 }}>
+        <div className={hasArabic(eyebrow) ? undefined : "dl-track"} style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", color: t.accent, marginBottom: 8 }}>
           {eyebrow}
         </div>
       )}
@@ -62,6 +63,9 @@ export function SectionTitle({ eyebrow, title, t, fontFamily, id }) {
           WebkitBackgroundClip: "text",
           WebkitTextFillColor: "transparent",
           backgroundClip: "text",
+          // Headroom for Amiri's tall ascenders / deep descenders / diacritics —
+          // ink outside the padding box gets no gradient and renders cut off.
+          paddingBlock: ".18em",
         }}
       >
         {title}

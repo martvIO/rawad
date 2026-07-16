@@ -53,7 +53,7 @@ export function Intro({ phase, cueEscalated, open, skip, guestName, lang, t, fon
         <span style={notch(t, "start")} />
         <span style={notch(t, "end")} />
 
-        <div className="dl-track" style={{ fontSize: 10, fontWeight: 800, textTransform: "uppercase", color: t.panelInkSoft }}>
+        <div className={lang === "he" ? "dl-track" : undefined} style={{ fontSize: 10, fontWeight: 800, textTransform: "uppercase", color: t.panelInkSoft }}>
           {L("بطاقة صعود", "כרטיס עלייה למטוס")}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "4px 0 18px" }}>
@@ -63,7 +63,7 @@ export function Intro({ phase, cueEscalated, open, skip, guestName, lang, t, fon
           </div>
         </div>
 
-        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".06em", color: t.panelInkSoft }}>
+        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: lang === "he" ? ".06em" : 0, color: t.panelInkSoft }}>
           {L("المسافر / المسافرة", "הנוסע/ת")}
         </div>
         <div style={{ fontWeight: 900, fontSize: "clamp(22px,6vw,30px)", lineHeight: 1.2, marginTop: 2, color: t.panelInk }}>
@@ -102,7 +102,7 @@ export function Intro({ phase, cueEscalated, open, skip, guestName, lang, t, fon
               color: t.stamp,
               fontWeight: 900,
               fontSize: 15,
-              letterSpacing: ".04em",
+              letterSpacing: lang === "he" ? ".04em" : 0,
               transform: "rotate(-11deg)",
               opacity: 0.92,
             }}

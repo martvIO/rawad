@@ -207,7 +207,6 @@ export function InviteNavMenu({ items, theme, font, lang, fixed = true, sorek = 
             color: theme.text,
             fontSize: 12.5,
             fontWeight: 800,
-            letterSpacing: 0.3,
             fontFamily: font.family,
             boxShadow: `0 8px 24px -12px ${theme.accentMuted}`,
             opacity: show ? 1 : 0,

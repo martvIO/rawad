@@ -12,6 +12,7 @@ import { useTemplateAssets } from "../hooks/useTemplateAssets.js";
 import { C } from "../styles/theme.js";
 import { fetchPublicSettings } from "../services/publicSettings.js";
 import { resolveContact, buildWhatsAppUrl, mailtoUrl } from "../utils/contact.js";
+import { track } from "../utils/arabicType.js";
 
 // ── Scroll hooks ────────────────────────────────────────────────────────────
 // The hero's parallax/fade used to come from a `scrollY` state updated on EVERY
@@ -379,7 +380,7 @@ function HeroSection({ t, lang, onEnterPortal, onContact, openSample }) {
       <div ref={heroRef} style={{ position: "relative", willChange: "transform, opacity" }}>
         <div style={{
           fontSize: 11, color: "#f0c84c", fontWeight: 800,
-          letterSpacing: 4, textTransform: "uppercase",
+          letterSpacing: track(t("landing_eyebrow"), 4), textTransform: "uppercase",
           marginBottom: 26,
           display: "inline-flex", alignItems: "center", gap: 14,
           animation: "dawa-hero-rise .9s ease both",
@@ -464,7 +465,7 @@ function HeroSection({ t, lang, onEnterPortal, onContact, openSample }) {
               border: "1px solid rgba(201,168,76,.20)",
               backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)",
               color: "#fff3c0", fontSize: 12, fontWeight: 700,
-              letterSpacing: ".3px",
+              letterSpacing: track(chip, ".3px"),
             }}>
               <span style={{ width: 5, height: 5, borderRadius: "50%", background: "#f0c84c" }} />
               {chip}
@@ -480,7 +481,7 @@ function HeroSection({ t, lang, onEnterPortal, onContact, openSample }) {
       }}>
         <span style={{
           fontFamily: "'Amiri','Frank Ruhl Libre',serif", fontStyle: "italic",
-          fontSize: 11, color: "#c9a84c", letterSpacing: 3, textTransform: "uppercase",
+          fontSize: 11, color: "#c9a84c", letterSpacing: track(t("scroll_cue"), 3), textTransform: "uppercase",
         }}>{t("scroll_cue")}</span>
         <span style={{
           width: 1, height: 40, display: "block",
@@ -535,7 +536,7 @@ function SectionHead({ eyebrow, title, sub }) {
       <div style={{
         display: "inline-flex", alignItems: "center", gap: 14,
         fontSize: 11, color: "#f0c84c", fontWeight: 800,
-        letterSpacing: 4, textTransform: "uppercase", marginBottom: 16,
+        letterSpacing: track(eyebrow, 4), textTransform: "uppercase", marginBottom: 16,
         opacity: 0.9,
       }}>
         <span style={{ width: 28, height: 1, background: "linear-gradient(90deg, transparent, #c9a84c)" }} />
@@ -568,7 +569,7 @@ function AboutSection({ t, lang }) {
         <div className="dawa-reveal">
           <div style={{
             fontSize: 11, color: "#f0c84c", fontWeight: 800,
-            letterSpacing: 4, textTransform: "uppercase", marginBottom: 18, opacity: 0.9,
+            letterSpacing: track(t("about_eyebrow"), 4), textTransform: "uppercase", marginBottom: 18, opacity: 0.9,
           }}>{t("about_eyebrow")}</div>
           <h2 style={{
             fontFamily: "'Amiri','Frank Ruhl Libre',serif", fontWeight: 900,
@@ -741,7 +742,7 @@ function ServicesSection({ t, onEnterPortal }) {
           onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.borderColor = "rgba(201,168,76,.35)"; e.currentTarget.style.boxShadow = "none"; }}
         >
           <div style={{ color: "#f0c84c", marginBottom: 16 }}><Icon name="mail" size={44} strokeWidth={1.4} /></div>
-          <div style={{ fontSize: 11, color: "#f0c84c", letterSpacing: 3, textTransform: "uppercase", fontWeight: 800, marginBottom: 10 }}>
+          <div style={{ fontSize: 11, color: "#f0c84c", letterSpacing: track(t("delivery_subtitle"), 3), textTransform: "uppercase", fontWeight: 800, marginBottom: 10 }}>
             {t("delivery_subtitle")}
           </div>
           <h3 style={{
@@ -910,7 +911,7 @@ function ShowcaseSection({ t, openSample }) {
               }} />
               {/* Digital-invitation preview — monogram, couple, date, countdown, RSVP */}
               <div style={{ marginTop: 22, textAlign: "center" }}>
-                <div style={{ fontSize: 9, color: "#a09070", letterSpacing: 2.5, textTransform: "uppercase", fontWeight: 800, marginBottom: 10 }}>
+                <div style={{ fontSize: 9, color: "#a09070", textTransform: "uppercase", fontWeight: 800, marginBottom: 10 }}>
                   دعوة زفاف
                 </div>
                 <div style={{
@@ -926,6 +927,7 @@ function ShowcaseSection({ t, openSample }) {
                   fontFamily: "'Amiri','Frank Ruhl Libre',serif", fontWeight: 900, fontSize: 25, lineHeight: 1.2,
                   background: "linear-gradient(135deg,#fff3c0,#f0c84c,#c9a84c)",
                   WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+                  paddingBlock: 4,
                 }}>أحمد &amp; ليلى</div>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, margin: "9px 0" }}>
                   <span style={{ width: 26, height: 1, background: "linear-gradient(90deg,transparent,#c9a84c)" }} />
@@ -942,7 +944,7 @@ function ShowcaseSection({ t, openSample }) {
                     borderRadius: 8, padding: "7px 0", textAlign: "center",
                   }}>
                     <div style={{ fontFamily: "'Amiri','Frank Ruhl Libre',serif", color: "#f0c84c", fontSize: 15, fontWeight: 900, lineHeight: 1 }}>{c.v}</div>
-                    <div style={{ fontSize: 7.5, color: C.dim, marginTop: 3, letterSpacing: .5 }}>{c.l}</div>
+                    <div style={{ fontSize: 7.5, color: C.dim, marginTop: 3 }}>{c.l}</div>
                   </div>
                 ))}
               </div>
@@ -968,7 +970,7 @@ function ShowcaseSection({ t, openSample }) {
         <div className="dawa-reveal delay-2">
           <div style={{
             fontSize: 11, color: "#f0c84c", fontWeight: 800,
-            letterSpacing: 4, textTransform: "uppercase",
+            letterSpacing: track(t("showcase_eyebrow"), 4), textTransform: "uppercase",
             marginBottom: 18, opacity: 0.9,
           }}>{t("showcase_eyebrow")}</div>
           <h2 style={{
@@ -1061,7 +1063,7 @@ function PricingSection({ t, onContact }) {
             display: "inline-block",
             background: "linear-gradient(135deg, #c9b87a, #f0e4b8)",
             color: "#1a1408", padding: "5px 14px", borderRadius: 999,
-            fontSize: 11.5, fontWeight: 900, letterSpacing: 0.8,
+            fontSize: 11.5, fontWeight: 900, letterSpacing: track(t("price_phys2_cheaper_badge"), 0.8),
             boxShadow: "0 4px 14px rgba(201,184,122,.35)",
             marginBottom: 18,
           }}>{t("price_phys2_cheaper_badge")}</div>
@@ -1133,7 +1135,7 @@ function PricingSection({ t, onContact }) {
             position: "absolute", top: -14, insetInlineStart: "50%", transform: "translateX(-50%)",
             background: "linear-gradient(135deg,#9b4bd4,#c084fc)", color: "#fff",
             padding: "6px 20px", borderRadius: 999, fontSize: 11, fontWeight: 900, whiteSpace: "nowrap",
-            letterSpacing: 1.5, boxShadow: "0 6px 20px rgba(155,75,212,.4)",
+            letterSpacing: track(t("price_vip_badge"), 1.5), boxShadow: "0 6px 20px rgba(155,75,212,.4)",
           }}>{t("price_vip_badge")}</div>
           <div style={{ fontSize: 44, marginBottom: 16 }}>♛</div>
           <div style={{ fontSize: 11, color: "#c084fc", letterSpacing: 3, textTransform: "uppercase", fontWeight: 800, marginBottom: 10 }}>VIP ROYAL</div>
@@ -1315,6 +1317,7 @@ function FooterSection({ t, lang, onEnterPortal, contact }) {
                   fontFamily: "'Amiri','Frank Ruhl Libre',serif", fontSize: 26, fontWeight: 900,
                   background: "linear-gradient(135deg,#fff3c0,#f0c84c,#c9a84c)",
                   WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+                  paddingBlock: 4,
                 }}>{lang === "he" ? "דעוה" : "دعوة"}</span>
                 <span style={{
                   fontFamily: "'Amiri','Frank Ruhl Libre',serif", fontSize: 15, fontWeight: 700,
@@ -1354,7 +1357,7 @@ function FooterSection({ t, lang, onEnterPortal, contact }) {
             <div key={k}>
               <div style={{
                 fontSize: 10.5, color: "#c9a84c", fontWeight: 800,
-                letterSpacing: 2.5, textTransform: "uppercase",
+                letterSpacing: track(col.title, 2.5), textTransform: "uppercase",
                 marginBottom: 18, opacity: 0.85,
               }}>{col.title}</div>
               <ul style={{ listStyle: "none", padding: 0 }}>

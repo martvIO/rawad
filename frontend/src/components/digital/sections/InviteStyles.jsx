@@ -4,9 +4,10 @@ function ViewStyles({ theme, fixed }) {
     <style>{`
     .dawa-inv ::selection { background: ${theme.accentMuted}; }
 
-    /* Subtle global letter-spacing — opens the Arabic/Hebrew text a touch for a
-     * more elegant, airy feel. Kept tiny (.4px) so the cursive Arabic joins stay
-     * intact; per-element rules below override where more spacing is wanted. */
+    /* Subtle global letter-spacing — a Hebrew/Latin flourish only. ANY positive
+     * tracking severs Arabic's cursive joins (there is no join-safe value), so
+     * the ARABIC CURSIVE JOINS block at the bottom resets this (and every
+     * per-element tracking below) to normal when the invite renders in Arabic. */
     .dawa-inv {
       letter-spacing: .4px;
       /* Central vertical-spacing tokens (round-two tightening). The fluid clamps
@@ -342,6 +343,7 @@ function ViewStyles({ theme, fixed }) {
     .dawa-inv[lang="ar"] .dawa-inv-cue,
     .dawa-inv[lang="ar"] .dawa-inv-story-when,
     .dawa-inv[lang="ar"] .dawa-inv-detail-meta,
+    .dawa-inv[lang="ar"] .dawa-inv-venue-city,
     .dawa-inv[lang="ar"] .dawa-inv-venue-label,
     .dawa-inv[lang="ar"] .dawa-inv-field label,
     .dawa-inv[lang="ar"] .dawa-inv-cd-lbl,
