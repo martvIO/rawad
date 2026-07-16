@@ -13,6 +13,7 @@
 // 503 and nothing is added — the button simply no-ops gracefully.
 import { applePassUrl, googlePassUrl } from "../../services/wallet.js";
 import { ON_GOLD } from "./inviteShared.jsx";
+import { Icon } from "./InviteIcon.jsx";
 
 function detectPlatform() {
   if (typeof navigator === "undefined") return "other";
@@ -71,13 +72,13 @@ export function WalletButton({ token, lang, theme, font }) {
       </div>
       {showApple && (
         <a href={applePassUrl(token, lang)} style={appleStyle}>
-          <span aria-hidden="true">🎟️</span>
+          <Icon name="ticket" size={16} />
           {he ? "הוסף ל‑Apple Wallet" : "أضف إلى Apple Wallet"}
         </a>
       )}
       {showGoogle && (
         <a href={googlePassUrl(token, lang)} style={googleStyle}>
-          <span aria-hidden="true">🎟️</span>
+          <Icon name="ticket" size={16} />
           {he ? "שמור ב‑Google Wallet" : "احفظ في Google Wallet"}
         </a>
       )}

@@ -1,5 +1,6 @@
 import { useEffect,useMemo,useState } from "react";
 import { ON_GOLD, SectionHead } from "../inviteShared.jsx";
+import { Icon } from "../InviteIcon.jsx";
 
 // ── Guestbook ───────────────────────────────────────────────────────────────────
 function GuestbookSection({ wishes, approvedWishes = [], onSubmitWish, theme, font, lang, disabled }) {
@@ -49,8 +50,9 @@ function GuestbookSection({ wishes, approvedWishes = [], onSubmitWish, theme, fo
       />
       <div className="dawa-inv-rsvp dawa-inv-reveal" style={{ marginBottom: 22 }}>
         {sent ? (
-          <div style={{ textAlign: "center", padding: "18px 12px", color: theme.accent, fontFamily: font.family, fontWeight: 800, lineHeight: 1.8 }}>
-            🌟 {lang === "he" ? "תודה! הברכה נשלחה וממתינה לאישור הזוג." : "شكراً! وصلت رسالتك وهي بانتظار موافقة العروسين."}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, textAlign: "center", padding: "18px 12px", color: theme.accent, fontFamily: font.family, fontWeight: 800, lineHeight: 1.8 }}>
+            <Icon name="star" size={20} style={{ flexShrink: 0 }} />
+            <span>{lang === "he" ? "תודה! הברכה נשלחה וממתינה לאישור הזוג." : "شكراً! وصلت رسالتك وهي بانتظار موافقة العروسين."}</span>
           </div>
         ) : (
           <>

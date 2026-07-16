@@ -1,5 +1,6 @@
 import { useEffect,useRef,useState } from "react";
 import { SectionHead } from "../inviteShared.jsx";
+import { Icon } from "../InviteIcon.jsx";
 import { useCountdown } from "../../../hooks/useCountdown.js";
 
 // ── Countdown ────────────────────────────────────────────────────────────────────
@@ -48,7 +49,9 @@ function CountdownSection({ weddingDate, dateText = "", theme, font, lang }) {
       />
       {reached ? (
         <div style={{ textAlign: "center", padding: "20px 0" }}>
-          <div style={{ fontSize: 56, marginBottom: 12 }}>🎊</div>
+          <div style={{ display: "flex", justifyContent: "center", marginBottom: 12, color: theme.accent }}>
+            <Icon name="celebrate" size={52} />
+          </div>
           <div style={{ color: theme.text, fontSize: 28, fontWeight: 900, fontFamily: font.family }}>
             {lang === "he" ? "היום החתונה!" : "اليوم الفرح!"}
           </div>

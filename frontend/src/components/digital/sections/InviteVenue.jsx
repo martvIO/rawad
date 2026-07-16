@@ -1,5 +1,6 @@
 import { Num } from "../../Num.jsx";
 import { SectionHead } from "../inviteShared.jsx";
+import { Icon } from "../InviteIcon.jsx";
 
 // ── Venue — destination card + details + real navigation CTAs ─────────────────
 // (Replaced the previous decorative fake "map" SVG — random grid + squiggle
@@ -31,12 +32,12 @@ function VenueSection({ venue, venueCity, venueAddress, accessNote, hotels, them
         {(accessNote || hotels.length > 0) && (
           <div className="dawa-inv-venue-info">
             {accessNote && (
-              <VenueRow icon="🚗" label={lang === "he" ? "הגעה" : "الوصول"} theme={theme} font={font}>
+              <VenueRow icon={<Icon name="car" size={20} />} label={lang === "he" ? "הגעה" : "الوصول"} theme={theme} font={font}>
                 {accessNote}
               </VenueRow>
             )}
             {hotels.length > 0 && (
-              <VenueRow icon="🛏" label={lang === "he" ? "מלונות בקרבת מקום" : "فنادق قريبة"} theme={theme} font={font}>
+              <VenueRow icon={<Icon name="bed" size={20} />} label={lang === "he" ? "מלונות בקרבת מקום" : "فنادق قريبة"} theme={theme} font={font}>
                 {hotels.map((h, i) => (
                   <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", fontSize: 14 }}>
                     <span>{h.name}</span>

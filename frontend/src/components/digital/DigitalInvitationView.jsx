@@ -14,6 +14,7 @@ import { localize, localizeItems, localizeList } from "../../utils/localize.js";
 import { supportsGradientText } from "../../utils/gradientText.js";
 import { ensureDigitalFonts } from "../../utils/digitalFonts.js";
 import { LangToggle } from "./inviteShared.jsx";
+import { Icon } from "./InviteIcon.jsx";
 import { Hero } from "./sections/InviteHero.jsx";
 import { StorySection } from "./sections/InviteStory.jsx";
 import { GallerySection } from "./sections/InviteGallery.jsx";
@@ -185,15 +186,15 @@ export function DigitalInvitationView({
   const navItems = useMemo(() => {
     const L = (ar, he) => (lang === "he" ? he : ar);
     return [
-      { id: "inv-top", label: L("الأعلى", "למעלה"), icon: "⬆️", show: true },
-      { id: "inv-story", label: L("القصة", "הסיפור"), icon: "📖", show: showStory },
-      { id: "inv-gallery", label: L("الصور", "התמונות"), icon: "🖼️", show: showGallery },
-      { id: "inv-details", label: L("التفاصيل", "הפרטים"), icon: "📋", show: showDetails },
-      { id: "inv-venue", label: L("المكان", "המקום"), icon: "📍", show: showVenue },
-      { id: "inv-countdown", label: L("العدّ التنازلي", "ספירה לאחור"), icon: "⏳", show: showCountdown },
-      { id: "rsvp", label: L("تأكيد الحضور", "אישור הגעה"), icon: "✅", show: true },
-      { id: "inv-gift", label: L("هدية", "מתנה"), icon: "🎁", show: showGift },
-      { id: "inv-guestbook", label: L("التهاني", "ברכות"), icon: "💌", show: showGuestbook },
+      { id: "inv-top", label: L("الأعلى", "למעלה"), icon: <Icon name="top" />, show: true },
+      { id: "inv-story", label: L("القصة", "הסיפור"), icon: <Icon name="story" />, show: showStory },
+      { id: "inv-gallery", label: L("الصور", "התמונות"), icon: <Icon name="gallery" />, show: showGallery },
+      { id: "inv-details", label: L("التفاصيل", "הפרטים"), icon: <Icon name="details" />, show: showDetails },
+      { id: "inv-venue", label: L("المكان", "המקום"), icon: <Icon name="venue" />, show: showVenue },
+      { id: "inv-countdown", label: L("العدّ التنازلي", "ספירה לאחור"), icon: <Icon name="countdown" />, show: showCountdown },
+      { id: "rsvp", label: L("تأكيد الحضور", "אישור הגעה"), icon: <Icon name="rsvp" />, show: true },
+      { id: "inv-gift", label: L("هدية", "מתנה"), icon: <Icon name="gift" />, show: showGift },
+      { id: "inv-guestbook", label: L("التهاني", "ברכות"), icon: <Icon name="guestbook" />, show: showGuestbook },
     ].filter((it) => it.show);
   }, [lang, showStory, showGallery, showDetails, showVenue, showCountdown, showGift, showGuestbook]);
 
@@ -355,7 +356,7 @@ export function DigitalInvitationView({
         fixed={isPublic}
         sorek={
           mode === "preview" || (isPublic && typeof onOpenSorek === "function")
-            ? { label: lang === "he" ? "התמונות שלך" : "صورك", icon: "📸", onClick: onOpenSorek }
+            ? { label: lang === "he" ? "התמונות שלך" : "صورك", icon: <Icon name="camera" />, onClick: onOpenSorek }
             : null
         }
       />

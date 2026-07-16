@@ -1,5 +1,6 @@
 import { useRef,useState } from "react";
 import { ON_GOLD, FloralFlourish } from "../inviteShared.jsx";
+import { Icon } from "../InviteIcon.jsx";
 
 // ── Footer ──────────────────────────────────────────────────────────────────────
 function InviteFooter({ theme, font, lang }) {
@@ -73,14 +74,14 @@ function FloatingDock({ theme, lang, fixed, weddingDate, groomName, brideName, v
       {showMusic && (
         <>
           <button className={`dawa-inv-dock-btn${playing ? " is-on" : ""}`} style={playing ? { background: `linear-gradient(135deg,${theme.gradientStops.join(",")})`, color: ON_GOLD, borderColor: "transparent" } : btnStyle} onClick={toggleMusic} aria-label="music">
-            {playing ? "♫" : "♪"}
+            <Icon name="music" />
             {playing && <span className="dawa-inv-dock-pulse" style={{ borderColor: theme.accent }} />}
           </button>
           <audio ref={audioRef} src={musicUrl} loop preload="none" />
         </>
       )}
-      <button className="dawa-inv-dock-btn" style={btnStyle} onClick={share} aria-label="share">⤴</button>
-      {weddingDate && <button className="dawa-inv-dock-btn" style={btnStyle} onClick={addToCalendar} aria-label="calendar">📅</button>}
+      <button className="dawa-inv-dock-btn" style={btnStyle} onClick={share} aria-label="share"><Icon name="share" /></button>
+      {weddingDate && <button className="dawa-inv-dock-btn" style={btnStyle} onClick={addToCalendar} aria-label="calendar"><Icon name="calendar" /></button>}
     </div>
   );
 }
