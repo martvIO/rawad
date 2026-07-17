@@ -33,7 +33,7 @@ export function Hero({ t, lang, guestName, namesLine, eyebrow, blessing, dateTex
       }} />
       <div className="rg-reveal d1" style={{ position: "relative" }}>
         {blessing && <div style={{ fontSize: 13, color: c.soft, marginBottom: 18, lineHeight: 1.9 }}>{blessing}</div>}
-        <div className="rg-track" style={{ fontSize: 10, fontWeight: 700, color: t.frame }}>
+        <div className="rg-track" style={{ fontSize: 10, fontWeight: 700, color: t.frameInk }}>
           {eyebrow || L(lang, "أنتم مدعوون", "אתם מוזמנים")}
         </div>
         <h1 style={{
@@ -58,7 +58,7 @@ export function Hero({ t, lang, guestName, namesLine, eyebrow, blessing, dateTex
       </div>
       {guestName && (
         <div className="rg-reveal d3" style={{ position: "relative", marginTop: 32, fontSize: 13, color: c.soft }}>
-          {L(lang, "إلى", "אל")} <span style={{ color: t.frame, fontWeight: 800 }}>{guestName}</span>
+          {L(lang, "إلى", "אל")} <span style={{ color: t.frameInk, fontWeight: 800 }}>{guestName}</span>
         </div>
       )}
     </header>

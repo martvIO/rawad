@@ -163,9 +163,11 @@ export function SectionTitle({ title, t, onBand }) {
 
 export function RgButton({ children, onClick, disabled, t, onBand, full, testid }) {
   // On the wine wall the button is gold; on a cream band gold-on-cream would
-  // vanish, so it inverts to the wine.
+  // vanish, so it inverts to the wine. The label uses onFrame, NOT bandInk —
+  // bandInk is whatever reads on the BAND, which on ivory is cream, and cream
+  // on gold measures 3.3:1. See tokens.js.
   const bg = onBand ? t.wine : t.frame;
-  const fg = onBand ? t.band : (t.bandInk || "#2e1219");
+  const fg = onBand ? t.band : t.onFrame;
   return (
     <button
       type="button"

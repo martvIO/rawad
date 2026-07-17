@@ -107,7 +107,7 @@ export function Intro({ t, lang, guestName, phase, cueEscalated, onOpen, onSkip 
           className="rg-track"
           style={{
             position: "absolute", insetInline: 0, bottom: "11%",
-            textAlign: "center", color: t.frame, fontWeight: 700,
+            textAlign: "center", color: t.frameInk, fontWeight: 700,
             fontSize: cueEscalated ? "clamp(13px,3vw,16px)" : "clamp(10px,2.4vw,12px)",
             opacity: cueEscalated ? 1 : 0.85,
             transition: "font-size .4s ease, opacity .4s ease",
@@ -130,7 +130,7 @@ export function Intro({ t, lang, guestName, phase, cueEscalated, onOpen, onSkip 
           style={{
             position: "absolute", insetInlineEnd: 16, bottom: 16,
             background: "transparent", border: "none", cursor: "pointer",
-            color: t.frame, fontSize: 10, fontWeight: 700,
+            color: t.frameInk, fontSize: 10, fontWeight: 700,
           }}
         >
           {L(lang, "تخطّي", "דלג")}

@@ -3,6 +3,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { RoyalGoldView, assignStripe } from "../../../../components/digital/templates/royal-gold/RoyalGoldView.jsx";
+import { rgTokens } from "../../../../components/digital/templates/royal-gold/tokens.js";
 
 const design = {
   templateId: "royal-gold",
@@ -171,5 +172,54 @@ describe("assignStripe — two cream bands must never touch", () => {
     expect(s.dress).toBe(true);
     expect(s.events).toBe(false);
     expect(s.venue).toBe(true);
+  });
+});
+
+describe("royal-gold palettes clear WCAG 1.4.3 (4.5:1) for body copy", () => {
+  // The ivory palette inverts the wall and band, which is exactly where this
+  // broke during the build: the ornament gold measured 3.3:1 on the cream wall,
+  // and the button's label (bandInk) went cream-on-gold at 3.3:1. Both are
+  // invisible on the two dark palettes, so only a per-palette check catches it.
+  const srgb = (c) => { const x = c / 255; return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4); };
+  const parse = (hex) => { const h = hex.replace("#", ""); return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16)); };
+  const lum = (rgb) => 0.2126 * srgb(rgb[0]) + 0.7152 * srgb(rgb[1]) + 0.0722 * srgb(rgb[2]);
+  const ratio = (a, b) => {
+    const [hi, lo] = [lum(a), lum(b)].sort((m, n) => n - m);
+    return (hi + 0.05) / (lo + 0.05);
+  };
+  const over = (fg, bg, alpha) => parse(fg).map((v, i) => Math.round(alpha * v + (1 - alpha) * parse(bg)[i]));
+
+  const PALETTES = ["royalGold", "royalGoldNoir", "royalGoldIvory"];
+
+  it.each(PALETTES)("%s: gold TEXT on the wall clears 4.5:1", (key) => {
+    const t = rgTokens(key);
+    expect(ratio(parse(t.frameInk), parse(t.theme.bg))).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it.each(PALETTES)("%s: the intro cue clears 4.5:1 THROUGH its opacity .85", (key) => {
+    // The cue is the strictest consumer of frameInk. Checking the raw token
+    // instead of the blend would pass while the rendered pixels fail.
+    const t = rgTokens(key);
+    expect(ratio(over(t.frameInk, t.theme.bg, 0.85), parse(t.theme.bg))).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it.each(PALETTES)("%s: the wall button's label clears 4.5:1 on the gold", (key) => {
+    const t = rgTokens(key);
+    expect(ratio(parse(t.onFrame), parse(t.frame))).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it.each(PALETTES)("%s: band copy clears 4.5:1 on the band", (key) => {
+    const t = rgTokens(key);
+    expect(ratio(parse(t.bandInk), parse(t.band))).toBeGreaterThanOrEqual(4.5);
+    expect(ratio(parse(t.bandInkSoft), parse(t.band))).toBeGreaterThanOrEqual(4.5);
+    // the band button inverts to the wine, so its label must read there too
+    expect(ratio(parse(t.band), parse(t.wine))).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it.each(PALETTES)("%s: wall copy clears 4.5:1 on the wall", (key) => {
+    const t = rgTokens(key);
+    expect(ratio(parse(t.theme.text), parse(t.theme.bg))).toBeGreaterThanOrEqual(4.5);
+    expect(ratio(parse(t.theme.textSoft), parse(t.theme.bg))).toBeGreaterThanOrEqual(4.5);
+    expect(ratio(parse(t.theme.accent), parse(t.theme.bg))).toBeGreaterThanOrEqual(4.5);
   });
 });

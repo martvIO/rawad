@@ -13,6 +13,7 @@ import sacredGardenThumb from "../../../assets/templates/sacred-garden.jpg";
 import blossomOudThumb from "../../../assets/templates/blossom-oud.jpg";
 import gildedOrchardThumb from "../../../assets/templates/gilded-orchard.jpg";
 import lumenThumb from "../../../assets/templates/lumen.jpg";
+import royalGoldThumb from "../../../assets/templates/royal-gold.jpg";
 
 export const BUNDLED_THUMBS = {
   "destination-love": destinationLoveThumb,
@@ -21,6 +22,7 @@ export const BUNDLED_THUMBS = {
   "blossom-oud": blossomOudThumb,
   "gilded-orchard": gildedOrchardThumb,
   lumen: lumenThumb,
+  "royal-gold": royalGoldThumb,
   // classic has no bundled thumbnail (picker/gallery render a label-only card).
 };
 
