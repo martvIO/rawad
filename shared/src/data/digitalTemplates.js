@@ -166,6 +166,24 @@ export const TEMPLATES = {
     },
   },
 
+  // Inspired by webgency's template5 ("Viktor and Paula"); no source text/photos.
+  // A wine wall with cream bands torn out of it, and the couple's photos hung on
+  // it in gold frames — besides classic, the only template that renders `media`.
+  "royal-gold": {
+    id: "royal-gold",
+    label_ar: "ذهب ملكي",
+    label_he: "זהב מלכותי",
+    thumbnail: "royal-gold",
+    bespoke: true,
+    themes: ["royalGold", "royalGoldNoir", "royalGoldIvory"],
+    defaults: {
+      themeColor: "royalGold",
+      fontFamily: "amiri",
+      envelopeEnabled: false,
+      envelopeStyle: "classic",
+    },
+  },
+
   // Additional templates land here one at a time as they're built — each
   // bespoke entry adds `bespoke:true` + a curated `themes` list, and its
   // `defaults` (themeColor === themes[0], fontFamily, envelopeEnabled:false,
