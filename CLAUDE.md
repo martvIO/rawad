@@ -351,7 +351,7 @@ backend/              Everything that runs on Firebase servers
 loadtest/             Python/Locust load-testing suite
 app/                  RESERVED — intentionally empty, future use
 
-(root)                firebase.json, .firebaserc, *.rules, netlify.toml, docs/,
+(root)                firebase.json, .firebaserc, *.rules, docs/,
                       thin orchestrator package.json (delegates via --prefix/-c)
 ```
 

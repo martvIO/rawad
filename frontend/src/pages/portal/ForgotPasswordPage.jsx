@@ -201,7 +201,7 @@ export function ForgotPasswordPage() {
             <BrandLogo size={62} />
           </div>
           <h1 style={{
-            fontFamily: "'Amiri','Frank Ruhl Libre',serif", fontSize: 26, marginBottom: 6,
+            fontFamily: "'Amiri','Frank Ruhl Libre','Amiri Fallback',serif", fontSize: 26, marginBottom: 6,
             background: "linear-gradient(135deg,#fff3c0 0%,#f0c84c 35%,#c9a84c 70%,#a0832c 100%)",
             WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text",
             paddingBlock: 4,

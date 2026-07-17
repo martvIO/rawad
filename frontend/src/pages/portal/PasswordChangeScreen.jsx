@@ -69,7 +69,7 @@ export function PasswordChangeScreen() {
           <div style={{ display: "flex", justifyContent: "center", marginBottom: 14 }}>
             <BrandLogo size={60} />
           </div>
-          <h1 style={{ fontFamily: "'Amiri','Frank Ruhl Libre',serif", color: C.gold, fontSize: 24, marginBottom: 8 }}>
+          <h1 style={{ fontFamily: "'Amiri','Frank Ruhl Libre','Amiri Fallback',serif", color: C.gold, fontSize: 24, marginBottom: 8 }}>
             {t("pwch_title")}
           </h1>
           <p style={{ color: "rgba(245,230,184,.78)", fontSize: 13, lineHeight: 1.8, maxWidth: 380, margin: "0 auto" }}>

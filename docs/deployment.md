@@ -149,11 +149,11 @@ Cloud Function rollback requires redeploying a previous build. Maintain tagged g
 
 ---
 
-## Netlify (alternative hosting)
+## Netlify (removed 2026-07-16)
 
-`netlify.toml` configures Netlify as an alternative to Firebase Hosting. Set:
-- Build command: `npm run build`
-- Publish directory: `dist`
-- Environment variable: `VITE_USE_EMULATORS=0`
-
-Note: Cloud Functions are not deployed via Netlify — Firebase still hosts functions, and `VITE_API_BASE_URL` must point to the Cloud Functions URL.
+`netlify.toml` used to configure Netlify as an alternative host. It was deleted: the
+config had gone dormant (production has been Firebase Hosting throughout) and it
+carried **none** of the security or cache headers that `firebase.json` defines — so a
+deploy through it would have silently shipped a site with no HSTS, no CSP, and no
+asset caching. Recover it from git history if Netlify is ever revisited, but mirror
+the `firebase.json` `headers` block into it first.

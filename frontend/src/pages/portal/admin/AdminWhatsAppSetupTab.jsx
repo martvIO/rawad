@@ -88,7 +88,7 @@ export function AdminWhatsAppSetupTab() {
 
   return (
     <div>
-      <div style={{ fontSize: 19, fontWeight: 900, color: C.gold, fontFamily: "'Amiri','Frank Ruhl Libre',serif", marginBottom: 4 }}>
+      <div style={{ fontSize: 19, fontWeight: 900, color: C.gold, fontFamily: "'Amiri','Frank Ruhl Libre','Amiri Fallback',serif", marginBottom: 4 }}>
         📱 {t("wa_setup_title")}
       </div>
       <div style={{ fontSize: 12, color: C.dim, marginBottom: 16 }}>{t("wa_setup_subtitle")}</div>

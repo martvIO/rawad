@@ -63,7 +63,7 @@ export function GroomManage() {
 
   return (
     <div style={{ maxWidth: 560, margin: "0 auto" }}>
-      <h1 style={{ fontFamily: "'Amiri','Frank Ruhl Libre',serif", color: C.gold, fontSize: 22, marginBottom: 6 }}>
+      <h1 style={{ fontFamily: "'Amiri','Frank Ruhl Libre','Amiri Fallback',serif", color: C.gold, fontSize: 22, marginBottom: 6 }}>
         {t("lc_title")}
       </h1>
       <p style={{ color: C.dim, fontSize: 13, lineHeight: 1.8, marginBottom: 18 }}>{t("lc_subtitle")}</p>

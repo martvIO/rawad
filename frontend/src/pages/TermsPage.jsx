@@ -16,7 +16,7 @@ function SectionCard({ title, body }) {
       border: "1px solid rgba(201,168,76,.18)",
     }}>
       <h3 style={{
-        fontFamily: "'Amiri','Frank Ruhl Libre',serif", fontWeight: 800,
+        fontFamily: "'Amiri','Frank Ruhl Libre','Amiri Fallback',serif", fontWeight: 800,
         fontSize: 20, color: "#fff3c0",
         marginTop: 0, marginBottom: 12, lineHeight: 1.4,
       }}>{title}</h3>
@@ -33,7 +33,7 @@ function PageSubhead({ title, intro }) {
   return (
     <div style={{ margin: "56px 0 24px" }}>
       <h2 style={{
-        fontFamily: "'Amiri','Frank Ruhl Libre',serif", fontWeight: 900,
+        fontFamily: "'Amiri','Frank Ruhl Libre','Amiri Fallback',serif", fontWeight: 900,
         fontSize: "clamp(24px, 3.4vw, 34px)", lineHeight: 1.3,
         color: "#fff3c0",
         marginTop: 0, marginBottom: 16,
@@ -101,7 +101,7 @@ export function TermsPage({ t, lang }) {
         <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 28 }}>
           <BrandLogo size={48} />
           <h1 style={{
-            fontFamily: "'Amiri','Frank Ruhl Libre',serif", fontWeight: 900,
+            fontFamily: "'Amiri','Frank Ruhl Libre','Amiri Fallback',serif", fontWeight: 900,
             fontSize: "clamp(28px, 4.2vw, 44px)", lineHeight: 1.2,
             background: "linear-gradient(135deg,#fff3c0,#f0c84c,#c9a84c)",
             WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
@@ -139,7 +139,7 @@ export function TermsPage({ t, lang }) {
             border: "1px solid rgba(201,168,76,.22)", textAlign: "center",
           }}>
             <div style={{
-              fontFamily: "'Amiri','Frank Ruhl Libre',serif", fontWeight: 800, fontSize: 18,
+              fontFamily: "'Amiri','Frank Ruhl Libre','Amiri Fallback',serif", fontWeight: 800, fontSize: 18,
               color: "#fff3c0", marginBottom: 16,
             }}>{t("terms_contact_heading")}</div>
             <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
@@ -158,7 +158,7 @@ export function TermsPage({ t, lang }) {
         <div style={{
           marginTop: 48, paddingTop: 24,
           borderTop: "1px solid rgba(201,168,76,.14)",
-          color: "#7a6a4a", fontSize: 12, textAlign: "center",
+          color: C.dim, fontSize: 12, textAlign: "center",
         }}>
           © {new Date().getFullYear()} {lang === "he" ? "דעוה" : "دعוة"}
         </div>

@@ -185,7 +185,7 @@ function EditModal({ user, onSave, onCancel, onResetPassword, t, lang }) {
       >
         {/* ─ رأس المودال ─ */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
-          <span style={{ color: C.gold, fontWeight: 900, fontSize: 17, fontFamily: "'Amiri','Frank Ruhl Libre',serif" }}>
+          <span style={{ color: C.gold, fontWeight: 900, fontSize: 17, fontFamily: "'Amiri','Frank Ruhl Libre','Amiri Fallback',serif" }}>
             {t("admin_user_edit_title")}
           </span>
           <button onClick={onCancel} disabled={saving} style={{

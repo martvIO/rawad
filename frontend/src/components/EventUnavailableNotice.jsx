@@ -37,7 +37,7 @@ export function EventUnavailableNotice({ state, t, lang, pausedNewDate }) {
         <div style={{ fontSize: 60, marginBottom: 14 }} aria-hidden>{icon}</div>
         <h1
           data-testid="event-unavailable-title"
-          style={{ fontFamily: "'Amiri','Frank Ruhl Libre',serif", color: C.gold, fontSize: 25, marginBottom: 12 }}
+          style={{ fontFamily: "'Amiri','Frank Ruhl Libre','Amiri Fallback',serif", color: C.gold, fontSize: 25, marginBottom: 12 }}
         >
           {title}
         </h1>

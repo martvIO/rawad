@@ -69,7 +69,7 @@ export function TemplateGalleryPage({ t, lang, setLang }) {
       <section style={{ maxWidth: 1100, margin: "0 auto", padding: "56px 24px 96px" }}>
         <div style={{ textAlign: "center", marginBottom: 48, maxWidth: 640, marginInline: "auto" }}>
           <h1 style={{
-            fontFamily: "'Amiri','Frank Ruhl Libre',serif", fontWeight: 900,
+            fontFamily: "'Amiri','Frank Ruhl Libre','Amiri Fallback',serif", fontWeight: 900,
             fontSize: "clamp(30px,5vw,50px)", lineHeight: 1.3, paddingBlock: 6,
             background: "linear-gradient(135deg,#fff3c0,#f0c84c,#c9a84c)",
             WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",

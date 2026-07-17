@@ -384,7 +384,7 @@ export function DigitalPhotographer() {
     return (
       <div style={{ animation: "fadeUp .3s ease", textAlign: "center", padding: "60px 24px" }}>
         <div style={{ fontSize: 56, marginBottom: 16 }}>🔒</div>
-        <div style={{ fontSize: 19, fontWeight: 900, color: C.gold, fontFamily: "'Amiri','Frank Ruhl Libre',serif", marginBottom: 8 }}>
+        <div style={{ fontSize: 19, fontWeight: 900, color: C.gold, fontFamily: "'Amiri','Frank Ruhl Libre','Amiri Fallback',serif", marginBottom: 8 }}>
           📸 {lang === "he" ? "אזור הצלם" : "منطقة المصور"}
         </div>
         <div style={{ fontSize: 13, color: C.dim, lineHeight: 1.9, maxWidth: 420, margin: "0 auto" }}>
@@ -401,7 +401,7 @@ export function DigitalPhotographer() {
 
       {/* Title */}
       <div style={{ marginBottom: 20 }}>
-        <div style={{ fontSize: 19, fontWeight: 900, color: C.gold, fontFamily: "'Amiri','Frank Ruhl Libre',serif", marginBottom: 4 }}>
+        <div style={{ fontSize: 19, fontWeight: 900, color: C.gold, fontFamily: "'Amiri','Frank Ruhl Libre','Amiri Fallback',serif", marginBottom: 4 }}>
           📸 {lang === "he" ? "אזור הצלם" : "منطقة المصور"}
         </div>
         <div style={{ fontSize: 12, color: C.dim }}>

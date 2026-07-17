@@ -147,7 +147,7 @@ export function AdminSecurityTab() {
   return (
     <div style={{ animation: "fadeUp .3s ease" }} data-testid="admin-security">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-        <div style={{ fontSize: 16, fontWeight: 900, color: C.gold, fontFamily: "'Amiri','Frank Ruhl Libre',serif" }}>
+        <div style={{ fontSize: 16, fontWeight: 900, color: C.gold, fontFamily: "'Amiri','Frank Ruhl Libre','Amiri Fallback',serif" }}>
           🛡 {L("مراقبة الأمان", "ניטור אבטחה")}
         </div>
         <button className="ghost-btn" style={{ padding: "6px 14px", fontSize: 12 }} onClick={reload} disabled={loading || busy}>

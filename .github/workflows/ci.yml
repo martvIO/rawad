@@ -222,6 +222,61 @@ jobs:
           path: test-report/
           retention-days: 14
 
+  # Nightly mobile Lighthouse on the two pages guests actually open from WhatsApp.
+  #
+  # WHY: the 2026-07-16 audit (Reports/WEB-QUALITY-2026-07-16.md) found mobile LCP
+  # failing on every public route — the fix (self-hosted fonts) is invisible to every
+  # other gate here, so nothing would notice it regressing. This is that gate.
+  #
+  # Thresholds are set just under the post-fix measurements, not at the 2.5 s ideal:
+  # they exist to catch a REGRESSION, and a gate that cries wolf gets ignored. Raise
+  # them as the numbers improve. Lighthouse is pinned — its scoring curve shifts
+  # between majors, which would otherwise move this goalpost silently.
+  lighthouse:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Run Lighthouse (mobile) on landing + demo invite
+        run: |
+          set -o pipefail
+          mkdir -p lighthouse-out
+          fail=0
+          for entry in "home|https://dawa.to/" "demo-invite|https://dawa.to/d/demo/demo?demo=1"; do
+            name="${entry%%|*}"; url="${entry#*|}"
+            echo "::group::$name — $url"
+            npx -y lighthouse@13.4.0 "$url" \
+              --only-categories=performance \
+              --form-factor=mobile --screenEmulation.mobile \
+              --throttling-method=simulate \
+              --chrome-flags="--headless=new --no-sandbox" \
+              --output=json --output=html \
+              --output-path="lighthouse-out/$name" --quiet || true
+            node -e '
+              const fs = require("fs");
+              const name = process.argv[1];
+              const r = JSON.parse(fs.readFileSync(`lighthouse-out/${name}.report.json`, "utf8"));
+              const perf = Math.round(r.categories.performance.score * 100);
+              const lcp = r.audits["largest-contentful-paint"].numericValue / 1000;
+              const cls = r.audits["cumulative-layout-shift"].numericValue;
+              const MIN_PERF = 80, MAX_LCP = 3.0, MAX_CLS = 0.1;
+              const bad = perf < MIN_PERF || lcp > MAX_LCP || cls > MAX_CLS;
+              console.log(`${name}: perf=${perf} (min ${MIN_PERF}) lcp=${lcp.toFixed(2)}s (max ${MAX_LCP}) cls=${cls.toFixed(3)} (max ${MAX_CLS}) => ${bad ? "FAIL" : "ok"}`);
+              process.exit(bad ? 1 : 0);
+            ' "$name" || fail=1
+            echo "::endgroup::"
+          done
+          exit $fail
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: lighthouse-report
+          path: lighthouse-out/
+          retention-days: 14
+
   # Secrets scan — prevents a credential from ever being committed.
   gitleaks:
     if: github.event_name != 'schedule'

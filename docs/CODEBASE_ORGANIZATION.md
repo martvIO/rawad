@@ -32,7 +32,7 @@ rawad/
   app/           RESERVED — intentionally empty (.gitkeep only). Future use.
 
   (root)         Firebase project config (firebase.json, .firebaserc, *.rules,
-                 firestore.indexes.json), netlify.toml, thin orchestrator
+                 firestore.indexes.json), thin orchestrator
                  package.json, CLAUDE.md, README.md, log.md, docs/, examples/,
                  wiki/ + graphify-out/ + memory/ (knowledge base — not app code)
 ```

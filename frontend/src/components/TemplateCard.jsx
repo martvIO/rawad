@@ -76,7 +76,7 @@ export function TemplateCard({ id, t, lang, thumb, compact = false }) {
 
       <div style={{ padding: compact ? "10px 12px 12px" : "14px 16px 16px", display: "flex", flexDirection: "column", gap: 10, flex: 1 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-          <div style={{ fontFamily: "'Amiri','Frank Ruhl Libre',serif", fontWeight: 900, fontSize: compact ? 15 : 18, color: C.goldLight }}>{label}</div>
+          <div style={{ fontFamily: "'Amiri','Frank Ruhl Libre','Amiri Fallback',serif", fontWeight: 900, fontSize: compact ? 15 : 18, color: C.goldLight }}>{label}</div>
           {/* Curated palette swatches — what this template can be recolored into. */}
           <div style={{ display: "inline-flex", gap: 4 }} aria-hidden="true">
             {swatchKeys(tpl).map((k) => (

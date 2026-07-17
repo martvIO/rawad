@@ -61,7 +61,7 @@ function FaqCard({ q, a }) {
       border: "1px solid rgba(201,168,76,.18)",
     }}>
       <h3 style={{
-        fontFamily: "'Amiri','Frank Ruhl Libre',serif", fontWeight: 800,
+        fontFamily: "'Amiri','Frank Ruhl Libre','Amiri Fallback',serif", fontWeight: 800,
         fontSize: 18, color: "#fff3c0",
         marginTop: 0, marginBottom: 10, lineHeight: 1.4,
       }}>{q}</h3>
@@ -121,7 +121,7 @@ export function HelpPage({ lang = "ar" }) {
         <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 22 }}>
           <BrandLogo size={48} />
           <h1 style={{
-            fontFamily: "'Amiri','Frank Ruhl Libre',serif", fontWeight: 900,
+            fontFamily: "'Amiri','Frank Ruhl Libre','Amiri Fallback',serif", fontWeight: 900,
             fontSize: "clamp(26px, 4.2vw, 40px)", lineHeight: 1.2,
             background: "linear-gradient(135deg,#fff3c0,#f0c84c,#c9a84c)",
             WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
@@ -136,7 +136,7 @@ export function HelpPage({ lang = "ar" }) {
         }}>{c.intro}</p>
 
         <h2 style={{
-          fontFamily: "'Amiri','Frank Ruhl Libre',serif", fontWeight: 900,
+          fontFamily: "'Amiri','Frank Ruhl Libre','Amiri Fallback',serif", fontWeight: 900,
           fontSize: "clamp(20px, 3vw, 26px)", color: "#fff3c0",
           marginTop: 0, marginBottom: 18, paddingBottom: 12,
           borderBottom: "1px solid rgba(201,168,76,.22)",
@@ -153,7 +153,7 @@ export function HelpPage({ lang = "ar" }) {
             border: "1px solid rgba(201,168,76,.22)", textAlign: "center",
           }}>
             <div style={{
-              fontFamily: "'Amiri','Frank Ruhl Libre',serif", fontWeight: 800, fontSize: 18,
+              fontFamily: "'Amiri','Frank Ruhl Libre','Amiri Fallback',serif", fontWeight: 800, fontSize: 18,
               color: "#fff3c0", marginBottom: 6,
             }}>{c.contactHeading}</div>
             <div style={{ color: "#d8c9a6", fontSize: 13.5, marginBottom: 16 }}>{c.contactIntro}</div>
@@ -174,7 +174,7 @@ export function HelpPage({ lang = "ar" }) {
         <div style={{
           marginTop: 44, paddingTop: 22,
           borderTop: "1px solid rgba(201,168,76,.14)",
-          color: "#7a6a4a", fontSize: 12, textAlign: "center",
+          color: C.dim, fontSize: 12, textAlign: "center",
         }}>
           © {new Date().getFullYear()} {lang === "he" ? "דעוה" : "دعوة"}
         </div>

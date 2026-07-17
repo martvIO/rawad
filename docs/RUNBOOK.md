@@ -155,6 +155,25 @@ Tag every release (`git tag vX.Y.Z`) so "the previous build" is unambiguous.
 
 ---
 
+## 6b. Invite-shell keep-warm (performance)
+
+The `/d/**` invite shell cold-starts in ~6 s (warm: ~0.4 s) — the worst first
+impression a guest can get, and it lands on the page that sells the product.
+A Cloud Scheduler job pings it every 5 minutes to keep an instance alive.
+
+- **Setup (once):** `bash backend/scripts/setup-keepwarm.sh` — creates the
+  `dawa-invite-keepwarm` job. Idempotent; re-run to change the schedule.
+- **Check it is alive:**
+  `curl -s -o /dev/null -w '%{time_starttransfer}s\n' https://dawa.to/d/keepwarm/keepwarm`
+  Well under 1 s means warm. Repeated ~6 s means the job is not firing —
+  `gcloud scheduler jobs describe dawa-invite-keepwarm --location=us-central1`.
+- **Deliberate limitation:** this is best-effort, not `minInstances: 1`. An
+  instance can still be evicted, and each deploy costs one cold hit. If real
+  guests are ever measured hitting 6 s loads (`inviteMetrics` field vitals),
+  escalate to `minInstances: 1` on `digitalInvitePreview` (~$5–10/mo).
+
+---
+
 ## 7. Known security debt (handoff blockers)
 
 1. **Secrets in history — verified clean locally; confirm the remote.** Local
@@ -219,3 +238,19 @@ codebase. Roughly highest value-to-effort first. Full rationale: `docs/WEB-AUDIT
       for max link-preview crawler coverage, then point the og:image meta at it.
 - [ ] **KPI baseline** — capture ~1 month from the admin analytics dashboard, then
       set targets (`docs/KPIS.md`). Optional: GA4/Clarity (needs a consent banner).
+
+### From the 2026-07-16 web-quality audit (`Reports/WEB-QUALITY-2026-07-16.md`)
+
+- [ ] **Run the invite keep-warm setup** — `bash backend/scripts/setup-keepwarm.sh`
+      (needs authenticated gcloud; §6b). Kills the measured 6 s cold start on the
+      guest-facing invite page. Until this runs, PERF-06 is still live in prod.
+- [ ] **Add the `www.dawa.to` DNS record** — currently `www` has *no* record at all,
+      so `https://www.dawa.to` fails to connect for anyone who types it. Add it as a
+      custom domain in Firebase Hosting (Console → Hosting → Add custom domain →
+      `www.dawa.to`) and create the CNAME/A records it prints at the registrar. The
+      CORS config already anticipates the origin. (SEO-04)
+- [ ] **Phone-smoke the Face Liveness scan** once after the next deploy. The
+      `fast-xml-parser` override (frontend/package.json) touches the AWS Amplify
+      dependency tree; the built bundle is byte-identical and the parser was already
+      tree-shaken out, so this is a low-risk confirmation — but liveness needs a real
+      face and cannot be tested headlessly (same constraint as TASK-FACE-3).

@@ -5,7 +5,7 @@
   "lang": "ar",
   "dir": "rtl",
   "start_url": "/",
-  "display": "standalone",
+  "display": "browser",
   "background_color": "#07070a",
   "theme_color": "#07070a",
   "icons": [

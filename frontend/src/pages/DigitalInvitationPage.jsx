@@ -291,7 +291,7 @@ function DigitalLandingMain({ t, lang, setLang }) {
     return (
       <CenteredMessage>
         <div style={{ display: "flex", justifyContent: "center", marginBottom: 12, color: C.red }}><Icon name="warning" size={52} /></div>
-        <h1 style={{ fontFamily: "'Amiri','Frank Ruhl Libre',serif", color: C.red, fontSize: 24 }}>
+        <h1 style={{ fontFamily: "'Amiri','Frank Ruhl Libre','Amiri Fallback',serif", color: C.red, fontSize: 24 }}>
           {lang === "he" ? "הזמנה לא חוקית" : "دعوة غير صالحة"}
         </h1>
       </CenteredMessage>
@@ -305,7 +305,7 @@ function DigitalLandingMain({ t, lang, setLang }) {
     return (
       <CenteredMessage>
         <div style={{ display: "flex", justifyContent: "center", marginBottom: 12, color: C.red }}><Icon name="clock" size={52} /></div>
-        <h1 style={{ fontFamily: "'Amiri','Frank Ruhl Libre',serif", color: C.red, fontSize: 24 }}>
+        <h1 style={{ fontFamily: "'Amiri','Frank Ruhl Libre','Amiri Fallback',serif", color: C.red, fontSize: 24 }}>
           {lang === "he" ? "ההזמנה פגה" : "انتهت صلاحية الدعوة"}
         </h1>
       </CenteredMessage>

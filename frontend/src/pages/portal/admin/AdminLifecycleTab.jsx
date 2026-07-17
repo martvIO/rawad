@@ -64,7 +64,7 @@ export function AdminLifecycleTab() {
 
   return (
     <div>
-      <h2 style={{ fontFamily: "'Amiri','Frank Ruhl Libre',serif", color: C.gold, fontSize: 18, marginBottom: 14 }}>
+      <h2 style={{ fontFamily: "'Amiri','Frank Ruhl Libre','Amiri Fallback',serif", color: C.gold, fontSize: 18, marginBottom: 14 }}>
         {t("adm_lc_title")}
       </h2>
 

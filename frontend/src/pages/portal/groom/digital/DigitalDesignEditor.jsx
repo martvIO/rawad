@@ -853,7 +853,7 @@ export function DesignEditorBody({ groomUid, designId, adminDemoMode = false, on
     <div style={{ animation: "fadeUp .3s ease" }}>
       {/* ── Title ──────────────────────────────────────────────────────────── */}
       <div style={{ marginBottom: 14 }}>
-        <div style={{ fontSize: 19, fontWeight: 900, color: C.gold, fontFamily: "'Amiri','Frank Ruhl Libre',serif", marginBottom: 4 }}>
+        <div style={{ fontSize: 19, fontWeight: 900, color: C.gold, fontFamily: "'Amiri','Frank Ruhl Libre','Amiri Fallback',serif", marginBottom: 4 }}>
           🎨 {tt(lang, "تصميم الدعوة", "עיצוב ההזמנה")}
         </div>
         <div style={{ fontSize: 12, color: C.dim, lineHeight: 1.7 }}>
@@ -1002,7 +1002,7 @@ export function DesignEditorBody({ groomUid, designId, adminDemoMode = false, on
             <div style={{ marginTop: 10 }}>
               <ProgressBar value={stepIdx + 1} total={WIZARD_STEP_IDS.length} color={C.gold} />
               <div style={{ marginTop: 6 }}>
-                <div style={{ fontSize: 18, fontWeight: 900, color: C.gold, fontFamily: "'Amiri','Frank Ruhl Libre',serif" }}>
+                <div style={{ fontSize: 18, fontWeight: 900, color: C.gold, fontFamily: "'Amiri','Frank Ruhl Libre','Amiri Fallback',serif" }}>
                   {WIZARD_STEPS[stepIdx]?.icon} {stepTitle(activeStep, lang)}
                 </div>
                 <div style={{ fontSize: 12, color: C.dim, marginTop: 2 }}>{stepSubtitle(activeStep, lang)}</div>

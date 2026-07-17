@@ -31,7 +31,7 @@ export function AdminSettingsTab() {
 
   return (
     <div>
-      <div style={{ fontSize: 19, fontWeight: 900, color: C.gold, fontFamily: "'Amiri','Frank Ruhl Libre',serif", marginBottom: 4 }}>
+      <div style={{ fontSize: 19, fontWeight: 900, color: C.gold, fontFamily: "'Amiri','Frank Ruhl Libre','Amiri Fallback',serif", marginBottom: 4 }}>
         ⚙ {t("admin_settings_title")}
       </div>
       <div style={{ fontSize: 12, color: C.dim, marginBottom: 16 }}>
@@ -127,7 +127,7 @@ export function AdminSettingsTab() {
       )}
 
       {/* ── Communication channels (shown on the public marketing site) ──── */}
-      <div style={{ fontSize: 17, fontWeight: 900, color: C.gold, fontFamily: "'Amiri','Frank Ruhl Libre',serif", margin: "26px 0 4px" }}>
+      <div style={{ fontSize: 17, fontWeight: 900, color: C.gold, fontFamily: "'Amiri','Frank Ruhl Libre','Amiri Fallback',serif", margin: "26px 0 4px" }}>
         💬 {t("admin_comms_title")}
       </div>
       <div style={{ fontSize: 12, color: C.dim, marginBottom: 14 }}>

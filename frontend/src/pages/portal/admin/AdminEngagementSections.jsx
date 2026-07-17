@@ -56,7 +56,7 @@ function fmtLag(ms, lang) {
 function Section({ icon, title, note, children }) {
   return (
     <div style={{ marginBottom: 26 }}>
-      <div style={{ fontSize: 15, fontWeight: 900, color: C.gold, fontFamily: "'Amiri','Frank Ruhl Libre',serif", marginBottom: note ? 4 : 10 }}>
+      <div style={{ fontSize: 15, fontWeight: 900, color: C.gold, fontFamily: "'Amiri','Frank Ruhl Libre','Amiri Fallback',serif", marginBottom: note ? 4 : 10 }}>
         {icon} {title}
       </div>
       {note && <div style={{ fontSize: 11, color: C.dim, marginBottom: 10, lineHeight: 1.6 }}>{note}</div>}

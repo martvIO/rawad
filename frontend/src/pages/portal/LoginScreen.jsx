@@ -27,7 +27,7 @@ export function LoginScreen() {
           <div style={{ display: "flex", justifyContent: "center", marginBottom: 12 }}>
             <BrandLogo size={62} />
           </div>
-          <h1 style={{ fontFamily: "'Amiri','Frank Ruhl Libre',serif", color: C.gold, fontSize: 26, marginBottom: 6 }}>{t("login_title")}</h1>
+          <h1 style={{ fontFamily: "'Amiri','Frank Ruhl Libre','Amiri Fallback',serif", color: C.gold, fontSize: 26, marginBottom: 6 }}>{t("login_title")}</h1>
           <p style={{ color: C.dim, fontSize: 13 }}>{t("login_subtitle")}</p>
         </div>
         <div className="gold-card" style={{ padding: 28 }}>

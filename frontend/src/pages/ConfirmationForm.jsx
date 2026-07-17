@@ -114,7 +114,7 @@ export function ConfirmationForm({ t, lang, setLang }) {
       <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
         <div role="status" aria-live="polite" style={{ maxWidth: 460, width: "100%", textAlign: "center" }}>
           <div style={{ fontSize: 64, marginBottom: 16 }} aria-hidden>🎉</div>
-          <h1 data-testid="conf-thanks-title" style={{ fontFamily: "'Amiri','Frank Ruhl Libre',serif", color: "#4cc97a", fontSize: 28, marginBottom: 12 }}>
+          <h1 data-testid="conf-thanks-title" style={{ fontFamily: "'Amiri','Frank Ruhl Libre','Amiri Fallback',serif", color: "#4cc97a", fontSize: 28, marginBottom: 12 }}>
             {t("conf_form_thanks_title")}
           </h1>
           <p style={{ color: "rgba(245,230,184,.8)", fontSize: 14, lineHeight: 1.9 }}>
@@ -136,7 +136,7 @@ export function ConfirmationForm({ t, lang, setLang }) {
           <div style={{ display: "flex", justifyContent: "center", marginBottom: 14 }}>
             <BrandLogo size={68} />
           </div>
-          <h1 style={{ fontFamily: "'Amiri','Frank Ruhl Libre',serif", color: C.gold, fontSize: 26, marginBottom: 10 }}>
+          <h1 style={{ fontFamily: "'Amiri','Frank Ruhl Libre','Amiri Fallback',serif", color: C.gold, fontSize: 26, marginBottom: 10 }}>
             {t("conf_form_welcome_title")}
           </h1>
           <p style={{ color: "rgba(245,230,184,.78)", fontSize: 13, lineHeight: 1.9, maxWidth: 400, margin: "0 auto" }}>

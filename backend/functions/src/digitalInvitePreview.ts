@@ -204,6 +204,19 @@ function buildOgTags(inputs: OgInputs): string {
 export const digitalInvitePreview = onRequest(
   { region: "us-central1" },
   async (req, res) => {
+    // Tokenized guest links must never land in a search index: the OG block below
+    // publishes the couple's names + wedding date, and one link forwarded into a
+    // public group or posted as a status would otherwise make a private wedding
+    // crawlable. robots.txt has documented this intent for a while; this header is
+    // what actually enforces it (robots.txt can't reach a per-token URL space).
+    //
+    // Safe for sharing: WhatsApp/Facebook/Twitter link-preview scrapers fetch on a
+    // user's behalf rather than as indexers and do NOT honour robots directives,
+    // so the OG tags below keep rendering a full-size preview. `noindex` speaks
+    // only to indexers (Googlebot et al.) — it is not `nosnippet`, and it does not
+    // block the fetch itself. Set before any send so the 500 path carries it too.
+    res.set("X-Robots-Tag", "noindex");
+
     // Path shapes: /d/{groomUsername}/{token}[/...]  |  /invite/{token}  |
     // /invite/digital/{token}. Take the last hex-looking segment so one handler
     // serves every guest-link form (digital invitation + physical invite link).

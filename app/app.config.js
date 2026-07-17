@@ -86,7 +86,10 @@ export default {
       contactWhatsapp: "972529348797",
       // Firebase Hosting SPA — serves the web renderer the design-preview WebView
       // loads at /preview/digital/:designId (auth via injected tokens).
-      webBaseUrl: process.env.DAWA_WEB_BASE_URL || "https://dawa-aa793.web.app",
+      webBaseUrl: process.env.DAWA_WEB_BASE_URL || "https://dawa.to",
+      eas: { 
+        "projectId": "c538aba3-8a0c-4dee-b964-0af01d0c4320",
+      }
     },
   },
 };

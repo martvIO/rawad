@@ -181,7 +181,7 @@ export function DigitalAddGuest() {
   return (
     <div style={{ animation: "fadeUp .3s ease" }}>
       <div style={{ marginBottom: 18 }}>
-        <div style={{ fontSize: 19, fontWeight: 900, color: C.gold, fontFamily: "'Amiri','Frank Ruhl Libre',serif", marginBottom: 4 }}>
+        <div style={{ fontSize: 19, fontWeight: 900, color: C.gold, fontFamily: "'Amiri','Frank Ruhl Libre','Amiri Fallback',serif", marginBottom: 4 }}>
           {lang === "he" ? "הוסף מוזמן חדש" : "إضافة مدعو جديد"}
         </div>
         <div style={{ fontSize: 12, color: C.dim }}>

@@ -58,7 +58,7 @@ function fmtDuration(ms, lang) {
 function Section({ icon, title, children }) {
   return (
     <div style={{ marginBottom: 26 }}>
-      <div style={{ fontSize: 15, fontWeight: 900, color: C.gold, fontFamily: "'Amiri','Frank Ruhl Libre',serif", marginBottom: 10 }}>
+      <div style={{ fontSize: 15, fontWeight: 900, color: C.gold, fontFamily: "'Amiri','Frank Ruhl Libre','Amiri Fallback',serif", marginBottom: 10 }}>
         {icon} {title}
       </div>
       {children}
@@ -153,7 +153,7 @@ export function AdminAnalytics() {
     <div style={{ animation: "fadeUp .3s ease" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16, gap: 10 }}>
         <div>
-          <div style={{ fontSize: 19, fontWeight: 900, color: C.gold, fontFamily: "'Amiri','Frank Ruhl Libre',serif", marginBottom: 4 }}>
+          <div style={{ fontSize: 19, fontWeight: 900, color: C.gold, fontFamily: "'Amiri','Frank Ruhl Libre','Amiri Fallback',serif", marginBottom: 4 }}>
             📊 {tt(lang, "لوحة التحليلات", "לוח אנליטיקה")}
           </div>
           <div style={{ fontSize: 12, color: C.dim }}>

@@ -3,15 +3,20 @@
 // ~17 families are loaded on demand — only when one of those surfaces mounts —
 // so the landing page, login, and the rest of the portal never pay for them.
 //
-// The 3 base families (Amiri, Cairo, Noto Naskh Arabic) are already loaded
-// globally via GlobalStyle.jsx, so this set only adds the new Arabic faces and
-// every Hebrew face. All origins are already allow-listed by the CSP in
+// The 4 base families (Amiri, Cairo, Heebo, Frank Ruhl Libre) are self-hosted and
+// declared inline in index.html, so this set only adds the extra Arabic faces and
+// the remaining Hebrew ones. All origins are already allow-listed by the CSP in
 // firebase.json (style-src fonts.googleapis.com, font-src fonts.gstatic.com).
+//
+// Noto Naskh Arabic used to ride along on the global <link>. It is picker-only —
+// no component asks for it — so self-hosting it would have made every visitor pay
+// for a face almost no design uses. It is requested on demand here instead.
 
 const FONT_HREF =
   "https://fonts.googleapis.com/css2" +
   // ── New Arabic faces ──
   "?family=Aref+Ruqaa:wght@400;700" +
+  "&family=Noto+Naskh+Arabic:wght@400;500;700" +
   "&family=El+Messiri:wght@400;500;700" +
   "&family=Reem+Kufi:wght@400;600;700" +
   "&family=Tajawal:wght@400;500;700" +
@@ -37,12 +42,13 @@ const FONT_HREF =
 // and the couple's names reflowed when the real face finally landed. The
 // invitation views therefore ask for just the families their design needs.
 //
-// Already loaded globally by index.html — never re-request these.
-const GLOBAL_FAMILIES = new Set(["Cairo", "Amiri", "Noto Naskh Arabic", "Heebo", "Frank Ruhl Libre"]);
+// Self-hosted and always present (index.html) — never request these from Google.
+const GLOBAL_FAMILIES = new Set(["Cairo", "Amiri", "Heebo", "Frank Ruhl Libre"]);
 
 // family name → its Google Fonts spec (same weights the full set requests).
 const FAMILY_SPEC = {
   "Aref Ruqaa": "Aref+Ruqaa:wght@400;700",
+  "Noto Naskh Arabic": "Noto+Naskh+Arabic:wght@400;500;700",
   "El Messiri": "El+Messiri:wght@400;500;700",
   "Reem Kufi": "Reem+Kufi:wght@400;600;700",
   Tajawal: "Tajawal:wght@400;500;700",

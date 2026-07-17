@@ -7,11 +7,12 @@
 // to its own dist file via fs (no network, no setWasmPaths needed).
 //
 // Descriptor compatibility: loads the face_recognition_model weights from
-// functions/models, which are byte-identical copies of public/models — the
-// files the guest's browser loads. Same weights ⇒ same descriptor space ⇒
-// client/server euclidean distances are directly comparable. The DETECTOR
-// differs (SSD MobileNet v1 here vs TinyFaceDetector in-browser) for better
-// recall on group shots; detector choice doesn't affect the descriptor space.
+// functions/models (populated by frontend/scripts/download-face-models.cjs).
+// Every descriptor in a collection must come from these same weights to stay
+// comparable, so pin the version — a bump silently changes the descriptor space
+// and invalidates stored rows. Matching used to happen in the browser off a
+// second copy of these files under frontend/public/models; that path is gone
+// (Rekognition + server-side indexing replaced it) and the copy was deleted.
 //
 // HEAVY MODULE — ~12 MB of weights + tfjs init. Must only ever be loaded via
 // dynamic import() from the trigger handler, NEVER statically from anything

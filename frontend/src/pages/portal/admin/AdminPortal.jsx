@@ -60,7 +60,7 @@ export function AdminPortal() {
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <button onClick={onBack} style={{ background: "none", border: "none", color: C.dim, cursor: "pointer", fontSize: 16 }}>←</button>
             <span style={{ fontSize: 20 }}>🔒</span>
-            <span style={{ fontFamily: "'Amiri','Frank Ruhl Libre',serif", color: C.gold, fontWeight: 900, fontSize: 17 }}>{t("admin_title")}</span>
+            <span style={{ fontFamily: "'Amiri','Frank Ruhl Libre','Amiri Fallback',serif", color: C.gold, fontWeight: 900, fontSize: 17 }}>{t("admin_title")}</span>
           </div>
           <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
             <LangSwitcher lang={lang} setLang={setLang} />

@@ -58,7 +58,7 @@ SDK**, so there are no `VITE_FIREBASE_*` reads here (those are backend-script-on
 | `VITE_DEBUG` | `frontend/src/utils/logger.js` | `.env` | Optional | unset | `1` = verbose frontend logging (`import.meta.env.DEV` also enables it) |
 | `VITE_COGNITO_IDENTITY_POOL_ID` | `frontend/src/utils/awsLiveness.js` | Netlify / `.env` | Optional | `""` | AWS Cognito pool for face-liveness capture |
 | `VITE_AWS_REGION` | `frontend/src/utils/awsLiveness.js` | Netlify / `.env` | Optional | `""` | AWS region for face-liveness |
-| `VITE_USE_EMULATORS` | — (set only; effective switch is `VITE_API_BASE_URL`) | `frontend/package.json` (`dev:emulator`), `netlify.toml` | Dev | — | Marker that the build targets emulators |
+| `VITE_USE_EMULATORS` | — (set only; effective switch is `VITE_API_BASE_URL`) | `frontend/package.json` (`dev:emulator`) | Dev | — | Marker that the build targets emulators |
 
 ### Cloud Functions runtime (`process.env`)
 
@@ -143,7 +143,6 @@ flags. Template: `loadtest/.env.example`. Credentials are never read from the ru
 |---|---|---|---|
 | `CI` | `frontend/playwright.config.ts` | GitHub Actions (auto), `.github/workflows/ci.yml` | `true` → Playwright retries x2 |
 | `GITHUB_TOKEN` | `.github/workflows/ci.yml` | GitHub Actions (auto) | Token for the gitleaks secret-scan action |
-| `NODE_VERSION` | Netlify build | `netlify.toml` | Node version for Netlify builds (`20`) |
 
 ---
 
@@ -223,7 +222,6 @@ Other frontend constants: `frontend/src/constants/roles.js` (`ROLES`),
 | `firestore.rules` | Firestore rules for the `/digitalInvitations/**` tree |
 | `firestore.indexes.json` | Firestore composite indexes (currently empty) |
 | `storage.rules` | Cloud Storage rules (proofs, digital media, photographer files, mockups) |
-| `netlify.toml` | Netlify build for the confirmation form (base `frontend`, `NODE_VERSION`, `VITE_USE_EMULATORS=0`) |
 | `frontend/vite.config.js` | Vite + React plugin (SPA build) |
 | `frontend/vitest.config.js` | Frontend unit-test project (jsdom, `src/__tests__/**`) |
 | `backend/vitest.config.js` | Backend test projects (`unit`, `integration`, `rekognition`) |

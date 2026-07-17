@@ -57,6 +57,13 @@ export { digitalInvitePreview } from "./digitalInvitePreview";
 // its own hosting rewrite (`/og/**`) and cache strategy.
 export { digitalOgImage } from "./digitalOgImage";
 
+// Hard 404 for missing hashed assets (`/assets/**` rewrite). Hosting serves
+// existing files before rewrites, so it only fires for chunks a deploy deleted —
+// stopping the SPA catch-all from returning index.html as JavaScript under a
+// 1-year immutable cache header. Kept out of the Express router (and importing
+// nothing but `onRequest`) so it stays the cheapest function in the codebase.
+export { assetsNotFound } from "./assetsNotFound";
+
 // RTDB onCreate trigger: pre-renders + caches the OG preview image at mint time
 // (og-cache/{token}.jpg) so the very first WhatsApp share shows the large image
 // instead of timing out on a cold render. Own function so the heavy canvas

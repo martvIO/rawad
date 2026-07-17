@@ -125,7 +125,7 @@ export function SharedCities() {
 
       {/* ── عنوان ──────────────────────────────────────────────────────── */}
       <div style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 18, fontWeight: 900, color: C.gold, fontFamily: "'Amiri','Frank Ruhl Libre',serif", marginBottom: 4 }}>
+        <div style={{ fontSize: 18, fontWeight: 900, color: C.gold, fontFamily: "'Amiri','Frank Ruhl Libre','Amiri Fallback',serif", marginBottom: 4 }}>
           🏘 {t("shared_title")}
         </div>
         <div style={{ fontSize: 12, color: C.dim, lineHeight: 1.7 }}>
@@ -264,7 +264,7 @@ export function SharedCities() {
           <div style={{ marginBottom: 14, padding: "10px 14px", borderRadius: 12,
             background: "rgba(201,168,76,.08)", border: "1px solid rgba(201,168,76,.22)" }}>
             <div style={{ fontSize: 12, color: C.dim }}>{t("shared_route_in")}</div>
-            <div style={{ fontSize: 18, fontWeight: 900, color: C.gold, fontFamily: "'Amiri','Frank Ruhl Libre',serif" }}>
+            <div style={{ fontSize: 18, fontWeight: 900, color: C.gold, fontFamily: "'Amiri','Frank Ruhl Libre','Amiri Fallback',serif" }}>
               🏘 {sharedSelectedCity}
             </div>
           </div>

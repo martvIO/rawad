@@ -42,7 +42,7 @@ export function DigitalPortal() {
         <div className="dawa-phead">
           <div className="dawa-phead-brand">
             <button onClick={onBack} style={{ background: "none", border: "none", color: C.dim, cursor: "pointer", fontSize: 16 }}>←</button>
-            <span style={{ fontFamily: "'Amiri','Frank Ruhl Libre',serif", color: C.blue, fontWeight: 900, fontSize: 18 }}>
+            <span style={{ fontFamily: "'Amiri','Frank Ruhl Libre','Amiri Fallback',serif", color: C.blue, fontWeight: 900, fontSize: 18 }}>
               {lang === "he" ? "דעוה" : "دعوة"}
             </span>
             <span style={{

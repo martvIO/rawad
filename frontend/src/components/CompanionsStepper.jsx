@@ -17,8 +17,11 @@ export function CompanionsStepper({ value, onChange }) {
   const dec = () => onChange((c) => clamp((Number.isFinite(c) ? c : MIN) - 1));
   const inc = () => onChange((c) => clamp((Number.isFinite(c) ? c : MIN) + 1));
   const btn = {
-    width: 38,
-    height: 38,
+    // 44px, up from 38: the headcount stepper is the control every guest touches
+    // to RSVP, on a phone, and 38 sat under the comfort target (WCAG 2.2 §2.5.8's
+    // 24px floor was already met — this is about thumbs, not compliance).
+    width: 44,
+    height: 44,
     borderRadius: "50%",
     border: "1px solid rgba(201,168,76,.35)",
     background: "rgba(201,168,76,.06)",
@@ -45,7 +48,7 @@ export function CompanionsStepper({ value, onChange }) {
       </button>
       <span
         data-testid="companions-value"
-        style={{ fontFamily: "'Amiri','Frank Ruhl Libre',serif", fontWeight: 800, color: C.goldLight, fontSize: 22, minWidth: 28, textAlign: "center" }}
+        style={{ fontFamily: "'Amiri','Frank Ruhl Libre','Amiri Fallback',serif", fontWeight: 800, color: C.goldLight, fontSize: 22, minWidth: 28, textAlign: "center" }}
       >
         <Num>{v}</Num>
       </span>

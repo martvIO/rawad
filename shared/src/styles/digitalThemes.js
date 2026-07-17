@@ -121,12 +121,22 @@ const THEMES = {
     overlay: "rgba(248,246,240,.92)",
     text: "#2a2218",
     textSoft: "#6a5838",
-    accent: "#a07840",
+    // Deepened from #a07840, which measured 3.70:1 on this cream bg and failed
+    // WCAG 1.4.3 for the 10–15px venue/eyebrow copy. Hue and saturation are held
+    // exactly (35°, 42.9%) and lightness alone drops 44%→30% — the same gold,
+    // deeper on cream. Clears 4.5:1 twice: 6.72:1 at full opacity, and 4.70:1
+    // through the `opacity:.85` InviteStyles puts on .dawa-inv-venue-label /
+    // -wish-who / -foot-tag — that blend over the cream is what rendered as the
+    // failing #ad8b5a, so the token is the only lever that fixes both at once.
+    accent: "#6d522c",
     accentMuted: "rgba(160,120,64,.14)",
     accentLine: "rgba(160,120,64,.22)",
     gradientStops: ["#a07840", "#c9a060", "#a07840"],
     monoStops: ["#a07840", "#c9a060", "#7a5828"],
-    eyebrow: "#a07840",
+    // Tracks `accent` — renders as 11.5px section eyebrows, so it needs the same
+    // 4.5:1. The ornament tokens (sparkle/petal) and the display-size gradient
+    // stops above deliberately keep the lighter gold: no body-copy requirement.
+    eyebrow: "#6d522c",
     petal: "radial-gradient(circle at 30% 30%, #f4d4c4 0%, #c98a78 80%)",
     sparkle: "#a07840",
     sparkleGlow: "#c9a060",

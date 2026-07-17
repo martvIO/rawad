@@ -191,7 +191,7 @@ export function PayPage({ t, lang, setLang }) {
           <div style={{ display: "flex", justifyContent: "center", marginBottom: 14 }}>
             <BrandLogo size={64} />
           </div>
-          <h1 style={{ fontFamily: "'Amiri','Frank Ruhl Libre',serif", color: C.gold, fontSize: 25, marginBottom: 8 }}>
+          <h1 style={{ fontFamily: "'Amiri','Frank Ruhl Libre','Amiri Fallback',serif", color: C.gold, fontSize: 25, marginBottom: 8 }}>
             {t("pay_title")}
           </h1>
         </div>
@@ -268,7 +268,7 @@ function Notice({ icon, color, title, children }) {
   return (
     <Centered>
       <div style={{ fontSize: 56, marginBottom: 12 }}>{icon}</div>
-      <h1 style={{ fontFamily: "'Amiri','Frank Ruhl Libre',serif", color, fontSize: 24, marginBottom: 8 }}>
+      <h1 style={{ fontFamily: "'Amiri','Frank Ruhl Libre','Amiri Fallback',serif", color, fontSize: 24, marginBottom: 8 }}>
         {title}
       </h1>
       {children}

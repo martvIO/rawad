@@ -22,7 +22,7 @@ export function EditGuestModal() {
             borderRadius: 18, padding: 24, animation: "slideUp .3s ease",
           }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
-              <div style={{ color: C.gold, fontWeight: 900, fontSize: 18, fontFamily: "'Amiri','Frank Ruhl Libre',serif" }}>
+              <div style={{ color: C.gold, fontWeight: 900, fontSize: 18, fontFamily: "'Amiri','Frank Ruhl Libre','Amiri Fallback',serif" }}>
                 {t("edit_title")}
               </div>
               <button onClick={cancelEdit} style={{

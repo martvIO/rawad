@@ -1,33 +1,37 @@
-// Downloads face-api.js model files into /public/models so the face-matching
-// page can load them from the same origin (no CDN, no CSP changes), and into
-// /functions/models for the server-side photo face-indexing trigger.
+// Downloads the face-api.js model files the SERVER needs into
+// backend/functions/models, for the photo face-indexing trigger.
 //
-// Browser models (/public/models — what /d/:user/:token/photos needs):
-//   tiny_face_detector_model        — fast face detection
-//   face_landmark_68_model          — 68-point landmarks for liveness (head yaw)
-//   face_recognition_model          — 128-D descriptors for matching
+// These models are the legacy face-api engine, which faceIndex/config.ts still
+// falls back to whenever AWS Rekognition credentials are absent (dev, emulator,
+// or a prod deploy missing its creds) — so they remain load-bearing and ship
+// with the functions deploy.
 //
-// Server models (/functions/models — what the indexPhotographerFile trigger needs):
+// Server models (backend/functions/models — what indexPhotographerFile needs):
 //   ssd_mobilenetv1_model           — higher-recall detector for group shots
 //   face_landmark_68_model          — landmarks (descriptor alignment)
-//   face_recognition_model          — MUST be byte-identical to the browser copy
-//                                     so client/server descriptors stay comparable
+//   face_recognition_model          — 128-D descriptors for matching
+//
+// History: this script also populated frontend/public/models for an in-browser
+// matching path that no longer exists — the browser side moved to Rekognition +
+// server-side indexing. Those 6.7 MB shipped in every hosting deploy while being
+// fetched by nobody (Reports/WEB-QUALITY-2026-07-16.md, PERF-03), so the public
+// copy was deleted and this script now downloads straight to the server dir.
 //
 // Usage:  node scripts/download-face-models.cjs
 //
 // Idempotent: skips files that already exist on disk.
 const https = require("https");
-const fs    = require("fs");
-const path  = require("path");
+const fs = require("fs");
+const path = require("path");
 
-const BASE       = "https://justadudewhohacks.github.io/face-api.js/models/";
-const OUT        = path.join(__dirname, "..", "public", "models");
+const BASE = "https://justadudewhohacks.github.io/face-api.js/models/";
 const SERVER_OUT = path.join(__dirname, "..", "..", "backend", "functions", "models");
 
-const FILES = [
-  // tiny face detector
-  "tiny_face_detector_model-weights_manifest.json",
-  "tiny_face_detector_model-shard1",
+const SERVER_FILES = [
+  // higher-recall detector (server-only — the browser never ran this one)
+  "ssd_mobilenetv1_model-weights_manifest.json",
+  "ssd_mobilenetv1_model-shard1",
+  "ssd_mobilenetv1_model-shard2",
   // 68-point landmark net
   "face_landmark_68_model-weights_manifest.json",
   "face_landmark_68_model-shard1",
@@ -37,61 +41,29 @@ const FILES = [
   "face_recognition_model-shard2",
 ];
 
-// Server set: the shared nets are COPIED from public/models (same bytes); only
-// the SSD MobileNet detector is downloaded (the browser doesn't use it).
-const SERVER_DOWNLOADS = [
-  "ssd_mobilenetv1_model-weights_manifest.json",
-  "ssd_mobilenetv1_model-shard1",
-  "ssd_mobilenetv1_model-shard2",
-];
-const SERVER_COPIES = [
-  "face_landmark_68_model-weights_manifest.json",
-  "face_landmark_68_model-shard1",
-  "face_recognition_model-weights_manifest.json",
-  "face_recognition_model-shard1",
-  "face_recognition_model-shard2",
-];
-
 function download(url, dest) {
   return new Promise((resolve, reject) => {
     const file = fs.createWriteStream(dest);
-    https.get(url, (res) => {
-      if (res.statusCode === 302 || res.statusCode === 301) {
-        return download(res.headers.location, dest).then(resolve, reject);
-      }
-      if (res.statusCode !== 200) {
-        return reject(new Error(`HTTP ${res.statusCode} for ${url}`));
-      }
-      res.pipe(file);
-      file.on("finish", () => file.close(resolve));
-    }).on("error", (err) => {
-      fs.unlink(dest, () => reject(err));
-    });
+    https
+      .get(url, (res) => {
+        if (res.statusCode === 302 || res.statusCode === 301) {
+          return download(res.headers.location, dest).then(resolve, reject);
+        }
+        if (res.statusCode !== 200) {
+          return reject(new Error(`HTTP ${res.statusCode} for ${url}`));
+        }
+        res.pipe(file);
+        file.on("finish", () => file.close(resolve));
+      })
+      .on("error", (err) => {
+        fs.unlink(dest, () => reject(err));
+      });
   });
 }
 
 (async () => {
-  if (!fs.existsSync(OUT)) fs.mkdirSync(OUT, { recursive: true });
-  for (const name of FILES) {
-    const dest = path.join(OUT, name);
-    if (fs.existsSync(dest) && fs.statSync(dest).size > 0) {
-      console.log(`✓ ${name} (already exists)`);
-      continue;
-    }
-    process.stdout.write(`↓ ${name} ... `);
-    try {
-      await download(BASE + name, dest);
-      console.log(`done (${fs.statSync(dest).size.toLocaleString()} bytes)`);
-    } catch (err) {
-      console.error(`FAILED — ${err.message}`);
-      process.exit(1);
-    }
-  }
-  console.log("All face-api models present in public/models/.\n");
-
-  // ── Server models for functions/models ───────────────────────────────────
-  if (!fs.existsSync(SERVER_OUT)) fs.mkdirSync(SERVER_OUT, { recursive: true });
-  for (const name of SERVER_DOWNLOADS) {
+  fs.mkdirSync(SERVER_OUT, { recursive: true });
+  for (const name of SERVER_FILES) {
     const dest = path.join(SERVER_OUT, name);
     if (fs.existsSync(dest) && fs.statSync(dest).size > 0) {
       console.log(`✓ ${name} (already exists)`);
@@ -106,15 +78,5 @@ function download(url, dest) {
       process.exit(1);
     }
   }
-  for (const name of SERVER_COPIES) {
-    const src  = path.join(OUT, name);
-    const dest = path.join(SERVER_OUT, name);
-    if (fs.existsSync(dest) && fs.statSync(dest).size === fs.statSync(src).size) {
-      console.log(`✓ ${name} (already copied)`);
-      continue;
-    }
-    fs.copyFileSync(src, dest);
-    console.log(`⇒ ${name} copied from public/models (${fs.statSync(dest).size.toLocaleString()} bytes)`);
-  }
-  console.log("\nAll server face models present in functions/models/.");
+  console.log("\nAll server face models present in backend/functions/models/.");
 })();

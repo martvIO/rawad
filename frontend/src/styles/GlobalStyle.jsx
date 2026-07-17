@@ -4,15 +4,17 @@
 
 export const GlobalStyle = () => (
   <style>{`
-    /* Fonts are loaded via <link> in index.html <head> (preconnect + stylesheet)
-       so they start downloading before this JS-injected stylesheet parses. */
+    /* Fonts are self-hosted woff2, declared @font-face inline in index.html <head>
+       (scripts/download-fonts.cjs) so they need no network round-trip before this
+       JS-injected stylesheet parses. The '* Fallback' families are metric-matched
+       stand-ins — same text box as the real face, so the swap shifts nothing. */
 
     /* ── Reset + base ──────────────────────────────────────────────────── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html { scroll-behavior: smooth; }
     body {
       background: #07070a; color: #f5e6b8;
-      font-family: 'Cairo', 'Heebo', 'Amiri', sans-serif; direction: rtl;
+      font-family: 'Cairo', 'Heebo', 'Amiri', 'Cairo Fallback', 'Heebo Fallback', sans-serif; direction: rtl;
       -webkit-font-smoothing: antialiased;
       -moz-osx-font-smoothing: grayscale;
       text-rendering: optimizeLegibility;

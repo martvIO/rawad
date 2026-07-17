@@ -31,7 +31,7 @@ export function DriverShareLocation() {
 
       {/* ── عنوان القسم ────────────────────────────────────────────── */}
       <div style={{ marginBottom: 20 }}>
-        <div style={{ fontSize: 19, fontWeight: 900, color: C.blue, fontFamily: "'Amiri','Frank Ruhl Libre',serif", marginBottom: 4 }}>
+        <div style={{ fontSize: 19, fontWeight: 900, color: C.blue, fontFamily: "'Amiri','Frank Ruhl Libre','Amiri Fallback',serif", marginBottom: 4 }}>
           📍 {lang === "he" ? "שיתוף מיקום עם חתנים" : "مشاركة موقعي مع العرسان"}
         </div>
         <div style={{ fontSize: 12, color: C.dim, lineHeight: 1.7 }}>

@@ -26,6 +26,25 @@ export default defineConfig({
     },
     dedupe: ["react", "react-dom"],
   },
+  build: {
+    rollupOptions: {
+      output: {
+        // Split ONLY the React platform out of the entry chunk. It never changes
+        // between app deploys, so it keeps its hash — and with /assets/** served
+        // immutable, returning visitors re-download just the app code.
+        //
+        // Deliberately NOT a blanket "everything in node_modules" vendor chunk:
+        // three, recharts and aws-amplify already sit in their own lazy route
+        // chunks, and hoisting them here would drag all three into the initial
+        // download for every visitor.
+        manualChunks(id) {
+          if (/node_modules[/\\](react|react-dom|scheduler|react-router|react-router-dom)[/\\]/.test(id)) {
+            return "vendor-react";
+          }
+        },
+      },
+    },
+  },
   // Let the dev server serve files from ../shared (outside the frontend root).
   server: { fs: { allow: [repoRoot] } },
 });
