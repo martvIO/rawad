@@ -26,7 +26,7 @@ _(ideas, frameworks, patterns, principles — pages that describe a concept)_
 - [[Polling and Realtime]] — REST polling (15–30s) for most data; SSE for live driver GPS
 - [[Security Model]] — three enforced server-side layers + non-authoritative UI guard; + 2026-07-01 monitoring/blocking/validation layer
 - [[Password Encryption]] — client RSA-OAEP-encrypts password fields as `enc:v1:` envelopes (defense-in-depth on top of HTTPS); backend middleware decrypts ahead of /auth + /users; LIVE in prod with plaintext rejection enforced, verified E2E 2026-07-03
-- [[Digital Invitations]] — the Firestore-backed WhatsApp-link invite flow (guest RSVP, design editor, approval workflow, token snapshots); now a multi-TEMPLATE system: classic + bespoke templates behind the TemplateRenderer registry seam, sealed-tap intro contract (`useIntroPhase`), curated per-template palettes on the brand gold identity — first bespoke template `destination-love` (رحلة الحب) shipped 2026-07-15
+- [[Digital Invitations]] — the Firestore-backed WhatsApp-link invite flow (guest RSVP, design editor, approval workflow, token snapshots); now a multi-TEMPLATE system: classic + bespoke templates behind the TemplateRenderer registry seam, sealed-tap intro contract (`useIntroPhase`), curated per-template palettes on the brand gold identity — **catalogue COMPLETE 2026-07-17: 8 selectable templates** (classic, destination-love, dolce-vita, sacred-garden, blossom-oud, gilded-orchard, lumen, royal-gold) + multi-day `events` everywhere
 - [[Face Matching]] — AWS Rekognition engine: guest "your photos" (camera-only Face Liveness → matches → ZIP) + OTP-gated "People" gallery; auto-send photos on publish; Cognito pool wired (us-east-1); consent + 30-day auto-purge
 - [[Optimistic UI Pattern]] — recurring bug class from the polling architecture, and its fix convention
 - [[Inline Styling Convention]] — 100% inline styles + `theme.js` tokens, no CSS framework
@@ -36,7 +36,7 @@ _(ideas, frameworks, patterns, principles — pages that describe a concept)_
 - [[Digit Normalization]] — Western ASCII digits everywhere: `numberingSystem: latn` dates, apiClient input scrubbing, DB migration script
 - [[List Search and Filter]] — reusable SearchBar + FilterChips + `useListFilter` on every portal list (12 lists); substring + phone-aware + hamza-insensitive
 - [[Load-Test Dashboard]] — local-only FastAPI+React control panel for the Locust suite; live SSE metrics, always-on LOADTEST-data cleanup (incl. new admin purge endpoint), archived run history + compare
-- [[Template Demo Surfaces]] — how a template gets SEEN (catalogue widening to 9 templates + multi-day events, 2026-07-16): public /templates gallery + landing strip, per-template demo links (one shared demo content, any template), groom picker live preview, admin-uploadable covers
+- [[Template Demo Surfaces]] — how a template gets SEEN (all 8 templates live, 2026-07-17 — `template2` turned out to BE `gilded-orchard`, so the catalogue is 8, not the 9 first counted): public /templates gallery + landing strip, per-template demo links (one shared demo content, any template), groom picker live preview, admin-uploadable covers
 - [[Guest Experience Metrics]] — first-party load time / time-to-open / RSVP-completion measurement; bounded metricsDaily histogram rollups; demo traffic quarantined from guest numbers
 
 - [[Payments]] — Lemon Squeezy overlay checkout (admin-minted single-use pay links) + X-Signature-verified order_created webhook for paid groom self-signup

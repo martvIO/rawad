@@ -774,10 +774,15 @@ So mint / sanitize / SSR stay untouched. Shape:
 Render gate is the standard `on(design?.eventsEnabled) && events.length > 0`, so empty arrays auto-hide
 and **every existing design and already-minted token is visually unchanged**.
 
-**Stash hazard:** the 2026-07-15 `gilded-orchard` stash now conflicts with the metrics/gallery work on
-`constants.ts` + `DigitalDesignEditor.jsx`. **Never `git stash pop`** — read it (`git stash show -p`),
-re-apply the events hunks by hand (Phase 0), lift the `gildedOrchard` palette when that template is
-built, then drop it.
+**Stash hazard (RESOLVED — stash dropped 2026-07-17):** the 2026-07-15 `gilded-orchard` stash was
+mined by hand and dropped. Taken: the `events` revival (→ Phase 0) and the `gildedOrchard` palette
+(→ that template). **Deliberately REJECTED: its `themeToBackground.js` + `sanitize.ts` hunks**, which
+modelled the decorations (`stringLights`, `stringLightsColor`, `vineBorders`, `fountain`,
+`fountainColor`) as **new design-doc background fields** — that would have breached the hard
+no-new-design-doc-fields rule for ornament only one template ever uses. `gilded-orchard` instead draws
+its lights/vines/fountain **intrinsically**, in its own components, so the schema did not grow. The
+stash was dropped rather than kept because a stale "recoverable, parked" stash is a *trap*: popping it
+later silently re-adds the rejected fields.
 
 ### Phase 0 SHIPPED (2026-07-16) — multi-day schedule on every template
 - **Shared schema**: `events` → `ARRAY_KEYS`, `eventsEnabled` → `TOGGLE_KEYS`.
@@ -798,4 +803,54 @@ built, then drop it.
   branch had zero coverage despite years in the schema.
 - **Templates 1–7 each render `events` natively** from here on — never retrofitted.
 
-See [[Template Demo Surfaces]], [[Guest Experience Metrics]], [[Usability Templates Test Plan]].
+### CORRECTION: the catalogue is **8**, not 9 (2026-07-16)
+**`template2` IS `gilded-orchard`.** At scout, webgency's `template2` turned out to be string lights +
+a fountain + vines on navy — i.e. exactly the design the 2026-07-15 stash had already scaffolded under
+the name `gilded-orchard`. They were counted as two separate templates in the decision table above, so
+"9 selectable" double-counted one design. **Final catalogue: 8** — `classic`, `destination-love`,
+`dolce-vita`, `sacred-garden`, `blossom-oud`, `gilded-orchard` (= template2), `lumen` (= template3,
+"Light design"), `royal-gold` (= template5, "Viktor and Paula"). Decision-table row 1 above and the
+old "7 to build" count are superseded by this line; every other decision (2–6) stands.
+
+### ALL 8 SHIPPED (2026-07-16 → 07-17) — TASK-TPL-2 complete
+Built one per phase against the recipe in [[Template Demo Surfaces]]. Every one is an **inspired-by
+reinterpretation** — no source text or photos — with code-drawn SVG ornament (so no template ships a
+raster asset beyond its 390×520 gallery cover), 3 curated palettes on brand grounds + one accent, and
+RSVP / countdown / sealed-tap routed through the shared hooks.
+
+| Template | Source | Identity | Accent · font |
+|---|---|---|---|
+| `dolce-vita` | Dolce Vita | Riviera stationery, wax-sealed letter, **scratch-to-reveal** date | blue · messiri |
+| `sacred-garden` | Sacred Garden | Embossed floral envelope, monogram seal, torn edges, CSS petals | green · reem |
+| `blossom-oud` | Blossom & Oud | **Mihrab arch**, girih, arabesque band | rose · scheherazade |
+| `gilded-orchard` | template2 | String lights, fountain, vines (palette lifted from the stash) | gold · markazi |
+| `lumen` | template3 | Effect-free minimalist — wide serif capitals, WHEN?/WHERE? | greige · noto |
+| `royal-gold` | template5 | **The wall** — cream bands torn out of wine, photos hung in gold frames | wine/gold · amiri |
+
+**`royal-gold` is the only template besides `classic` that renders `media`** — as hung, tilted gold
+frames rather than a grid. Its wall/band stripe is assigned by **rendered** index (`assignStripe`,
+exported + tested over all 2^8 on/off subsets): gallery and schedule are pinned to the wall because
+the frames and the rose only read against wine, a pinned wall resets the alternation, and the rest
+flip — which is what stops two torn cream bands ending up adjacent when a groom switches off the dress
+code or gift section. Its ivory palette **inverts** the wall and band roles, so every consumer reads
+`ink(t, onBand)` and nothing hard-codes a colour.
+
+**a11y trap worth remembering (royal-gold ivory, and the same one [[Visual Design System]] hit on the
+classic cream palette):** a gold that clears 4.5:1 as a raw token can still fail once rendered.
+- `frame` (ornament: frames, seal, diamonds) is decorative and stays bright; a separate **`frameInk`**
+  carries text. On the dark grounds they're the same colour; only ivory's cream wall forces them apart.
+- The **opacity blend is what sets the value**: the intro cue renders at `opacity:.85`, and `#7f642d`
+  measured 5.1:1 raw but **3.78:1 blended**. Shipped `#685224` (6.80 raw / 4.77 blended).
+- A button's label must contrast with **its own background**, not the band: `bandInk` is cream on the
+  ivory palette, so gold buttons went cream-on-gold at 3.3:1. Hence **`onFrame`**.
+- Guarded by 15 per-palette contrast tests covering the raw token AND the .85 blend, verified
+  non-vacuous by restoring the failing colour.
+
+**Concurrency hazard (2026-07-17):** this phase ran while a second Claude session was editing the same
+working tree ([[Web Quality Report 2026-07-16]]). It deleted untracked files mid-build and reverted
+tracked edits twice, and the `netlify.toml` deletion leaked into the Lumen commit (amended out). If two
+sessions must share a tree: **commit early**, back work up outside the repo, and diff every file before
+staging — `git add <path>` still stages the *other* session's hunks in that file. See [[Known Bugs]].
+
+See [[Template Demo Surfaces]], [[Guest Experience Metrics]], [[Usability Templates Test Plan]],
+[[Arabic Typography]], [[Visual Design System]].

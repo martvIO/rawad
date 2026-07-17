@@ -87,13 +87,20 @@ gating and unknown-id rejection confirmed live. The `templateAssets` 404 in dev
 (prod API lacks the endpoint until deploy) correctly falls back to bundled art —
 the designed chain.
 
-## Catalogue widening (2026-07-16)
-Grilled: the catalogue goes **4 → 9 templates** (all 8 webgency designs minus the real-couple page,
-plus `gilded-orchard`, plus `classic`). Nothing on THIS page needs changing to support that — the
-gallery, landing strip, picker and per-template demo links are all data-driven from `TEMPLATES`, so
-each new template appears on every surface the moment it is registered. Each will want a bundled cover
-in `templates/thumbs.js` (else it renders the themed ornament), overridable live via the admin uploader.
-Decisions + build order: [[Digital Invitations]] and [[Tasks Backlog]] TASK-TPL-2.
+## Catalogue widening (2026-07-16) → COMPLETE at **8** (2026-07-17)
+Grilled as "4 → 9", shipped as **8**: `template2` turned out to BE `gilded-orchard`, so the original
+count double-counted one design. Final: `classic`, `destination-love`, `dolce-vita`, `sacred-garden`,
+`blossom-oud`, `gilded-orchard`, `lumen`, `royal-gold`.
+
+**The data-driven claim on this page held, and that is the headline.** Nothing here changed to absorb
+six new templates. Each one appeared on the gallery, the landing strip, the picker and its own demo
+link the moment its `TEMPLATES` entry existed, and reported its own `templateId` metrics with no
+per-surface wiring. Registering a template is: shared `TEMPLATES` entry → `registry.js` lazy Component
+→ `thumbs.js` cover → backend `TEMPLATE_IDS` + `THEME_COLORS` (mirror pinned by
+`digitalTemplateSync.test.ts`). All 8 covers are 390×520 and load in the gallery; any is overridable
+live via the admin uploader.
+
+Decisions + per-template detail: [[Digital Invitations]] and [[Tasks Backlog]] TASK-TPL-2.
 
 ## Related
 [[Digital Invitations]] · [[Guest Experience Metrics]] · [[Visual Design System]] ·

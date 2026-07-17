@@ -358,3 +358,6 @@ Touched: Arabic-Typography, Visual-Design-System, index
 
 ## [2026-07-16 15:20] session | Template catalogue 4→9 grilled + multi-day events shipped
 Touched: Digital-Invitations, Tasks-Backlog, Template-Demo-Surfaces, index
+
+## [2026-07-17 12:40] session | Template catalogue COMPLETE — 8/8, royal-gold shipped
+Touched: Digital-Invitations, Tasks-Backlog, Template-Demo-Surfaces, index

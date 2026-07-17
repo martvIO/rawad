@@ -33,21 +33,25 @@ Prioritized work for [[Dawa]] (full list in `TASKS.md`).
 
 ## Templates (2026-07-14 — from the reel-templates grilling in [[Digital Invitations]], needs its own go-ahead)
 - **TASK-TPL-1** — design + build the **reel-template port pipeline**: take a Claude Design HTML mockup + spec (produced via `docs/REEL-TO-TEMPLATE-PROMPT.md`) and land it as a selectable template — template registry, groom editor picker, native-theme token registration, per-template `envelopeEnabled:false` default, sealed-tap intro component, and how a template interacts with the design approval state machine + mint-time `designSnapshot`. Blocked on: owner producing the first mockup+spec from a reel.
-- **TASK-TPL-2 (IN PROGRESS — scope widened 4 → 9 on 2026-07-16)** — build the **full template
-  catalogue**. `classic` + `destination-love` are LIVE. **7 to build**, reviewed one at a time:
-  `dolce-vita` → `sacred-garden` → `blossom-oud` → `template2` → `template3` → `template5` →
-  `gilded-orchard`. Preceded by **Phase 0: multi-day `events` everywhere**.
-  - **Scope reversal (owner, 2026-07-16):** the earlier "top-4 flagships only" decision is superseded —
-    ALL 8 webgency designs are in (the 3 previously skipped = `template2`/`template3`/`template5`,
-    marketing names Vibrant Vows / Royal Gold / Minimalist, confirmed at scout), plus the revived
-    `gilded-orchard`. **Still excluded: "Eternal Romance" (`jathuandthanu`)** — a real couple's
-    personalized page, not a generic template.
-  - **Wave 1 usability gate DOWNGRADED to non-blocking** (owner, 2026-07-16): build now, gate later.
-    Rationale: the sealed-tap behaviour lives in ONE shared file (`useIntroPhase`), so a Wave 1 finding
-    changes it once and all 9 templates inherit it — that is exactly what the seam was built for. The
-    gate itself ([[Usability Templates Test Plan]]) is still worth running; it just no longer blocks.
+- **TASK-TPL-2 — ✅ DONE (2026-07-17). The catalogue is complete: 8 selectable templates.**
+  `classic`, `destination-love`, `dolce-vita`, `sacred-garden`, `blossom-oud`, `gilded-orchard`,
+  `lumen`, `royal-gold` — all live in the picker, the `/templates` gallery, the landing strip and the
+  demo links, each reporting its own `templateId` metrics. Preceded by **Phase 0: multi-day `events`
+  everywhere** (shipped). Per-template detail + the a11y trap: [[Digital Invitations]].
+  - **Scope: 8, not 9.** `template2` turned out to BE `gilded-orchard` (string lights + fountain +
+    vines on navy = the stashed scaffold), so the 2026-07-16 "9 selectable" double-counted one design.
+    `template3` = `lumen`, `template5` = `royal-gold`. **Still excluded: "Eternal Romance"
+    (`jathuandthanu`)** — a real couple's personalized page, not a generic template.
+  - **Wave 1 usability gate: still non-blocking, still worth running** (owner, 2026-07-16). Rationale
+    held up: the sealed-tap behaviour lives in ONE shared file (`useIntroPhase`) and all 8 templates
+    inherit it, so a Wave 1 finding changes it once. **Now unblocked and newly worth it — there are 8
+    templates to test against instead of 2.** See [[Usability Templates Test Plan]].
+  - The stash is fully mined (events → Phase 0, `gildedOrchard` palette → that template) and dropped.
   - Plan: `~/.claude/plans/search-and-think-and-delegated-allen.md`. See [[Digital Invitations]].
-- **Parked:** the **gilded-orchard scaffold** is stashed (`git stash` on main, 2026-07-15) — events-schedule revival + bg decorations (string lights / vine borders / fountain) + `gildedOrchard` palette. Recover if it becomes a 5th template; cherry-pick the `events` schema if a webgency template needs a multi-day schedule.
+- **TASK-TPL-3 (NEW, needs a go-ahead)** — the **demo design's `weddingDate` is in the past**
+  (14 Jul 2026), so every template's countdown demos as `00 00 00 00` — including on the public
+  `/templates` gallery a prospect sees. Roll it forward (or make the demo date relative). Affects all
+  8 templates; it's demo data, not a template bug.
 
 ## UX opportunity backlog (2026-07-02 — from [[UX Research Discovery 2026-07-02]], each item needs its own go-ahead)
 Owner funded **all four clusters** in the interview; sequence by impact. Baseline usability test
