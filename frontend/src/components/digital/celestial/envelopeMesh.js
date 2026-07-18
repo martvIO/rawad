@@ -1445,8 +1445,8 @@ function buildEnvelopeBloom({ pal, preset, content } = {}) {
   const pausedRise = (x) => {
     const c = clamp01(x);
     if (c < 0.09) return 0.18 * smooth(c / 0.09);       // small edge open — rays shoot out
-    if (c < 0.24) return 0.18;                           // HOLD suspended (~2s)
-    return 0.18 + 0.82 * smooth((c - 0.24) / 0.76);      // then OPEN slowly, filling the timeline
+    if (c < 0.165) return 0.18;                          // HOLD suspended (~1s — half the old pause)
+    return 0.18 + 0.82 * smooth((c - 0.165) / 0.835);    // then OPEN slowly, filling the timeline
   };
 
   function applyVisual(t) {
@@ -1519,11 +1519,14 @@ function buildEnvelopeBloom({ pal, preset, content } = {}) {
       lt.intensity = 0.15 + 3.4 * fi;
     }
     // Interior light — a warm glow revealed as the flaps open (occluded when closed).
-    // Kept MODERATE (a warm glow behind, not pure white): the pure-white full-screen
-    // climax is the FLASH at the very end, so the whole screen only whites out for the
-    // final ~1s (owner: "خلف المكتوب ضو" during the open, "كل الشاشة ضو ثانية" at the end).
+    // The full-screen wash is a BRIEF CLIMAX, not a long build: it stays a SOFT backing
+    // glow through the whole open, then flares to its brightest only in the final ~1s as
+    // the flaps vanish, so the whole screen only lights up for about a second (owner:
+    // "الضو الي ببين بكل الشاشة خليه بس لمدة ثانية").
     const openMax = Math.max(topF, restF);
-    innerMat.opacity = Math.min(0.68, 0.1 + 0.7 * openMax) * fade * smooth(clamp01(openMax / 0.14));
+    const revealF = smooth(clamp01(openMax / 0.14));       // present once the flaps crack open
+    const flareF  = smooth(clamp01((tt - 0.80) / 0.05));   // brightens only in the last ~0.8s
+    innerMat.opacity = (0.15 + 0.53 * flareF) * revealF * fade;
     // Two STRONG side-rays aimed onto the side triangles — grow WITH the top flap (soft at
     // the crack so the flap stays legible, strong as it opens). They sit off the top-flap
     // face so they light the SIDE flaps, not wash the top one.
