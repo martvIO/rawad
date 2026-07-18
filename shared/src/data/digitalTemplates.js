@@ -214,4 +214,5 @@ export function getTemplateThemeKeys(id) {
 // (frontend/src/components/digital/celestial/envelopeStyles/registry.js).
 export const ENVELOPE_STYLES = [
   { key: "classic", icon: "✉️", label_ar: "المكتوب العادي", label_he: "המעטפה הרגילה" },
+  { key: "bloom", icon: "🌸", label_ar: "المتفتّح (أزهار)", label_he: "הפריחה" },
 ];

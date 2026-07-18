@@ -399,6 +399,10 @@ export function DesignEditorBody({ groomUid, designId, adminDemoMode = false, on
   // theme-derived defaults shown in the swatches when an override is unset.
   const envOverrides = f.envelope && typeof f.envelope === "object" ? f.envelope : {};
   const envDefaults = useMemo(() => resolveEnvelopePalette(getDigitalTheme(themeColor)), [themeColor]);
+  // The "bloom" (floral) style is a different SHAPE: it has no inner card and no
+  // arabesque star system, but adds its own light/snow tints. Gate the envelope
+  // controls on it so the groom only sees pickers that actually do something.
+  const envIsBloom = (envOverrides.style || "classic") === "bloom";
   // Custom-background overrides + the theme-derived defaults shown when unset.
   const bgOverrides = f.background && typeof f.background === "object" ? f.background : {};
   const bgDefaults = useMemo(() => resolveBackground(getDigitalTheme(themeColor), {}), [themeColor]);
@@ -1452,18 +1456,39 @@ export function DesignEditorBody({ groomUid, designId, adminDemoMode = false, on
             </div>
           </div>
 
-          <EnvColorRow testid="design-env-paper" label={tt(lang, "لون الورق", "צבע הנייר")} value={envOverrides.paper} defaultHex={envDefaults.paper} presets={["#2a211a", "#1a1f2e", "#f9f6f0", "#2a1a1a"]} disabled={!editable} onPick={(hex) => setEnvField("paper", hex)} onReset={() => resetEnvField("paper")} />
-          <EnvColorRow testid="design-env-wax" label={tt(lang, "لون الختم (الدائرة)", "צבע החותם (העיגול)")} value={envOverrides.wax} defaultHex={envDefaults.wax} presets={["#f4ece0", "#b3232a", "#1f3b2e", "#caa14e"]} disabled={!editable} onPick={(hex) => setEnvField("wax", hex)} onReset={() => resetEnvField("wax")} />
-          <EnvColorRow testid="design-env-foil" label={tt(lang, "لون النجوم والذهب", "צבע הכוכבים והזהב")} value={envOverrides.foil} defaultHex={envDefaults.foil} presets={["#caa14e", "#c0c0c0", "#e8b4b8", "#d4af37"]} disabled={!editable} onPick={(hex) => setEnvField("foil", hex)} onReset={() => resetEnvField("foil")} />
-          <EnvColorRow testid="design-env-card" label={tt(lang, "لون البطاقة الداخلية", "צבע הכרטיס הפנימי")} value={envOverrides.cardPaper} defaultHex={envDefaults.cardPaper} presets={["#f9f6f0", "#f4ece0", "#f7f0e6", "#efe6d8"]} disabled={!editable} onPick={(hex) => setEnvField("cardPaper", hex)} onReset={() => resetEnvField("cardPaper")} />
-          <EnvColorRow testid="design-env-ink" label={tt(lang, "لون الحبر", "צבע הדיו")} value={envOverrides.cardInk} defaultHex={envDefaults.cardInk} presets={["#3a2412", "#1a1a1a", "#2a1a3a", "#1f3b2e"]} disabled={!editable} onPick={(hex) => setEnvField("cardInk", hex)} onReset={() => resetEnvField("cardInk")} />
+          {/* Cardstock, wax and gold apply to BOTH styles. Under bloom the defaults +
+              preset chips reflect its blush/ivory/gold signature. */}
+          <EnvColorRow testid="design-env-paper" label={tt(lang, "لون المكتوب (الورق)", "צבע המעטפה (הנייר)")} value={envOverrides.paper} defaultHex={envIsBloom ? "#f7e7e8" : envDefaults.paper} presets={envIsBloom ? ["#f7e7e8", "#eae2d0", "#e6d8e2", "#dfeae2"] : ["#2a211a", "#1a1f2e", "#f9f6f0", "#2a1a1a"]} disabled={!editable} onPick={(hex) => setEnvField("paper", hex)} onReset={() => resetEnvField("paper")} />
+          <EnvColorRow testid="design-env-wax" label={tt(lang, "لون الشمع (الختم)", "צבע השעווה (החותם)")} value={envOverrides.wax} defaultHex={envIsBloom ? "#8a2230" : envDefaults.wax} presets={["#f4ece0", "#b3232a", "#1f3b2e", "#caa14e"]} disabled={!editable} onPick={(hex) => setEnvField("wax", hex)} onReset={() => resetEnvField("wax")} />
+          <EnvColorRow testid="design-env-foil" label={envIsBloom ? tt(lang, "لون الذهب (الختم والحواف)", "צבע הזהב (החותם והקצוות)") : tt(lang, "لون النجوم والذهب", "צבע הכוכבים והזהב")} value={envOverrides.foil} defaultHex={envIsBloom ? "#eccf94" : envDefaults.foil} presets={["#eccf94", "#caa14e", "#c98a90", "#d4af37"]} disabled={!editable} onPick={(hex) => setEnvField("foil", hex)} onReset={() => resetEnvField("foil")} />
 
-          <div style={{ marginTop: 12 }}>
-            <ToggleRow label={tt(lang, "نجوم على كامل المظروف", "כוכבים על כל המעטפה")} checked={envOverrides.stars !== false} disabled={!editable} testid="design-env-stars" onChange={(c) => setEnvField("stars", c)} />
-            <ToggleRow label={tt(lang, "نجمة على الختم", "כוכב על החותם")} checked={envOverrides.sealStar === true} disabled={!editable} testid="design-env-seal-star" onChange={(c) => setEnvField("sealStar", c)} />
-          </div>
-          <RangeRow testid="design-env-density" label={tt(lang, "كثافة النجوم", "צפיפות הכוכבים")} min={1} max={4} step={1} value={envOverrides.starDensity ?? 2} disabled={!editable || envOverrides.stars === false} onInput={(v) => bufferEnvField("starDensity", v)} onCommit={(v) => commitEnvField("starDensity", v)} />
-          <RangeRow testid="design-env-intensity" label={tt(lang, "وضوح النجوم", "עוצמת הכוכבים")} min={0} max={1} step={0.05} value={envOverrides.starIntensity ?? 0.22} disabled={!editable || envOverrides.stars === false} onInput={(v) => bufferEnvField("starIntensity", v)} onCommit={(v) => commitEnvField("starIntensity", v)} />
+          {/* Bloom-only colours: the reveal light/rays (glow) and the snowflake emboss tint (snow). */}
+          {envIsBloom && (
+            <EnvColorRow testid="design-env-glow" label={tt(lang, "لون الضوء والشعاع", "צבע האור והקרן")} value={envOverrides.glow} defaultHex="#ffcf9a" presets={["#ffcf9a", "#ffe1a0", "#fff0d8", "#ffd0e0"]} disabled={!editable} onPick={(hex) => setEnvField("glow", hex)} onReset={() => resetEnvField("glow")} />
+          )}
+          {envIsBloom && (
+            <EnvColorRow testid="design-env-snow" label={tt(lang, "لون زخرفة الثلج", "צבע קישוט השלג")} value={envOverrides.snow} defaultHex="#ecd2d3" presets={["#ecd2d3", "#e6d0c8", "#dfe6ea", "#f0dcd8"]} disabled={!editable} onPick={(hex) => setEnvField("snow", hex)} onReset={() => resetEnvField("snow")} />
+          )}
+
+          {/* Classic-only: inner card + the arabesque star system (bloom has neither). */}
+          {!envIsBloom && (
+            <EnvColorRow testid="design-env-card" label={tt(lang, "لون البطاقة الداخلية", "צבע הכרטיס הפנימי")} value={envOverrides.cardPaper} defaultHex={envDefaults.cardPaper} presets={["#f9f6f0", "#f4ece0", "#f7f0e6", "#efe6d8"]} disabled={!editable} onPick={(hex) => setEnvField("cardPaper", hex)} onReset={() => resetEnvField("cardPaper")} />
+          )}
+          {!envIsBloom && (
+            <EnvColorRow testid="design-env-ink" label={tt(lang, "لون الحبر", "צבע הדיו")} value={envOverrides.cardInk} defaultHex={envDefaults.cardInk} presets={["#3a2412", "#1a1a1a", "#2a1a3a", "#1f3b2e"]} disabled={!editable} onPick={(hex) => setEnvField("cardInk", hex)} onReset={() => resetEnvField("cardInk")} />
+          )}
+          {!envIsBloom && (
+            <div style={{ marginTop: 12 }}>
+              <ToggleRow label={tt(lang, "نجوم على كامل المظروف", "כוכבים על כל המעטפה")} checked={envOverrides.stars !== false} disabled={!editable} testid="design-env-stars" onChange={(c) => setEnvField("stars", c)} />
+              <ToggleRow label={tt(lang, "نجمة على الختم", "כוכב על החותם")} checked={envOverrides.sealStar === true} disabled={!editable} testid="design-env-seal-star" onChange={(c) => setEnvField("sealStar", c)} />
+            </div>
+          )}
+          {!envIsBloom && (
+            <RangeRow testid="design-env-density" label={tt(lang, "كثافة النجوم", "צפיפות הכוכבים")} min={1} max={4} step={1} value={envOverrides.starDensity ?? 2} disabled={!editable || envOverrides.stars === false} onInput={(v) => bufferEnvField("starDensity", v)} onCommit={(v) => commitEnvField("starDensity", v)} />
+          )}
+          {!envIsBloom && (
+            <RangeRow testid="design-env-intensity" label={tt(lang, "وضوح النجوم", "עוצמת הכוכבים")} min={0} max={1} step={0.05} value={envOverrides.starIntensity ?? 0.22} disabled={!editable || envOverrides.stars === false} onInput={(v) => bufferEnvField("starIntensity", v)} onCommit={(v) => commitEnvField("starIntensity", v)} />
+          )}
 
           <EnvelopePreview
             themeColor={themeColor}
@@ -1930,7 +1955,10 @@ function RangeRow({ testid, label, min, max, step, value, onInput, onCommit, dis
 function EnvelopePreview({ themeColor, overrides, content, lang }) {
   const theme = useMemo(() => getDigitalTheme(themeColor), [themeColor]);
   const colors = useMemo(() => resolveEnvelopePalette(theme, overrides), [theme, overrides]);
-  const colorsKey = useMemo(() => JSON.stringify(colors), [colors]);
+  // Key the remount on BOTH the resolved colours AND the raw overrides — the style
+  // and the bloom-only glow/snow tints live only in `overrides`, not in `colors`, so
+  // switching style or tuning any picker must re-bake the preview to match the guest page.
+  const colorsKey = useMemo(() => JSON.stringify({ c: colors, o: overrides || null }), [colors, overrides]);
   const worldRef = useRef(null);
   const [remount, setRemount] = useState(0);
 
@@ -1952,7 +1980,7 @@ function EnvelopePreview({ themeColor, overrides, content, lang }) {
           mode="preview"
           fixed={false}
           tier={2}
-          envelope={{ colors, content }}
+          envelope={{ style: overrides?.style, colors, overrides, content }}
           onReady={(w) => { worldRef.current = w; }}
           elevated={false}
         />

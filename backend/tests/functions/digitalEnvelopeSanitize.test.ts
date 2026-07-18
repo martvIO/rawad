@@ -71,6 +71,37 @@ describe("sanitizeMediaSettings — envelope overrides", () => {
     if (!r.ok) expect(r.error).toBe("invalid_toggle");
   });
 
+  it("accepts the bloom opening style slug", () => {
+    expect(ok({ envelope: { style: "bloom" } }).envelope).toEqual({ style: "bloom" });
+    expect(ok({ envelope: { style: "classic" } }).envelope).toEqual({ style: "classic" });
+  });
+
+  it("accepts + lowercases the bloom-only glow and snow colours", () => {
+    expect(ok({ envelope: { glow: "#FFCF9A", snow: "#ECD2D3" } }).envelope)
+      .toEqual({ glow: "#ffcf9a", snow: "#ecd2d3" });
+  });
+
+  it("rejects a malformed glow/snow colour", () => {
+    for (const key of ["glow", "snow"]) {
+      const r = sanitizeMediaSettings({ envelope: { [key]: "pink" } });
+      expect(r.ok, key).toBe(false);
+      if (!r.ok) expect(r.error).toBe("invalid_envelope_color");
+    }
+  });
+
+  it("round-trips a full bloom design (style + all colour picks)", () => {
+    const v = ok({
+      envelope: {
+        style: "bloom", paper: "#f7e7e8", wax: "#8a2230", foil: "#c98a90",
+        glow: "#ffcf9a", snow: "#ecd2d3",
+      },
+    });
+    expect(v.envelope).toEqual({
+      style: "bloom", paper: "#f7e7e8", wax: "#8a2230", foil: "#c98a90",
+      glow: "#ffcf9a", snow: "#ecd2d3",
+    });
+  });
+
   it("treats {} and null as a reset to defaults", () => {
     expect(ok({ envelope: {} }).envelope).toEqual({});
     expect(ok({ envelope: null }).envelope).toEqual({});

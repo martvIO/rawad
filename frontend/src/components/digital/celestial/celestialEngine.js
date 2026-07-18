@@ -257,8 +257,18 @@ export function createCelestialWorld(canvas, opts = {}) {
       revealFired = true;
       if (onRevealCb) onRevealCb();
     }
-    if (openT >= 1) {
-      if (holdUntil === 0) holdUntil = now + 320; // brief hold on the light, then glide
+    // An envelope can request a DIRECT hand-off: the instant its flaps have vanished, drop
+    // the envelope and fire onComplete so the invitation opens immediately — no hold, no
+    // camera glide (bloom uses this; owner: "لما تختفي المثلثات دغري تفتح الدعوة"). It may
+    // hand off BEFORE openT reaches 1 (via HANDOFF_AT) so there is no dead tail after the
+    // flaps disappear — the remaining slice of the open is skipped once they're gone.
+    if (env && env.DIRECT_HANDOFF) {
+      const handoffAt = env.HANDOFF_AT != null ? env.HANDOFF_AT : 1;
+      if (openT >= handoffAt) { finishGlide(); return; }
+    } else if (openT >= 1) {
+      // Otherwise: brief hold on the light, then glide the camera back to the scene.
+      const holdMs = env && env.HOLD_MS != null ? env.HOLD_MS : 320;
+      if (holdUntil === 0) holdUntil = now + holdMs;
       else if (now >= holdUntil) {
         glideFrom = { z: cam.z, y: cam.y, lookY: lastLookY, fov: ENV_FOV };
         mode = "glide";
@@ -311,7 +321,7 @@ export function createCelestialWorld(canvas, opts = {}) {
       // Envelope framing (scroll ignored). Gentle parallax while framed.
       const gpx = px * 0.25, gpy = py * 0.25;
       if (mode === "glide") {
-        glideT = Math.min(1, glideT + dt * 0.5);
+        glideT = Math.min(1, glideT + dt * ((env && env.GLIDE_SPEED) || 0.5));
         const g = easeInOut(glideT);
         tz = glideFrom.z + (60 - glideFrom.z) * g;
         tx = driftX * g + gpx;
@@ -324,7 +334,7 @@ export function createCelestialWorld(canvas, opts = {}) {
         if (glideT >= 1) finishGlide();
       } else {
         // "envelope" (sealed) or "opening" — the pose comes from the envelope.
-        if (mode === "opening") openT = Math.min(1, openT + dt / OPEN_DURATION);
+        if (mode === "opening") openT = Math.min(1, openT + dt / ((env && env.DURATION) || OPEN_DURATION));
         const pose = mode === "opening"
           ? env.setOpen(openT, ENV_FOV, asp)
           : env.framePose(ENV_FOV, asp);
@@ -377,7 +387,9 @@ export function createCelestialWorld(canvas, opts = {}) {
   function enterEnvelope() {
     if (!liveEnvelope || env || disposed) return;
     env = buildEnvelope({
+      style: liveEnvelope.style,
       colors: liveEnvelope.colors,
+      overrides: liveEnvelope.overrides,   // raw groom picks — styled presets layer these over their palette
       monogram: liveEnvelope.monogram,
       content: liveEnvelope.content,
     });

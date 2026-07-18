@@ -72,7 +72,10 @@ const MAX_GUEST_STATUSES = new Set(["pending", "attending", "absent"]);
 
 // Envelope (3D) customization — per-design colour overrides + star options.
 const HEX_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
-const ENVELOPE_COLOR_KEYS = ["paper", "wax", "foil", "cardPaper", "cardInk"] as const;
+// paper/wax/foil/cardPaper/cardInk are the classic envelope colours; glow (the
+// bloom style's reveal light / rays) and snow (its floral emboss tint) are the
+// extra bloom-only colours the groom can pick. All validated as #rrggbb.
+const ENVELOPE_COLOR_KEYS = ["paper", "wax", "foil", "cardPaper", "cardInk", "glow", "snow"] as const;
 const STAR_DENSITY_MIN = 1;
 const STAR_DENSITY_MAX = 4;
 const STAR_INTENSITY_MIN = 0;

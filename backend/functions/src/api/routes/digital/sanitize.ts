@@ -253,6 +253,8 @@ interface EnvelopeSettings {
   foil?: string;
   cardPaper?: string;
   cardInk?: string;
+  glow?: string;   // bloom style: reveal light / rays colour
+  snow?: string;   // bloom style: floral (snowflake) emboss tint
   stars?: boolean;
   starDensity?: number;
   starIntensity?: number;

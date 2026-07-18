@@ -197,7 +197,9 @@ export function CelestialAmbience({
     .map((s) => s.trim().replace(/^['"]|['"]$/g, ""))
     .filter(Boolean);
   const envelopeProp = {
+    style: (envelopeOverrides && envelopeOverrides.style) || "classic",
     colors: resolveEnvelopePalette(theme, envelopeOverrides),
+    overrides: envelopeOverrides || null,   // raw picks — bloom layers these over its preset palette
     monogram,
     content: {
       namesAr, namesHe, blessing, welcome, eyebrow, date: dateText,
