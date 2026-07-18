@@ -281,7 +281,8 @@ export function createCelestialWorld(canvas, opts = {}) {
     if (disposed || contextLost) return;
     raf = requestAnimationFrame(frame);
     if (paused) { lastNow = now; return; }
-    const dt = Math.min(0.05, Math.max(0, (now - lastNow) / 1000));
+    const raw = Math.max(0, (now - lastNow) / 1000);
+    const dt = Math.min(0.05, raw);
     lastNow = now;
 
     const t = now * 0.001;
@@ -334,7 +335,12 @@ export function createCelestialWorld(canvas, opts = {}) {
         if (glideT >= 1) finishGlide();
       } else {
         // "envelope" (sealed) or "opening" — the pose comes from the envelope.
-        if (mode === "opening") openT = Math.min(1, openT + dt / ((env && env.DURATION) || OPEN_DURATION));
+        // Advance the reveal by REAL elapsed time (a generous 0.1s cap, not the 0.05s
+        // camera cap) so the opening lasts the same wall-clock DURATION at any frame
+        // rate — a heavy desktop render was hitting the 0.05 cap and stretching the open
+        // vs. the phone (owner: "بالكمبيوتر بوخد الفتح وقت اكتر من التلفون"). Pause already
+        // resets lastNow, so a backgrounded tab can't produce a huge jump here.
+        if (mode === "opening") openT = Math.min(1, openT + Math.min(0.1, raw) / ((env && env.DURATION) || OPEN_DURATION));
         const pose = mode === "opening"
           ? env.setOpen(openT, ENV_FOV, asp)
           : env.framePose(ENV_FOV, asp);

@@ -1458,11 +1458,13 @@ function buildEnvelopeBloom({ pal, preset, content } = {}) {
     // "أول ما يختفي الختم يبلش المثلث الي فوق"). Top rises with a small-open→hold→rise.
     const topF  = pausedRise(clamp01((tt - 0.11) / 0.72)); // opens SLOWLY across the timeline
     const restF = smooth(clamp01((tt - 0.30) / 0.55));     // the OTHER three open WITH the top
-    const diss  = ease(clamp01((tt - 0.83) / 0.06));       // the instant the flaps finish opening they
-                                                           // vanish QUICKLY (no lingering tail), then the
-                                                           // engine hands off at HANDOFF_AT so the invitation
-                                                           // opens the moment the triangles disappear (owner:
-                                                           // "لما تختفي المثلثات دغري تفتح الدعوة").
+    const diss  = ease(clamp01((tt - 0.73) / 0.09));       // the flaps MELT AWAY (fade) as they finish
+                                                           // opening instead of splaying + lingering — so on a
+                                                           // WIDE desktop screen (where they don't clip off the
+                                                           // edges like on a phone) they still DISAPPEAR at the
+                                                           // same moment, then the engine hands off at HANDOFF_AT
+                                                           // and the invitation opens instantly (owner: "زي التلفون
+                                                           // — أول ما تختفي المثلثات دغري تفتح الدعوة").
 
     // The TOP flap LIFTS straight UP the screen (with only a slight forward tilt for
     // volume) — an unmistakable "opening UP", never sliding/folding BACKWARD (owner:
@@ -1525,7 +1527,7 @@ function buildEnvelopeBloom({ pal, preset, content } = {}) {
     // "الضو الي ببين بكل الشاشة خليه بس لمدة ثانية").
     const openMax = Math.max(topF, restF);
     const revealF = smooth(clamp01(openMax / 0.14));       // present once the flaps crack open
-    const flareF  = smooth(clamp01((tt - 0.80) / 0.05));   // brightens only in the last ~0.8s
+    const flareF  = smooth(clamp01((tt - 0.68) / 0.05));   // flares bright just as the flaps melt away
     innerMat.opacity = (0.15 + 0.53 * flareF) * revealF * fade;
     // Two STRONG side-rays aimed onto the side triangles — grow WITH the top flap (soft at
     // the crack so the flap stays legible, strong as it opens). They sit off the top-flap
@@ -1569,7 +1571,7 @@ function buildEnvelopeBloom({ pal, preset, content } = {}) {
     const margin = realAsp > HW / HH ? 1.14 : 1.0;   // desktop: pull back a touch; phone: unchanged
     const cover = Math.min(HH / tn, HW / (tn * asp)) * margin;
     const tc = clamp01(t);
-    const diss = ease(clamp01((tc - 0.83) / 0.06));
+    const diss = ease(clamp01((tc - 0.73) / 0.09));
     // Sealed = dead head-on. As the flaps open, the camera RISES + looks down into a
     // gentle 3/4 view so the top flap is clearly seen LIFTING up in 3-D (a pure
     // head-on camera only ever looks INTO the opening). Settles back head-on on the
@@ -1597,7 +1599,7 @@ function buildEnvelopeBloom({ pal, preset, content } = {}) {
     // page, no lingering tail, no camera glide. HANDOFF_AT fires the hand-off just after the
     // dissolve completes (0.83→0.89) so the invitation opens the instant the triangles disappear
     // while the OPEN itself stays slow (owner: "بطيء زي ما هو + الدعوة فوراً لما تختفي المثلثات").
-    DIRECT_HANDOFF: true, HANDOFF_AT: 0.90,
+    DIRECT_HANDOFF: true, HANDOFF_AT: 0.83,
     setOpen(t, fov, aspect) { applyVisual(t); return framing(t, fov, aspect); },
     framePose(fov, aspect) { return framing(0, fov, aspect); },
     refreshCard() { /* the bloom shape has no baked card */ },
