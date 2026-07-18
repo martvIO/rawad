@@ -1457,8 +1457,8 @@ function buildEnvelopeBloom({ pal, preset, content } = {}) {
     // Seal cracks + vanishes FIRST; only THEN does the top flap begin (owner:
     // "أول ما يختفي الختم يبلش المثلث الي فوق"). Top rises with a small-open→hold→rise.
     const topF  = pausedRise(clamp01((tt - 0.11) / 0.72)); // opens SLOWLY across the timeline
-    const restF = smooth(clamp01((tt - 0.30) / 0.55));     // the OTHER three open WITH the top
-    const diss  = ease(clamp01((tt - 0.73) / 0.09));       // the flaps MELT AWAY (fade) as they finish
+    const restF = smooth(clamp01((tt - 0.30) / 0.42));     // the OTHER three open WITH the top (faster)
+    const diss  = ease(clamp01((tt - 0.65) / 0.08));       // the flaps MELT AWAY (fade) as they finish
                                                            // opening instead of splaying + lingering — so on a
                                                            // WIDE desktop screen (where they don't clip off the
                                                            // edges like on a phone) they still DISAPPEAR at the
@@ -1527,7 +1527,7 @@ function buildEnvelopeBloom({ pal, preset, content } = {}) {
     // "الضو الي ببين بكل الشاشة خليه بس لمدة ثانية").
     const openMax = Math.max(topF, restF);
     const revealF = smooth(clamp01(openMax / 0.14));       // present once the flaps crack open
-    const flareF  = smooth(clamp01((tt - 0.68) / 0.05));   // flares bright just as the flaps melt away
+    const flareF  = smooth(clamp01((tt - 0.60) / 0.05));   // flares bright just as the flaps melt away
     innerMat.opacity = (0.15 + 0.53 * flareF) * revealF * fade;
     // Two STRONG side-rays aimed onto the side triangles — grow WITH the top flap (soft at
     // the crack so the flap stays legible, strong as it opens). They sit off the top-flap
@@ -1560,18 +1560,19 @@ function buildEnvelopeBloom({ pal, preset, content } = {}) {
   // gentle push-IN on the final dissolve toward the revealed invitation.
   function framing(t, fov, aspect) {
     const tn = Math.tan(((fov || 34) * Math.PI / 180) / 2);
-    // On a portrait phone the tall envelope fills the screen edge-to-edge. On a WIDE
-    // desktop screen a raw cover-fit is width-constrained and blows the portrait
-    // envelope up (~3–4× too tall, cropped + "weird"), so CLAMP the aspect to the
-    // envelope's OWN portrait ratio: it then frames as a centred phone-shaped column
-    // with the star field filling the sides, and gets a little breathing room so it
-    // reads tidy — not edge-to-edge — on desktop (owner: "زبطها تبين زي التلفون ومرتبة").
+    // Only a LANDSCAPE / wide screen (a desktop) gets the tidy centred portrait column;
+    // EVERY portrait screen — a phone, even ~0.6 aspect once the browser chrome shows —
+    // keeps the full-screen cover fit, edge-to-edge (owner: "بالتلفون بدي المكتوب عكامل
+    // الشاشة"). A raw cover fit on a wide screen is width-constrained and blows the
+    // portrait envelope up ~3–4× (cropped + "weird"), so wide screens clamp the aspect to
+    // the envelope's own portrait ratio + a little breathing room.
     const realAsp = aspect || 1;
-    const asp = Math.min(realAsp, HW / HH);
-    const margin = realAsp > HW / HH ? 1.14 : 1.0;   // desktop: pull back a touch; phone: unchanged
+    const wide = realAsp > 0.85;
+    const asp = wide ? HW / HH : realAsp;
+    const margin = wide ? 1.14 : 1.0;
     const cover = Math.min(HH / tn, HW / (tn * asp)) * margin;
     const tc = clamp01(t);
-    const diss = ease(clamp01((tc - 0.73) / 0.09));
+    const diss = ease(clamp01((tc - 0.65) / 0.08));
     // Sealed = dead head-on. As the flaps open, the camera RISES + looks down into a
     // gentle 3/4 view so the top flap is clearly seen LIFTING up in 3-D (a pure
     // head-on camera only ever looks INTO the opening). Settles back head-on on the
@@ -1599,7 +1600,7 @@ function buildEnvelopeBloom({ pal, preset, content } = {}) {
     // page, no lingering tail, no camera glide. HANDOFF_AT fires the hand-off just after the
     // dissolve completes (0.83→0.89) so the invitation opens the instant the triangles disappear
     // while the OPEN itself stays slow (owner: "بطيء زي ما هو + الدعوة فوراً لما تختفي المثلثات").
-    DIRECT_HANDOFF: true, HANDOFF_AT: 0.83,
+    DIRECT_HANDOFF: true, HANDOFF_AT: 0.74,
     setOpen(t, fov, aspect) { applyVisual(t); return framing(t, fov, aspect); },
     framePose(fov, aspect) { return framing(0, fov, aspect); },
     refreshCard() { /* the bloom shape has no baked card */ },
