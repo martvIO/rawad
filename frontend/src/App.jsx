@@ -21,6 +21,7 @@ import { PeopleGallery } from "./pages/PeopleGallery.jsx";
 import { PayPage } from "./pages/PayPage.jsx";
 import { NotFoundPage } from "./pages/NotFoundPage.jsx";
 import { Portal } from "./pages/portal/Portal.jsx";
+import { DevEnv2 } from "./pages/_DevEnv2.jsx"; // TEMP dev harness — remove
 
 // Public template gallery — lazy so its cards + thumbnails stay out of the
 // landing/main chunk (only prospects who ask for it pay the download).
@@ -125,6 +126,7 @@ export default function App() {
           <Route path="/d/:groomUsername/:token/*" element={<DigitalInvitationPage {...langProps} />} />
           {/* Groom-facing draft preview for the native app's WebView (auth via injected tokens). */}
           <Route path="/preview/digital/:designId" element={<DigitalDesignPreviewPage {...langProps} />} />
+          <Route path="/envelopes-preview" element={<DevEnv2 />} />{/* TEMP owner preview — remove */}
           <Route path="/g/:groomUsername/*" element={<PeopleGallery {...langProps} />} />
           <Route path="/portal/*" element={<Portal onBack={onBack} {...langProps} />} />
           {/* Eager, unlike /templates above: this is the error path, so making it
