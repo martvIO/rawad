@@ -1558,8 +1558,16 @@ function buildEnvelopeBloom({ pal, preset, content } = {}) {
   // gentle push-IN on the final dissolve toward the revealed invitation.
   function framing(t, fov, aspect) {
     const tn = Math.tan(((fov || 34) * Math.PI / 180) / 2);
-    const asp = aspect || 1;
-    const cover = Math.min(HH / tn, HW / (tn * asp));
+    // On a portrait phone the tall envelope fills the screen edge-to-edge. On a WIDE
+    // desktop screen a raw cover-fit is width-constrained and blows the portrait
+    // envelope up (~3–4× too tall, cropped + "weird"), so CLAMP the aspect to the
+    // envelope's OWN portrait ratio: it then frames as a centred phone-shaped column
+    // with the star field filling the sides, and gets a little breathing room so it
+    // reads tidy — not edge-to-edge — on desktop (owner: "زبطها تبين زي التلفون ومرتبة").
+    const realAsp = aspect || 1;
+    const asp = Math.min(realAsp, HW / HH);
+    const margin = realAsp > HW / HH ? 1.14 : 1.0;   // desktop: pull back a touch; phone: unchanged
+    const cover = Math.min(HH / tn, HW / (tn * asp)) * margin;
     const tc = clamp01(t);
     const diss = ease(clamp01((tc - 0.83) / 0.06));
     // Sealed = dead head-on. As the flaps open, the camera RISES + looks down into a
