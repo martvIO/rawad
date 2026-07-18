@@ -40,6 +40,46 @@ The guest photos page (`/d/:user/:token/photos`) now runs on a server-side face 
 - **Guest phone fields use the shared `PhoneInput`** — both the digital-invitation RSVP (`components/digital/sections/InviteRsvp.jsx`) and the "your photos" enrollment (`pages/DigitalYourPhotos.jsx`) replaced their bare `<input>` with the groom-portal `components/PhoneInput.jsx` (country picker, 2-3-4 formatting, live ✓, and **Arabic-Indic→Latin digit conversion via `toWesternDigits`**). This fixed a real bug: the bare inputs silently dropped Arabic numerals (٠١٢٣) so a guest typing them saw "invalid phone". Submit/enroll now gate on the exported `isCompletePhone(e164)`. Server `normalisePhone` already accepts E.164, so no backend change.
 - **Import guests from contacts (vCard / CSV)** — the digital add-guest bulk panel (`pages/portal/groom/digital/DigitalAddGuest.jsx`) gained a "📇 import from contacts" file upload. `utils/contactsImport.js` (dependency-free) parses `.vcf` (FN/N + prefers a CELL/MOBILE TEL, unfolds folded lines) and `.csv`/`.tsv` (skips header, picks the most-digit cell as phone so an email column isn't mistaken for one) into "Name, Phone" lines that feed the existing `parseGuestLines` preview + dedup + batch-add. **Truth about platforms:** no browser has a native contact picker on iPhone Safari or desktop (`navigator.contacts.select` is Android-Chrome-only) — file upload is the only universal method; the user exports contacts to a `.vcf`/`.csv` and uploads. Unit tests: `__tests__/utils/contactsImport.test.js`.
 
+## Bloom envelope shipped as a selectable style + per-invitation colours (2026-07-18)
+A second opening-envelope **shape** — `bloom`, a portrait envelope whose four triangular
+flaps fold outward in an X to reveal a warm glow, with a falling-snow (snowflake) emboss on
+the cardstock and a circle-crack wax seal — is now a **groom-selectable style** in the design
+editor, alongside `classic`. It was already fully built in the renderer (`STYLE_PRESETS.bloom`
+→ `buildEnvelopeBloom` in `envelopeMesh.js`); this change wired it into the editor + let its
+colours be customised per invitation.
+
+- **Style picker:** added `{ key: "bloom", … }` to `ENVELOPE_STYLES` in
+  `shared/src/data/digitalTemplates.js` (the one list both the web + native editors read).
+  Persists as `design.envelope.style`; the backend already validated it as a free slug.
+- **The real fix:** `buildEnvelope` previously did `...(styled ? preset.palette : colors)`,
+  which **discarded the groom's colours** for any styled preset — every picker was a no-op
+  under bloom. Now it threads the **raw** `design.envelope` overrides (not the theme-resolved
+  `colors`) and layers the explicit hex picks OVER the preset palette, so an untouched bloom
+  keeps its signature blush/ivory/gold defaults and only picked colours win. `glow` (reveal
+  light + rays), `snow` (floral emboss tint), `linen` flow through a per-render bloom preset;
+  the foil pick also drives the seal emblem gold (derived `foilBright` → `sealLogo`).
+- **Plumbing:** `overrides` (raw `design.envelope`) now rides alongside `colors` through
+  `CelestialAmbience` → `celestialEngine.buildEnvelope`; the editor's `EnvelopePreview` passes
+  the chosen `style` + `overrides` and re-bakes on style/glow/snow change. The classic path is
+  unchanged (still uses `colors`).
+- **Editor UI:** `envIsBloom` gates the envelope rows — cardstock(`paper`)/wax/gold(`foil`)
+  always; **glow + snow** pickers shown only for bloom; inner-card(`cardPaper`/`cardInk`) and
+  the arabesque star toggles/sliders hidden for bloom (it has neither). The background **stars**
+  colour was already a separate wired control (`design.starfield.color`).
+- **Backend (the one DB-adjacent change):** added `glow`,`snow` to `ENVELOPE_COLOR_KEYS`
+  (`constants.ts`) + the `EnvelopeSettings` type so `sanitizeEnvelope` persists them as `#rrggbb`;
+  no `firestore.rules`/`database.rules.json` change (design docs are owner/admin-gated, no
+  field-level validate). Tests in `digitalEnvelopeSanitize.test.ts` (14/14).
+- **Bloom motion polish** carried in the same files (earlier this session): the reveal rays now
+  light the side-triangles' shared upper edges; a falling-snow emboss replaced the earlier
+  florals; the circle-crack wax seal was restored; and the hand-off is **instant** — the moment
+  the flaps vanish (openT 0.83→0.89 dissolve, `HANDOFF_AT` 0.90) the digital invitation opens,
+  with no white page and no camera glide (`DIRECT_HANDOFF`).
+- Still deployed with the temp `/envelopes-preview` (`_DevEnv2.jsx`) no-login harness; safe to
+  remove now the in-editor picker supersedes it. Verified: builds + unit tests + a clean 3-lens
+  adversarial code review (0 blockers/majors). Headless WebGL screenshotting was flaky this
+  session, so the live editor flow is owner-verified. See [[Visual Design System]].
+
 ## Celestial 3D envelope — luxury PBR build, white/gold recolour (2026-06-29)
 The invitation's opening ceremony is a procedural **three.js** envelope inside a drifting particle world (`components/digital/celestial/`: `celestialEngine.js`, `CelestialCanvas.jsx`, `envelopeMesh.js`, `particles.glsl.js`; orchestrated by `sections/CelestialAmbience.jsx`, with the legible sealed text as a DOM overlay in `CelestialEnvelopeOverlay.jsx`). The lazy three.js chunk loads only when the world runs.
 

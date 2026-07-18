@@ -361,3 +361,6 @@ Touched: Digital-Invitations, Tasks-Backlog, Template-Demo-Surfaces, index
 
 ## [2026-07-17 12:40] session | Template catalogue COMPLETE — 8/8, royal-gold shipped
 Touched: Digital-Invitations, Tasks-Backlog, Template-Demo-Surfaces, index
+
+## [2026-07-18 21:15] session | Bloom envelope shipped on-site + colour pickers
+Touched: Digital-Invitations
