@@ -2092,14 +2092,26 @@ function buildEnvelopeGate({ pal, preset } = {}) {
     try { xa.filter = "none"; } catch { /* ignore */ }
     doorAoTex.needsUpdate = true;
   });
+  // Photoreal DOOR: a REAL marble PBR (photographed colour + normal + roughness), not
+  // procedural. Bundled 512² maps loaded via TextureLoader; the Texture is assigned to
+  // the material immediately so the `map` shader define is stable (no mid-open recompile)
+  // and the image just uploads when it arrives.
+  const texLoader = new THREE.TextureLoader();
+  const cfgTex = (t, srgb, rx, ry) => { if (srgb) setSRGB(t); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(rx, ry); t.anisotropy = 8; disposables.push(t); return t; };
+  // 1×1 colour placeholder → the map define is present from construction, so swapping the
+  // real photo in on load is a texture upload, NOT a shader recompile, and there's no black
+  // flash / broken-normal frame before the async maps arrive (they load in the boot window).
+  const px1 = (hex, srgb) => { const c = document.createElement("canvas"); c.width = c.height = 1; const g = c.getContext("2d"); g.fillStyle = hex; g.fillRect(0, 0, 1, 1); const t = new THREE.CanvasTexture(c); if (srgb) setSRGB(t); disposables.push(t); return t; };
   const doorMat = new THREE.MeshStandardMaterial({
-    color: 0xffffff, map: arab.color, metalnessMap: arab.metal, metalness: 1.0,
-    roughnessMap: arab.rough, roughness: 0.52,
-    normalMap: doorNorTex, normalScale: new THREE.Vector2(1.5, 1.5),
-    aoMap: doorAoTex, aoMapIntensity: 1.15,
-    bumpMap: grain, bumpScale: 0.004, envMap: env, envMapIntensity: 0.5, emissive: doorCol, emissiveIntensity: 0.02,
+    color: 0xffffff,
+    map: px1("#35332f", true), normalMap: px1("#8080ff", false), roughnessMap: px1("#c8c8c8", false),
+    normalScale: new THREE.Vector2(0.7, 0.7), roughness: 0.9, metalness: 0.0,
+    envMap: env, envMapIntensity: 0.6,
     side: THREE.DoubleSide, transparent: true, depthWrite: true,
   });
+  texLoader.load("/tex3d/marble_c.jpg", (t) => { doorMat.map = cfgTex(t, true, 1.3, 2.6); });
+  texLoader.load("/tex3d/marble_n.jpg", (t) => { doorMat.normalMap = cfgTex(t, false, 1.3, 2.6); });
+  texLoader.load("/tex3d/marble_r.jpg", (t) => { doorMat.roughnessMap = cfgTex(t, false, 1.3, 2.6); });
   const goldMat = new THREE.MeshPhysicalMaterial({
     color: goldCol, metalness: 1.0, roughness: 0.2, clearcoat: 0.6, clearcoatRoughness: 0.15,
     envMap: env, envMapIntensity: 1.9, emissive: goldBright, emissiveIntensity: 0.06,
@@ -2414,7 +2426,6 @@ function buildEnvelopeBook({ pal, preset } = {}) {
   const disposables = [];
   const pendingBakes = [];
   const env = makeRoomEnv(disposables);
-  const grain = makeLinenGrainB(disposables);
   const HW = 0.94, HH = 1.94;
 
   const bw = 0.74, bh = 1.12, bd = 0.14;   // book half-extents (portrait), half-thickness
@@ -2433,63 +2444,38 @@ function buildEnvelopeBook({ pal, preset } = {}) {
   const washQuad = new THREE.Mesh(new THREE.PlaneGeometry(30, 30), washMat);
   washQuad.position.set(0, 0, 0.5); washQuad.renderOrder = 1; washQuad.visible = false; group.add(washQuad);
 
-  const coverMat = new THREE.MeshStandardMaterial({ color: coverCol, roughness: 0.62, metalness: 0, bumpMap: grain, bumpScale: 0.012, envMap: env, envMapIntensity: 0.14, emissive: coverCol, emissiveIntensity: 0.14, side: THREE.DoubleSide, transparent: true, depthWrite: true });
+  // Photoreal COVER: real burgundy LEATHER — the preset's burgundy base carrying a
+  // photographed leather grain (normal) + roughness map (real pores / wrinkles / varied
+  // sheen), not a procedural emboss. 512² maps via TextureLoader; assigned to the material
+  // immediately so the shader defines are stable (no mid-open recompile), image uploads
+  // when it arrives. Both covers share the two textures (one decode).
+  const texLoader = new THREE.TextureLoader();
+  const cfgTex = (t, srgb, rx, ry) => { if (srgb) setSRGB(t); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(rx, ry); t.anisotropy = 8; disposables.push(t); return t; };
+  const px1 = (hex, srgb) => { const c = document.createElement("canvas"); c.width = c.height = 1; const g = c.getContext("2d"); g.fillStyle = hex; g.fillRect(0, 0, 1, 1); const t = new THREE.CanvasTexture(c); if (srgb) setSRGB(t); disposables.push(t); return t; };
+  // The photo leather is a rich BROWN grain; this tint multiplies it to burgundy/oxblood
+  // (cut the green channel, keep red + blue) so the preset colour is honoured while every
+  // pore, wrinkle and tonal shift in the real grain survives. Both covers share the maps.
+  // 1×1 placeholders keep the shader defines stable (no recompile / flash) until the real
+  // photos load in the boot window and swap in (see the texLoader.load calls after frontMat).
+  const leatherTint = new THREE.Color(1.05, 0.42, 0.58);
+  const lColT = px1("#4a3326", true), lNorT = px1("#8080ff", false), lRghT = px1("#cfcfcf", false);
+  const coverMat = new THREE.MeshStandardMaterial({ color: leatherTint, map: lColT, roughness: 0.95, metalness: 0, normalMap: lNorT, normalScale: new THREE.Vector2(1.1, 1.1), roughnessMap: lRghT, envMap: env, envMapIntensity: 0.35, emissive: coverCol, emissiveIntensity: 0.02, side: THREE.DoubleSide, transparent: true, depthWrite: true });
   const goldMat = new THREE.MeshPhysicalMaterial({ color: goldCol, metalness: 1.0, roughness: 0.2, clearcoat: 0.6, clearcoatRoughness: 0.15, envMap: env, envMapIntensity: 1.8, emissive: goldBright, emissiveIntensity: 0.06, side: THREE.DoubleSide, transparent: true, depthWrite: true });
   const pageMat = new THREE.MeshStandardMaterial({ color: pageCol, roughness: 0.85, metalness: 0, emissive: pageCol, emissiveIntensity: 0.1, side: THREE.DoubleSide, transparent: true, depthWrite: true });
   const frontGold = goldMat.clone();
-  // Front cover: burgundy leather with an EMBOSSED gold arabesque (carved relief via a
-  // raised normal map) + a leather grain — the recipe that makes the gate read as 3D.
-  const arabB = makeArabesque({ bg: "#" + coverCol.getHexString(), line: "#" + goldCol.getHexString(), alpha: 0.42, lineW: 2.2, cells: 2, repeat: [1, 2], withMetal: true });
-  disposables.push(arabB.color, arabB.metal, arabB.rough);
-  const RS = 512;
-  const rHb = document.createElement("canvas"); rHb.width = rHb.height = RS;
-  const rNb = document.createElement("canvas"); rNb.width = rNb.height = RS;
-  const rAb = document.createElement("canvas"); rAb.width = rAb.height = RS;
-  const coverNorTex = new THREE.CanvasTexture(rNb);
-  coverNorTex.wrapS = coverNorTex.wrapT = THREE.RepeatWrapping; coverNorTex.repeat.set(1, 2);
-  const coverAoTex = new THREE.CanvasTexture(rAb);
-  coverAoTex.wrapS = coverAoTex.wrapT = THREE.RepeatWrapping; coverAoTex.repeat.set(1, 2);
-  disposables.push(coverNorTex, coverAoTex);
-  { const xn = rNb.getContext("2d"); xn.fillStyle = "#8080ff"; xn.fillRect(0, 0, RS, RS);
-    const xa0 = rAb.getContext("2d"); xa0.fillStyle = "#ffffff"; xa0.fillRect(0, 0, RS, RS); }
-  const cells = 2, un = RS / cells;
-  const girihStar = (ctx, ox, oy, r, lw) => {
-    ctx.lineWidth = lw;
-    ctx.beginPath();
-    for (let i = 0; i < 16; i++) { const a = (i * Math.PI) / 8 - Math.PI / 2; const rr = i % 2 === 0 ? r : r * 0.45; const px = ox + Math.cos(a) * rr, py = oy + Math.sin(a) * rr; i ? ctx.lineTo(px, py) : ctx.moveTo(px, py); }
-    ctx.closePath(); ctx.stroke();
-    ctx.beginPath();
-    for (let i = 0; i < 8; i++) { const a = (i * Math.PI) / 4; const px = ox + Math.cos(a) * r * 0.4, py = oy + Math.sin(a) * r * 0.4; i ? ctx.lineTo(px, py) : ctx.moveTo(px, py); }
-    ctx.closePath(); ctx.stroke();
-  };
-  const girihGrid = (ctx, lw1, lw2) => {
-    for (let gy = 0; gy <= cells; gy++) for (let gx = 0; gx <= cells; gx++) girihStar(ctx, gx * un, gy * un, un * 0.5, lw1);
-    for (let gy = 0; gy < cells; gy++) for (let gx = 0; gx < cells; gx++) girihStar(ctx, gx * un + un / 2, gy * un + un / 2, un * 0.24, lw2);
-  };
-  pendingBakes.push(() => {
-    const x = rHb.getContext("2d");
-    x.fillStyle = "#787878"; x.fillRect(0, 0, RS, RS);
-    x.strokeStyle = "#ffffff"; x.lineJoin = "round"; x.lineCap = "round";
-    try { x.filter = "blur(1.1px)"; } catch { /* ignore */ }
-    girihGrid(x, RS * 0.012, RS * 0.009);
-    try { x.filter = "none"; } catch { /* ignore */ }
-    heightToNormal(rHb, 3.4, rNb);
-    coverNorTex.needsUpdate = true;
-    const xa = rAb.getContext("2d");
-    xa.fillStyle = "#ffffff"; xa.fillRect(0, 0, RS, RS);
-    xa.strokeStyle = "rgba(20,6,12,0.55)"; xa.lineJoin = "round"; xa.lineCap = "round";
-    try { xa.filter = "blur(3.2px)"; } catch { /* ignore */ }
-    girihGrid(xa, RS * 0.028, RS * 0.022);
-    try { xa.filter = "none"; } catch { /* ignore */ }
-    coverAoTex.needsUpdate = true;
-  });
+  // Front cover: the same real burgundy leather (shared maps) + a gold border frame and
+  // diamond emblem (separate geometry below). The photographed grain + roughness carry the
+  // realism; no procedural emboss.
   const frontMat = new THREE.MeshStandardMaterial({
-    color: 0xffffff, map: arabB.color, metalnessMap: arabB.metal, metalness: 1.0,
-    roughnessMap: arabB.rough, roughness: 0.48, normalMap: coverNorTex, normalScale: new THREE.Vector2(1.3, 1.3),
-    aoMap: coverAoTex, aoMapIntensity: 1.15,
-    bumpMap: grain, bumpScale: 0.016, envMap: env, envMapIntensity: 0.75, emissive: coverCol, emissiveIntensity: 0.05,
+    color: leatherTint, map: lColT, roughness: 0.92, metalness: 0,
+    normalMap: lNorT, normalScale: new THREE.Vector2(1.3, 1.3), roughnessMap: lRghT,
+    envMap: env, envMapIntensity: 0.4, emissive: coverCol, emissiveIntensity: 0.015,
     side: THREE.DoubleSide, transparent: true, depthWrite: true,
   });
+  // Load the real leather photos once, swap them into both covers when ready.
+  texLoader.load("/tex3d/leather_c.jpg", (t) => { cfgTex(t, true, 2.4, 3.2); coverMat.map = frontMat.map = t; });
+  texLoader.load("/tex3d/leather_n.jpg", (t) => { cfgTex(t, false, 2.4, 3.2); coverMat.normalMap = frontMat.normalMap = t; });
+  texLoader.load("/tex3d/leather_r.jpg", (t) => { cfgTex(t, false, 2.4, 3.2); coverMat.roughnessMap = frontMat.roughnessMap = t; });
 
   // Page block (cream, with gilded gold edges) + back cover + spine.
   const pages = new THREE.Mesh(new THREE.BoxGeometry(bw * 2 * 0.92, bh * 2 * 0.95, bd * 2 * 0.9), pageMat);
@@ -2533,10 +2519,10 @@ function buildEnvelopeBook({ pal, preset } = {}) {
 
   // Form-defining light (low ambient + raking key + cool rim + warm fill) so the leather
   // cover, embossed gold + gilded edges read as real 3D, not a flat graphic.
-  group.add(new THREE.AmbientLight(0xfff3ea, 0.3));
-  const key = new THREE.DirectionalLight(0xfff4e2, 1.55); key.position.set(6.5, 6, 6); group.add(key);
+  group.add(new THREE.AmbientLight(0xfff3ea, 0.32));
+  const key = new THREE.DirectionalLight(0xfff4e2, 1.8); key.position.set(7.5, 3.2, 3.6); group.add(key);  // grazing rake → leather grain catches light
   const rim = new THREE.DirectionalLight(0xbcd2ff, 0.7); rim.position.set(-5.5, 2.5, -4); group.add(rim);
-  const fill = new THREE.DirectionalLight(0xffe6cf, 0.3); fill.position.set(-4, -2.5, 5); group.add(fill);
+  const fill = new THREE.DirectionalLight(0xffe6cf, 0.44); fill.position.set(-4, -2.5, 5); group.add(fill);
   const innerGlow = new THREE.PointLight(glowCol, 0.0, 9 * S, 1); innerGlow.position.set(0, 0.1, 0.0); group.add(innerGlow);
 
   const smooth = (x) => { const c = clamp01(x); return c < 0.5 ? 2 * c * c : 1 - Math.pow(-2 * c + 2, 2) / 2; };
