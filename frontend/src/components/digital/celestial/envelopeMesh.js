@@ -64,6 +64,14 @@ const STYLE_PRESETS = {
     palette: { paper: "#f7e7e8", foil: "#c98a90", foilBright: "#f2d8d4", wax: "#8a2230", cardPaper: "#fdf6f5", cardInk: "#5a2530", sealLogo: "#eccf94" },
     floralTint: "#ecd2d3", glow: "#ffcf9a", linen: "#f6e6e6",
   },
+  // A DIFFERENT SHAPE: two pleated velvet drapes on a gold rod that DRAW APART to a
+  // warm light, then dissolve into the "through the light" hand-off. Fixed luxury
+  // palette (no groom colour pickers). `shape:"curtain"` → buildEnvelopeCurtain.
+  "curtain": {
+    shape: "curtain", light: true,
+    palette: { velvet: "#e7dbc4", gold: "#c9a24e", goldBright: "#f0deA0" },
+    glow: "#ffe6c2",
+  },
   "royal-blush": {
     palette: { paper: "#f7e7e8", foil: "#c98a90", foilBright: "#f2d8d4", wax: "#8a2230", cardPaper: "#fdf6f5", cardInk: "#5a2530" },
     floralTint: "#ecd2d3", glow: "#ffcf9a", linen: "#f4e2e2",
@@ -138,6 +146,7 @@ export function buildEnvelope({ style, colors, overrides, content } = {}) {
     };
     return buildEnvelopeBloom({ pal, preset: presetForBloom, content });
   }
+  if (preset && preset.shape === "curtain") return buildEnvelopeCurtain({ pal, preset, content });
   // Star (arabesque) options — one coherent system across the flap + shell.
   // They ride on the same `colors` object from resolveEnvelopePalette().
   const starsEnabled = colors?.starsEnabled !== false;            // default ON
@@ -1720,6 +1729,227 @@ function buildEnvelopeBloom({ pal, preset, content } = {}) {
     setOpen(t, fov, aspect) { applyVisual(t); return framing(t, fov, aspect); },
     framePose(fov, aspect) { return framing(0, fov, aspect); },
     refreshCard() { /* the bloom shape has no baked card */ },
+    dispose,
+  };
+}
+
+// ── VELVET CURTAINS SHAPE ─────────────────────────────────────────────────────
+// Two pleated velvet drapes on a gold rod that DRAW APART (gathering toward their
+// outer edges) to reveal a warm light, then dissolve into the "through the light"
+// hand-off. Same engine contract + BAKE_QUEUE / no-recompile perf rules as bloom.
+function buildEnvelopeCurtain({ pal, preset } = {}) {
+  const velvetCol  = col(pal && pal.velvet, "#6a1a2e");
+  const goldCol    = col(pal && pal.gold, "#d9b45a");
+  const goldBright = col(pal && pal.goldBright, "#f4e2a8");
+  const glowCol    = col(preset && preset.glow, "#ffd79a");
+
+  const group = new THREE.Group();
+  const S = 3.0; group.scale.setScalar(S);
+  let disposed = false;
+  const disposables = [];
+  const pendingBakes = [];
+  const env = makeStudioEnvB(disposables);
+
+  const HW = 0.94, HH = 1.94; // tall portrait — matches bloom so framing is identical
+  const zt = 0.06;
+
+  // Interior light + full-screen wash, revealed as the drapes part (depth-tested
+  // behind them so the closed velvet occludes it; the widening gap reveals it).
+  const innerCanvas = document.createElement("canvas"); innerCanvas.width = innerCanvas.height = 256;
+  const innerTex = new THREE.CanvasTexture(innerCanvas); disposables.push(innerTex);
+  pendingBakes.push(() => { paintSprite(innerCanvas, "glow"); innerTex.needsUpdate = true; });
+  const innerMat = new THREE.MeshBasicMaterial({ map: innerTex, color: glowCol, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending });
+  const innerLight = new THREE.Mesh(new THREE.PlaneGeometry(HW * 4.4, HH * 4.4), innerMat);
+  innerLight.position.set(0, 0, -0.05); innerLight.renderOrder = 2; group.add(innerLight);
+  const washCol = glowCol.clone().lerp(new THREE.Color("#fff7e8"), 0.15);
+  const washMat = new THREE.MeshBasicMaterial({ color: washCol, transparent: true, opacity: 0, depthWrite: false, depthTest: false });
+  const washQuad = new THREE.Mesh(new THREE.PlaneGeometry(30, 30), washMat);
+  washQuad.position.set(0, 0, 0.5); washQuad.renderOrder = 1; washQuad.visible = false; group.add(washQuad);
+
+  // Dark backing so no starfield peeks through the centre seam before the parting.
+  const backMat = new THREE.MeshStandardMaterial({ color: 0x1c0b12, roughness: 0.9, metalness: 0, transparent: true, depthWrite: true });
+  const back = new THREE.Mesh(new THREE.PlaneGeometry(HW * 2.3, HH * 2.3), backMat);
+  back.position.z = -0.12; group.add(back);
+
+  // REALISTIC velvet: the fold RELIEF now comes from real 3D geometry (mkPanel below),
+  // not a fake normal map, and the material carries the sheen BRDF — retro-reflective
+  // fuzz that lights the fold shoulders + grazing silhouette, the thing a plain
+  // MeshStandard can't do (v1 read as flat). A fine grain bump adds micro-fibre. Deep
+  // burgundy lifted a touch out of near-black; transparent from construction (only
+  // opacity/depthWrite animate later).
+  const grain = makeLinenGrainB(disposables);
+  const velvetMat = new THREE.MeshPhysicalMaterial({
+    color: velvetCol,                    // cream — the fold light/shadow comes from the 3D geometry
+    roughness: 0.74, metalness: 0.0,     // + the side-raking key, NOT baked shading (reads as real cloth)
+    sheen: 0.85, sheenColor: new THREE.Color("#fff0d6"), sheenRoughness: 0.45,
+    bumpMap: grain, bumpScale: 0.012,
+    envMap: env, envMapIntensity: 0.10,
+    emissive: velvetCol, emissiveIntensity: 0.05,
+    vertexColors: true,                  // baked fold-valley AO (mkPanel) → deeper, realer folds
+    side: THREE.DoubleSide, transparent: true, depthWrite: true,
+  });
+
+  // Natural velvet FOLD profile across the panel width (u ∈ [0,1]): a SUM of a few
+  // cosines at different frequencies + fixed phases → irregular, organic fold spacing
+  // (~6 major folds) rather than a mechanical single sine. Deterministic (no random).
+  const foldZ = (u) =>
+      Math.sin(u * 7 * Math.PI * 2 + 0.6) * 0.52 +
+      Math.sin(u * 4.3 * Math.PI * 2 + 2.2) * 0.34 +
+      Math.sin(u * 2.7 * Math.PI * 2 + 5.1) * 0.22 +
+      Math.sin(u * 11 * Math.PI * 2 + 3.7) * 0.14;  // organic, irregular ≈ [-1.2, 1.2]
+  const FAMP = 0.17;
+  // Two drape panels, each pivoted at its OUTER edge so scaling x gathers the fabric
+  // toward that edge (the inner edge sweeps outward → the centre gap opens).
+  const mkPanel = (sx) => {
+    // A high-segment plane DISPLACED in z into real 3D folds (one-time build cost): the
+    // ridges catch the raking key, the valleys fall to shadow (deepened by baked AO
+    // vertex colours), and the panel's edge shows the wavy fold cross-section — genuine
+    // folded fabric. Fold amplitude tapers to ~0 at the top and fills toward the bottom,
+    // with a slight forward belly + a pooling hem kick.
+    const geo = new THREE.PlaneGeometry(HW, HH * 2, 96, 40);
+    const pos = geo.attributes.position;
+    const colr = new Float32Array(pos.count * 3);
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i), y = pos.getY(i);
+      const u = (x + HW / 2) / HW;                    // 0..1 across the panel width
+      const vy = (y + HH) / (HH * 2);                 // 0 bottom .. 1 top
+      const taper = 0.20 + 0.80 * (1 - vy);           // pinched at top, full at bottom
+      const hem = vy < 0.14 ? (0.14 - vy) * 0.7 : 0;  // extra fold depth where it pools
+      const belly = 0.06 * Math.sin(vy * Math.PI);    // gentle forward bow mid-height
+      const fv = foldZ(u);
+      pos.setZ(i, FAMP * fv * (taper + hem) + belly);
+      // Soft ambient occlusion baked per-vertex: fold VALLEYS darker, crests full — the
+      // extra depth cue that pushes it from "CG" to "real cloth" (multiplies the cream).
+      const ao = 0.56 + 0.44 * clamp01((fv + 1.2) / 2.4);
+      colr[i * 3] = colr[i * 3 + 1] = colr[i * 3 + 2] = ao;
+    }
+    geo.setAttribute("color", new THREE.BufferAttribute(colr, 3));
+    geo.computeVertexNormals();
+    // Pivot (group) at the TOP OUTER corner (world (sx·HW, HH)) — the curtain HANGS from
+    // there, so scaling the group's x gathers it toward the outer edge (opens the gap)
+    // and a gentle rotation.z swings its free bottom edge in the wind (applyVisual).
+    geo.translate(-sx * HW / 2, -HH, 0);
+    const mesh = new THREE.Mesh(geo, velvetMat);
+    mesh.position.z = zt;
+    const g = new THREE.Group();
+    g.position.set(sx * HW, HH, 0);
+    g.add(mesh); group.add(g);
+    return g;
+  };
+  const leftPanel = mkPanel(-1);           // covers world x [-HW, 0]
+  const rightPanel = mkPanel(1);           // covers world x [0, HW]
+
+  // Press feedback: a warm glow blooms at the centre seam on the tap, then the
+  // drapes part. Additive, drawn in front, decays as the parting takes over.
+  const pressCanvas = document.createElement("canvas"); pressCanvas.width = pressCanvas.height = 256;
+  const pressTex = new THREE.CanvasTexture(pressCanvas); disposables.push(pressTex);
+  pendingBakes.push(() => { paintSprite(pressCanvas, "glow"); pressTex.needsUpdate = true; });
+  const pressMat = new THREE.MeshBasicMaterial({ map: pressTex, color: glowCol, transparent: true, opacity: 0, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending });
+  const pressGlow = new THREE.Mesh(new THREE.PlaneGeometry(1.5, HH * 1.7), pressMat);
+  pressGlow.position.set(0, 0, zt + 0.22); pressGlow.renderOrder = 6; pressGlow.visible = false; group.add(pressGlow);
+
+  // Lights — constant count, intensity-driven (never toggled visible, to keep the
+  // point-light count stable and avoid a mid-open shader recompile).
+  // LOW ambient + a strong SIDE-RAKING key: the raking light deepens the vertical fold
+  // shadows (valleys → soft shadow, crests → highlight) so the drape reads as real cloth.
+  // A high ambient (v2 had 0.98) fills the shadows flat — the #1 "looks CG" mistake.
+  group.add(new THREE.AmbientLight(0xfff3ea, 0.40));
+  const key = new THREE.DirectionalLight(0xfff4e2, 1.55); key.position.set(7, 3.5, 4.5); group.add(key);
+  const fill = new THREE.DirectionalLight(0xeaf0ff, 0.30); fill.position.set(-6, -1.5, 4); group.add(fill);
+  const innerGlow = new THREE.PointLight(glowCol, 0.0, 9 * S, 1); innerGlow.position.set(0, 0.1, -0.1); group.add(innerGlow);
+
+  const smooth = (x) => { const c = clamp01(x); return c < 0.5 ? 2 * c * c : 1 - Math.pow(-2 * c + 2, 2) / 2; };
+  const softLinear = (u) => { const c = clamp01(u), a = 0.14, n = 1 - a / 2; return c < a ? (c * c) / (2 * a * n) : (c - a / 2) / n; };
+  const HANDOFF = 0.91;
+
+  function applyVisual(t) {
+    const tt = clamp01(t);
+    // Timeline (DURATION 6.5s): press glow 0→0.10 · drapes draw apart 0.10→0.85
+    //   (gather toward the outer edges + gentle sway) · glow revealed through the
+    //   widening gap · velvet+gold late-fade · wash swells → HANDOFF 0.91 → dim → 1
+    const glowRise = ease(clamp01(tt / 0.07));
+    const glowFall = ease(clamp01((tt - 0.10) / 0.09));
+    const pressF = glowRise * (1 - glowFall);
+    pressMat.opacity = 0.85 * pressF;
+    pressGlow.scale.set(0.7 + 0.5 * glowRise, 1, 1);
+    pressGlow.visible = pressF > 0.003;
+
+    const partRaw = clamp01((tt - 0.10) / 0.75);
+    const partF = softLinear(partRaw);
+    const sc = 1 - 0.66 * partF;                 // gather toward the outer edge (stays a substantial
+                                                 // drape the camera flies BETWEEN, not a thin strip)
+    const zc = 1 + 0.5 * partF;                  // folds bunch DEEPER as the fabric gathers
+    leftPanel.scale.set(sc, 1, zc); rightPanel.scale.set(sc, 1, zc);
+    // WIND: a gentle gust billows each drape's free (bottom) edge toward the OPPOSITE side
+    // of its travel as it opens — the panels hang from a TOP pivot so rotation.z swings the
+    // bottom like real cloth (owner: "كأنه في هوا بزيح شوي منها للجهة العكسية"). Left opens
+    // out-left so its bottom drags right (+z rot) and vice-versa → both billow inward.
+    const windA = 0.05 * Math.sin(partF * Math.PI) + 0.02 * Math.sin(partF * Math.PI * 4);
+    leftPanel.rotation.z = windA; rightPanel.rotation.z = -windA;
+
+    const washDim = smooth(clamp01((tt - HANDOFF) / (1 - HANDOFF)));
+
+    // Late fade: the gathered drapes + gold dissolve into the light near the end.
+    // Only depthWrite flips (pure GL state) — materials are transparent-from-build.
+    const fadeF = smooth(clamp01((partRaw - 0.84) / 0.16));
+    const op = 1 - fadeF;
+    const wantW = fadeF <= 0.0001;
+    if (velvetMat.depthWrite !== wantW) { velvetMat.depthWrite = wantW; backMat.depthWrite = wantW; }
+    velvetMat.opacity = op; backMat.opacity = op;
+
+    // Interior glow + wash ("through the light"), revealed by the widening gap.
+    const revealF = smooth(clamp01(partF / 0.10));
+    const flareF  = smooth(clamp01((tt - (HANDOFF - 0.13)) / 0.09));
+    // Keep the light MODEST while the drapes part + the camera flies between them (so the
+    // velvet stays visible), then flare to the full golden wash only at the climax.
+    innerMat.opacity = (0.12 + 0.34 * flareF) * (1 - washDim) * revealF;
+    innerLight.visible = innerMat.opacity > 0.002;
+    const ws = 1 + 0.9 * flareF; innerLight.scale.set(ws, ws, 1);
+    washMat.opacity = 0.78 * flareF * (1 - washDim);   // warm GOLD climax, not a blown-out white page
+    washQuad.visible = washMat.opacity > 0.002;
+
+    const grow = partF * (2 - partF);
+    innerGlow.intensity = (0.22 + 2.1 * grow) * (1 - washDim);
+  }
+
+  // Head-on cover fit (phones fill edge-to-edge, wide desktops get the tidy portrait
+  // column) — PLUS a forward DOLLY: as the drapes part the camera pushes in through the
+  // widening gap toward the light behind them (owner: "الكاميرا تفوت لجوا ورا البرداي").
+  // The engine eases the returned z, so a per-openT-shrinking z reads as a smooth
+  // fly-in and the shared star field rushes past. The drapes fade before the camera
+  // reaches their plane, so nothing clips.
+  function framing(t, fov, aspect) {
+    const tn = Math.tan(((fov || 34) * Math.PI / 180) / 2);
+    const realAsp = aspect || 1;
+    const wide = realAsp > 0.85;
+    const asp = wide ? HW / HH : realAsp;
+    const margin = wide ? 1.14 : 1.0;
+    const zBase = Math.min(HH / tn, HW / (tn * asp)) * margin * S;
+    const dolly = smooth(clamp01((clamp01(t) - 0.10) / 0.75));
+    return { y: 0, z: zBase * (1 - 0.60 * dolly), lookAtY: 0 };
+  }
+
+  applyVisual(0);
+
+  function dispose() {
+    if (disposed) return; disposed = true;
+    group.traverse((o) => {
+      if (o.geometry) o.geometry.dispose();
+      if (o.material) {
+        const mats = Array.isArray(o.material) ? o.material : [o.material];
+        for (const m of mats) { for (const k of ["map", "normalMap", "roughnessMap", "metalnessMap", "envMap"]) if (m[k] && m[k].dispose) m[k].dispose(); m.dispose(); }
+      }
+    });
+    for (const d of disposables) { try { d.dispose(); } catch { /* ignore */ } }
+  }
+
+  return {
+    group, REVEAL_AT: 0.10, DURATION: 6.5,
+    DIRECT_HANDOFF: true, HANDOFF_AT: HANDOFF, WASH_TAIL: true,
+    BAKE_QUEUE: pendingBakes, WARM_TEXTURES: [innerTex, pressTex],
+    setOpen(t, fov, aspect) { applyVisual(t); return framing(t, fov, aspect); },
+    framePose(fov, aspect) { return framing(0, fov, aspect); },
+    refreshCard() { /* the curtain shape has no baked card */ },
     dispose,
   };
 }
