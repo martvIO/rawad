@@ -112,6 +112,29 @@ flattens the climax to a matte wall; and the additive boost must stay modest
 (`innerMat` peak ≈0.53, wash 0.88, washCol only 0.15-lerped to white) or ACES blows the climax
 out to the white page the owner rejected. Classic regression + double-replay verified clean.
 
+## Bloom luxury cascade — stillness, top-first, edge light (2026-07-19, 3rd iteration)
+Owner grilled a more ceremonial open (supersedes the all-four-together choreography of
+`7616b65` while keeping its slide motion and both bookends). Locked decisions: ~0.8s
+suspenseful STILLNESS after the crack; the TOP triangle slides out alone and the other
+three release exactly at its halfway point (overlapping cascade, same `softLinear`);
+edge glow BOTH ways — light spills along the two diagonals the top uncovers AND each
+flap's hairline ignites toward hot gold over the first 30% of its own travel;
+**DURATION 8.0s**, `HANDOFF 0.92` (tail 0.64s < the 650ms done→gone timer), `REVEAL_AT 0.090`.
+
+Design was Plan-agent drafted and 3-lens adversarially verified before build; the one
+confirmed defect (origin-centred spill plane poking a glow nub past the outer corner,
+where nothing occludes) was fixed by shortening to `diagLen·0.85` re-anchored toward
+centre. Implementation notes: seam-spill planes reuse the previously dead
+`makeSeamGlowTex()`, sit at z 0.02 BEHIND the flaps (depth-tested) so the closed paper
+physically masks them — the top's departure reveals them per-pixel, and they can never
+light the outer paper; the TOP flap got `flapMat/edgeMat` CLONES (shared textures +
+compiled program — the deferred floral bake reaches both) for its own fade clock;
+contact shadows regained per-caster tags (top's strips lift with the top); all perf
+invariants held (no transparent flips/needsUpdate, constant light count, BAKE_QUEUE
+untouched, spillTex joins WARM_TEXTURES). Verified: beat screenshots across all 12
+beats, stillness truly still, 18ms max frame gap at tap/stillness/fades/handoff,
+classic + replay clean, 756+631 tests green.
+
 ## Envelope boot performance + invite cold-start diet (2026-07-19)
 Owner reported "lag" — grilling + Playwright profiling showed the animation RUNTIME was
 already 60fps; the real problems were the **boot** (one monolithic 7.9s main-thread bake

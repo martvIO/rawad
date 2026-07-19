@@ -1343,6 +1343,16 @@ function buildEnvelopeBloom({ pal, preset, content } = {}) {
     emissive: col(pal.paper, "#f7e7e8"), emissiveIntensity: 0.42,
     side: THREE.DoubleSide, transparent: true, depthWrite: true, // see flapMat note
   });
+  // The TOP flap leads the cascade and fades on its own clock, so it carries its
+  // own material instances. clone() copies texture REFERENCES (the deferred floral
+  // bake's needsUpdate reaches both) and an identical define-set → the clones share
+  // the originals' compiled shader program; no new compile, no boot-contract change.
+  const flapMatTop = flapMat.clone();
+  const edgeMatTop = edgeMat.clone();
+  // Hairline-ignite colours: each departing flap's border brightens from the resting
+  // foil toward a hot gold aligned with the preset's glow (coherent on custom palettes).
+  const edgeBase = col(pal.foil, "#c98a90");
+  const edgeHot = glowCol.clone().lerp(new THREE.Color("#fff7e0"), 0.30);
 
   // Inner back — revealed as the flaps open, then fades with the structure at the
   // end. NO invitation card: the flaps open and the structure dissolves straight
@@ -1374,13 +1384,35 @@ function buildEnvelopeBloom({ pal, preset, content } = {}) {
   const washQuad = new THREE.Mesh(new THREE.PlaneGeometry(30, 30), washMat);
   washQuad.position.set(0, 0, 0.5); washQuad.renderOrder = 1; washQuad.visible = false; group.add(washQuad);
 
+  // LUXURY seam-spill: warm light hugging the two upper diagonals the TOP triangle
+  // uncovers as it leads the cascade. Placed BEHIND the flaps (z 0.02 < zt 0.05)
+  // and depth-tested, so the closed paper physically occludes it and the top flap's
+  // departure reveals it per-pixel — no manual masking, and it can never light the
+  // outer paper. Length 0.85·diagLen re-anchored toward the centre: an origin-
+  // centred full-diagonal plane would poke a glow nub past the outer corner, where
+  // no flap or back panel occludes (verifier-confirmed leak). Bright end (u=0 of
+  // makeSeamGlowTex) anchors at the seal/centre. Same define-set as innerMat →
+  // shares its compiled program; a mesh, not a light (light count stays constant).
+  const spillTex = makeSeamGlowTex(); disposables.push(spillTex);
+  const diagLen = Math.hypot(HW, HH);
+  const mkSeamSpill = (sx) => {
+    const m = new THREE.MeshBasicMaterial({ map: spillTex, color: glowCol, transparent: true, opacity: 0, depthWrite: false, depthTest: true, blending: THREE.AdditiveBlending });
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(diagLen * 0.85, 0.46), m);
+    mesh.position.set(sx * HW * 0.425, HH * 0.425, 0.02);
+    mesh.rotation.z = Math.atan2(HH, sx * HW); // local +x runs centre → top corner
+    mesh.renderOrder = 2; mesh.visible = false;
+    group.add(mesh);
+    return { mesh, mat: m };
+  };
+  const spillL = mkSeamSpill(-1), spillR = mkSeamSpill(1);
+
   // Four flaps tiling the rectangle in an X (two diagonals), hinged at outer edges.
   // A foil hairline on each flap's edges makes the X seams + border read (like a
   // real envelope back) and rides with the flap as it folds.
   const zt = 0.05;
   const edges = [];
-  const addFlap = (pivot, pts) => {
-    const m = bloomFlap(pts, [flapMat, edgeMat]);
+  const addFlap = (pivot, pts, mats) => {
+    const m = bloomFlap(pts, mats);
     const e = new THREE.LineSegments(
       new THREE.EdgesGeometry(m.geometry, 20),
       new THREE.LineBasicMaterial({ color: col(pal.foil, "#c98a90"), transparent: true, opacity: 0.55, depthWrite: false }),
@@ -1393,13 +1425,15 @@ function buildEnvelopeBloom({ pal, preset, content } = {}) {
   // a visible sliver of the side flaps — the overlap reads clearly, not a flush tile.
   const OVER = HH * 0.1;
   const leftPivot = new THREE.Group(); leftPivot.position.set(-HW, 0, zt); group.add(leftPivot);
-  const leftFlap = addFlap(leftPivot, [[0, -HH], [0, HH], [HW, 0]]);
+  const leftFlap = addFlap(leftPivot, [[0, -HH], [0, HH], [HW, 0]], [flapMat, edgeMat]);
   const rightPivot = new THREE.Group(); rightPivot.position.set(HW, 0, zt + 0.02); group.add(rightPivot);
-  const rightFlap = addFlap(rightPivot, [[0, -HH], [0, HH], [-HW, 0]]);
+  const rightFlap = addFlap(rightPivot, [[0, -HH], [0, HH], [-HW, 0]], [flapMat, edgeMat]);
   const botPivot = new THREE.Group(); botPivot.position.set(0, -HH, zt + 0.06); group.add(botPivot);
-  addFlap(botPivot, [[-HW, 0], [HW, 0], [0, HH + OVER]]);
+  addFlap(botPivot, [[-HW, 0], [HW, 0], [0, HH + OVER]], [flapMat, edgeMat]);
   const topPivot = new THREE.Group(); topPivot.position.set(0, HH, zt + 0.1); group.add(topPivot);
-  addFlap(topPivot, [[-HW, 0], [HW, 0], [0, -HH - OVER]]);
+  addFlap(topPivot, [[-HW, 0], [HW, 0], [0, -HH - OVER]], [flapMatTop, edgeMatTop]);
+  // Hairline handles for the per-flap ignite (push order above: L, R, B, T).
+  const [edgeL, edgeR, edgeB, edgeT] = edges;
 
   // Professional CONTACT SHADOW: the raised top & bottom flaps cast a soft shadow
   // onto the side flaps beneath, along the four X seams — so it clearly reads that
@@ -1410,7 +1444,7 @@ function buildEnvelopeBloom({ pal, preset, content } = {}) {
   const SHADOW_COL   = 0x140d05;
   const shadowTex = makeShadowTex(); disposables.push(shadowTex);
   const shadows = [];
-  const mkShadow = (flap, S0, S1, centroid) => {
+  const mkShadow = (flap, S0, S1, centroid, caster) => {
     const dx = S1[0] - S0[0], dy = S1[1] - S0[1];
     const L = Math.hypot(dx, dy);
     const ux = dx / L, uy = dy / L;
@@ -1431,13 +1465,15 @@ function buildEnvelopeBloom({ pal, preset, content } = {}) {
     mesh.position.set(S0[0], S0[1], SHADOW_Z);
     mesh.renderOrder = 4;
     flap.add(mesh);
-    shadows.push({ mesh, mat });
+    shadows.push({ mesh, mat, caster });
     return mesh;
   };
-  mkShadow(leftFlap,  [ HW, 0], [0,  HH], [ HW / 3, 0]);
-  mkShadow(leftFlap,  [ HW, 0], [0, -HH], [ HW / 3, 0]);
-  mkShadow(rightFlap, [-HW, 0], [0,  HH], [-HW / 3, 0]);
-  mkShadow(rightFlap, [-HW, 0], [0, -HH], [-HW / 3, 0]);
+  // Upper strips are cast by the TOP flap, lower by the BOTTOM — each lifts off
+  // with its own caster, a free depth-storytelling beat during the top's solo glide.
+  mkShadow(leftFlap,  [ HW, 0], [0,  HH], [ HW / 3, 0], "top");
+  mkShadow(leftFlap,  [ HW, 0], [0, -HH], [ HW / 3, 0], "rest");
+  mkShadow(rightFlap, [-HW, 0], [0,  HH], [-HW / 3, 0], "top");
+  mkShadow(rightFlap, [-HW, 0], [0, -HH], [-HW / 3, 0], "rest");
 
   // A REAL pressed-wax seal that CRACKS IN TWO: two scalloped half-meshes sharing a
   // jagged crack seam, the logo debossed on top. They part + fade on tap.
@@ -1498,18 +1534,23 @@ function buildEnvelopeBloom({ pal, preset, content } = {}) {
   // Single source of truth for the hand-off point: the wash swells INTO it, dims
   // AFTER it, and the returned HANDOFF_AT (which the engine's clearAlpha ramp
   // derives its window from) is this same constant — retuning it can't desync
-  // the mesh's washDim from the engine's reveal tail.
-  const HANDOFF = 0.90;
+  // the mesh's washDim from the engine's reveal tail. At DURATION 8.0 the tail is
+  // (1 − 0.92) × 8.0 = 0.64s — just inside Ambience's 650ms done→gone timer and
+  // the editor's 700ms re-seal delay.
+  const HANDOFF = 0.92;
 
   function applyVisual(t) {
     const tt = clamp01(t);
-    // Timeline (normalized; DURATION 6.5s):
-    //   glow ring 0→0.11 · seal cracks 0.11→0.20 · the four triangles SLIDE 0.22→0.84
-    //   (late fade 0.70→0.84) · wash swells 0.76→0.90 · HANDOFF 0.90 · wash dims → 1
+    // Timeline (normalized; DURATION 8.0s — the luxury cascade):
+    //   glow ring 0→0.075 · seal cracks 0.090→0.165 · STILLNESS 0.165→0.265 (0.8s)
+    //   · TOP triangle slides alone from 0.265 · the other three release at
+    //   top-halfway (0.490) · seam-spill light hugs the two uncovered diagonals ·
+    //   each hairline ignites as its flap departs · per-group late fades · wash
+    //   swells → HANDOFF 0.92 · wash dims → 1
     // Press feedback: the glow ring blooms around the seal on the tap, then decays
     // as the crack takes over (owner: glow first, THEN the envelope opens).
-    const glowRise = ease(clamp01(tt / 0.09));
-    const glowFall = ease(clamp01((tt - 0.13) / 0.09));
+    const glowRise = ease(clamp01(tt / 0.075));
+    const glowFall = ease(clamp01((tt - 0.105) / 0.075));
     const ringF = glowRise * (1 - glowFall);
     ringMat.opacity = 0.95 * ringF;
     sealRing.scale.setScalar(0.70 + 0.50 * glowRise);  // blooms outward from the press
@@ -1521,10 +1562,12 @@ function buildEnvelopeBloom({ pal, preset, content } = {}) {
     sealPulse.intensity = 2.4 * ringF;
 
     // Wax seal CRACKS IN TWO once the glow peaks: the halves part + tip forward,
-    // then fade — fully gone before the triangles start to slide.
-    const crackSnap = ease(clamp01((tt - 0.11) / 0.03));   // sharp fracture instant
-    const split     = smooth(clamp01((tt - 0.12) / 0.07)); // halves part fast
-    const sealFade  = ease(clamp01((tt - 0.14) / 0.06));   // then vanish
+    // then fade. Fully gone at tt 0.165 — where the owner's 0.8s SUSPENSEFUL
+    // STILLNESS begins: no geometry moves until 0.265, only the ring/pulse
+    // afterglow decays. Anticipation is the luxury beat.
+    const crackSnap = ease(clamp01((tt - 0.090) / 0.025)); // sharp fracture instant
+    const split     = smooth(clamp01((tt - 0.098) / 0.057)); // halves part fast
+    const sealFade  = ease(clamp01((tt - 0.115) / 0.050));   // then vanish
     sealGroup.visible = sealFade < 0.999;
     sealGroup.scale.setScalar(1 + 0.02 * Math.sin(crackSnap * Math.PI)); // tiny jolt, NOT a shrink
     const sep  = 0.30 * split;
@@ -1534,49 +1577,77 @@ function buildEnvelopeBloom({ pal, preset, content } = {}) {
     sealTopH.position.set(0,  sep, fwd);         sealTopH.rotation.set( tip, 0,  roll);
     sealBotH.position.set(0, -sep, fwd * 0.96);  sealBotH.rotation.set(-tip, 0, -roll);
 
-    // ALL FOUR triangles slide straight OUT toward their own screen edge — flat,
-    // coplanar, in perfect unison, constant speed after the soft release (owner:
-    // the four parts open together, at a constant speed, and float into the space).
-    const sldRaw = clamp01((tt - 0.22) / 0.62);
-    const sldF = softLinear(sldRaw);
+    // TOP-FIRST CASCADE (owner): the top triangle glides out alone; when it is
+    // halfway (topRaw 0.5 → tt 0.490 exactly), the other three release together.
+    // Same straight glide, same softLinear constant-speed feel for both groups.
+    const topRaw = clamp01((tt - 0.265) / 0.450);
+    const topF = softLinear(topRaw);
+    const restRaw = clamp01((tt - 0.490) / 0.375);
+    const restF = softLinear(restRaw);
     const D_VERT = 2.7, D_SIDE = 1.35;
-    topPivot.position.y   =  HH + D_VERT * sldF;
-    botPivot.position.y   = -HH - D_VERT * sldF;
-    leftPivot.position.x  = -HW - D_SIDE * sldF;
-    rightPivot.position.x =  HW + D_SIDE * sldF;
+    topPivot.position.y   =  HH + D_VERT * topF;
+    botPivot.position.y   = -HH - D_VERT * restF;
+    leftPivot.position.x  = -HW - D_SIDE * restF;
+    rightPivot.position.x =  HW + D_SIDE * restF;
     // all pivot rotations stay 0 — the triangles never fold, they glide
 
-    // Late fade: fully visible for most of the travel, softly dissolving near the
-    // end — never an instant vanish. On a wide desktop (where the side triangles
-    // never physically leave the screen) this IS the "melt into the space around
-    // the column"; on a phone they are near their edges by the time it starts.
-    const fadeF = smooth(clamp01((sldRaw - 0.77) / 0.23));
-    const op = 1 - fadeF;
-    // ONLY a depthWrite flip — pure per-draw GL state, no shader permutation, no
-    // needsUpdate (the materials are transparent-from-construction). Writing depth
-    // until the fade keeps the overlap crisp; releasing it during the fade stops
-    // the still-coplanar triangles punching depth holes into the depth-tested
-    // interior glow behind them.
-    const wantW = fadeF <= 0.0001;
-    if (flapMat.depthWrite !== wantW) {
-      flapMat.depthWrite = wantW; edgeMat.depthWrite = wantW; backMat.depthWrite = wantW;
+    // Per-group late fades: each group dissolves near the end of ITS travel.
+    // ONLY depthWrite flips — pure per-draw GL state, no shader permutation, no
+    // needsUpdate (materials are transparent-from-construction). The back panel
+    // fades with the REST group so the wedge the top vacates stays backed.
+    const topFadeF  = smooth(clamp01((topRaw - 0.77) / 0.23));
+    const restFadeF = smooth(clamp01((restRaw - 0.77) / 0.23));
+    const opTop = 1 - topFadeF, opRest = 1 - restFadeF;
+    const wantWTop = topFadeF <= 0.0001;
+    if (flapMatTop.depthWrite !== wantWTop) {
+      flapMatTop.depthWrite = wantWTop; edgeMatTop.depthWrite = wantWTop;
     }
-    flapMat.opacity = op; edgeMat.opacity = op; backMat.opacity = op;
-    sealMat.opacity = 1 - sealFade;                    // the seal is long gone before the fade
-    for (const e of edges) e.material.opacity = (e.material.userData.base || 0.55) * op;
+    const wantWRest = restFadeF <= 0.0001;
+    if (flapMat.depthWrite !== wantWRest) {
+      flapMat.depthWrite = wantWRest; edgeMat.depthWrite = wantWRest; backMat.depthWrite = wantWRest;
+    }
+    flapMatTop.opacity = opTop; edgeMatTop.opacity = opTop;
+    flapMat.opacity = opRest; edgeMat.opacity = opRest; backMat.opacity = opRest;
+    sealMat.opacity = 1 - sealFade;                    // the seal is long gone before the fades
 
-    // Warm interior light grows as the triangles part; dims fully through the
-    // hand-off tail so nothing is left lit if the env ever outlives openT=1.
+    // EDGE IGNITE (owner: luxury): each flap's gold hairline brightens toward hot
+    // gold over the first 30% of ITS OWN travel, holds while gliding, then dies
+    // with its group's fade. Colour/opacity are uniforms — no recompile, in-place
+    // Color.copy/lerp (no per-frame allocation).
+    const ignTop  = smooth(clamp01(topRaw / 0.30));
+    const ignRest = smooth(clamp01(restRaw / 0.30));
+    edgeT.material.color.copy(edgeBase).lerp(edgeHot, ignTop);
+    edgeT.material.opacity = (0.55 + 0.40 * ignTop) * opTop;
+    for (const e of [edgeL, edgeR, edgeB]) {
+      e.material.color.copy(edgeBase).lerp(edgeHot, ignRest);
+      e.material.opacity = (0.55 + 0.40 * ignRest) * opRest;
+    }
+
+    // SEAM-SPILL (owner: "glowing light from the edges" after the top opens):
+    // hugs the two uncovered diagonals during the top's solo glide — revealed
+    // per-pixel by the departing top flap (depth-tested behind the paper), then
+    // dissolves into the general interior flood once the cascade releases.
     const washDim = smooth(clamp01((tt - HANDOFF) / (1 - HANDOFF)));
-    const grow = sldF * (2 - sldF);
+    const spillGrow = smooth(clamp01(topF / 0.60));
+    const spillFade = smooth(clamp01(restF / 0.45));
+    const spillO = 0.50 * spillGrow * (1 - spillFade) * (1 - washDim);
+    spillL.mat.opacity = spillR.mat.opacity = spillO;
+    spillL.mesh.visible = spillR.mesh.visible = spillO > 0.002;
+    const spw = 0.6 + 0.4 * spillGrow;                 // the glow thickens with the gap
+    spillL.mesh.scale.set(1, spw, 1); spillR.mesh.scale.set(1, spw, 1);
+
+    // Warm interior light: gentle rise during the solo glide, full flood with the
+    // cascade; dims fully through the hand-off tail.
+    const gTop = topF * (2 - topF), gRest = restF * (2 - restF);
+    const grow = 0.35 * gTop + 0.65 * gRest;
     for (const lt of seamLights) lt.intensity = (0.15 + 3.4 * grow) * (1 - washDim);
 
-    // Interior glow — revealed as the triangles part, swelling into the brief
-    // full-screen golden wash at the hand-off ("through the light"), then dimming
-    // as the invitation cross-blends in beneath. Full-bright window ≈ 0.6s, within
-    // the owner's "الضو الي ببين بكل الشاشة خليه بس لمدة ثانية" cap.
-    const revealF = smooth(clamp01(sldF / 0.14));
-    const flareF  = smooth(clamp01((tt - (HANDOFF - 0.14)) / 0.10));
+    // Interior glow — appears with the FIRST gap (the top's), swelling into the
+    // brief full-screen golden wash at the hand-off ("through the light"), then
+    // dimming as the invitation cross-blends in beneath. Perceptual bright window
+    // ≈0.95s, inside the owner's "الضو الي ببين بكل الشاشة خليه بس لمدة ثانية" cap.
+    const revealF = smooth(clamp01(topF / 0.14));
+    const flareF  = smooth(clamp01((tt - (HANDOFF - 0.13)) / 0.09));
     // Keep the additive boost modest — the wash must peak as luminous GOLD, not a
     // blown-out white page (the owner explicitly rejected a white hand-off).
     innerMat.opacity = (0.15 + 0.38 * flareF) * (1 - washDim) * revealF;
@@ -1586,14 +1657,18 @@ function buildEnvelopeBloom({ pal, preset, content } = {}) {
     washMat.opacity = 0.88 * flareF * (1 - washDim);
     washQuad.visible = washMat.opacity > 0.002;
 
-    // Contact shadows: all four fade together over the first quarter of the slide.
-    const shK = (1 - smooth(clamp01(sldRaw / 0.25))) * op;
-    for (const sh of shadows) { sh.mat.opacity = shK; sh.mesh.visible = shK > 0.002; }
+    // Contact shadows lift off with their CASTER: the top's strips fade during the
+    // solo glide, the bottom's stay until the cascade — a free depth beat.
+    for (const sh of shadows) {
+      const raw = sh.caster === "top" ? topRaw : restRaw;
+      const shK = (1 - smooth(clamp01(raw / 0.25))) * opRest; // strips live ON the side flaps
+      sh.mat.opacity = shK; sh.mesh.visible = shK > 0.002;
+    }
 
-    // Central junction glow: grows with the slide PLUS a brief golden pulse at the
-    // crack instant ("seal breaks → light escapes").
+    // Central junction glow: grows with the cascade PLUS a brief golden pulse at
+    // the crack instant — the pulse dies INSIDE the stillness (by tt 0.245).
     innerGlow.intensity = (0.30 + 2.9 * grow) * (1 - washDim)
-                        + 1.6 * crackSnap * (1 - ease(clamp01((tt - 0.19) / 0.12)));
+                        + 1.6 * crackSnap * (1 - ease(clamp01((tt - 0.155) / 0.090)));
   }
 
   // Sealed: fill the screen (cover = the tighter dimension fills). The camera is
@@ -1630,18 +1705,18 @@ function buildEnvelopeBloom({ pal, preset, content } = {}) {
   }
 
   return {
-    group, REVEAL_AT: 0.11, DURATION: 6.5, // tap → invitation ≈ 6.5s (owner: "more than 5-6s")
-    // "Through the light" hand-off: onComplete fires at the wash PEAK (HANDOFF ≈ 5.85s)
-    // while the envelope keeps rendering its dimming wash; WASH_TAIL tells the engine to ramp
-    // clearAlpha → 0 over the tail and remove the env only at openT = 1, so the invitation
-    // cross-blends in BENEATH the dimming gold — no cut, no white page. The tail's wall
-    // clock, (1 − HANDOFF) × DURATION = 0.65s, is sized to CelestialAmbience's 650ms
-    // done→gone timer — retune them together.
+    group, REVEAL_AT: 0.090, DURATION: 8.0, // luxury cascade: tap → invitation ≈ 8s
+    // "Through the light" hand-off: onComplete fires at the wash PEAK (HANDOFF 0.92
+    // ≈ 7.36s) while the envelope keeps rendering its dimming wash; WASH_TAIL tells
+    // the engine to ramp clearAlpha → 0 over the tail and remove the env only at
+    // openT = 1, so the invitation cross-blends in BENEATH the dimming gold — no
+    // cut, no white page. The tail's wall clock, (1 − HANDOFF) × DURATION = 0.64s,
+    // sits just inside CelestialAmbience's 650ms done→gone timer — retune together.
     DIRECT_HANDOFF: true, HANDOFF_AT: HANDOFF, WASH_TAIL: true,
     // Boot contract: the engine drains BAKE_QUEUE one closure per rAF before the
     // first envelope render (or synchronously if a tap beats the drain), then
     // pre-uploads WARM_TEXTURES so nothing uploads mid-choreography.
-    BAKE_QUEUE: pendingBakes, WARM_TEXTURES: [innerTex, ringTex],
+    BAKE_QUEUE: pendingBakes, WARM_TEXTURES: [innerTex, ringTex, spillTex],
     setOpen(t, fov, aspect) { applyVisual(t); return framing(t, fov, aspect); },
     framePose(fov, aspect) { return framing(0, fov, aspect); },
     refreshCard() { /* the bloom shape has no baked card */ },

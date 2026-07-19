@@ -370,3 +370,6 @@ Touched: Digital-Invitations
 
 ## [2026-07-19 09:43] session | Envelope boot perf: 7.9s bake stall → chunked + hitch-free
 Touched: Digital-Invitations
+
+## [2026-07-19 13:50] session | Bloom luxury cascade: stillness, top-first, edge light
+Touched: Digital-Invitations
