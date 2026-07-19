@@ -373,3 +373,6 @@ Touched: Digital-Invitations
 
 ## [2026-07-19 13:50] session | Bloom luxury cascade: stillness, top-first, edge light
 Touched: Digital-Invitations
+
+## [2026-07-19 23:13] session | Publish velvet curtains to editor; drop photoreal gate/book
+Touched: Digital-Invitations

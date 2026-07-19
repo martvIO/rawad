@@ -135,6 +135,45 @@ untouched, spillTex joins WARM_TEXTURES). Verified: beat screenshots across all 
 beats, stillness truly still, 18ms max frame gap at tap/stillness/fades/handoff,
 classic + replay clean, 756+631 tests green.
 
+## Velvet-curtain envelope PUBLISHED; photoreal gate/book built then DROPPED (2026-07-19)
+Owner asked for four new luxurious opening **shapes** (velvet curtains · palace gate ·
+gift box · gilded book) previewed on the no-login `/envelopes-preview` harness (`_DevEnv2.jsx`)
+before any go-live. Outcome: **only the curtain ships.**
+
+- **Curtain** (`الستائر المخملية`) — owner-approved on the preview (cream velvet, real 3D fold
+  geometry + sheen BRDF + wind + camera dolly-in). Now **published to the real groom editor**:
+  a `{ key: "curtain", …, fixedPalette: true }` entry in `ENVELOPE_STYLES`
+  (`shared/src/data/digitalTemplates.js`) — same one-list publish step bloom used. Because the
+  curtain is a **fixed** velvet/gold palette (a shape, not a colour), a NEW `fixedPalette` flag
+  on the registry entry makes `DigitalDesignEditor` derive `envFixedPalette` and hide the ENTIRE
+  envelope colour/star block for it (`{!envFixedPalette && (<>…</>)}` wrap around the
+  paper/wax/foil + bloom glow/snow + classic card/ink/stars rows), leaving only the style card +
+  live `EnvelopePreview`. No colour can leak: `buildEnvelope`'s `pal` only ever carries groom
+  picks for `paper/wax/foil/cardPaper/cardInk`, and the curtain builder reads `pal.velvet/gold/
+  goldBright` which come purely from `preset.palette`. **No backend/rules change** — `sanitize.ts`
+  validates `envelope.style` as a free safe-slug (`/^[a-z0-9_-]{1,32}$/`), not an enum, and the
+  render chain already dispatches `shape:"curtain"` → `buildEnvelopeCurtain`.
+- **Gate + book** — rebuilt to genuine photorealism using **real photographic PBR textures**
+  (owner's chosen fix after procedural attempts read as CG): real black-marble maps on the gate
+  door, real grained-leather maps tinted to burgundy on the book cover (green-channel
+  `leatherTint` multiply keeps the preset colour while the photo grain survives), bundled at
+  512px in `frontend/public/tex3d/` (~247 KB total, marble_* + leather_*), loaded via
+  `TextureLoader` with **1×1 placeholder swap-on-load** (stable shader defines → no recompile /
+  black-flash). Both looked genuinely real in render + on the live preview — but **owner reviewed
+  and dropped them** ("خلص فلتك ضيف بس الستائر" = forget them, add only the curtains). The
+  gate/book builders + `/tex3d/` assets remain in the repo (still on `/envelopes-preview`), just
+  not wired into the editor. The **gift** box was dropped earlier ("الهدية فلتك منها").
+- **Wiring map:** built via a fan-out workflow, every claim then verified against real files.
+  Single source of truth for selectable styles = `ENVELOPE_STYLES`; the render path
+  (`DigitalInvitationView → CelestialAmbience → CelestialCanvas → celestialEngine → buildEnvelope
+  → STYLE_PRESETS[style]`) and `sanitize.ts` slug validation mean a new style needs only a
+  registry entry + its 3D preset — no backend redeploy.
+- **Test gap (surfaced, not hidden):** the live groom login→editor click-through could NOT be run
+  — the Firebase emulators need Java 21 and this machine only has Java 8. Verified instead via a
+  clean `npm run build`, exhaustive code verification, the owner-approved curtain render, and a
+  deployed smoke-test (live `/envelopes-preview` curtain renders + `/portal/login` loads, 0 page
+  errors). See [[Visual Design System]].
+
 ## Envelope boot performance + invite cold-start diet (2026-07-19)
 Owner reported "lag" — grilling + Playwright profiling showed the animation RUNTIME was
 already 60fps; the real problems were the **boot** (one monolithic 7.9s main-thread bake
