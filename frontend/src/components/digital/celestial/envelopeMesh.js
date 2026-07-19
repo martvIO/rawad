@@ -1976,6 +1976,32 @@ function buildEnvelopeCurtain({ pal, preset } = {}) {
   };
 }
 
+// A richer STUDIO/ROOM environment for image-based lighting — the single biggest lever
+// for real-time PBR realism. A warm vertical gradient (bright ceiling → warm wall →
+// dark floor) with two soft "softbox" windows the metals reflect as real highlights, so
+// gold + PBR surfaces read as photographed, not flat. Equirectangular; sRGB.
+function makeRoomEnv(disposables) {
+  const w = 512, h = 256, c = document.createElement("canvas"); c.width = w; c.height = h;
+  const x = c.getContext("2d");
+  const g = x.createLinearGradient(0, 0, 0, h);
+  g.addColorStop(0.00, "#fdf6e8"); g.addColorStop(0.30, "#ece0c9");
+  g.addColorStop(0.50, "#cbb79a"); g.addColorStop(0.72, "#6a5942"); g.addColorStop(1.00, "#241c12");
+  x.fillStyle = g; x.fillRect(0, 0, w, h);
+  const softbox = (cx, cy, r, bright) => {
+    const rg = x.createRadialGradient(cx, cy, 0, cx, cy, r);
+    rg.addColorStop(0, `rgba(255,253,244,${bright})`);
+    rg.addColorStop(0.55, `rgba(255,248,232,${bright * 0.38})`);
+    rg.addColorStop(1, "rgba(255,248,232,0)");
+    x.fillStyle = rg; x.fillRect(0, 0, w, h);
+  };
+  softbox(w * 0.27, h * 0.30, w * 0.17, 0.98);   // key window (bright)
+  softbox(w * 0.73, h * 0.40, w * 0.13, 0.5);    // fill window
+  softbox(w * 0.5, h * 0.16, w * 0.34, 0.28);    // soft ceiling wash
+  const t = new THREE.CanvasTexture(c);
+  t.mapping = THREE.EquirectangularReflectionMapping; setSRGB(t);
+  disposables.push(t); return t;
+}
+
 // ── ORNATE GATE / PALACE-DOOR SHAPE ───────────────────────────────────────────
 // Two ivory-and-gold arabesque doors in a gold frame that SWING open on their outer
 // hinges to a warm light, camera flying through the doorway → "through the light"
@@ -1991,7 +2017,7 @@ function buildEnvelopeGate({ pal, preset } = {}) {
   let disposed = false;
   const disposables = [];
   const pendingBakes = [];
-  const env = makeStudioEnvB(disposables);
+  const env = makeRoomEnv(disposables);
   const grain = makeLinenGrainB(disposables);
 
   const HW = 0.94, HH = 1.94;
@@ -2024,41 +2050,59 @@ function buildEnvelopeGate({ pal, preset } = {}) {
   const RS = 512;
   const rH = document.createElement("canvas"); rH.width = rH.height = RS;
   const rN = document.createElement("canvas"); rN.width = rN.height = RS;
+  const rAo = document.createElement("canvas"); rAo.width = rAo.height = RS;
   const doorNorTex = new THREE.CanvasTexture(rN);
   doorNorTex.wrapS = doorNorTex.wrapT = THREE.RepeatWrapping; doorNorTex.repeat.set(1, 2);
-  disposables.push(doorNorTex);
-  { const xn = rN.getContext("2d"); xn.fillStyle = "#8080ff"; xn.fillRect(0, 0, RS, RS); }
+  const doorAoTex = new THREE.CanvasTexture(rAo);
+  doorAoTex.wrapS = doorAoTex.wrapT = THREE.RepeatWrapping; doorAoTex.repeat.set(1, 2);
+  disposables.push(doorNorTex, doorAoTex);
+  { const xn = rN.getContext("2d"); xn.fillStyle = "#8080ff"; xn.fillRect(0, 0, RS, RS);
+    const xa0 = rAo.getContext("2d"); xa0.fillStyle = "#ffffff"; xa0.fillRect(0, 0, RS, RS); }
+  const cells = 2, un = RS / cells;
+  const girihStar = (ctx, ox, oy, r, lw) => {
+    ctx.lineWidth = lw;
+    ctx.beginPath();
+    for (let i = 0; i < 16; i++) { const a = (i * Math.PI) / 8 - Math.PI / 2; const rr = i % 2 === 0 ? r : r * 0.45; const px = ox + Math.cos(a) * rr, py = oy + Math.sin(a) * rr; i ? ctx.lineTo(px, py) : ctx.moveTo(px, py); }
+    ctx.closePath(); ctx.stroke();
+    ctx.beginPath();
+    for (let i = 0; i < 8; i++) { const a = (i * Math.PI) / 4; const px = ox + Math.cos(a) * r * 0.4, py = oy + Math.sin(a) * r * 0.4; i ? ctx.lineTo(px, py) : ctx.moveTo(px, py); }
+    ctx.closePath(); ctx.stroke();
+  };
+  const girihGrid = (ctx, lw1, lw2) => {
+    for (let gy = 0; gy <= cells; gy++) for (let gx = 0; gx <= cells; gx++) girihStar(ctx, gx * un, gy * un, un * 0.5, lw1);
+    for (let gy = 0; gy < cells; gy++) for (let gx = 0; gx < cells; gx++) girihStar(ctx, gx * un + un / 2, gy * un + un / 2, un * 0.24, lw2);
+  };
   pendingBakes.push(() => {
+    // HEIGHT → normal (raised carved girih)
     const x = rH.getContext("2d");
     x.fillStyle = "#787878"; x.fillRect(0, 0, RS, RS);
     x.strokeStyle = "#ffffff"; x.lineJoin = "round"; x.lineCap = "round";
     try { x.filter = "blur(1.1px)"; } catch { /* ignore */ }
-    const cells = 2, un = RS / cells;
-    const star = (ox, oy, r, lw) => {
-      x.lineWidth = lw;
-      x.beginPath();
-      for (let i = 0; i < 16; i++) { const a = (i * Math.PI) / 8 - Math.PI / 2; const rr = i % 2 === 0 ? r : r * 0.45; const px = ox + Math.cos(a) * rr, py = oy + Math.sin(a) * rr; i ? x.lineTo(px, py) : x.moveTo(px, py); }
-      x.closePath(); x.stroke();
-      x.beginPath();
-      for (let i = 0; i < 8; i++) { const a = (i * Math.PI) / 4; const px = ox + Math.cos(a) * r * 0.4, py = oy + Math.sin(a) * r * 0.4; i ? x.lineTo(px, py) : x.moveTo(px, py); }
-      x.closePath(); x.stroke();
-    };
-    for (let gy = 0; gy <= cells; gy++) for (let gx = 0; gx <= cells; gx++) star(gx * un, gy * un, un * 0.5, RS * 0.013);
-    for (let gy = 0; gy < cells; gy++) for (let gx = 0; gx < cells; gx++) star(gx * un + un / 2, gy * un + un / 2, un * 0.24, RS * 0.010);
+    girihGrid(x, RS * 0.013, RS * 0.010);
     try { x.filter = "none"; } catch { /* ignore */ }
-    heightToNormal(rH, 3.4, rN);
+    heightToNormal(rH, 3.9, rN);
     doorNorTex.needsUpdate = true;
+    // AO cavity shadow: soft dark halo hugging the carved lines (multiplies the albedo)
+    // — the depth cue that turns embossing into deep carving. Multiplied via uv2.
+    const xa = rAo.getContext("2d");
+    xa.fillStyle = "#ffffff"; xa.fillRect(0, 0, RS, RS);
+    xa.strokeStyle = "rgba(64,48,30,0.5)"; xa.lineJoin = "round"; xa.lineCap = "round";
+    try { xa.filter = "blur(3.5px)"; } catch { /* ignore */ }
+    girihGrid(xa, RS * 0.03, RS * 0.024);
+    try { xa.filter = "none"; } catch { /* ignore */ }
+    doorAoTex.needsUpdate = true;
   });
   const doorMat = new THREE.MeshStandardMaterial({
     color: 0xffffff, map: arab.color, metalnessMap: arab.metal, metalness: 1.0,
-    roughnessMap: arab.rough, roughness: 0.5,
-    normalMap: doorNorTex, normalScale: new THREE.Vector2(1.2, 1.2),
-    bumpMap: grain, bumpScale: 0.004, envMap: env, envMapIntensity: 0.85, emissive: doorCol, emissiveIntensity: 0.045,
+    roughnessMap: arab.rough, roughness: 0.52,
+    normalMap: doorNorTex, normalScale: new THREE.Vector2(1.5, 1.5),
+    aoMap: doorAoTex, aoMapIntensity: 1.15,
+    bumpMap: grain, bumpScale: 0.004, envMap: env, envMapIntensity: 0.5, emissive: doorCol, emissiveIntensity: 0.02,
     side: THREE.DoubleSide, transparent: true, depthWrite: true,
   });
   const goldMat = new THREE.MeshPhysicalMaterial({
-    color: goldCol, metalness: 0.96, roughness: 0.24, clearcoat: 0.5, clearcoatRoughness: 0.2,
-    envMap: env, envMapIntensity: 1.25, emissive: goldBright, emissiveIntensity: 0.16,
+    color: goldCol, metalness: 1.0, roughness: 0.2, clearcoat: 0.6, clearcoatRoughness: 0.15,
+    envMap: env, envMapIntensity: 1.9, emissive: goldBright, emissiveIntensity: 0.06,
     side: THREE.DoubleSide, transparent: true, depthWrite: true,
   });
 
@@ -2081,7 +2125,9 @@ function buildEnvelopeGate({ pal, preset } = {}) {
   const mkDoor = (sx) => {
     const g = new THREE.Group();
     g.position.set(sx * (openW / 2), 0, zt); // hinge at the outer edge of the opening
-    const panel = new THREE.Mesh(new THREE.BoxGeometry(dW, dH, 0.14), doorMat);   // real thickness
+    const panelGeo = new THREE.BoxGeometry(dW, dH, 0.14);   // real thickness
+    panelGeo.setAttribute("uv2", new THREE.BufferAttribute(panelGeo.attributes.uv.array, 2)); // aoMap uses uv2
+    const panel = new THREE.Mesh(panelGeo, doorMat);
     panel.position.set(-sx * dW / 2, 0, 0);  // door extends INWARD from the hinge
     g.add(panel);
     // two raised gold-bordered panels (moldings) proud of the face — real 3D depth
@@ -2367,7 +2413,7 @@ function buildEnvelopeBook({ pal, preset } = {}) {
   let disposed = false;
   const disposables = [];
   const pendingBakes = [];
-  const env = makeStudioEnvB(disposables);
+  const env = makeRoomEnv(disposables);
   const grain = makeLinenGrainB(disposables);
   const HW = 0.94, HH = 1.94;
 
@@ -2388,7 +2434,7 @@ function buildEnvelopeBook({ pal, preset } = {}) {
   washQuad.position.set(0, 0, 0.5); washQuad.renderOrder = 1; washQuad.visible = false; group.add(washQuad);
 
   const coverMat = new THREE.MeshStandardMaterial({ color: coverCol, roughness: 0.62, metalness: 0, bumpMap: grain, bumpScale: 0.012, envMap: env, envMapIntensity: 0.14, emissive: coverCol, emissiveIntensity: 0.14, side: THREE.DoubleSide, transparent: true, depthWrite: true });
-  const goldMat = new THREE.MeshPhysicalMaterial({ color: goldCol, metalness: 0.96, roughness: 0.26, clearcoat: 0.5, envMap: env, envMapIntensity: 1.2, emissive: goldBright, emissiveIntensity: 0.16, side: THREE.DoubleSide, transparent: true, depthWrite: true });
+  const goldMat = new THREE.MeshPhysicalMaterial({ color: goldCol, metalness: 1.0, roughness: 0.2, clearcoat: 0.6, clearcoatRoughness: 0.15, envMap: env, envMapIntensity: 1.8, emissive: goldBright, emissiveIntensity: 0.06, side: THREE.DoubleSide, transparent: true, depthWrite: true });
   const pageMat = new THREE.MeshStandardMaterial({ color: pageCol, roughness: 0.85, metalness: 0, emissive: pageCol, emissiveIntensity: 0.1, side: THREE.DoubleSide, transparent: true, depthWrite: true });
   const frontGold = goldMat.clone();
   // Front cover: burgundy leather with an EMBOSSED gold arabesque (carved relief via a
@@ -2398,35 +2444,50 @@ function buildEnvelopeBook({ pal, preset } = {}) {
   const RS = 512;
   const rHb = document.createElement("canvas"); rHb.width = rHb.height = RS;
   const rNb = document.createElement("canvas"); rNb.width = rNb.height = RS;
+  const rAb = document.createElement("canvas"); rAb.width = rAb.height = RS;
   const coverNorTex = new THREE.CanvasTexture(rNb);
   coverNorTex.wrapS = coverNorTex.wrapT = THREE.RepeatWrapping; coverNorTex.repeat.set(1, 2);
-  disposables.push(coverNorTex);
-  { const xn = rNb.getContext("2d"); xn.fillStyle = "#8080ff"; xn.fillRect(0, 0, RS, RS); }
+  const coverAoTex = new THREE.CanvasTexture(rAb);
+  coverAoTex.wrapS = coverAoTex.wrapT = THREE.RepeatWrapping; coverAoTex.repeat.set(1, 2);
+  disposables.push(coverNorTex, coverAoTex);
+  { const xn = rNb.getContext("2d"); xn.fillStyle = "#8080ff"; xn.fillRect(0, 0, RS, RS);
+    const xa0 = rAb.getContext("2d"); xa0.fillStyle = "#ffffff"; xa0.fillRect(0, 0, RS, RS); }
+  const cells = 2, un = RS / cells;
+  const girihStar = (ctx, ox, oy, r, lw) => {
+    ctx.lineWidth = lw;
+    ctx.beginPath();
+    for (let i = 0; i < 16; i++) { const a = (i * Math.PI) / 8 - Math.PI / 2; const rr = i % 2 === 0 ? r : r * 0.45; const px = ox + Math.cos(a) * rr, py = oy + Math.sin(a) * rr; i ? ctx.lineTo(px, py) : ctx.moveTo(px, py); }
+    ctx.closePath(); ctx.stroke();
+    ctx.beginPath();
+    for (let i = 0; i < 8; i++) { const a = (i * Math.PI) / 4; const px = ox + Math.cos(a) * r * 0.4, py = oy + Math.sin(a) * r * 0.4; i ? ctx.lineTo(px, py) : ctx.moveTo(px, py); }
+    ctx.closePath(); ctx.stroke();
+  };
+  const girihGrid = (ctx, lw1, lw2) => {
+    for (let gy = 0; gy <= cells; gy++) for (let gx = 0; gx <= cells; gx++) girihStar(ctx, gx * un, gy * un, un * 0.5, lw1);
+    for (let gy = 0; gy < cells; gy++) for (let gx = 0; gx < cells; gx++) girihStar(ctx, gx * un + un / 2, gy * un + un / 2, un * 0.24, lw2);
+  };
   pendingBakes.push(() => {
     const x = rHb.getContext("2d");
     x.fillStyle = "#787878"; x.fillRect(0, 0, RS, RS);
     x.strokeStyle = "#ffffff"; x.lineJoin = "round"; x.lineCap = "round";
     try { x.filter = "blur(1.1px)"; } catch { /* ignore */ }
-    const cells = 2, un = RS / cells;
-    const star = (ox, oy, r, lw) => {
-      x.lineWidth = lw;
-      x.beginPath();
-      for (let i = 0; i < 16; i++) { const a = (i * Math.PI) / 8 - Math.PI / 2; const rr = i % 2 === 0 ? r : r * 0.45; const px = ox + Math.cos(a) * rr, py = oy + Math.sin(a) * rr; i ? x.lineTo(px, py) : x.moveTo(px, py); }
-      x.closePath(); x.stroke();
-      x.beginPath();
-      for (let i = 0; i < 8; i++) { const a = (i * Math.PI) / 4; const px = ox + Math.cos(a) * r * 0.4, py = oy + Math.sin(a) * r * 0.4; i ? x.lineTo(px, py) : x.moveTo(px, py); }
-      x.closePath(); x.stroke();
-    };
-    for (let gy = 0; gy <= cells; gy++) for (let gx = 0; gx <= cells; gx++) star(gx * un, gy * un, un * 0.5, RS * 0.012);
-    for (let gy = 0; gy < cells; gy++) for (let gx = 0; gx < cells; gx++) star(gx * un + un / 2, gy * un + un / 2, un * 0.24, RS * 0.009);
+    girihGrid(x, RS * 0.012, RS * 0.009);
     try { x.filter = "none"; } catch { /* ignore */ }
-    heightToNormal(rHb, 3.0, rNb);
+    heightToNormal(rHb, 3.4, rNb);
     coverNorTex.needsUpdate = true;
+    const xa = rAb.getContext("2d");
+    xa.fillStyle = "#ffffff"; xa.fillRect(0, 0, RS, RS);
+    xa.strokeStyle = "rgba(20,6,12,0.55)"; xa.lineJoin = "round"; xa.lineCap = "round";
+    try { xa.filter = "blur(3.2px)"; } catch { /* ignore */ }
+    girihGrid(xa, RS * 0.028, RS * 0.022);
+    try { xa.filter = "none"; } catch { /* ignore */ }
+    coverAoTex.needsUpdate = true;
   });
   const frontMat = new THREE.MeshStandardMaterial({
     color: 0xffffff, map: arabB.color, metalnessMap: arabB.metal, metalness: 1.0,
-    roughnessMap: arabB.rough, roughness: 0.56, normalMap: coverNorTex, normalScale: new THREE.Vector2(1.0, 1.0),
-    bumpMap: grain, bumpScale: 0.014, envMap: env, envMapIntensity: 0.4, emissive: coverCol, emissiveIntensity: 0.08,
+    roughnessMap: arabB.rough, roughness: 0.48, normalMap: coverNorTex, normalScale: new THREE.Vector2(1.3, 1.3),
+    aoMap: coverAoTex, aoMapIntensity: 1.15,
+    bumpMap: grain, bumpScale: 0.016, envMap: env, envMapIntensity: 0.75, emissive: coverCol, emissiveIntensity: 0.05,
     side: THREE.DoubleSide, transparent: true, depthWrite: true,
   });
 
@@ -2443,7 +2504,9 @@ function buildEnvelopeBook({ pal, preset } = {}) {
   // Front cover - hinged on the SPINE (left edge); swings open toward the viewer.
   const front = new THREE.Group();
   front.position.set(-bw, 0, bd + 0.03);
-  const fc = new THREE.Mesh(new THREE.BoxGeometry(bw * 2, bh * 2, 0.05), frontMat);
+  const fcGeo = new THREE.BoxGeometry(bw * 2, bh * 2, 0.05);
+  fcGeo.setAttribute("uv2", new THREE.BufferAttribute(fcGeo.attributes.uv.array, 2)); // aoMap uses uv2
+  const fc = new THREE.Mesh(fcGeo, frontMat);
   fc.position.set(bw, 0, 0); front.add(fc);
   // gold border frame + a central diamond emblem on the front cover
   const brd = (() => {
