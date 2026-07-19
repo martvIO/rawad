@@ -215,4 +215,7 @@ export function getTemplateThemeKeys(id) {
 export const ENVELOPE_STYLES = [
   { key: "classic", icon: "✉️", label_ar: "المكتوب العادي", label_he: "המעטפה הרגילה" },
   { key: "bloom", icon: "🌸", label_ar: "المتفتّح (أزهار)", label_he: "הפריחה" },
+  // Fixed luxury palette (velvet + gold) baked into the 3D preset — a SHAPE, not a
+  // colour — so `fixedPalette` tells the editor to hide the envelope colour pickers.
+  { key: "curtain", icon: "🎭", label_ar: "الستائر المخملية", label_he: "וילונות הקטיפה", fixedPalette: true },
 ];

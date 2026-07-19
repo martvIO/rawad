@@ -402,7 +402,12 @@ export function DesignEditorBody({ groomUid, designId, adminDemoMode = false, on
   // The "bloom" (floral) style is a different SHAPE: it has no inner card and no
   // arabesque star system, but adds its own light/snow tints. Gate the envelope
   // controls on it so the groom only sees pickers that actually do something.
-  const envIsBloom = (envOverrides.style || "classic") === "bloom";
+  const envStyle = envOverrides.style || "classic";
+  const envIsBloom = envStyle === "bloom";
+  // Fixed-palette styles (e.g. curtain) are a locked luxury look — the groom gets NO
+  // envelope colour pickers. Read the flag from the ENVELOPE_STYLES registry so any new
+  // fixed style opts in by data alone, with no further editor edits.
+  const envFixedPalette = !!ENVELOPE_STYLES.find((s) => s.key === envStyle)?.fixedPalette;
   // Custom-background overrides + the theme-derived defaults shown when unset.
   const bgOverrides = f.background && typeof f.background === "object" ? f.background : {};
   const bgDefaults = useMemo(() => resolveBackground(getDigitalTheme(themeColor), {}), [themeColor]);
@@ -1431,9 +1436,10 @@ export function DesignEditorBody({ groomUid, designId, adminDemoMode = false, on
             {tt(lang, "خصّص ألوان المظروف والنجوم. اترك أي لون فارغاً لاستخدام لون القالب.", "התאם את צבעי המעטפה והכוכבים. השאר צבע ריק כדי להשתמש בצבע הערכה.")}
           </div>
 
-          {/* Opening-envelope STYLE picker. One style today ("المكتوب العادي"); the
-              placeholder card hints that more are coming. The choice persists as
-              envelope.style so future styles slot in with no other rewiring. */}
+          {/* Opening-envelope STYLE picker, driven entirely by the ENVELOPE_STYLES
+              registry (classic · bloom · curtain today); the placeholder card hints that
+              more are coming. The choice persists as envelope.style so future styles slot
+              in with no other rewiring. */}
           <div style={{ marginBottom: 16 }}>
             <div style={{ marginBottom: 8, fontSize: 12, color: C.goldDim, fontWeight: 700 }}>
               {tt(lang, "شكل فتح المكتوب", "סגנון פתיחת המעטפה")}
@@ -1457,7 +1463,9 @@ export function DesignEditorBody({ groomUid, designId, adminDemoMode = false, on
           </div>
 
           {/* Cardstock, wax and gold apply to BOTH styles. Under bloom the defaults +
-              preset chips reflect its blush/ivory/gold signature. */}
+              preset chips reflect its blush/ivory/gold signature. A fixed-palette style
+              (curtain) hides this whole colour/star block — its velvet/gold look is locked. */}
+          {!envFixedPalette && (<>
           <EnvColorRow testid="design-env-paper" label={tt(lang, "لون المكتوب (الورق)", "צבע המעטפה (הנייר)")} value={envOverrides.paper} defaultHex={envIsBloom ? "#f7e7e8" : envDefaults.paper} presets={envIsBloom ? ["#f7e7e8", "#eae2d0", "#e6d8e2", "#dfeae2"] : ["#2a211a", "#1a1f2e", "#f9f6f0", "#2a1a1a"]} disabled={!editable} onPick={(hex) => setEnvField("paper", hex)} onReset={() => resetEnvField("paper")} />
           <EnvColorRow testid="design-env-wax" label={tt(lang, "لون الشمع (الختم)", "צבע השעווה (החותם)")} value={envOverrides.wax} defaultHex={envIsBloom ? "#8a2230" : envDefaults.wax} presets={["#f4ece0", "#b3232a", "#1f3b2e", "#caa14e"]} disabled={!editable} onPick={(hex) => setEnvField("wax", hex)} onReset={() => resetEnvField("wax")} />
           <EnvColorRow testid="design-env-foil" label={envIsBloom ? tt(lang, "لون الذهب (الختم والحواف)", "צבע הזהב (החותם והקצוות)") : tt(lang, "لون النجوم والذهب", "צבע הכוכבים והזהב")} value={envOverrides.foil} defaultHex={envIsBloom ? "#eccf94" : envDefaults.foil} presets={["#eccf94", "#caa14e", "#c98a90", "#d4af37"]} disabled={!editable} onPick={(hex) => setEnvField("foil", hex)} onReset={() => resetEnvField("foil")} />
@@ -1489,6 +1497,7 @@ export function DesignEditorBody({ groomUid, designId, adminDemoMode = false, on
           {!envIsBloom && (
             <RangeRow testid="design-env-intensity" label={tt(lang, "وضوح النجوم", "עוצמת הכוכבים")} min={0} max={1} step={0.05} value={envOverrides.starIntensity ?? 0.22} disabled={!editable || envOverrides.stars === false} onInput={(v) => bufferEnvField("starIntensity", v)} onCommit={(v) => commitEnvField("starIntensity", v)} />
           )}
+          </>)}
 
           <EnvelopePreview
             themeColor={themeColor}
