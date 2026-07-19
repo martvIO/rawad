@@ -72,6 +72,25 @@ const STYLE_PRESETS = {
     palette: { velvet: "#e7dbc4", gold: "#c9a24e", goldBright: "#f0deA0" },
     glow: "#ffe6c2",
   },
+  // Two ornate ivory-and-gold palace DOORS under a gold frame that SWING open to a
+  // warm light, camera flying through. Fixed luxury palette. → buildEnvelopeGate.
+  "gate": {
+    shape: "gate", light: true,
+    palette: { door: "#ece2cf", gold: "#c9a24e", goldBright: "#f2dfa0" },
+    glow: "#ffe6c2",
+  },
+  // A ribboned luxury GIFT BOX whose lid + bow lift off to a burst of light. → gift.
+  "gift": {
+    shape: "gift", light: true,
+    palette: { box: "#ece2cf", gold: "#c9a24e", goldBright: "#f2dfa0" },
+    glow: "#ffe6c2",
+  },
+  // A gilded BOOK whose cover swings open to light between the pages. → book.
+  "book": {
+    shape: "book", light: true,
+    palette: { cover: "#5e1a2c", gold: "#d8b45a", goldBright: "#f4e2a8", page: "#f3ead2" },
+    glow: "#ffe6c2",
+  },
   "royal-blush": {
     palette: { paper: "#f7e7e8", foil: "#c98a90", foilBright: "#f2d8d4", wax: "#8a2230", cardPaper: "#fdf6f5", cardInk: "#5a2530" },
     floralTint: "#ecd2d3", glow: "#ffcf9a", linen: "#f4e2e2",
@@ -147,6 +166,9 @@ export function buildEnvelope({ style, colors, overrides, content } = {}) {
     return buildEnvelopeBloom({ pal, preset: presetForBloom, content });
   }
   if (preset && preset.shape === "curtain") return buildEnvelopeCurtain({ pal, preset, content });
+  if (preset && preset.shape === "gate") return buildEnvelopeGate({ pal, preset, content });
+  if (preset && preset.shape === "gift") return buildEnvelopeGift({ pal, preset, content });
+  if (preset && preset.shape === "book") return buildEnvelopeBook({ pal, preset, content });
   // Star (arabesque) options — one coherent system across the flap + shell.
   // They ride on the same `colors` object from resolveEnvelopePalette().
   const starsEnabled = colors?.starsEnabled !== false;            // default ON
@@ -1950,6 +1972,500 @@ function buildEnvelopeCurtain({ pal, preset } = {}) {
     setOpen(t, fov, aspect) { applyVisual(t); return framing(t, fov, aspect); },
     framePose(fov, aspect) { return framing(0, fov, aspect); },
     refreshCard() { /* the curtain shape has no baked card */ },
+    dispose,
+  };
+}
+
+// ── ORNATE GATE / PALACE-DOOR SHAPE ───────────────────────────────────────────
+// Two ivory-and-gold arabesque doors in a gold frame that SWING open on their outer
+// hinges to a warm light, camera flying through the doorway → "through the light"
+// hand-off. Same engine contract + perf rules as bloom/curtain.
+function buildEnvelopeGate({ pal, preset } = {}) {
+  const doorCol   = col(pal && pal.door, "#ece2cf");
+  const goldCol   = col(pal && pal.gold, "#c9a24e");
+  const goldBright = col(pal && pal.goldBright, "#f2dfa0");
+  const glowCol   = col(preset && preset.glow, "#ffe6c2");
+
+  const group = new THREE.Group();
+  const S = 3.0; group.scale.setScalar(S);
+  let disposed = false;
+  const disposables = [];
+  const pendingBakes = [];
+  const env = makeStudioEnvB(disposables);
+  const grain = makeLinenGrainB(disposables);
+
+  const HW = 0.94, HH = 1.94;
+  const zt = 0.10, FR = 0.15;              // door depth layer, gold frame thickness
+
+  // Interior light + full-screen wash behind the doors (revealed as they swing open).
+  const innerCanvas = document.createElement("canvas"); innerCanvas.width = innerCanvas.height = 256;
+  const innerTex = new THREE.CanvasTexture(innerCanvas); disposables.push(innerTex);
+  pendingBakes.push(() => { paintSprite(innerCanvas, "glow"); innerTex.needsUpdate = true; });
+  const innerMat = new THREE.MeshBasicMaterial({ map: innerTex, color: glowCol, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending });
+  const innerLight = new THREE.Mesh(new THREE.PlaneGeometry(HW * 4.4, HH * 4.4), innerMat);
+  innerLight.position.set(0, 0, -0.16); innerLight.renderOrder = 2; group.add(innerLight);
+  const washCol = glowCol.clone().lerp(new THREE.Color("#fff7e8"), 0.15);
+  const washMat = new THREE.MeshBasicMaterial({ color: washCol, transparent: true, opacity: 0, depthWrite: false, depthTest: false });
+  const washQuad = new THREE.Mesh(new THREE.PlaneGeometry(30, 30), washMat);
+  washQuad.position.set(0, 0, 0.5); washQuad.renderOrder = 1; washQuad.visible = false; group.add(washQuad);
+
+  // Dark corridor behind, so the doorway reads before the light blooms.
+  const backMat = new THREE.MeshStandardMaterial({ color: 0x120b06, roughness: 0.9, metalness: 0, transparent: true, depthWrite: true });
+  const back = new THREE.Mesh(new THREE.PlaneGeometry(HW * 2.2, HH * 2.2), backMat);
+  back.position.z = -0.22; group.add(back);
+
+  // Ivory door stock with a metallic gold arabesque girih lattice (reuses makeArabesque:
+  // the gold lines are the metallic/smooth part of the PBR over matte ivory).
+  const arab = makeArabesque({ bg: "#" + doorCol.getHexString(), line: "#" + goldCol.getHexString(), alpha: 0.5, lineW: 2.4, cells: 2, repeat: [1, 2], withMetal: true });
+  disposables.push(arab.color, arab.metal, arab.rough);
+  const doorMat = new THREE.MeshStandardMaterial({
+    color: 0xffffff, map: arab.color, metalnessMap: arab.metal, metalness: 1.0,
+    roughnessMap: arab.rough, roughness: 0.6, bumpMap: grain, bumpScale: 0.006,
+    envMap: env, envMapIntensity: 0.6, emissive: doorCol, emissiveIntensity: 0.07,
+    side: THREE.DoubleSide, transparent: true, depthWrite: true,
+  });
+  const goldMat = new THREE.MeshPhysicalMaterial({
+    color: goldCol, metalness: 0.96, roughness: 0.24, clearcoat: 0.5, clearcoatRoughness: 0.2,
+    envMap: env, envMapIntensity: 1.25, emissive: goldBright, emissiveIntensity: 0.16,
+    side: THREE.DoubleSide, transparent: true, depthWrite: true,
+  });
+
+  // A rectangular gold molding FRAME (rect outline with a rect hole), extruded + beveled.
+  const mkFrameMesh = (w, h, t) => {
+    const sh = new THREE.Shape();
+    sh.moveTo(-w / 2, -h / 2); sh.lineTo(w / 2, -h / 2); sh.lineTo(w / 2, h / 2); sh.lineTo(-w / 2, h / 2); sh.closePath();
+    const iw = w - 2 * t, ih = h - 2 * t;
+    const hole = new THREE.Path();
+    hole.moveTo(-iw / 2, -ih / 2); hole.lineTo(-iw / 2, ih / 2); hole.lineTo(iw / 2, ih / 2); hole.lineTo(iw / 2, -ih / 2); hole.closePath();
+    sh.holes.push(hole);
+    return new THREE.Mesh(new THREE.ExtrudeGeometry(sh, { depth: 0.05, bevelEnabled: true, bevelThickness: 0.014, bevelSize: 0.012, bevelSegments: 1 }), goldMat);
+  };
+
+  // Two doors, hinged at their OUTER edges, filling the opening inside the frame.
+  const openW = HW * 2 - FR * 1.5;         // total door opening width
+  const dW = openW / 2;                     // one door width
+  const dH = HH * 2 - FR * 1.5;             // door height
+  const doors = [];
+  const mkDoor = (sx) => {
+    const g = new THREE.Group();
+    g.position.set(sx * (openW / 2), 0, zt); // hinge at the outer edge of the opening
+    const panel = new THREE.Mesh(new THREE.BoxGeometry(dW, dH, 0.06), doorMat);
+    panel.position.set(-sx * dW / 2, 0, 0);  // door extends INWARD from the hinge
+    g.add(panel);
+    // two recessed gold-bordered panels (moldings) on the face
+    for (const cy of [1, -1]) {
+      const pm = mkFrameMesh(dW * 0.66, dH * 0.4, 0.028);
+      pm.position.set(-sx * dW / 2, cy * dH * 0.22, 0.035); g.add(pm);
+    }
+    // gold ring handle near the inner (meeting) edge
+    const handle = new THREE.Mesh(new THREE.TorusGeometry(0.055, 0.017, 10, 22), goldMat);
+    handle.position.set(-sx * (dW - 0.11), 0, 0.06); g.add(handle);
+    group.add(g); doors.push({ g, sx });
+  };
+  mkDoor(-1); mkDoor(1);
+
+  // Outer gold frame + a top-centre crest + four corner rosettes.
+  const frame = mkFrameMesh(HW * 2, HH * 2, FR);
+  frame.position.set(0, 0, zt + 0.06); group.add(frame);
+  const crest = new THREE.Mesh(new THREE.SphereGeometry(0.15, 18, 14), goldMat);
+  crest.position.set(0, HH - 0.02, zt + 0.08); group.add(crest);
+  for (const cx of [-1, 1]) for (const cy of [-1, 1]) {
+    const r = new THREE.Mesh(new THREE.SphereGeometry(0.075, 14, 12), goldMat);
+    r.position.set(cx * (HW - FR / 2), cy * (HH - FR / 2), zt + 0.10); group.add(r);
+  }
+
+  // Press feedback: a warm glow blooms at the meeting seam on the tap.
+  const pressCanvas = document.createElement("canvas"); pressCanvas.width = pressCanvas.height = 256;
+  const pressTex = new THREE.CanvasTexture(pressCanvas); disposables.push(pressTex);
+  pendingBakes.push(() => { paintSprite(pressCanvas, "glow"); pressTex.needsUpdate = true; });
+  const pressMat = new THREE.MeshBasicMaterial({ map: pressTex, color: glowCol, transparent: true, opacity: 0, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending });
+  const pressGlow = new THREE.Mesh(new THREE.PlaneGeometry(1.2, HH * 1.4), pressMat);
+  pressGlow.position.set(0, 0, zt + 0.3); pressGlow.renderOrder = 6; pressGlow.visible = false; group.add(pressGlow);
+
+  // Lights — constant count, intensity-driven.
+  group.add(new THREE.AmbientLight(0xfff3ea, 0.55));
+  const key = new THREE.DirectionalLight(0xfff4e2, 1.2); key.position.set(5, 5, 7); group.add(key);
+  const fill = new THREE.DirectionalLight(0xeaf0ff, 0.34); fill.position.set(-5, -1.5, 4); group.add(fill);
+  const innerGlow = new THREE.PointLight(glowCol, 0.0, 9 * S, 1); innerGlow.position.set(0, 0.1, -0.2); group.add(innerGlow);
+
+  const smooth = (x) => { const c = clamp01(x); return c < 0.5 ? 2 * c * c : 1 - Math.pow(-2 * c + 2, 2) / 2; };
+  const HANDOFF = 0.91;
+
+  function applyVisual(t) {
+    const tt = clamp01(t);
+    // Timeline (DURATION 6.5s): press glow 0→0.10 · doors SWING open 0.10→0.85 · light
+    //   pours through the widening gap · doors + frame late-fade · wash → HANDOFF → dim
+    const glowRise = ease(clamp01(tt / 0.07));
+    const glowFall = ease(clamp01((tt - 0.10) / 0.09));
+    const pressF = glowRise * (1 - glowFall);
+    pressMat.opacity = 0.85 * pressF; pressGlow.visible = pressF > 0.003;
+
+    const swingRaw = clamp01((tt - 0.10) / 0.75);
+    const swing = smooth(swingRaw) * 1.85;      // up to ~106° — doors swing wide open
+    for (const d of doors) d.g.rotation.y = d.sx * swing;
+
+    const washDim = smooth(clamp01((tt - HANDOFF) / (1 - HANDOFF)));
+
+    // Late fade: doors + frame dissolve into the light near the end.
+    const fadeF = smooth(clamp01((swingRaw - 0.82) / 0.18));
+    const op = 1 - fadeF;
+    const wantW = fadeF <= 0.0001;
+    if (doorMat.depthWrite !== wantW) { doorMat.depthWrite = wantW; goldMat.depthWrite = wantW; backMat.depthWrite = wantW; }
+    doorMat.opacity = op; goldMat.opacity = op; backMat.opacity = op;
+
+    // Interior glow + wash ("through the light"), revealed by the opening doors.
+    const revealF = smooth(clamp01(swing / 0.4));
+    const flareF  = smooth(clamp01((tt - (HANDOFF - 0.13)) / 0.09));
+    innerMat.opacity = (0.14 + 0.34 * flareF) * (1 - washDim) * revealF;
+    innerLight.visible = innerMat.opacity > 0.002;
+    const ws = 1 + 0.9 * flareF; innerLight.scale.set(ws, ws, 1);
+    washMat.opacity = 0.78 * flareF * (1 - washDim);
+    washQuad.visible = washMat.opacity > 0.002;
+
+    const grow = smooth(swingRaw);
+    innerGlow.intensity = (0.25 + 2.4 * grow) * (1 - washDim);
+  }
+
+  // Head-on cover fit + a forward DOLLY through the doorway as the doors open.
+  function framing(t, fov, aspect) {
+    const tn = Math.tan(((fov || 34) * Math.PI / 180) / 2);
+    const realAsp = aspect || 1;
+    const wide = realAsp > 0.85;
+    const asp = wide ? HW / HH : realAsp;
+    const margin = wide ? 1.14 : 1.0;
+    const zBase = Math.min(HH / tn, HW / (tn * asp)) * margin * S;
+    const dolly = smooth(clamp01((clamp01(t) - 0.10) / 0.75));
+    return { y: 0, z: zBase * (1 - 0.55 * dolly), lookAtY: 0 };
+  }
+
+  applyVisual(0);
+
+  function dispose() {
+    if (disposed) return; disposed = true;
+    group.traverse((o) => {
+      if (o.geometry) o.geometry.dispose();
+      if (o.material) {
+        const mats = Array.isArray(o.material) ? o.material : [o.material];
+        for (const m of mats) { for (const k of ["map", "normalMap", "roughnessMap", "metalnessMap", "envMap"]) if (m[k] && m[k].dispose) m[k].dispose(); m.dispose(); }
+      }
+    });
+    for (const d of disposables) { try { d.dispose(); } catch { /* ignore */ } }
+  }
+
+  return {
+    group, REVEAL_AT: 0.10, DURATION: 6.5,
+    DIRECT_HANDOFF: true, HANDOFF_AT: HANDOFF, WASH_TAIL: true,
+    BAKE_QUEUE: pendingBakes, WARM_TEXTURES: [innerTex, pressTex],
+    setOpen(t, fov, aspect) { applyVisual(t); return framing(t, fov, aspect); },
+    framePose(fov, aspect) { return framing(0, fov, aspect); },
+    refreshCard() { /* the gate shape has no baked card */ },
+    dispose,
+  };
+}
+
+// ── RIBBONED GIFT BOX SHAPE ───────────────────────────────────────────────────
+// A cream-and-gold wrapped gift box whose lid + bow LIFT off and float away to a
+// burst of light from inside, camera rising in → "through the light" hand-off.
+function buildEnvelopeGift({ pal, preset } = {}) {
+  const boxCol    = col(pal && pal.box, "#ece2cf");
+  const goldCol   = col(pal && pal.gold, "#c9a24e");
+  const goldBright = col(pal && pal.goldBright, "#f2dfa0");
+  const glowCol   = col(preset && preset.glow, "#ffe6c2");
+
+  const group = new THREE.Group();
+  const S = 3.0; group.scale.setScalar(S);
+  let disposed = false;
+  const disposables = [];
+  const pendingBakes = [];
+  const env = makeStudioEnvB(disposables);
+  const grain = makeLinenGrainB(disposables);
+  const HW = 0.94, HH = 1.94;
+
+  const bw = 0.64, bh = 0.6, bd = 0.44;    // box half-extents (a discrete box floating in the scene)
+  const boxY = -0.14;                       // box centre (slightly low, lid + bow above)
+  const lidH = 0.17;                        // lid half-height
+  const lidY0 = boxY + bh + lidH;           // lid resting on the box top
+
+  // Interior light + full-screen wash — bursts from the box TOP as the lid lifts.
+  const innerCanvas = document.createElement("canvas"); innerCanvas.width = innerCanvas.height = 256;
+  const innerTex = new THREE.CanvasTexture(innerCanvas); disposables.push(innerTex);
+  pendingBakes.push(() => { paintSprite(innerCanvas, "glow"); innerTex.needsUpdate = true; });
+  const innerMat = new THREE.MeshBasicMaterial({ map: innerTex, color: glowCol, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending });
+  const innerLight = new THREE.Mesh(new THREE.PlaneGeometry(bw * 4, bh * 4), innerMat);
+  innerLight.position.set(0, boxY + bh + 0.1, 0.15); innerLight.renderOrder = 2; group.add(innerLight);
+  const washCol = glowCol.clone().lerp(new THREE.Color("#fff7e8"), 0.15);
+  const washMat = new THREE.MeshBasicMaterial({ color: washCol, transparent: true, opacity: 0, depthWrite: false, depthTest: false });
+  const washQuad = new THREE.Mesh(new THREE.PlaneGeometry(30, 30), washMat);
+  washQuad.position.set(0, 0, 0.5); washQuad.renderOrder = 1; washQuad.visible = false; group.add(washQuad);
+
+  const boxMat = new THREE.MeshStandardMaterial({ color: boxCol, roughness: 0.5, metalness: 0, bumpMap: grain, bumpScale: 0.008, envMap: env, envMapIntensity: 0.25, emissive: boxCol, emissiveIntensity: 0.06, side: THREE.DoubleSide, transparent: true, depthWrite: true });
+  const goldMat = new THREE.MeshPhysicalMaterial({ color: goldCol, metalness: 0.96, roughness: 0.24, clearcoat: 0.5, clearcoatRoughness: 0.2, envMap: env, envMapIntensity: 1.25, emissive: goldBright, emissiveIntensity: 0.16, side: THREE.DoubleSide, transparent: true, depthWrite: true });
+  // Lid has its OWN material clones so it can fade as it floats up while the base stays.
+  const lidBoxMat = boxMat.clone();
+  const lidGoldMat = goldMat.clone();
+
+  // Box base + a gold ribbon cross (vertical + horizontal bands proud of the box).
+  const base = new THREE.Mesh(new THREE.BoxGeometry(bw * 2, bh * 2, bd * 2), boxMat);
+  base.position.set(0, boxY, 0); group.add(base);
+  const ribV = new THREE.Mesh(new THREE.BoxGeometry(bw * 0.3, bh * 2 + 0.02, bd * 2 + 0.05), goldMat);
+  ribV.position.set(0, boxY, 0); group.add(ribV);
+  const ribH = new THREE.Mesh(new THREE.BoxGeometry(bw * 2 + 0.05, bh * 0.3, bd * 2 + 0.05), goldMat);
+  ribH.position.set(0, boxY, 0); group.add(ribH);
+
+  // Lid group (flat cream lid + gold rim + a bow) — lifts off, tilts, floats away, fades.
+  const lid = new THREE.Group();
+  lid.position.set(0, lidY0, 0);
+  const lidMesh = new THREE.Mesh(new THREE.BoxGeometry(bw * 2.16, lidH * 2, bd * 2.16), lidBoxMat);
+  lid.add(lidMesh);
+  const lidRim = new THREE.Mesh(new THREE.BoxGeometry(bw * 2.2, lidH * 0.5, bd * 2.2), lidGoldMat);
+  lidRim.position.y = -lidH + 0.02; lid.add(lidRim);
+  const mkLoop = (sxl) => { const l = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.05, 10, 24), lidGoldMat); l.position.set(sxl * 0.15, lidH + 0.05, 0); l.scale.set(1, 0.8, 0.5); l.rotation.z = sxl * 0.5; lid.add(l); };
+  mkLoop(-1); mkLoop(1);
+  const knot = new THREE.Mesh(new THREE.SphereGeometry(0.075, 14, 12), lidGoldMat); knot.position.set(0, lidH + 0.05, 0.02); lid.add(knot);
+  group.add(lid);
+
+  // Press feedback (warm glow at the bow on tap).
+  const pressCanvas = document.createElement("canvas"); pressCanvas.width = pressCanvas.height = 256;
+  const pressTex = new THREE.CanvasTexture(pressCanvas); disposables.push(pressTex);
+  pendingBakes.push(() => { paintSprite(pressCanvas, "glow"); pressTex.needsUpdate = true; });
+  const pressMat = new THREE.MeshBasicMaterial({ map: pressTex, color: glowCol, transparent: true, opacity: 0, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending });
+  const pressGlow = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 1.6), pressMat);
+  pressGlow.position.set(0, lidY0 + 0.1, 0.4); pressGlow.renderOrder = 6; pressGlow.visible = false; group.add(pressGlow);
+
+  group.add(new THREE.AmbientLight(0xfff3ea, 0.6));
+  const key = new THREE.DirectionalLight(0xfff4e2, 1.18); key.position.set(5, 6, 7); group.add(key);
+  const fill = new THREE.DirectionalLight(0xeaf0ff, 0.35); fill.position.set(-5, -1.5, 4); group.add(fill);
+  const innerGlow = new THREE.PointLight(glowCol, 0.0, 9 * S, 1); innerGlow.position.set(0, boxY + bh, 0.1); group.add(innerGlow);
+
+  const smooth = (x) => { const c = clamp01(x); return c < 0.5 ? 2 * c * c : 1 - Math.pow(-2 * c + 2, 2) / 2; };
+  const HANDOFF = 0.91;
+
+  function applyVisual(t) {
+    const tt = clamp01(t);
+    // press 0->0.10 . lid+bow LIFT off 0.10->0.85 . light bursts from the box . lid fades
+    // as it rises . base fades late . wash -> HANDOFF -> dim
+    const glowRise = ease(clamp01(tt / 0.07));
+    const glowFall = ease(clamp01((tt - 0.10) / 0.09));
+    const pressF = glowRise * (1 - glowFall);
+    pressMat.opacity = 0.8 * pressF; pressGlow.visible = pressF > 0.003;
+    pressGlow.scale.setScalar(0.7 + 0.5 * glowRise);
+
+    const liftRaw = clamp01((tt - 0.10) / 0.75);
+    const lift = smooth(liftRaw);
+    lid.position.y = lidY0 + lift * 2.8;         // floats up and off the top
+    lid.rotation.z = lift * 0.22; lid.rotation.x = lift * 0.16;
+
+    const washDim = smooth(clamp01((tt - HANDOFF) / (1 - HANDOFF)));
+
+    // Lid fades as it rises; base + ribbon fade only at the very end.
+    const lidFade = smooth(clamp01((liftRaw - 0.45) / 0.5));
+    const baseFade = smooth(clamp01((liftRaw - 0.82) / 0.18));
+    const lidWantW = lidFade <= 0.0001, baseWantW = baseFade <= 0.0001;
+    if (lidBoxMat.depthWrite !== lidWantW) { lidBoxMat.depthWrite = lidWantW; lidGoldMat.depthWrite = lidWantW; }
+    if (boxMat.depthWrite !== baseWantW) { boxMat.depthWrite = baseWantW; goldMat.depthWrite = baseWantW; }
+    lidBoxMat.opacity = lidGoldMat.opacity = 1 - lidFade;
+    boxMat.opacity = goldMat.opacity = 1 - baseFade;
+
+    // Light bursts from the box top as the lid clears it, then the wash climax.
+    const revealF = smooth(clamp01(lift / 0.2));
+    const flareF  = smooth(clamp01((tt - (HANDOFF - 0.13)) / 0.09));
+    innerMat.opacity = (0.14 + 0.36 * flareF) * (1 - washDim) * revealF;
+    innerLight.visible = innerMat.opacity > 0.002;
+    const ws = 1 + 1.1 * flareF; innerLight.scale.set(ws, ws, 1);
+    washMat.opacity = 0.78 * flareF * (1 - washDim);
+    washQuad.visible = washMat.opacity > 0.002;
+    innerGlow.intensity = (0.2 + 2.6 * lift) * (1 - washDim);
+  }
+
+  // Head-on cover fit + a forward DOLLY rising toward the opening box as the lid lifts.
+  function framing(t, fov, aspect) {
+    const tn = Math.tan(((fov || 34) * Math.PI / 180) / 2);
+    const realAsp = aspect || 1;
+    const wide = realAsp > 0.85;
+    const asp = wide ? HW / HH : realAsp;
+    const margin = wide ? 1.14 : 1.0;
+    const zBase = Math.min(HH / tn, HW / (tn * asp)) * margin * S;
+    const dolly = smooth(clamp01((clamp01(t) - 0.10) / 0.75));
+    return { y: 0, z: zBase * (1 - 0.5 * dolly), lookAtY: (boxY + 0.35) * S * dolly };
+  }
+
+  applyVisual(0);
+
+  function dispose() {
+    if (disposed) return; disposed = true;
+    group.traverse((o) => {
+      if (o.geometry) o.geometry.dispose();
+      if (o.material) {
+        const mats = Array.isArray(o.material) ? o.material : [o.material];
+        for (const m of mats) { for (const k of ["map", "normalMap", "roughnessMap", "metalnessMap", "envMap"]) if (m[k] && m[k].dispose) m[k].dispose(); m.dispose(); }
+      }
+    });
+    for (const d of disposables) { try { d.dispose(); } catch { /* ignore */ } }
+  }
+
+  return {
+    group, REVEAL_AT: 0.10, DURATION: 6.0,
+    DIRECT_HANDOFF: true, HANDOFF_AT: HANDOFF, WASH_TAIL: true,
+    BAKE_QUEUE: pendingBakes, WARM_TEXTURES: [innerTex, pressTex],
+    setOpen(t, fov, aspect) { applyVisual(t); return framing(t, fov, aspect); },
+    framePose(fov, aspect) { return framing(0, fov, aspect); },
+    refreshCard() { /* the gift shape has no baked card */ },
+    dispose,
+  };
+}
+
+// ── GILDED BOOK SHAPE ─────────────────────────────────────────────────────────
+// A closed burgundy-leather-and-gold book facing the viewer; the front cover SWINGS
+// open on the spine to a warm light between the pages, camera easing in -> hand-off.
+function buildEnvelopeBook({ pal, preset } = {}) {
+  const coverCol  = col(pal && pal.cover, "#5e1a2c");
+  const goldCol   = col(pal && pal.gold, "#d8b45a");
+  const goldBright = col(pal && pal.goldBright, "#f4e2a8");
+  const pageCol   = col(pal && pal.page, "#f3ead2");
+  const glowCol   = col(preset && preset.glow, "#ffe6c2");
+
+  const group = new THREE.Group();
+  const S = 3.0; group.scale.setScalar(S);
+  let disposed = false;
+  const disposables = [];
+  const pendingBakes = [];
+  const env = makeStudioEnvB(disposables);
+  const grain = makeLinenGrainB(disposables);
+  const HW = 0.94, HH = 1.94;
+
+  const bw = 0.74, bh = 1.12, bd = 0.14;   // book half-extents (portrait), half-thickness
+
+  // Interior light + wash — glows from between the pages as the cover opens.
+  const innerCanvas = document.createElement("canvas"); innerCanvas.width = innerCanvas.height = 256;
+  const innerTex = new THREE.CanvasTexture(innerCanvas); disposables.push(innerTex);
+  pendingBakes.push(() => { paintSprite(innerCanvas, "glow"); innerTex.needsUpdate = true; });
+  const innerMat = new THREE.MeshBasicMaterial({ map: innerTex, color: glowCol, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending });
+  const innerLight = new THREE.Mesh(new THREE.PlaneGeometry(bw * 4.4, bh * 4.4), innerMat);
+  // In FRONT of the cream pages but BEHIND the closed front cover, so the swinging
+  // cover reveals the light flooding out (not the flat opaque page face).
+  innerLight.position.set(0, 0, bd + 0.01); innerLight.renderOrder = 2; group.add(innerLight);
+  const washCol = glowCol.clone().lerp(new THREE.Color("#fff7e8"), 0.15);
+  const washMat = new THREE.MeshBasicMaterial({ color: washCol, transparent: true, opacity: 0, depthWrite: false, depthTest: false });
+  const washQuad = new THREE.Mesh(new THREE.PlaneGeometry(30, 30), washMat);
+  washQuad.position.set(0, 0, 0.5); washQuad.renderOrder = 1; washQuad.visible = false; group.add(washQuad);
+
+  const coverMat = new THREE.MeshStandardMaterial({ color: coverCol, roughness: 0.62, metalness: 0, bumpMap: grain, bumpScale: 0.012, envMap: env, envMapIntensity: 0.14, emissive: coverCol, emissiveIntensity: 0.14, side: THREE.DoubleSide, transparent: true, depthWrite: true });
+  const goldMat = new THREE.MeshPhysicalMaterial({ color: goldCol, metalness: 0.96, roughness: 0.26, clearcoat: 0.5, envMap: env, envMapIntensity: 1.2, emissive: goldBright, emissiveIntensity: 0.16, side: THREE.DoubleSide, transparent: true, depthWrite: true });
+  const pageMat = new THREE.MeshStandardMaterial({ color: pageCol, roughness: 0.85, metalness: 0, emissive: pageCol, emissiveIntensity: 0.1, side: THREE.DoubleSide, transparent: true, depthWrite: true });
+  const frontMat = coverMat.clone();   // front cover fades on its own clock as it opens
+  const frontGold = goldMat.clone();
+
+  // Page block (cream, with gilded gold edges) + back cover + spine.
+  const pages = new THREE.Mesh(new THREE.BoxGeometry(bw * 2 * 0.92, bh * 2 * 0.95, bd * 2 * 0.9), pageMat);
+  group.add(pages);
+  const edge = new THREE.Mesh(new THREE.BoxGeometry(0.03, bh * 2 * 0.96, bd * 2 * 0.92), goldMat);
+  edge.position.set(bw * 0.92, 0, 0); group.add(edge);   // gilded fore-edge (right)
+  const backCover = new THREE.Mesh(new THREE.BoxGeometry(bw * 2, bh * 2, 0.05), coverMat);
+  backCover.position.set(0, 0, -bd - 0.02); group.add(backCover);
+  const spine = new THREE.Mesh(new THREE.BoxGeometry(0.09, bh * 2, bd * 2 + 0.1), coverMat);
+  spine.position.set(-bw - 0.02, 0, 0); group.add(spine);
+
+  // Front cover - hinged on the SPINE (left edge); swings open toward the viewer.
+  const front = new THREE.Group();
+  front.position.set(-bw, 0, bd + 0.03);
+  const fc = new THREE.Mesh(new THREE.BoxGeometry(bw * 2, bh * 2, 0.05), frontMat);
+  fc.position.set(bw, 0, 0); front.add(fc);
+  // gold border frame + a central diamond emblem on the front cover
+  const brd = (() => {
+    const w = bw * 2 * 0.82, h = bh * 2 * 0.88, tw = 0.05;
+    const sh = new THREE.Shape();
+    sh.moveTo(-w / 2, -h / 2); sh.lineTo(w / 2, -h / 2); sh.lineTo(w / 2, h / 2); sh.lineTo(-w / 2, h / 2); sh.closePath();
+    const iw = w - 2 * tw, ih = h - 2 * tw; const ho = new THREE.Path();
+    ho.moveTo(-iw / 2, -ih / 2); ho.lineTo(-iw / 2, ih / 2); ho.lineTo(iw / 2, ih / 2); ho.lineTo(iw / 2, -ih / 2); ho.closePath();
+    sh.holes.push(ho);
+    return new THREE.Mesh(new THREE.ExtrudeGeometry(sh, { depth: 0.02, bevelEnabled: false }), frontGold);
+  })();
+  brd.position.set(bw, 0, 0.03); front.add(brd);
+  const emblem = new THREE.Mesh(new THREE.OctahedronGeometry(0.16, 0), frontGold);
+  emblem.position.set(bw, 0, 0.05); emblem.scale.set(1, 1.5, 0.4); front.add(emblem);
+  group.add(front);
+
+  // Press feedback at the fore-edge.
+  const pressCanvas = document.createElement("canvas"); pressCanvas.width = pressCanvas.height = 256;
+  const pressTex = new THREE.CanvasTexture(pressCanvas); disposables.push(pressTex);
+  pendingBakes.push(() => { paintSprite(pressCanvas, "glow"); pressTex.needsUpdate = true; });
+  const pressMat = new THREE.MeshBasicMaterial({ map: pressTex, color: glowCol, transparent: true, opacity: 0, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending });
+  const pressGlow = new THREE.Mesh(new THREE.PlaneGeometry(1.4, bh * 1.6), pressMat);
+  pressGlow.position.set(0, 0, bd + 0.4); pressGlow.renderOrder = 6; pressGlow.visible = false; group.add(pressGlow);
+
+  group.add(new THREE.AmbientLight(0xfff3ea, 0.6));
+  const key = new THREE.DirectionalLight(0xfff4e2, 1.12); key.position.set(6, 5, 7); group.add(key);
+  const fill = new THREE.DirectionalLight(0xeaf0ff, 0.34); fill.position.set(-5, -1.5, 4); group.add(fill);
+  const innerGlow = new THREE.PointLight(glowCol, 0.0, 9 * S, 1); innerGlow.position.set(0, 0.1, 0.0); group.add(innerGlow);
+
+  const smooth = (x) => { const c = clamp01(x); return c < 0.5 ? 2 * c * c : 1 - Math.pow(-2 * c + 2, 2) / 2; };
+  const HANDOFF = 0.91;
+
+  function applyVisual(t) {
+    const tt = clamp01(t);
+    // press 0->0.10 . front cover SWINGS open 0.10->0.85 . light glows from the pages .
+    // cover + book late-fade . wash -> HANDOFF -> dim
+    const glowRise = ease(clamp01(tt / 0.07));
+    const glowFall = ease(clamp01((tt - 0.10) / 0.09));
+    const pressF = glowRise * (1 - glowFall);
+    pressMat.opacity = 0.8 * pressF; pressGlow.visible = pressF > 0.003;
+
+    const openRaw = clamp01((tt - 0.10) / 0.75);
+    const openF = smooth(openRaw);
+    front.rotation.y = openF * 2.4;             // swings wide open on the spine (~137deg)
+
+    const washDim = smooth(clamp01((tt - HANDOFF) / (1 - HANDOFF)));
+
+    const frontFade = smooth(clamp01((openRaw - 0.55) / 0.45));
+    const bookFade = smooth(clamp01((openRaw - 0.82) / 0.18));
+    const fWantW = frontFade <= 0.0001, bWantW = bookFade <= 0.0001;
+    if (frontMat.depthWrite !== fWantW) { frontMat.depthWrite = fWantW; frontGold.depthWrite = fWantW; }
+    if (coverMat.depthWrite !== bWantW) { coverMat.depthWrite = bWantW; goldMat.depthWrite = bWantW; pageMat.depthWrite = bWantW; }
+    frontMat.opacity = frontGold.opacity = 1 - frontFade;
+    coverMat.opacity = goldMat.opacity = pageMat.opacity = 1 - bookFade;
+
+    const revealF = smooth(clamp01(openF / 0.3));
+    const flareF  = smooth(clamp01((tt - (HANDOFF - 0.13)) / 0.09));
+    innerMat.opacity = (0.14 + 0.36 * flareF) * (1 - washDim) * revealF;
+    innerLight.visible = innerMat.opacity > 0.002;
+    const ws = 1 + 1.0 * flareF; innerLight.scale.set(ws, ws, 1);
+    washMat.opacity = 0.78 * flareF * (1 - washDim);
+    washQuad.visible = washMat.opacity > 0.002;
+    innerGlow.intensity = (0.2 + 2.4 * openF) * (1 - washDim);
+  }
+
+  function framing(t, fov, aspect) {
+    const tn = Math.tan(((fov || 34) * Math.PI / 180) / 2);
+    const realAsp = aspect || 1;
+    const wide = realAsp > 0.85;
+    const asp = wide ? HW / HH : realAsp;
+    const margin = wide ? 1.14 : 1.0;
+    const zBase = Math.min(HH / tn, HW / (tn * asp)) * margin * S;
+    const dolly = smooth(clamp01((clamp01(t) - 0.10) / 0.75));
+    return { y: 0, z: zBase * (1 - 0.28 * dolly), lookAtY: 0 };
+  }
+
+  applyVisual(0);
+
+  function dispose() {
+    if (disposed) return; disposed = true;
+    group.traverse((o) => {
+      if (o.geometry) o.geometry.dispose();
+      if (o.material) {
+        const mats = Array.isArray(o.material) ? o.material : [o.material];
+        for (const m of mats) { for (const k of ["map", "normalMap", "roughnessMap", "metalnessMap", "envMap"]) if (m[k] && m[k].dispose) m[k].dispose(); m.dispose(); }
+      }
+    });
+    for (const d of disposables) { try { d.dispose(); } catch { /* ignore */ } }
+  }
+
+  return {
+    group, REVEAL_AT: 0.10, DURATION: 6.0,
+    DIRECT_HANDOFF: true, HANDOFF_AT: HANDOFF, WASH_TAIL: true,
+    BAKE_QUEUE: pendingBakes, WARM_TEXTURES: [innerTex, pressTex],
+    setOpen(t, fov, aspect) { applyVisual(t); return framing(t, fov, aspect); },
+    framePose(fov, aspect) { return framing(0, fov, aspect); },
+    refreshCard() { /* the book shape has no baked card */ },
     dispose,
   };
 }

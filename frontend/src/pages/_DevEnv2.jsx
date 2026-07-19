@@ -6,12 +6,15 @@ const CelestialCanvas = lazy(() => import("../components/digital/celestial/Celes
 
 const STYLES = [
   { key: "bloom", label: "المتفتّح (٤ طيّات)", sw: "#e9c9cb" },
-  { key: "curtain", label: "الستائر المخملية", sw: "#6a1a2e" },
+  { key: "curtain", label: "الستائر المخملية", sw: "#e7dbc4" },
+  { key: "gate", label: "بوابة القصر", sw: "#c9a24e" },
+  { key: "gift", label: "علبة الهدية", sw: "#ece2cf" },
+  { key: "book", label: "الكتاب المذهّب", sw: "#5e1a2c" },
   { key: "classic", label: "المكتوب العادي", sw: "#8a6a52" },
 ];
 
 export function DevEnv2() {
-  const [style, setStyle] = useState("curtain");
+  const [style, setStyle] = useState("gate");
   const [k, setK] = useState(0); // remount key: rebuilds the sealed envelope on switch / replay
   const worldRef = useRef(null);
   const theme = getDigitalTheme("ivorygold");
