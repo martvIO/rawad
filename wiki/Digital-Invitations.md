@@ -80,7 +80,37 @@ colours be customised per invitation.
   adversarial code review (0 blockers/majors). Headless WebGL screenshotting was flaky this
   session, so the live editor flow is owner-verified. See [[Visual Design System]].
 
-## Celestial 3D envelope — luxury PBR build, white/gold recolour (2026-06-29)
+## Bloom opening rework — glow-press, unified slide, through-the-light hand-off (2026-07-19)
+A grilling session locked a full re-choreography of the bloom open (superseding several of the
+2026-07-18 owner decisions: top-flap-first, edge-crack + suspended pause, side-aimed rays,
+melt-mid-fold, instant hand-off). The design was drafted by a Plan agent against the live code
+and adversarially verified by 3 lenses before implementation; verifier findings (depth-write
+holes in the wash, radial-sprite corner gaps, clock-race wording) were folded in.
+
+**Locked decisions (grilled 2026-07-19):**
+1. **Press feedback:** tap (anywhere — target unchanged, auto-open too) → a warm glow RING
+   blooms around the wax seal (~0.7s) → the crack-in-two plays → flaps begin.
+2. **Choreography:** ALL FOUR triangles move together — no top-first solo, no pause, no rays.
+3. **Motion:** no rotation at all — each triangle SLIDES straight out toward its own screen
+   edge, flat and coplanar ("float into the space").
+4. **Exit:** constant speed after a soft ~0.5s release (`softLinear`, C¹ quadratic ramp then
+   dead-linear), with a gentle LATE fade — on wide desktops the side triangles never physically
+   leave the screen, so the fade IS the melt-into-space.
+5. **Duration:** `DURATION 6.5s` (was 16), tap→invitation ≈ 6.5s.
+6. **Hand-off:** "through the light" — interior glow + a solid full-screen wash quad swell to a
+   golden climax at `HANDOFF_AT 0.90`, where `onComplete` fires WITHOUT removing the envelope;
+   the engine ramps clearAlpha→0 over the tail and `finishGlide()`s only at openT=1, so the
+   invitation cross-blends in beneath the dimming gold. New env-contract flag **`WASH_TAIL`**
+   in `celestialEngine.js` (flag-gated; classic byte-identical). Timeline: glow 0–0.11 · crack
+   0.11–0.20 · slide 0.22–0.84 · fade 0.70–0.84 · wash 0.76–0.90 · dim 0.90–1.
+7. **Camera:** `framing()` is now fully static (dissolve push-in dropped) — straight slides
+   stay axis-aligned.
+
+**Tuning learned in browser testing (phone 390×844 + wide 1440×900 via `/envelopes-preview`):**
+the wash quad must render BENEATH the additive glow (renderOrder 1 < innerLight 2) or it
+flattens the climax to a matte wall; and the additive boost must stay modest
+(`innerMat` peak ≈0.53, wash 0.88, washCol only 0.15-lerped to white) or ACES blows the climax
+out to the white page the owner rejected. Classic regression + double-replay verified clean.
 The invitation's opening ceremony is a procedural **three.js** envelope inside a drifting particle world (`components/digital/celestial/`: `celestialEngine.js`, `CelestialCanvas.jsx`, `envelopeMesh.js`, `particles.glsl.js`; orchestrated by `sections/CelestialAmbience.jsx`, with the legible sealed text as a DOM overlay in `CelestialEnvelopeOverlay.jsx`). The lazy three.js chunk loads only when the world runs.
 
 **The envelope is the full PBR "luxury" build**, restored from the merged `feat/arch-tech-debt-seams` work (commit `2f56adf`/`3a9345a`) after an interim commit (`eb3ca55`) had stripped it to a flat `MeshBasicMaterial` envelope:

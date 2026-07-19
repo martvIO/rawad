@@ -264,7 +264,20 @@ export function createCelestialWorld(canvas, opts = {}) {
     // flaps disappear — the remaining slice of the open is skipped once they're gone.
     if (env && env.DIRECT_HANDOFF) {
       const handoffAt = env.HANDOFF_AT != null ? env.HANDOFF_AT : 1;
-      if (openT >= handoffAt) { finishGlide(); return; }
+      if (env.WASH_TAIL) {
+        // "Through the light" (bloom): fire onComplete at the wash PEAK so the DOM
+        // content starts cross-blending in, but KEEP rendering the dimming wash —
+        // frame() ramps clearAlpha → 0 over the tail, hitting exactly 0 at the same
+        // openT=1 that removes the env (curve endpoints are locked even though the
+        // mesh's washDim uses its own ease). Consuming the cb makes this once-only
+        // and lets the eventual finishGlide's own cb guard no-op.
+        if (onCompleteCb && openT >= handoffAt) {
+          const cb = onCompleteCb;
+          onCompleteCb = null;
+          cb();
+        }
+        if (openT >= 1) { finishGlide(); return; }
+      } else if (openT >= handoffAt) { finishGlide(); return; }
     } else if (openT >= 1) {
       // Otherwise: brief hold on the light, then glide the camera back to the scene.
       const holdMs = env && env.HOLD_MS != null ? env.HOLD_MS : 320;
@@ -346,7 +359,15 @@ export function createCelestialWorld(canvas, opts = {}) {
           : env.framePose(ENV_FOV, asp);
         tz = pose.z; tx = gpx; ty = pose.y + gpy;
         lx = cam.x * 0.1; ly = pose.lookAtY; lz = 0;
-        fov = ENV_FOV; clearA = 1; posEase = mode === "opening" ? 0.2 : 0.12;
+        // WASH_TAIL envelopes: past HANDOFF_AT the opaque themed clear ramps to
+        // transparent so the DOM invitation shows through BENEATH the dimming wash.
+        // Same DIRECT_HANDOFF && WASH_TAIL precondition as advanceOpen — an env
+        // setting WASH_TAIL alone must not ramp while the glide path still runs.
+        const hAt = env && env.HANDOFF_AT != null ? env.HANDOFF_AT : 1;
+        clearA = (env && env.DIRECT_HANDOFF && env.WASH_TAIL && openT > hAt)
+          ? 1 - easeInOut(Math.min(1, (openT - hAt) / (1 - hAt)))
+          : 1;
+        fov = ENV_FOV; posEase = mode === "opening" ? 0.2 : 0.12;
         if (mode === "opening") advanceOpen(now);
       }
       lastLookY = ly;

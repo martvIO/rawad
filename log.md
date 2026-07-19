@@ -364,3 +364,6 @@ Touched: Digital-Invitations, Tasks-Backlog, Template-Demo-Surfaces, index
 
 ## [2026-07-18 21:15] session | Bloom envelope shipped on-site + colour pickers
 Touched: Digital-Invitations
+
+## [2026-07-19 08:02] session | Bloom open reworked — glow press, unified slide, light hand-off
+Touched: Digital-Invitations

@@ -1969,7 +1969,11 @@ function EnvelopePreview({ themeColor, overrides, content, lang }) {
     return () => clearTimeout(id);
   }, [colorsKey]);
 
-  const play = () => worldRef.current?.openEnvelope({ onComplete: () => setRemount((n) => n + 1) });
+  // WASH_TAIL envelopes (bloom) fire onComplete at the wash PEAK and keep rendering
+  // a ~0.65s dimming tail — remounting immediately would cut the climax, so the
+  // re-seal waits out the tail. Classic fires after its glide (env already gone),
+  // where the extra beat is invisible.
+  const play = () => worldRef.current?.openEnvelope({ onComplete: () => setTimeout(() => setRemount((n) => n + 1), 700) });
 
   return (
     <div data-testid="design-env-preview" style={{ position: "relative", height: 300, borderRadius: 14, overflow: "hidden", border: "1px solid rgba(201,168,76,.22)", background: theme.bg, marginTop: 14 }}>

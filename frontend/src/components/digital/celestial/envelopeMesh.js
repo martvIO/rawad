@@ -57,8 +57,8 @@ const REVEAL_AT = 0.18;
 // `floralTint` = the barely-there colour of the embossed florals on the paper.
 const STYLE_PRESETS = {
   // A DIFFERENT SHAPE (not a recolour): a portrait envelope whose four triangular
-  // flaps fold OUTWARD from the centre — like the reference — revealing the card
-  // with a warm glow. `shape:"bloom"` routes buildEnvelope to buildEnvelopeBloom.
+  // flaps slide straight OUTWARD from the centre in unison, revealing a warm glow
+  // that swells to a hand-off wash. `shape:"bloom"` routes to buildEnvelopeBloom.
   "bloom": {
     shape: "bloom", light: true,
     palette: { paper: "#f7e7e8", foil: "#c98a90", foilBright: "#f2d8d4", wax: "#8a2230", cardPaper: "#fdf6f5", cardInk: "#5a2530", sealLogo: "#eccf94" },
@@ -1310,6 +1310,15 @@ function buildEnvelopeBloom({ pal, preset, content } = {}) {
   const innerMat = new THREE.MeshBasicMaterial({ map: innerTex, color: glowCol, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending });
   const innerLight = new THREE.Mesh(new THREE.PlaneGeometry(HW * 4.4, HH * 4.4), innerMat);
   innerLight.position.set(0, 0, 0.0); innerLight.renderOrder = 2; group.add(innerLight);
+  // The ~1s "through the light" climax needs a genuinely FULL-screen wash, and the
+  // additive radial sprite above can't deliver it — its alpha dies before a wide
+  // screen's corners. This solid colour quad guarantees edge-to-edge warmth, drawn
+  // BENEATH the additive glow (renderOrder 1 < innerLight's 2) so the radial light
+  // still ADDS on top of it — a luminous golden wash, not a flat matte wall.
+  const washCol = glowCol.clone().lerp(new THREE.Color("#fff7e8"), 0.15);
+  const washMat = new THREE.MeshBasicMaterial({ color: washCol, transparent: true, opacity: 0, depthWrite: false, depthTest: false });
+  const washQuad = new THREE.Mesh(new THREE.PlaneGeometry(30, 30), washMat);
+  washQuad.position.set(0, 0, 0.5); washQuad.renderOrder = 1; washQuad.visible = false; group.add(washQuad);
 
   // Four flaps tiling the rectangle in an X (two diagonals), hinged at outer edges.
   // A foil hairline on each flap's edges makes the X seams + border read (like a
@@ -1340,15 +1349,14 @@ function buildEnvelopeBloom({ pal, preset, content } = {}) {
 
   // Professional CONTACT SHADOW: the raised top & bottom flaps cast a soft shadow
   // onto the side flaps beneath, along the four X seams — so it clearly reads that
-  // top/bottom sit ABOVE the sides. Baked strips parented to the side flaps; each
-  // fades + slides as its caster flap lifts (driven in applyVisual), gone once open.
+  // top/bottom sit ABOVE the sides. A SEALED-state depth cue: all four strips fade
+  // together over the first quarter of the unified slide (driven in applyVisual).
   const SHADOW_W     = 0.34;
-  const SHADOW_SLIDE = 0.06;
   const SHADOW_Z     = 0.10;
   const SHADOW_COL   = 0x140d05;
   const shadowTex = makeShadowTex(); disposables.push(shadowTex);
   const shadows = [];
-  const mkShadow = (flap, S0, S1, centroid, caster) => {
+  const mkShadow = (flap, S0, S1, centroid) => {
     const dx = S1[0] - S0[0], dy = S1[1] - S0[1];
     const L = Math.hypot(dx, dy);
     const ux = dx / L, uy = dy / L;
@@ -1369,13 +1377,13 @@ function buildEnvelopeBloom({ pal, preset, content } = {}) {
     mesh.position.set(S0[0], S0[1], SHADOW_Z);
     mesh.renderOrder = 4;
     flap.add(mesh);
-    shadows.push({ mesh, mat, caster, sx: S0[0], sy: S0[1], inx: nx, iny: ny, flipY });
+    shadows.push({ mesh, mat });
     return mesh;
   };
-  mkShadow(leftFlap,  [ HW, 0], [0,  HH], [ HW / 3, 0], "top");
-  mkShadow(leftFlap,  [ HW, 0], [0, -HH], [ HW / 3, 0], "rest");
-  mkShadow(rightFlap, [-HW, 0], [0,  HH], [-HW / 3, 0], "top");
-  mkShadow(rightFlap, [-HW, 0], [0, -HH], [-HW / 3, 0], "rest");
+  mkShadow(leftFlap,  [ HW, 0], [0,  HH], [ HW / 3, 0]);
+  mkShadow(leftFlap,  [ HW, 0], [0, -HH], [ HW / 3, 0]);
+  mkShadow(rightFlap, [-HW, 0], [0,  HH], [-HW / 3, 0]);
+  mkShadow(rightFlap, [-HW, 0], [0, -HH], [-HW / 3, 0]);
 
   // A REAL pressed-wax seal that CRACKS IN TWO: two scalloped half-meshes sharing a
   // jagged crack seam, the logo debossed on top. They part + fade on tap.
@@ -1393,96 +1401,68 @@ function buildEnvelopeBloom({ pal, preset, content } = {}) {
   const sealBotH = makeWaxHalf(-1, sealMat, { crackPts, RG: 0.28 });
   sealTopH.renderOrder = sealBotH.renderOrder = 5;
   sealGroup.add(sealTopH, sealBotH);
+  // Press feedback (owner): the moment the guest taps, a warm glow RING blooms
+  // AROUND the wax seal, then decays as the crack takes over. Parented to `group`,
+  // not sealGroup — the sealGroup goes invisible once its halves fade, and the
+  // ring must outlast the crack's start. The ring texture's bright band sits at
+  // ~0.86 of its radius, landing just OUTSIDE the RG=0.28 wax disc.
+  const ringTex = sprite("ring"); disposables.push(ringTex);
+  const ringMat = new THREE.MeshBasicMaterial({ map: ringTex, color: glowCol, transparent: true, opacity: 0, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending });
+  const sealRing = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 1.5), ringMat);
+  sealRing.position.set(0, 0, zt + 0.19); sealRing.renderOrder = 6; sealRing.visible = false;
+  group.add(sealRing);
+  const sealPulse = new THREE.PointLight(col(pal.foilBright, "#f6e3a6"), 0, 5 * S, 1.8);
+  sealPulse.position.set(0, 0.05, 0.9); group.add(sealPulse);
 
   group.add(new THREE.AmbientLight(0xfff3ea, 0.82));
   const key = new THREE.DirectionalLight(0xfff1d8, 0.8); key.position.set(4, 6, 6.5); group.add(key);
   const fill = new THREE.DirectionalLight(0xf1e6dc, 0.4); fill.position.set(-4, -2, 5); group.add(fill);
   const innerGlow = new THREE.PointLight(glowCol, 0.0, 9 * S, 1); innerGlow.position.set(0, 0.1, -0.15); group.add(innerGlow);
-  // NO more X strips — the visible light is the FULL interior glow (above) + a wide
-  // top beam (below). Four warm PointLights stay to backlight the revealed interior.
+  // The visible light is the FULL interior glow (above) + the wash quad. Four warm
+  // PointLights backlight the revealed interior; all four grow together with the slide.
   const mkSeamLight = (cx, cy) => {
     const l = new THREE.PointLight(glowCol, 0.0, 8 * S, 1);
     l.position.set(cx * HW * 0.42, cy * HH * 0.42, -0.05);
     group.add(l); return l;
   };
-  const seamLights = [
-    { lt: mkSeamLight(-1,  1), kind: "top" },
-    { lt: mkSeamLight( 1,  1), kind: "top" },
-    { lt: mkSeamLight(-1, -1), kind: "rest" },
-    { lt: mkSeamLight( 1, -1), kind: "rest" },
-  ];
-  // Two STRONG rays escaping the top triangle's edges, each AIMED down its upper diagonal
-  // ONTO a side triangle (owner: "شعاع قوي… متجه على المثلثات الي عالجوانب"). Biased toward
-  // the side flap (not over the top flap, so the top flap stays legible during the pause).
-  // Additive, in FRONT (never occluded), growing with the top flap's open.
-  const beamTex = sprite("glow"); disposables.push(beamTex);
-  const diagLen = Math.hypot(HW, HH);
-  const mkSideRay = (sx) => {
-    const m = new THREE.MeshBasicMaterial({ map: beamTex, color: glowCol, transparent: true, opacity: 0, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending });
-    // A glow stretched ALONG the shared upper diagonal (centre → top corner) and centred
-    // right ON that diagonal — the edge the side triangle SHARES with the top triangle. Its
-    // soft spread spills onto the side triangle so, as the top flap lifts, the side triangle's
-    // upper edge visibly lights up (owner: "الضوء فوق أطراف المثلثين الجانبيين المجاورة للمثلث").
-    const geo = new THREE.PlaneGeometry(diagLen * 1.28, HH * 0.6);
-    const mesh = new THREE.Mesh(geo, m);
-    // unit vector perpendicular to the diagonal, pointing INTO the side triangle (away from
-    // the top flap) — nudge the glow slightly that way so it lands on the side flap, not the top.
-    const px = (sx * HH) / diagLen, py = (-HW) / diagLen;
-    const push = HH * 0.1;
-    mesh.position.set(sx * HW * 0.5 + px * push, HH * 0.5 + py * push, zt + 0.06);
-    mesh.rotation.z = Math.atan2(HH, sx * HW);       // aligned with the upper diagonal
-    mesh.renderOrder = 8; group.add(mesh);
-    return { mesh, mat: m };
-  };
-  const sideRayL = mkSideRay(-1), sideRayR = mkSideRay(1);
+  const seamLights = [mkSeamLight(-1, 1), mkSeamLight(1, 1), mkSeamLight(-1, -1), mkSeamLight(1, -1)];
 
-  const A_OPEN = Math.PI * 0.9;   // ~162° — flaps fold fully UP/OUTWARD like petals
-  // ease-in-out for a gentle, gradual "شوي شوي" fold (no snappy start).
+  // ease-in-out kept for the fades/shadows; the slide itself uses softLinear below.
   const smooth = (x) => { const c = clamp01(x); return c < 0.5 ? 2 * c * c : 1 - Math.pow(-2 * c + 2, 2) / 2; };
-  // The TOP flap cracks a TINY sliver at the edges (just enough for the ray to leak),
-  // HOLDS suspended ~2s, then OPENS fully up (owner: "يفتح نتفة الحواف بس وتطلع دغري
-  // الشعاع… ويضل ثانيتين معلق وبعدها بكمل"): 0→0.08 tiny, hold at 0.08, then 0.08→1.
-  const pausedRise = (x) => {
-    const c = clamp01(x);
-    if (c < 0.09) return 0.18 * smooth(c / 0.09);       // small edge open — rays shoot out
-    if (c < 0.165) return 0.18;                          // HOLD suspended (~1s — half the old pause)
-    return 0.18 + 0.82 * smooth((c - 0.165) / 0.835);    // then OPEN slowly, filling the timeline
+  // Owner: the four triangles glide at a CONSTANT speed with only a soft release —
+  // a quadratic ramp (~0.5s) whose exit velocity equals the linear segment's slope
+  // (C¹ at the seam), then dead-constant to the end. f(1) = 1 exactly.
+  const softLinear = (u) => {
+    const c = clamp01(u), a = 0.13, n = 1 - a / 2;
+    return c < a ? (c * c) / (2 * a * n) : (c - a / 2) / n;
   };
+  // Single source of truth for the hand-off point: the wash swells INTO it, dims
+  // AFTER it, and the returned HANDOFF_AT (which the engine's clearAlpha ramp
+  // derives its window from) is this same constant — retuning it can't desync
+  // the mesh's washDim from the engine's reveal tail.
+  const HANDOFF = 0.90;
 
   function applyVisual(t) {
     const tt = clamp01(t);
-    // Timeline (normalized; DURATION 16s → true slow-motion):
-    //   wax cracks 0.02→0.09 · TOP flap 0.10→0.46 · other three 0.50→0.86 · dissolve 0.88→1
-    const frac  = ease(clamp01(tt / 0.06));            // legacy handle (returned)
-    // Seal cracks + vanishes FIRST; only THEN does the top flap begin (owner:
-    // "أول ما يختفي الختم يبلش المثلث الي فوق"). Top rises with a small-open→hold→rise.
-    const topF  = pausedRise(clamp01((tt - 0.11) / 0.72)); // opens SLOWLY across the timeline
-    const restF = smooth(clamp01((tt - 0.30) / 0.42));     // the OTHER three open WITH the top (faster)
-    const diss  = ease(clamp01((tt - 0.65) / 0.08));       // the flaps MELT AWAY (fade) as they finish
-                                                           // opening instead of splaying + lingering — so on a
-                                                           // WIDE desktop screen (where they don't clip off the
-                                                           // edges like on a phone) they still DISAPPEAR at the
-                                                           // same moment, then the engine hands off at HANDOFF_AT
-                                                           // and the invitation opens instantly (owner: "زي التلفون
-                                                           // — أول ما تختفي المثلثات دغري تفتح الدعوة").
+    // Timeline (normalized; DURATION 6.5s):
+    //   glow ring 0→0.11 · seal cracks 0.11→0.20 · the four triangles SLIDE 0.22→0.84
+    //   (late fade 0.70→0.84) · wash swells 0.76→0.90 · HANDOFF 0.90 · wash dims → 1
+    // Press feedback: the glow ring blooms around the seal on the tap, then decays
+    // as the crack takes over (owner: glow first, THEN the envelope opens).
+    const glowRise = ease(clamp01(tt / 0.09));
+    const glowFall = ease(clamp01((tt - 0.13) / 0.09));
+    const ringF = glowRise * (1 - glowFall);
+    ringMat.opacity = 0.95 * ringF;
+    sealRing.scale.setScalar(0.70 + 0.50 * glowRise);  // blooms outward from the press
+    sealRing.visible = ringF > 0.003;
+    sealPulse.intensity = 2.4 * ringF;
+    sealPulse.visible = ringF > 0.003; // invisible lights skip the lighting loop entirely
 
-    // The TOP flap LIFTS straight UP the screen (with only a slight forward tilt for
-    // volume) — an unmistakable "opening UP", never sliding/folding BACKWARD (owner:
-    // "يفتح لفوق ومش يرجع لورا"). As it rises it uncovers the full-length rays beneath.
-    topPivot.rotation.x   = -0.55 * topF;        // slight forward tilt (volume, faces the viewer)
-    topPivot.position.y   =  HH + 2.4 * topF;    // rises UP the screen (stays legible, then off top)
-    botPivot.rotation.x   = -A_OPEN * restF;
-    leftPivot.rotation.y  = -A_OPEN * restF;
-    rightPivot.rotation.y =  A_OPEN * restF;
-
-    // Wax seal: CRACKS within ~1s of the tap, halves part fast, then the whole seal
-    // FADES OUT cleanly — FULLY gone (~1.3s) BEFORE the top flap opens, so no seal
-    // shadow ever lingers above the ray (owner: "خلال ثانية ينكسر ويختفي بدون آثار").
-    // Wax seal CRACKS IN TWO on tap: the halves part + tip forward, then fade — fully
-    // gone BEFORE the top flap opens.
-    const crackSnap = ease(clamp01((tt - 0.01) / 0.045));  // sharp fracture instant
-    const split     = smooth(clamp01((tt - 0.02) / 0.08)); // halves part fast
-    const sealFade  = ease(clamp01((tt - 0.03) / 0.05));   // then vanish
+    // Wax seal CRACKS IN TWO once the glow peaks: the halves part + tip forward,
+    // then fade — fully gone before the triangles start to slide.
+    const crackSnap = ease(clamp01((tt - 0.11) / 0.03));   // sharp fracture instant
+    const split     = smooth(clamp01((tt - 0.12) / 0.07)); // halves part fast
+    const sealFade  = ease(clamp01((tt - 0.14) / 0.06));   // then vanish
     sealGroup.visible = sealFade < 0.999;
     sealGroup.scale.setScalar(1 + 0.02 * Math.sin(crackSnap * Math.PI)); // tiny jolt, NOT a shrink
     const sep  = 0.30 * split;
@@ -1492,72 +1472,71 @@ function buildEnvelopeBloom({ pal, preset, content } = {}) {
     sealTopH.position.set(0,  sep, fwd);         sealTopH.rotation.set( tip, 0,  roll);
     sealBotH.position.set(0, -sep, fwd * 0.96);  sealBotH.rotation.set(-tip, 0, -roll);
 
-    // Opacity: flaps stay opaque until the dissolve; the seal fades right after the press
-    // (opaque flip only for the flaps, whose overlap would otherwise darken).
-    const op = 1 - diss;
-    const wantT = diss > 0.0001;
-    if (flapMat.transparent !== wantT) { flapMat.transparent = wantT; flapMat.needsUpdate = true; }
-    if (edgeMat.transparent !== wantT) { edgeMat.transparent = wantT; edgeMat.needsUpdate = true; }
+    // ALL FOUR triangles slide straight OUT toward their own screen edge — flat,
+    // coplanar, in perfect unison, constant speed after the soft release (owner:
+    // the four parts open together, at a constant speed, and float into the space).
+    const sldRaw = clamp01((tt - 0.22) / 0.62);
+    const sldF = softLinear(sldRaw);
+    const D_VERT = 2.7, D_SIDE = 1.35;
+    topPivot.position.y   =  HH + D_VERT * sldF;
+    botPivot.position.y   = -HH - D_VERT * sldF;
+    leftPivot.position.x  = -HW - D_SIDE * sldF;
+    rightPivot.position.x =  HW + D_SIDE * sldF;
+    // all pivot rotations stay 0 — the triangles never fold, they glide
+
+    // Late fade: fully visible for most of the travel, softly dissolving near the
+    // end — never an instant vanish. On a wide desktop (where the side triangles
+    // never physically leave the screen) this IS the "melt into the space around
+    // the column"; on a phone they are near their edges by the time it starts.
+    const fadeF = smooth(clamp01((sldRaw - 0.77) / 0.23));
+    const op = 1 - fadeF;
+    const wantT = fadeF > 0.0001;
+    // The transparent flip keeps the opaque overlap crisp until the fade begins; the
+    // depthWrite flip stops the fading (still-coplanar) triangles from punching
+    // depth holes into the depth-tested interior glow behind them.
+    if (flapMat.transparent !== wantT) {
+      flapMat.transparent = wantT; edgeMat.transparent = wantT;
+      flapMat.depthWrite = !wantT; edgeMat.depthWrite = !wantT; backMat.depthWrite = !wantT;
+      flapMat.needsUpdate = true; edgeMat.needsUpdate = true;
+    }
     flapMat.opacity = op; edgeMat.opacity = op; backMat.opacity = op;
-    sealMat.opacity = (1 - sealFade) * op;             // press → then dissolve
+    sealMat.opacity = 1 - sealFade;                    // the seal is long gone before the fade
     for (const e of edges) e.material.opacity = (e.material.userData.base || 0.55) * op;
 
-    // Light from ALL FOUR flap edges: begins with the TOP flap, GROWS as more flaps
-    // open, largest at full reveal, then eases on the dissolve.
-    const union = (a, b) => 1 - (1 - a) * (1 - b);
-    const fTop  = union(topF, restF);     // top ∪ side  — lights FIRST
-    const fRest = restF * (2 - restF);    // rest ∪ rest — grows later
-    // The ray must appear IMMEDIATELY at the tiny edge-crack, then keep GROWING as the
-    // flap opens further — so front-load the top seams, but still climb to full.
-    // The beam grows WITH the flap (linear), so at the tiny-crack + pause it's only a
-    // soft ray beside the top flap and does NOT wash it out — the flap stays visible
-    // (owner: "الشعاع ما يأثّر على المثلث ويضلّ يبين عادي"). It builds to full as it opens.
-    const rayTop = fTop;
-    const fade  = 1 - diss;
-    let totalF = 0;
-    for (const { lt, kind } of seamLights) {
-      const fi = (kind === "top" ? rayTop : fRest) * fade;
-      totalF += fi;
-      lt.intensity = 0.15 + 3.4 * fi;
-    }
-    // Interior light — a warm glow revealed as the flaps open (occluded when closed).
-    // The full-screen wash is a BRIEF CLIMAX, not a long build: it stays a SOFT backing
-    // glow through the whole open, then flares to its brightest only in the final ~1s as
-    // the flaps vanish, so the whole screen only lights up for about a second (owner:
-    // "الضو الي ببين بكل الشاشة خليه بس لمدة ثانية").
-    const openMax = Math.max(topF, restF);
-    const revealF = smooth(clamp01(openMax / 0.14));       // present once the flaps crack open
-    const flareF  = smooth(clamp01((tt - 0.60) / 0.05));   // flares bright just as the flaps melt away
-    innerMat.opacity = (0.15 + 0.53 * flareF) * revealF * fade;
-    // Two STRONG side-rays aimed onto the side triangles — grow WITH the top flap (soft at
-    // the crack so the flap stays legible, strong as it opens). They sit off the top-flap
-    // face so they light the SIDE flaps, not wash the top one.
-    const beamF = rayTop * fade;
-    const beamO = Math.min(1, 1.35 * beamF);
-    sideRayL.mat.opacity = beamO; sideRayR.mat.opacity = beamO;
-    const bs = 0.7 + 0.45 * beamF;
-    sideRayL.mesh.scale.set(bs, bs, 1); sideRayR.mesh.scale.set(bs, bs, 1);
-    // Contact shadows are a SEALED-STATE depth cue: each stays until ITS flap opens.
-    // The TWO TOP shadows fade as the TOP flap opens; the TWO BOTTOM shadows remain
-    // until the other three open (owner: "لما يفتح المثلث الفوقاني بس الظلين الفوقانيين
-    // يختفوا والتحتانيين يضلّوا، ولما تفتح الثلاثة يختفي الظل").
-    for (const sh of shadows) {
-      const cF = sh.caster === "top" ? topF : restF;
-      const k = (1 - smooth(clamp01(cF / 0.5))) * (1 - diss);
-      sh.mat.opacity = k;
-      sh.mesh.visible = k > 0.002;
-    }
-    // Central junction glow: seam-total reveal PLUS a brief golden pulse at the crack
-    // instant ("seal breaks → light escapes"). Single merged driver for innerGlow.
-    innerGlow.intensity = (0.30 + 0.72 * totalF) * (1 - 0.6 * diss)
-                        + 1.6 * crackSnap * (1 - ease(clamp01((tt - 0.09) / 0.12)));
+    // Warm interior light grows as the triangles part; dims fully through the
+    // hand-off tail so nothing is left lit if the env ever outlives openT=1.
+    const washDim = smooth(clamp01((tt - HANDOFF) / (1 - HANDOFF)));
+    const grow = sldF * (2 - sldF);
+    for (const lt of seamLights) lt.intensity = (0.15 + 3.4 * grow) * (1 - washDim);
 
-    return { frac, fold: Math.max(topF, restF), rise: diss };
+    // Interior glow — revealed as the triangles part, swelling into the brief
+    // full-screen golden wash at the hand-off ("through the light"), then dimming
+    // as the invitation cross-blends in beneath. Full-bright window ≈ 0.6s, within
+    // the owner's "الضو الي ببين بكل الشاشة خليه بس لمدة ثانية" cap.
+    const revealF = smooth(clamp01(sldF / 0.14));
+    const flareF  = smooth(clamp01((tt - (HANDOFF - 0.14)) / 0.10));
+    // Keep the additive boost modest — the wash must peak as luminous GOLD, not a
+    // blown-out white page (the owner explicitly rejected a white hand-off).
+    innerMat.opacity = (0.15 + 0.38 * flareF) * (1 - washDim) * revealF;
+    innerLight.visible = innerMat.opacity > 0.002; // no draw call while sealed
+    const ws = 1 + 0.9 * flareF;
+    innerLight.scale.set(ws, ws, 1);
+    washMat.opacity = 0.88 * flareF * (1 - washDim);
+    washQuad.visible = washMat.opacity > 0.002;
+
+    // Contact shadows: all four fade together over the first quarter of the slide.
+    const shK = (1 - smooth(clamp01(sldRaw / 0.25))) * op;
+    for (const sh of shadows) { sh.mat.opacity = shK; sh.mesh.visible = shK > 0.002; }
+
+    // Central junction glow: grows with the slide PLUS a brief golden pulse at the
+    // crack instant ("seal breaks → light escapes").
+    innerGlow.intensity = (0.30 + 2.9 * grow) * (1 - washDim)
+                        + 1.6 * crackSnap * (1 - ease(clamp01((tt - 0.19) / 0.12)));
   }
 
-  // Sealed: fill the screen (cover = the tighter dimension fills). The envelope
-  // does NOT shrink while opening (owner's request) — the camera holds; only a
-  // gentle push-IN on the final dissolve toward the revealed invitation.
+  // Sealed: fill the screen (cover = the tighter dimension fills). The camera is
+  // fully STATIC, dead head-on — the four triangles slide along the screen axes,
+  // so any push-in/tilt would add radial drift to their dead-straight paths.
   function framing(t, fov, aspect) {
     const tn = Math.tan(((fov || 34) * Math.PI / 180) / 2);
     // Only a LANDSCAPE / wide screen (a desktop) gets the tidy centred portrait column;
@@ -1571,13 +1550,7 @@ function buildEnvelopeBloom({ pal, preset, content } = {}) {
     const asp = wide ? HW / HH : realAsp;
     const margin = wide ? 1.14 : 1.0;
     const cover = Math.min(HH / tn, HW / (tn * asp)) * margin;
-    const tc = clamp01(t);
-    const diss = ease(clamp01((tc - 0.65) / 0.08));
-    // Sealed = dead head-on. As the flaps open, the camera RISES + looks down into a
-    // gentle 3/4 view so the top flap is clearly seen LIFTING up in 3-D (a pure
-    // head-on camera only ever looks INTO the opening). Settles back head-on on the
-    // dissolve so the invitation hands off flat.
-    return { y: 0, z: cover * (1 - 0.08 * diss) * S, lookAtY: 0 };
+    return { y: 0, z: cover * S, lookAtY: 0 };
   }
 
   applyVisual(0);
@@ -1595,12 +1568,14 @@ function buildEnvelopeBloom({ pal, preset, content } = {}) {
   }
 
   return {
-    group, REVEAL_AT: 0.11, DURATION: 16.0, // true slow-motion, graceful petal-like open
-    // The moment the flaps VANISH (openT 0.89), hand off to the invitation DIRECTLY — no white
-    // page, no lingering tail, no camera glide. HANDOFF_AT fires the hand-off just after the
-    // dissolve completes (0.83→0.89) so the invitation opens the instant the triangles disappear
-    // while the OPEN itself stays slow (owner: "بطيء زي ما هو + الدعوة فوراً لما تختفي المثلثات").
-    DIRECT_HANDOFF: true, HANDOFF_AT: 0.74,
+    group, REVEAL_AT: 0.11, DURATION: 6.5, // tap → invitation ≈ 6.5s (owner: "more than 5-6s")
+    // "Through the light" hand-off: onComplete fires at the wash PEAK (HANDOFF ≈ 5.85s)
+    // while the envelope keeps rendering its dimming wash; WASH_TAIL tells the engine to ramp
+    // clearAlpha → 0 over the tail and remove the env only at openT = 1, so the invitation
+    // cross-blends in BENEATH the dimming gold — no cut, no white page. The tail's wall
+    // clock, (1 − HANDOFF) × DURATION = 0.65s, is sized to CelestialAmbience's 650ms
+    // done→gone timer — retune them together.
+    DIRECT_HANDOFF: true, HANDOFF_AT: HANDOFF, WASH_TAIL: true,
     setOpen(t, fov, aspect) { applyVisual(t); return framing(t, fov, aspect); },
     framePose(fov, aspect) { return framing(0, fov, aspect); },
     refreshCard() { /* the bloom shape has no baked card */ },
