@@ -2018,10 +2018,42 @@ function buildEnvelopeGate({ pal, preset } = {}) {
   // the gold lines are the metallic/smooth part of the PBR over matte ivory).
   const arab = makeArabesque({ bg: "#" + doorCol.getHexString(), line: "#" + goldCol.getHexString(), alpha: 0.5, lineW: 2.4, cells: 2, repeat: [1, 2], withMetal: true });
   disposables.push(arab.color, arab.metal, arab.rough);
+  // CARVED RELIEF normal map (deferred): the same girih lattice RAISED, so the gold
+  // reads as physically carved inlay under the raking light — not a flat print. Same
+  // 2-cell grid + [1,2] repeat as the colour map so relief and gold line up exactly.
+  const RS = 512;
+  const rH = document.createElement("canvas"); rH.width = rH.height = RS;
+  const rN = document.createElement("canvas"); rN.width = rN.height = RS;
+  const doorNorTex = new THREE.CanvasTexture(rN);
+  doorNorTex.wrapS = doorNorTex.wrapT = THREE.RepeatWrapping; doorNorTex.repeat.set(1, 2);
+  disposables.push(doorNorTex);
+  { const xn = rN.getContext("2d"); xn.fillStyle = "#8080ff"; xn.fillRect(0, 0, RS, RS); }
+  pendingBakes.push(() => {
+    const x = rH.getContext("2d");
+    x.fillStyle = "#787878"; x.fillRect(0, 0, RS, RS);
+    x.strokeStyle = "#ffffff"; x.lineJoin = "round"; x.lineCap = "round";
+    try { x.filter = "blur(1.1px)"; } catch { /* ignore */ }
+    const cells = 2, un = RS / cells;
+    const star = (ox, oy, r, lw) => {
+      x.lineWidth = lw;
+      x.beginPath();
+      for (let i = 0; i < 16; i++) { const a = (i * Math.PI) / 8 - Math.PI / 2; const rr = i % 2 === 0 ? r : r * 0.45; const px = ox + Math.cos(a) * rr, py = oy + Math.sin(a) * rr; i ? x.lineTo(px, py) : x.moveTo(px, py); }
+      x.closePath(); x.stroke();
+      x.beginPath();
+      for (let i = 0; i < 8; i++) { const a = (i * Math.PI) / 4; const px = ox + Math.cos(a) * r * 0.4, py = oy + Math.sin(a) * r * 0.4; i ? x.lineTo(px, py) : x.moveTo(px, py); }
+      x.closePath(); x.stroke();
+    };
+    for (let gy = 0; gy <= cells; gy++) for (let gx = 0; gx <= cells; gx++) star(gx * un, gy * un, un * 0.5, RS * 0.013);
+    for (let gy = 0; gy < cells; gy++) for (let gx = 0; gx < cells; gx++) star(gx * un + un / 2, gy * un + un / 2, un * 0.24, RS * 0.010);
+    try { x.filter = "none"; } catch { /* ignore */ }
+    heightToNormal(rH, 3.4, rN);
+    doorNorTex.needsUpdate = true;
+  });
   const doorMat = new THREE.MeshStandardMaterial({
     color: 0xffffff, map: arab.color, metalnessMap: arab.metal, metalness: 1.0,
-    roughnessMap: arab.rough, roughness: 0.6, bumpMap: grain, bumpScale: 0.006,
-    envMap: env, envMapIntensity: 0.6, emissive: doorCol, emissiveIntensity: 0.07,
+    roughnessMap: arab.rough, roughness: 0.5,
+    normalMap: doorNorTex, normalScale: new THREE.Vector2(1.2, 1.2),
+    bumpMap: grain, bumpScale: 0.004, envMap: env, envMapIntensity: 0.85, emissive: doorCol, emissiveIntensity: 0.045,
     side: THREE.DoubleSide, transparent: true, depthWrite: true,
   });
   const goldMat = new THREE.MeshPhysicalMaterial({
@@ -2049,13 +2081,13 @@ function buildEnvelopeGate({ pal, preset } = {}) {
   const mkDoor = (sx) => {
     const g = new THREE.Group();
     g.position.set(sx * (openW / 2), 0, zt); // hinge at the outer edge of the opening
-    const panel = new THREE.Mesh(new THREE.BoxGeometry(dW, dH, 0.06), doorMat);
+    const panel = new THREE.Mesh(new THREE.BoxGeometry(dW, dH, 0.14), doorMat);   // real thickness
     panel.position.set(-sx * dW / 2, 0, 0);  // door extends INWARD from the hinge
     g.add(panel);
-    // two recessed gold-bordered panels (moldings) on the face
+    // two raised gold-bordered panels (moldings) proud of the face — real 3D depth
     for (const cy of [1, -1]) {
-      const pm = mkFrameMesh(dW * 0.66, dH * 0.4, 0.028);
-      pm.position.set(-sx * dW / 2, cy * dH * 0.22, 0.035); g.add(pm);
+      const pm = mkFrameMesh(dW * 0.66, dH * 0.4, 0.03);
+      pm.position.set(-sx * dW / 2, cy * dH * 0.22, 0.08); g.add(pm);
     }
     // gold ring handle near the inner (meeting) edge
     const handle = new THREE.Mesh(new THREE.TorusGeometry(0.055, 0.017, 10, 22), goldMat);
@@ -2082,10 +2114,13 @@ function buildEnvelopeGate({ pal, preset } = {}) {
   const pressGlow = new THREE.Mesh(new THREE.PlaneGeometry(1.2, HH * 1.4), pressMat);
   pressGlow.position.set(0, 0, zt + 0.3); pressGlow.renderOrder = 6; pressGlow.visible = false; group.add(pressGlow);
 
-  // Lights — constant count, intensity-driven.
-  group.add(new THREE.AmbientLight(0xfff3ea, 0.55));
-  const key = new THREE.DirectionalLight(0xfff4e2, 1.2); key.position.set(5, 5, 7); group.add(key);
-  const fill = new THREE.DirectionalLight(0xeaf0ff, 0.34); fill.position.set(-5, -1.5, 4); group.add(fill);
+  // LOW ambient + a strong raking KEY (top-side) + a cool RIM (back edge) + a warm fill:
+  // form-defining light so the carved relief + door depth read as real 3D, not flat
+  // (high ambient was the "looks CG" flatten — same lesson as the curtains).
+  group.add(new THREE.AmbientLight(0xfff3ea, 0.28));
+  const key = new THREE.DirectionalLight(0xfff4e2, 1.7); key.position.set(6.5, 7, 5); group.add(key);
+  const rim = new THREE.DirectionalLight(0xbcd2ff, 0.75); rim.position.set(-5.5, 2.5, -4); group.add(rim);
+  const fill = new THREE.DirectionalLight(0xffe6cf, 0.3); fill.position.set(-4, -2.5, 5); group.add(fill);
   const innerGlow = new THREE.PointLight(glowCol, 0.0, 9 * S, 1); innerGlow.position.set(0, 0.1, -0.2); group.add(innerGlow);
 
   const smooth = (x) => { const c = clamp01(x); return c < 0.5 ? 2 * c * c : 1 - Math.pow(-2 * c + 2, 2) / 2; };
@@ -2232,9 +2267,12 @@ function buildEnvelopeGift({ pal, preset } = {}) {
   const pressGlow = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 1.6), pressMat);
   pressGlow.position.set(0, lidY0 + 0.1, 0.4); pressGlow.renderOrder = 6; pressGlow.visible = false; group.add(pressGlow);
 
-  group.add(new THREE.AmbientLight(0xfff3ea, 0.6));
-  const key = new THREE.DirectionalLight(0xfff4e2, 1.18); key.position.set(5, 6, 7); group.add(key);
-  const fill = new THREE.DirectionalLight(0xeaf0ff, 0.35); fill.position.set(-5, -1.5, 4); group.add(fill);
+  // Form-defining light (low ambient + raking key + cool rim + warm fill) so the box +
+  // ribbon + bow read as real 3D, not flat cardboard.
+  group.add(new THREE.AmbientLight(0xfff3ea, 0.3));
+  const key = new THREE.DirectionalLight(0xfff4e2, 1.6); key.position.set(6, 7, 6); group.add(key);
+  const rim = new THREE.DirectionalLight(0xbcd2ff, 0.7); rim.position.set(-5.5, 2.5, -4); group.add(rim);
+  const fill = new THREE.DirectionalLight(0xffe6cf, 0.3); fill.position.set(-4, -2.5, 5); group.add(fill);
   const innerGlow = new THREE.PointLight(glowCol, 0.0, 9 * S, 1); innerGlow.position.set(0, boxY + bh, 0.1); group.add(innerGlow);
 
   const smooth = (x) => { const c = clamp01(x); return c < 0.5 ? 2 * c * c : 1 - Math.pow(-2 * c + 2, 2) / 2; };
@@ -2352,8 +2390,45 @@ function buildEnvelopeBook({ pal, preset } = {}) {
   const coverMat = new THREE.MeshStandardMaterial({ color: coverCol, roughness: 0.62, metalness: 0, bumpMap: grain, bumpScale: 0.012, envMap: env, envMapIntensity: 0.14, emissive: coverCol, emissiveIntensity: 0.14, side: THREE.DoubleSide, transparent: true, depthWrite: true });
   const goldMat = new THREE.MeshPhysicalMaterial({ color: goldCol, metalness: 0.96, roughness: 0.26, clearcoat: 0.5, envMap: env, envMapIntensity: 1.2, emissive: goldBright, emissiveIntensity: 0.16, side: THREE.DoubleSide, transparent: true, depthWrite: true });
   const pageMat = new THREE.MeshStandardMaterial({ color: pageCol, roughness: 0.85, metalness: 0, emissive: pageCol, emissiveIntensity: 0.1, side: THREE.DoubleSide, transparent: true, depthWrite: true });
-  const frontMat = coverMat.clone();   // front cover fades on its own clock as it opens
   const frontGold = goldMat.clone();
+  // Front cover: burgundy leather with an EMBOSSED gold arabesque (carved relief via a
+  // raised normal map) + a leather grain — the recipe that makes the gate read as 3D.
+  const arabB = makeArabesque({ bg: "#" + coverCol.getHexString(), line: "#" + goldCol.getHexString(), alpha: 0.42, lineW: 2.2, cells: 2, repeat: [1, 2], withMetal: true });
+  disposables.push(arabB.color, arabB.metal, arabB.rough);
+  const RS = 512;
+  const rHb = document.createElement("canvas"); rHb.width = rHb.height = RS;
+  const rNb = document.createElement("canvas"); rNb.width = rNb.height = RS;
+  const coverNorTex = new THREE.CanvasTexture(rNb);
+  coverNorTex.wrapS = coverNorTex.wrapT = THREE.RepeatWrapping; coverNorTex.repeat.set(1, 2);
+  disposables.push(coverNorTex);
+  { const xn = rNb.getContext("2d"); xn.fillStyle = "#8080ff"; xn.fillRect(0, 0, RS, RS); }
+  pendingBakes.push(() => {
+    const x = rHb.getContext("2d");
+    x.fillStyle = "#787878"; x.fillRect(0, 0, RS, RS);
+    x.strokeStyle = "#ffffff"; x.lineJoin = "round"; x.lineCap = "round";
+    try { x.filter = "blur(1.1px)"; } catch { /* ignore */ }
+    const cells = 2, un = RS / cells;
+    const star = (ox, oy, r, lw) => {
+      x.lineWidth = lw;
+      x.beginPath();
+      for (let i = 0; i < 16; i++) { const a = (i * Math.PI) / 8 - Math.PI / 2; const rr = i % 2 === 0 ? r : r * 0.45; const px = ox + Math.cos(a) * rr, py = oy + Math.sin(a) * rr; i ? x.lineTo(px, py) : x.moveTo(px, py); }
+      x.closePath(); x.stroke();
+      x.beginPath();
+      for (let i = 0; i < 8; i++) { const a = (i * Math.PI) / 4; const px = ox + Math.cos(a) * r * 0.4, py = oy + Math.sin(a) * r * 0.4; i ? x.lineTo(px, py) : x.moveTo(px, py); }
+      x.closePath(); x.stroke();
+    };
+    for (let gy = 0; gy <= cells; gy++) for (let gx = 0; gx <= cells; gx++) star(gx * un, gy * un, un * 0.5, RS * 0.012);
+    for (let gy = 0; gy < cells; gy++) for (let gx = 0; gx < cells; gx++) star(gx * un + un / 2, gy * un + un / 2, un * 0.24, RS * 0.009);
+    try { x.filter = "none"; } catch { /* ignore */ }
+    heightToNormal(rHb, 3.0, rNb);
+    coverNorTex.needsUpdate = true;
+  });
+  const frontMat = new THREE.MeshStandardMaterial({
+    color: 0xffffff, map: arabB.color, metalnessMap: arabB.metal, metalness: 1.0,
+    roughnessMap: arabB.rough, roughness: 0.56, normalMap: coverNorTex, normalScale: new THREE.Vector2(1.0, 1.0),
+    bumpMap: grain, bumpScale: 0.014, envMap: env, envMapIntensity: 0.4, emissive: coverCol, emissiveIntensity: 0.08,
+    side: THREE.DoubleSide, transparent: true, depthWrite: true,
+  });
 
   // Page block (cream, with gilded gold edges) + back cover + spine.
   const pages = new THREE.Mesh(new THREE.BoxGeometry(bw * 2 * 0.92, bh * 2 * 0.95, bd * 2 * 0.9), pageMat);
@@ -2393,9 +2468,12 @@ function buildEnvelopeBook({ pal, preset } = {}) {
   const pressGlow = new THREE.Mesh(new THREE.PlaneGeometry(1.4, bh * 1.6), pressMat);
   pressGlow.position.set(0, 0, bd + 0.4); pressGlow.renderOrder = 6; pressGlow.visible = false; group.add(pressGlow);
 
-  group.add(new THREE.AmbientLight(0xfff3ea, 0.6));
-  const key = new THREE.DirectionalLight(0xfff4e2, 1.12); key.position.set(6, 5, 7); group.add(key);
-  const fill = new THREE.DirectionalLight(0xeaf0ff, 0.34); fill.position.set(-5, -1.5, 4); group.add(fill);
+  // Form-defining light (low ambient + raking key + cool rim + warm fill) so the leather
+  // cover, embossed gold + gilded edges read as real 3D, not a flat graphic.
+  group.add(new THREE.AmbientLight(0xfff3ea, 0.3));
+  const key = new THREE.DirectionalLight(0xfff4e2, 1.55); key.position.set(6.5, 6, 6); group.add(key);
+  const rim = new THREE.DirectionalLight(0xbcd2ff, 0.7); rim.position.set(-5.5, 2.5, -4); group.add(rim);
+  const fill = new THREE.DirectionalLight(0xffe6cf, 0.3); fill.position.set(-4, -2.5, 5); group.add(fill);
   const innerGlow = new THREE.PointLight(glowCol, 0.0, 9 * S, 1); innerGlow.position.set(0, 0.1, 0.0); group.add(innerGlow);
 
   const smooth = (x) => { const c = clamp01(x); return c < 0.5 ? 2 * c * c : 1 - Math.pow(-2 * c + 2, 2) / 2; };
