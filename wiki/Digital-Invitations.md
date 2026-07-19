@@ -111,6 +111,57 @@ the wash quad must render BENEATH the additive glow (renderOrder 1 < innerLight 
 flattens the climax to a matte wall; and the additive boost must stay modest
 (`innerMat` peak ≈0.53, wash 0.88, washCol only 0.15-lerped to white) or ACES blows the climax
 out to the white page the owner rejected. Classic regression + double-replay verified clean.
+
+## Envelope boot performance + invite cold-start diet (2026-07-19)
+Owner reported "lag" — grilling + Playwright profiling showed the animation RUNTIME was
+already 60fps; the real problems were the **boot** (one monolithic 7.9s main-thread bake
+task at 6× CPU throttle, ≈1.3s unthrottled — `createCelestialWorld → buildEnvelopeBloom`
+baking every texture synchronously) and **shader-compile hitches** (33–50ms frames) at the
+tap and the fade. Design was adversarially verified against the three r0.169 source before
+implementation. Quality bar: subtle simplification allowed; choreography untouched.
+
+**Hitch kills (proven mechanisms):**
+- `sealPulse` light stays VISIBLE at intensity 0 — its `visible` flip at the tap changed
+  the scene's point-light count, invalidating every lit material's program (mass recompile
+  at first interaction).
+- `flapMat`/`edgeMat` are `transparent:true` FROM CONSTRUCTION (opacity 1 renders
+  byte-identical); the fade now flips only `depthWrite` (pure GL state) — the old
+  `.transparent` + `needsUpdate` flip forced a mid-animation recompile (`#define OPAQUE`
+  is baked into the program key).
+- Sealed-idle `renderer.compileAsync(scene, camera)` warm-up (engine `scheduleWarmup`) —
+  `compile()` visits invisible meshes, so the reveal-only actors' shaders build during the
+  idle. Classic gets it too (its light counts are stable).
+
+**Boot bake diet + frame-chunking (`BAKE_QUEUE` contract):**
+- `heightToNormal` rewritten on typed arrays + precomputed wrap tables (same math, ±1 LSB).
+- `makeFloral` gained `size`/`defer` params — bloom bakes at 256² with `heightBoost` 1.5
+  (halved WITH the resolution or the emboss reads ~2× bolder; browser-verified); classic
+  keeps 512² default. `makeLinenGrainB` 256→128. `makeSealTex` split into create +
+  `paintSeal`; `sprite()` split into create + `paintSprite`.
+- Bloom queues its heavy paints (floral, seal, glow sprite) as `env.BAKE_QUEUE` closures;
+  the ENGINE drains one per rAF behind the opaque boot cover, skipping rendering until
+  drained (no placeholder ever visible), then pre-uploads `env.WARM_TEXTURES` and warms
+  shaders. A tap that beats the drain triggers a synchronous drain in `openEnvelope`.
+- **Measured**: worst task 7,944→637ms @6× (≈106ms unthrottled); canvas-appear 9.4s→0.98s
+  @6×; tap/fade/wash frame gaps 33–50→18ms. Visuals match baseline after the heightBoost
+  compensation, classic behavior unchanged, 756+631 unit tests green, zero prod-build
+  console issues.
+
+**Invite cold start (follow-up to [[Web Quality Report 2026-07-16]]):**
+- Entry chunk 564KB/164KB gz → **394KB/132KB gz**: Portal shell, PeopleGallery, PayPage,
+  InviteForm, DigitalInviteForm, DigitalDesignPreviewPage, ConfirmationForm, DevEnv2 all
+  `lazy()` with a shared splash-matched Suspense wrapper (`lz()` in App.jsx). Kept eager:
+  DigitalInvitationPage + classic view (never-suspends contract), Landing, NotFound (BP-01).
+- Warm import of the three chunk (129KB gz) at entry eval on invite-shaped URLs
+  (`/d/`, `/preview/digital/`, `/invite/digital/` — the last client-redirects into `/d/`),
+  gated on saveData/reduced-motion; Vite dedupes with CelestialAmbience's `lazy()`.
+- `index.html` preconnect to fonts.googleapis/gstatic (helps picker-only font designs).
+- Deliberately NOT done: `minInstances` (owner chose free keepwarm, 2026-07-16);
+  modulepreload injection into the function-served HTML (no manifest + freshness coupling —
+  revisit if post-deploy RUM `readyMs` stays poor). RUM instrument: `inviteMetrics.js`
+  sealedMs/readyMs medians pre/post deploy.
+
+## Celestial 3D envelope — luxury PBR build, white/gold recolour (2026-06-29)
 The invitation's opening ceremony is a procedural **three.js** envelope inside a drifting particle world (`components/digital/celestial/`: `celestialEngine.js`, `CelestialCanvas.jsx`, `envelopeMesh.js`, `particles.glsl.js`; orchestrated by `sections/CelestialAmbience.jsx`, with the legible sealed text as a DOM overlay in `CelestialEnvelopeOverlay.jsx`). The lazy three.js chunk loads only when the world runs.
 
 **The envelope is the full PBR "luxury" build**, restored from the merged `feat/arch-tech-debt-seams` work (commit `2f56adf`/`3a9345a`) after an interim commit (`eb3ca55`) had stripped it to a flat `MeshBasicMaterial` envelope:

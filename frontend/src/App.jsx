@@ -12,22 +12,24 @@ import { GlobalStyle } from "./styles/GlobalStyle.jsx";
 import { LandingPage } from "./pages/LandingPage.jsx";
 import { TermsPage } from "./pages/TermsPage.jsx";
 import { HelpPage } from "./pages/HelpPage.jsx";
-import { ConfirmationForm } from "./pages/ConfirmationForm.jsx";
-import { InviteForm } from "./pages/InviteForm.jsx";
-import { DigitalInviteForm } from "./pages/DigitalInviteForm.jsx";
 import { DigitalInvitationPage } from "./pages/DigitalInvitationPage.jsx";
-import { DigitalDesignPreviewPage } from "./pages/DigitalDesignPreviewPage.jsx";
-import { PeopleGallery } from "./pages/PeopleGallery.jsx";
-import { PayPage } from "./pages/PayPage.jsx";
 import { NotFoundPage } from "./pages/NotFoundPage.jsx";
-import { Portal } from "./pages/portal/Portal.jsx";
-import { DevEnv2 } from "./pages/_DevEnv2.jsx"; // TEMP dev harness — remove
 
-// Public template gallery — lazy so its cards + thumbnails stay out of the
-// landing/main chunk (only prospects who ask for it pay the download).
-const TemplateGalleryPage = lazy(() =>
-  import("./pages/TemplateGalleryPage.jsx").then((m) => ({ default: m.TemplateGalleryPage })),
-);
+// Entry-chunk diet: every route below is lazy so the two cold-start-critical
+// public paths — the landing page and the guest invite (/d/**, whose page and
+// classic template must render synchronously with the embedded __DAWA_INVITE__
+// record) — don't pay for the portal, forms, gallery, or pay flows. NotFoundPage
+// stays eager (BP-01: the error path must not depend on a chunk fetch).
+const lazyPage = (loader, name) => lazy(() => loader().then((m) => ({ default: m[name] })));
+const TemplateGalleryPage = lazyPage(() => import("./pages/TemplateGalleryPage.jsx"), "TemplateGalleryPage");
+const ConfirmationForm = lazyPage(() => import("./pages/ConfirmationForm.jsx"), "ConfirmationForm");
+const InviteForm = lazyPage(() => import("./pages/InviteForm.jsx"), "InviteForm");
+const DigitalInviteForm = lazyPage(() => import("./pages/DigitalInviteForm.jsx"), "DigitalInviteForm");
+const DigitalDesignPreviewPage = lazyPage(() => import("./pages/DigitalDesignPreviewPage.jsx"), "DigitalDesignPreviewPage");
+const PeopleGallery = lazyPage(() => import("./pages/PeopleGallery.jsx"), "PeopleGallery");
+const PayPage = lazyPage(() => import("./pages/PayPage.jsx"), "PayPage");
+const Portal = lazyPage(() => import("./pages/portal/Portal.jsx"), "Portal");
+const DevEnv2 = lazyPage(() => import("./pages/_DevEnv2.jsx"), "DevEnv2"); // TEMP dev harness — remove
 
 // Route → document-title/canonical table (SEO-01, SEO-03). Central by design:
 // the title belongs to the route table, and one ordered list next to <Routes> is
@@ -104,6 +106,12 @@ export default function App() {
   const langProps = { t, lang, setLang };
   const onBack = () => navigate("/");
 
+  // Every lazy route MUST render inside a Suspense boundary or React crashes the
+  // route; one shared splash-matched fallback keeps chunk-hops flash-free.
+  const lz = (el) => (
+    <Suspense fallback={<div style={{ minHeight: "100vh", background: "#07070a" }} />}>{el}</Suspense>
+  );
+
   return (
     <>
       <GlobalStyle />
@@ -112,25 +120,21 @@ export default function App() {
       <main id="main-content" tabIndex={-1}>
         <Routes>
           <Route path="/" element={<LandingPage onEnterPortal={() => navigate("/portal")} {...langProps} />} />
-          <Route path="/templates" element={
-            <Suspense fallback={<div style={{ minHeight: "100vh", background: "#07070a" }} />}>
-              <TemplateGalleryPage {...langProps} />
-            </Suspense>
-          } />
+          <Route path="/templates" element={lz(<TemplateGalleryPage {...langProps} />)} />
           <Route path="/terms" element={<TermsPage {...langProps} />} />
           <Route path="/help" element={<HelpPage {...langProps} />} />
-          <Route path="/confirm/:groomUsername" element={<ConfirmationForm {...langProps} />} />
-          <Route path="/invite/digital/:token" element={<DigitalInviteForm {...langProps} />} />
-          <Route path="/invite/:token" element={<InviteForm {...langProps} />} />
-          <Route path="/pay/:token" element={<PayPage {...langProps} />} />
+          <Route path="/confirm/:groomUsername" element={lz(<ConfirmationForm {...langProps} />)} />
+          <Route path="/invite/digital/:token" element={lz(<DigitalInviteForm {...langProps} />)} />
+          <Route path="/invite/:token" element={lz(<InviteForm {...langProps} />)} />
+          <Route path="/pay/:token" element={lz(<PayPage {...langProps} />)} />
           <Route path="/d/:groomUsername/:token/*" element={<DigitalInvitationPage {...langProps} />} />
           {/* Groom-facing draft preview for the native app's WebView (auth via injected tokens). */}
-          <Route path="/preview/digital/:designId" element={<DigitalDesignPreviewPage {...langProps} />} />
-          <Route path="/envelopes-preview" element={<DevEnv2 />} />{/* TEMP owner preview — remove */}
-          <Route path="/g/:groomUsername/*" element={<PeopleGallery {...langProps} />} />
-          <Route path="/portal/*" element={<Portal onBack={onBack} {...langProps} />} />
-          {/* Eager, unlike /templates above: this is the error path, so making it
-              depend on a chunk fetch would break it exactly when the network or a
+          <Route path="/preview/digital/:designId" element={lz(<DigitalDesignPreviewPage {...langProps} />)} />
+          <Route path="/envelopes-preview" element={lz(<DevEnv2 />)} />{/* TEMP owner preview — remove */}
+          <Route path="/g/:groomUsername/*" element={lz(<PeopleGallery {...langProps} />)} />
+          <Route path="/portal/*" element={lz(<Portal onBack={onBack} {...langProps} />)} />
+          {/* Eager, unlike the lazy routes above: this is the error path, so making
+              it depend on a chunk fetch would break it exactly when the network or a
               stale deploy is already the problem (BP-01). It costs ~1 KB and its
               only import, BrandLogo, is in the main chunk already. */}
           <Route path="*" element={<NotFoundPage {...langProps} />} />

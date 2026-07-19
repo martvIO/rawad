@@ -16,6 +16,20 @@ import { applyDemoOverrides } from "../utils/demoOverrides.js";
 import { createInviteMetrics } from "../utils/inviteMetrics.js";
 import { DEFAULT_TEMPLATE_ID } from "@dawa/core/data/digitalTemplates.js";
 
+// Warm the 3D-envelope chunks (three.module ~129KB gz + CelestialCanvas) the
+// moment the entry evaluates on an invite-shaped URL, instead of waiting for
+// CelestialAmbience to render through Suspense — the download then overlaps the
+// token/JSON read, fonts, and React's first render. Vite dedupes this with the
+// later lazy() (same specifier → same chunk). /invite/digital/* is included
+// because it client-redirects into /d/*; saveData/reduced-motion guests never
+// mount the 3D world, so don't spend their bytes.
+if (typeof window !== "undefined"
+    && /^\/(d|preview\/digital|invite\/digital)\//.test(window.location.pathname)
+    && !(navigator.connection && navigator.connection.saveData)
+    && !(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches)) {
+  import("../components/digital/celestial/CelestialCanvas.jsx").catch(() => {});
+}
+
 const DEMO_MEDIA = [
   { url: "https://images.unsplash.com/photo-1519741497674-611481863552?w=1200&q=80", kind: "image", storagePath: "demo/1" },
   { url: "https://images.unsplash.com/photo-1465495976277-4387d4b0e4a6?w=1200&q=80", kind: "image", storagePath: "demo/2" },

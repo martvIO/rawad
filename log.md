@@ -367,3 +367,6 @@ Touched: Digital-Invitations
 
 ## [2026-07-19 08:02] session | Bloom open reworked — glow press, unified slide, light hand-off
 Touched: Digital-Invitations
+
+## [2026-07-19 09:43] session | Envelope boot perf: 7.9s bake stall → chunked + hitch-free
+Touched: Digital-Invitations

@@ -693,8 +693,16 @@ function makeWaxHalf(side, material, o = {}) {
 }
 
 function makeSealTex(pal, opts = {}) {
-  const s = SEAL_TEX_S, c = document.createElement("canvas");
-  c.width = c.height = s; const x = c.getContext("2d");
+  const c = document.createElement("canvas");
+  c.width = c.height = SEAL_TEX_S;
+  paintSeal(c, pal, opts);
+  const t = new THREE.CanvasTexture(c); setSRGB(t); return t;
+}
+// The full 512² wax paint (dozens of gradient/Path2D fills incl. blurred brand
+// stamps) is the 2nd-heaviest boot bake — split from makeSealTex so the bloom
+// path can queue it as a deferred boot step; classic keeps the one-shot call.
+function paintSeal(c, pal, opts = {}) {
+  const s = SEAL_TEX_S; const x = c.getContext("2d");
   const cx = s / 2, cy = s / 2;
   const blob   = !!opts.blob;
   const dome   = opts.dome   != null ? !!opts.dome   : blob;
@@ -824,8 +832,6 @@ function makeSealTex(pal, opts = {}) {
     x.strokeStyle = "rgba(255,246,225,0.35)"; x.lineWidth = 2; x.stroke();
     x.restore();
   }
-
-  const t = new THREE.CanvasTexture(c); setSRGB(t); return t;
 }
 
 // ── invitation card faces: color + metalness + roughness canvases ──
@@ -1011,8 +1017,15 @@ function applyBurst(s, b) {
 
 // soft sprite textures shared by the burst actors
 function sprite(kind) {
-  const s = kind === "dot" ? 64 : 256, c = document.createElement("canvas");
-  c.width = c.height = s; const x = c.getContext("2d");
+  const c = document.createElement("canvas");
+  c.width = c.height = kind === "dot" ? 64 : 256;
+  paintSprite(c, kind);
+  return new THREE.CanvasTexture(c);
+}
+// Paint half of sprite(), split out so the bloom boot can queue a sprite's paint
+// as a deferred bake while assigning its (blank) texture synchronously.
+function paintSprite(c, kind) {
+  const s = c.width; const x = c.getContext("2d");
   if (kind === "dot") {
     const gr = x.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
     gr.addColorStop(0, "rgba(255,255,255,1)"); gr.addColorStop(0.35, "rgba(255,236,180,0.9)"); gr.addColorStop(1, "rgba(255,200,90,0)");
@@ -1027,7 +1040,6 @@ function sprite(kind) {
     gr.addColorStop(0, "rgba(255,248,220,0.95)"); gr.addColorStop(0.25, "rgba(255,224,150,0.6)"); gr.addColorStop(0.6, "rgba(240,200,90,0.18)"); gr.addColorStop(1, "rgba(240,200,90,0)");
     x.fillStyle = gr; x.fillRect(0, 0, s, s);
   }
-  return new THREE.CanvasTexture(c);
 }
 
 // A warm glow STRIP texture: brightest at the seam's CENTRE (seal) end, fading
@@ -1163,23 +1175,32 @@ function drawGarden(ctx, color, alpha, lw, s) {
   ctx.restore();
 }
 
-function heightToNormal(heightCanvas, strength = 2) {
+function heightToNormal(heightCanvas, strength = 2, targetCanvas = null) {
   const s = heightCanvas.width;
   const hd = heightCanvas.getContext("2d").getImageData(0, 0, s, s).data;
-  const nc = document.createElement("canvas"); nc.width = nc.height = s;
+  const nc = targetCanvas || document.createElement("canvas"); nc.width = nc.height = s;
   const nx = nc.getContext("2d"); const nimg = nx.createImageData(s, s); const nd = nimg.data;
-  const at = (x, y) => hd[(((y % s + s) % s) * s + ((x % s + s) % s)) * 4]; // red channel, wrapped
+  // This is the single hottest bake loop of the envelope boot (s×s iterations on
+  // the main thread), so it runs on precomputed wrapped-neighbour offset tables
+  // and raw indices instead of a per-pixel closure with double-modulo wrapping.
+  // Same math as the naive form (red channel, wrapped Sobel-ish gradient),
+  // output identical within ±1 LSB (sqrt vs hypot rounding).
+  const xm = new Int32Array(s), xp = new Int32Array(s);
+  for (let i = 0; i < s; i++) { xm[i] = ((i - 1 + s) % s) * 4; xp[i] = ((i + 1) % s) * 4; }
+  const k = strength / 255;
   for (let y = 0; y < s; y++) {
+    const row = y * s * 4;
+    const rowUp = (((y - 1 + s) % s)) * s * 4;
+    const rowDn = (((y + 1) % s)) * s * 4;
     for (let x = 0; x < s; x++) {
-      const dx = (at(x + 1, y) - at(x - 1, y)) / 255 * strength;
-      const dy = (at(x, y + 1) - at(x, y - 1)) / 255 * strength;
-      let nX = -dx, nY = -dy; const nZ = 1;
-      const inv = 1 / Math.hypot(nX, nY, nZ);
-      nX *= inv; nY *= inv;
-      const i = (y * s + x) * 4;
-      nd[i] = (nX * 0.5 + 0.5) * 255;
-      nd[i + 1] = (nY * 0.5 + 0.5) * 255;
-      nd[i + 2] = (nZ * inv * 0.5 + 0.5) * 255;
+      const x4 = x * 4;
+      const dx = (hd[row + xp[x]] - hd[row + xm[x]]) * k;
+      const dy = (hd[rowDn + x4] - hd[rowUp + x4]) * k;
+      const inv = 1 / Math.sqrt(dx * dx + dy * dy + 1);
+      const i = row + x4;
+      nd[i] = (-dx * inv * 0.5 + 0.5) * 255;
+      nd[i + 1] = (-dy * inv * 0.5 + 0.5) * 255;
+      nd[i + 2] = (inv * 0.5 + 0.5) * 255;
       nd[i + 3] = 255;
     }
   }
@@ -1187,28 +1208,42 @@ function heightToNormal(heightCanvas, strength = 2) {
   return nc;
 }
 
-function makeFloral({ paper, tint, tintAlpha = 0.3, repeat = [1, 1], heightBoost = 2 }) {
-  const s = 512;
+function makeFloral({ paper, tint, tintAlpha = 0.3, repeat = [1, 1], heightBoost = 2, size = 512, defer = null }) {
+  const s = size;
   const mk = () => { const c = document.createElement("canvas"); c.width = c.height = s; return c; };
-  // Colour map: paper base + faint tinted florals (the relief carries the look).
-  const cc = mk(); const xc = cc.getContext("2d");
-  xc.fillStyle = paper || "#f2dcdd"; xc.fillRect(0, 0, s, s);
-  drawGarden(xc, tint || "#e6c2c3", tintAlpha, 1.6, s);
-  // Height map: mid-grey ground, white raised florals, softly blurred so the
-  // emboss has rounded shoulders rather than hard walls.
-  const hc = mk(); const xh = hc.getContext("2d");
-  xh.fillStyle = "#7c7c7c"; xh.fillRect(0, 0, s, s);
-  try { xh.filter = "blur(1.35px)"; } catch { /* older canvas: no blur */ }
-  drawGarden(xh, "#ffffff", 1.0, 2.0, s);
-  try { xh.filter = "none"; } catch { /* ignore */ }
-  const nc = heightToNormal(hc, heightBoost);
+  const cc = mk(), hc = mk(), ncv = mk();
+  const paint = () => {
+    // Colour map: paper base + faint tinted florals (the relief carries the look).
+    const xc = cc.getContext("2d");
+    xc.fillStyle = paper || "#f2dcdd"; xc.fillRect(0, 0, s, s);
+    drawGarden(xc, tint || "#e6c2c3", tintAlpha, 1.6, s);
+    // Height map: mid-grey ground, white raised florals, softly blurred so the
+    // emboss has rounded shoulders rather than hard walls.
+    const xh = hc.getContext("2d");
+    xh.fillStyle = "#7c7c7c"; xh.fillRect(0, 0, s, s);
+    try { xh.filter = "blur(1.35px)"; } catch { /* older canvas: no blur */ }
+    drawGarden(xh, "#ffffff", 1.0, 2.0, s);
+    try { xh.filter = "none"; } catch { /* ignore */ }
+    heightToNormal(hc, heightBoost, ncv);
+  };
   const tex = (canvas, srgb) => {
     const t = new THREE.CanvasTexture(canvas);
     if (srgb) setSRGB(t);
     t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(repeat[0], repeat[1]);
     return t;
   };
-  return { colorTex: tex(cc, true), normalTex: tex(nc, false) };
+  const colorTex = tex(cc, true), normalTex = tex(ncv, false);
+  if (defer) {
+    // Deferred boot bake: fill plain placeholders now (paper tone + neutral
+    // normal) so nothing can flash black, and queue the real garden paint —
+    // the engine drains the queue across frames behind the boot cover.
+    const xc = cc.getContext("2d"); xc.fillStyle = paper || "#f2dcdd"; xc.fillRect(0, 0, s, s);
+    const xn = ncv.getContext("2d"); xn.fillStyle = "#8080ff"; xn.fillRect(0, 0, s, s);
+    defer.push(() => { paint(); colorTex.needsUpdate = true; normalTex.needsUpdate = true; });
+  } else {
+    paint();
+  }
+  return { colorTex, normalTex };
 }
 
 // ── BLOOM SHAPE ──────────────────────────────────────────────────────────────
@@ -1229,7 +1264,9 @@ function makeStudioEnvB(disposables) {
   disposables.push(t); return t;
 }
 function makeLinenGrainB(disposables) {
-  const sz = 256, c = document.createElement("canvas"); c.width = c.height = sz;
+  // 128² is plenty for tiling bump/roughness grain at repeat 2.5 — quarter the
+  // boot-bake iterations of the old 256² with no visible difference.
+  const sz = 128, c = document.createElement("canvas"); c.width = c.height = sz;
   const x = c.getContext("2d"); const img = x.createImageData(sz, sz), d = img.data;
   for (let yy = 0; yy < sz; yy++) for (let xx = 0; xx < sz; xx++) {
     const i = (yy * sz + xx) * 4;
@@ -1263,12 +1300,21 @@ function buildEnvelopeBloom({ pal, preset, content } = {}) {
   const S = 3.0; group.scale.setScalar(S);
   let disposed = false;
   const disposables = [];
+  // Heavy paints are QUEUED here instead of running inline: the engine drains one
+  // per rAF behind the opaque boot cover (and drains synchronously on a tap that
+  // beats the drain), so the boot never blocks the main thread in one long task.
+  const pendingBakes = [];
   const env = makeStudioEnvB(disposables);
   const grain = makeLinenGrainB(disposables);
 
   const HW = 0.94, HH = 1.94; // tall portrait — fills the phone screen edge-to-edge
 
-  const fl = makeFloral({ paper: pal.paper, tint: preset && preset.floralTint, tintAlpha: 0.34, repeat: [1.0, 1.4], heightBoost: 3.0 });
+  // 256² (was 512²): the emboss is blur-softened low-frequency relief, so at this
+  // repeat and phone DPRs the loss is sub-pixel — and the dominant boot bake
+  // (garden paint + normal-map loop) gets 4× cheaper. Classic keeps 512 (default).
+  // heightBoost halves with the resolution: at 256² each texel spans 2× the UV
+  // distance, so the same boost would read ~2× bolder than the shipped look.
+  const fl = makeFloral({ paper: pal.paper, tint: preset && preset.floralTint, tintAlpha: 0.34, repeat: [1.0, 1.4], heightBoost: 1.5, size: 256, defer: pendingBakes });
   disposables.push(fl.colorTex, fl.normalTex);
   // Pronounced matte pressed-cardstock: ornate rose emboss (normalMap) over a strong
   // paper tooth (bumpMap:grain), no gloss, a whisper of envMap, blush emissive lift for ACES.
@@ -1281,7 +1327,10 @@ function buildEnvelopeBloom({ pal, preset, content } = {}) {
     metalness: 0.0,
     emissive: col(pal.paper, "#f7e7e8"), emissiveIntensity: 0.16,       // ACES blush lift
     envMap: env, envMapIntensity: 0.05,                                 // a whisper of life
-    side: THREE.DoubleSide, transparent: false, depthWrite: true,
+    // transparent FROM CONSTRUCTION (opacity stays 1 until the late fade, which
+    // renders byte-identical to an opaque pass): flipping .transparent mid-open
+    // would bake a different shader (#define OPAQUE) and recompile at the fade.
+    side: THREE.DoubleSide, transparent: true, depthWrite: true,
   });
   flapMat.map.anisotropy = 8;                                          // crisp florals at grazing angles
   // Pale matte edge for the extruded cardstock walls (group 1) — a lifted-emissive
@@ -1292,7 +1341,7 @@ function buildEnvelopeBloom({ pal, preset, content } = {}) {
     bumpMap: grain, bumpScale: 0.010,
     roughnessMap: grain, roughness: 0.92, metalness: 0.0,
     emissive: col(pal.paper, "#f7e7e8"), emissiveIntensity: 0.42,
-    side: THREE.DoubleSide, transparent: false, depthWrite: true,
+    side: THREE.DoubleSide, transparent: true, depthWrite: true, // see flapMat note
   });
 
   // Inner back — revealed as the flaps open, then fades with the structure at the
@@ -1306,7 +1355,12 @@ function buildEnvelopeBloom({ pal, preset, content } = {}) {
   // sitting just behind the flaps. The closed opaque flaps occlude it; as each flap
   // opens it's revealed in that flap's area, so the interior reads as a growing FULL
   // light (not four X streaks) — and fills the screen once all four are open.
-  const innerTex = sprite("glow"); disposables.push(innerTex);
+  // Reveal-only glow (first drawn ~1.4s into the open): the texture is assigned
+  // synchronously (keeps the material's `map` define stable) but its gradient is
+  // painted as a deferred boot bake.
+  const innerCanvas = document.createElement("canvas"); innerCanvas.width = innerCanvas.height = 256;
+  const innerTex = new THREE.CanvasTexture(innerCanvas); disposables.push(innerTex);
+  pendingBakes.push(() => { paintSprite(innerCanvas, "glow"); innerTex.needsUpdate = true; });
   const innerMat = new THREE.MeshBasicMaterial({ map: innerTex, color: glowCol, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending });
   const innerLight = new THREE.Mesh(new THREE.PlaneGeometry(HW * 4.4, HH * 4.4), innerMat);
   innerLight.position.set(0, 0, 0.0); innerLight.renderOrder = 2; group.add(innerLight);
@@ -1388,8 +1442,13 @@ function buildEnvelopeBloom({ pal, preset, content } = {}) {
   // A REAL pressed-wax seal that CRACKS IN TWO: two scalloped half-meshes sharing a
   // jagged crack seam, the logo debossed on top. They part + fade on tap.
   const crackPts = sealCrackPoints();
-  const sealTex = makeSealTex(pal, { blob: true, dome: true, deboss: true });
+  // Seal is sealed-state hero art, but its 512² vector paint is the 2nd-heaviest
+  // boot bake — deferred; the engine holds the first envelope render (behind the
+  // opaque boot cover) until the queue is drained, so no placeholder is ever seen.
+  const sealCanvas = document.createElement("canvas"); sealCanvas.width = sealCanvas.height = SEAL_TEX_S;
+  const sealTex = new THREE.CanvasTexture(sealCanvas); setSRGB(sealTex);
   disposables.push(sealTex);
+  pendingBakes.push(() => { paintSeal(sealCanvas, pal, { blob: true, dome: true, deboss: true }); sealTex.needsUpdate = true; });
   const sealMat = new THREE.MeshPhysicalMaterial({
     color: 0xffffff, map: sealTex, metalness: 0.0, roughness: 0.20,
     clearcoat: 1.0, clearcoatRoughness: 0.10, envMap: env, envMapIntensity: 1.3,
@@ -1455,8 +1514,11 @@ function buildEnvelopeBloom({ pal, preset, content } = {}) {
     ringMat.opacity = 0.95 * ringF;
     sealRing.scale.setScalar(0.70 + 0.50 * glowRise);  // blooms outward from the press
     sealRing.visible = ringF > 0.003;
+    // sealPulse stays VISIBLE at intensity 0 (like innerGlow/seamLights): hiding a
+    // light changes the scene's point-light COUNT, which invalidates the program
+    // cache of every lit material — i.e. a mass shader recompile at the exact
+    // moment of the first tap. A visible intensity-0 light costs almost nothing.
     sealPulse.intensity = 2.4 * ringF;
-    sealPulse.visible = ringF > 0.003; // invisible lights skip the lighting loop entirely
 
     // Wax seal CRACKS IN TWO once the glow peaks: the halves part + tip forward,
     // then fade — fully gone before the triangles start to slide.
@@ -1490,14 +1552,14 @@ function buildEnvelopeBloom({ pal, preset, content } = {}) {
     // the column"; on a phone they are near their edges by the time it starts.
     const fadeF = smooth(clamp01((sldRaw - 0.77) / 0.23));
     const op = 1 - fadeF;
-    const wantT = fadeF > 0.0001;
-    // The transparent flip keeps the opaque overlap crisp until the fade begins; the
-    // depthWrite flip stops the fading (still-coplanar) triangles from punching
-    // depth holes into the depth-tested interior glow behind them.
-    if (flapMat.transparent !== wantT) {
-      flapMat.transparent = wantT; edgeMat.transparent = wantT;
-      flapMat.depthWrite = !wantT; edgeMat.depthWrite = !wantT; backMat.depthWrite = !wantT;
-      flapMat.needsUpdate = true; edgeMat.needsUpdate = true;
+    // ONLY a depthWrite flip — pure per-draw GL state, no shader permutation, no
+    // needsUpdate (the materials are transparent-from-construction). Writing depth
+    // until the fade keeps the overlap crisp; releasing it during the fade stops
+    // the still-coplanar triangles punching depth holes into the depth-tested
+    // interior glow behind them.
+    const wantW = fadeF <= 0.0001;
+    if (flapMat.depthWrite !== wantW) {
+      flapMat.depthWrite = wantW; edgeMat.depthWrite = wantW; backMat.depthWrite = wantW;
     }
     flapMat.opacity = op; edgeMat.opacity = op; backMat.opacity = op;
     sealMat.opacity = 1 - sealFade;                    // the seal is long gone before the fade
@@ -1576,6 +1638,10 @@ function buildEnvelopeBloom({ pal, preset, content } = {}) {
     // clock, (1 − HANDOFF) × DURATION = 0.65s, is sized to CelestialAmbience's 650ms
     // done→gone timer — retune them together.
     DIRECT_HANDOFF: true, HANDOFF_AT: HANDOFF, WASH_TAIL: true,
+    // Boot contract: the engine drains BAKE_QUEUE one closure per rAF before the
+    // first envelope render (or synchronously if a tap beats the drain), then
+    // pre-uploads WARM_TEXTURES so nothing uploads mid-choreography.
+    BAKE_QUEUE: pendingBakes, WARM_TEXTURES: [innerTex, ringTex],
     setOpen(t, fov, aspect) { applyVisual(t); return framing(t, fov, aspect); },
     framePose(fov, aspect) { return framing(0, fov, aspect); },
     refreshCard() { /* the bloom shape has no baked card */ },

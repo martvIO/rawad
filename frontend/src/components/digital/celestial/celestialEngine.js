@@ -298,6 +298,16 @@ export function createCelestialWorld(canvas, opts = {}) {
     const dt = Math.min(0.05, raw);
     lastNow = now;
 
+    // Deferred boot bakes: drain ONE per frame and skip rendering until done, so
+    // the envelope build never blocks the main thread in one long task and no
+    // placeholder texture is ever painted (the opaque boot cover / container bg
+    // shows meanwhile). A tap that beats the drain is handled in openEnvelope.
+    if (env && env.BAKE_QUEUE && env.BAKE_QUEUE.length) {
+      env.BAKE_QUEUE.shift()();
+      if (env.BAKE_QUEUE.length === 0) finishBakes();
+      return;
+    }
+
     const t = now * 0.001;
     material.uniforms.uTime.value = t;
 
@@ -391,6 +401,35 @@ export function createCelestialWorld(canvas, opts = {}) {
     raf = 0;
   }
 
+  // After the boot bakes drain: pre-upload the reveal-only textures (so nothing
+  // does a first texImage2D mid-choreography), then warm the shaders.
+  function finishBakes() {
+    if (!env) return;
+    if (env.WARM_TEXTURES) {
+      for (const tx of env.WARM_TEXTURES) { try { renderer.initTexture(tx); } catch { /* ignore */ } }
+    }
+    scheduleWarmup();
+  }
+
+  // Sealed-idle shader warm-up: renderer.compile() visits even invisible meshes,
+  // so the reveal-only actors (wash quad, seal ring, interior glow — hidden at
+  // t=0) get their programs built during the sealed idle instead of stalling the
+  // first tap / the wash. The scene's light COUNT is constant for the envelope's
+  // whole life (no visibility-toggled lights), so the compiled programs stay
+  // valid through the reveal. compileAsync is non-blocking where the browser
+  // supports parallel shader compile.
+  function scheduleWarmup() {
+    const ric = typeof window !== "undefined" && typeof window.requestIdleCallback === "function"
+      ? (fn) => window.requestIdleCallback(fn, { timeout: 1500 })
+      : (fn) => setTimeout(fn, 300);
+    ric(() => {
+      if (disposed || contextLost || !env || mode !== "envelope") return;
+      if (env.BAKE_QUEUE && env.BAKE_QUEUE.length) return; // drain path reschedules via finishBakes
+      if (typeof renderer.compileAsync === "function") renderer.compileAsync(scene, camera).catch(() => {});
+      else { try { renderer.compile(scene, camera); } catch { /* ignore */ } }
+    });
+  }
+
   function finishGlide() {
     mode = "scroll";
     camera.fov = SCENE_FOV;
@@ -432,6 +471,9 @@ export function createCelestialWorld(canvas, opts = {}) {
     const pose = env.framePose(ENV_FOV, camera.aspect || 1);
     cam = { x: 0, y: pose.y, z: pose.z };
     lastLookY = pose.lookAtY;
+    // Envelopes without a bake queue (classic) warm their shaders immediately;
+    // queued envelopes (bloom) warm up via finishBakes() once the drain completes.
+    if (!env.BAKE_QUEUE || env.BAKE_QUEUE.length === 0) scheduleWarmup();
     // Re-bake the card calligraphy once the wedding fonts finish loading (canvas
     // text silently falls back to a default face until then).
     if (env.refreshCard && typeof document !== "undefined" && document.fonts && document.fonts.ready) {
@@ -451,6 +493,10 @@ export function createCelestialWorld(canvas, opts = {}) {
 
   function openEnvelope(cbs) {
     if (mode !== "envelope") return;
+    // A tap (or auto-open) can beat the per-frame bake drain: finish any remaining
+    // boot bakes NOW so the reveal never plays over placeholder art. Worst case
+    // equals the old one-shot synchronous cost, and only on a sub-100ms tap.
+    if (env && env.BAKE_QUEUE) { while (env.BAKE_QUEUE.length) env.BAKE_QUEUE.shift()(); }
     onRevealCb = cbs && cbs.onReveal;
     onCompleteCb = cbs && cbs.onComplete;
     openT = 0;
